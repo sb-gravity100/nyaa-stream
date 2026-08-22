@@ -1,0 +1,15 @@
+[package]
+name = "torrent-engine"
+version = "0.1.0"
+edition.workspace = true
+
+[dependencies]
+librqbit = "9.0.1"
+tokio = { workspace = true }
+axum = "0.8"
+axum-extra = { version = "0.10", features = ["typed-header"] }
+axum-range = "1.0.0"
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+serde = { workspace = true }
