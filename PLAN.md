@@ -10,7 +10,20 @@ against AniList metadata, and streams them straight to mpv.
 kept for architecture reference only (gitignored, not a dependency). Useful
 modules: `src/types/streaming_server.rs`, `src/models/streaming_server.rs`
 (local streaming server model), `src/types/resource.rs` (catalog/stream
-aggregation patterns).
+aggregation patterns), `src/types/resource/meta_item.rs` (confirms
+`Video.series_info` is always `{season, episode}` — validates defaulting
+unlabeled releases to season 1 rather than leaving season unknown).
+
+`reference/stremio-web/` — shallow clone of https://github.com/Stremio/stremio-web
+(there is no separate `stremio-desktop` repo — the desktop app is this same
+UI wrapped by a native shell). Gitignored, reference-only. Used to verify
+real behavior instead of guessing: `src/routes/MetaDetails/` (detail-page
+layout — fixed low-opacity background image, no blur, docked frosted-glass
+side panel, not a stacked banner), `src/components/MetaPreview/MetaPreview.js`
+(confirms `logo`/`background`/`poster` are three distinct addon-supplied
+fields, and that anime entries usually lack `logo` since Cinemeta/Kitsu
+don't provide one), `src/components/*/Placeholder` (loading state is
+solid-color skeleton blocks, not a spinner).
 
 ## Stack
 
@@ -21,9 +34,20 @@ aggregation patterns).
   by our own `axum` HTTP server that streams a torrent file's bytes with
   Range support (`axum-range`), so mpv can start playback before the full
   file is downloaded
-- **Torrent source:** nyaa.si search via its RSS feed (`/?page=rss&q=...&c=...`)
+- **Torrent source:** nyaa.si search, scraping its paginated HTML results
+  table (its RSS feed was found to silently ignore the `p=` page param and
+  always cap at 75 results — see `crates/nyaa-client`)
 - **Metadata:** AniList GraphQL API (`https://graphql.anilist.co`), no auth
-  required for public queries
+  required for public queries; Kitsu API (`crates/kitsu-client`) as a
+  secondary source for wide backdrop banners and per-episode thumbnails,
+  resolved from an AniList id via Kitsu's crowdsourced mapping table
+- **Thumbnails:** backdrop/episode art falls back Kitsu → AniList
+  `streamingEpisodes` → a torrent-captured frame (`capture_torrent_thumbnail`
+  spawns a headless mpv against the episode's stream, grabs one frame after
+  a few seconds of playback, caches it to disk) when neither has coverage
+- **Persistence:** browser `localStorage` for the saved-anime library
+  (`src/library.ts`) — deliberately not committing to the sqlite-vs-flat-file
+  backend store decision below, which is still open
 
 ## Workspace layout
 
@@ -33,36 +57,63 @@ nyaa_stream/
   src-tauri/                 Tauri app crate (commands, window, app state)
   crates/
     torrent-engine/          librqbit wrapper + local streaming HTTP server
-    nyaa-client/             nyaa.si RSS search client
+    nyaa-client/              nyaa.si search client (paginated HTML scrape)
     anilist-client/          AniList GraphQL client
+    kitsu-client/            Kitsu API client (backdrop + episode thumbnails)
     mpv-ipc/                 spawns mpv, talks JSON IPC (pause/seek/volume)
   src/                       Preact + TypeScript frontend
   reference/stremio-core/    reference-only clone, gitignored
+  reference/stremio-web/     reference-only clone, gitignored
 ```
 
-## Data flow (search → play)
+## Data flow (search → browse → play)
 
-1. User searches a title → frontend calls `search_anime` (AniList) for
-   metadata/posters and `search_torrents` (nyaa.si RSS) for releases,
-   scoped to the anime category.
-2. User picks a release → frontend calls `play_magnet` with the magnet
-   link. Backend adds it to the librqbit session with sequential download
-   enabled, gets a `stream_url` from the local streaming server, and spawns
-   `mpv` pointed at that URL.
-3. Frontend controls playback (pause/seek/volume) via Tauri commands that
-   forward to `mpv-ipc`, which talks to the running mpv instance's IPC
-   socket.
+1. User types in the top search bar → debounced `search_anime` (AniList)
+   fills a live dropdown (max 10 results, real ratings/format/season).
+2. Picking a result opens the media page (`MediaPage.tsx`) and, in
+   parallel: `search_torrents_for_anime` searches nyaa.si using the
+   English title first, falling back to romaji if too few results
+   (candidate titles are punctuation-sanitized — a raw AniList curly
+   apostrophe was found to drop nyaa.si matches from 75 to 1); and
+   `get_anime_details` lazily fetches the fuller AniList record (synopsis,
+   `streamingEpisodes` thumbnails) that the lightweight dropdown search
+   doesn't request.
+3. Each nyaa.si result is parsed by `episodeParser.ts` into season/episode
+   or batch (deterministic regex, not fuzzy matching — verified against a
+   150-title real-world scrape). Batches with an explicit episode range in
+   the title are spread across the specific episodes they cover; ambiguous
+   titles fall back to `get_torrent_details_batch`, which scrapes each
+   torrent's own nyaa.si view page for its real file count (batch or not)
+   and submitter — only for titles the regex couldn't already resolve, to
+   keep request volume down.
+4. The media page's docked panel lists one row per episode (stremio-web's
+   real `VideosList` pattern), not a flat list of raw torrent releases —
+   picking a specific source is deferred to a future video-player dropdown,
+   not built yet.
+5. Saving an anime (`library.ts`, `localStorage`) makes it appear on the
+   home page's "Library" grid and folds its recent episodes (AniList's
+   batched `airingSchedules` query, this calendar week + last week)
+   into the "Latest Episodes" row.
+6. Playback: frontend would call `play_magnet` with a chosen magnet link;
+   backend adds it to the librqbit session, gets a `stream_url` from the
+   local streaming server, and spawns `mpv` pointed at that URL. Playback
+   controls (pause/seek/volume) go through `mpv-ipc`. **Not wired to the
+   UI yet** — see Known gaps.
 
 ## Known gaps / not yet implemented
 
-- Episode-to-release matching (mapping AniList episode numbers to specific
-  nyaa.si torrents/batches) is not built yet — `search_torrents` is a plain
-  keyword search.
-- No persistence yet (watch history, library, continue-watching).
+- No video player UI: `play_magnet`/`set_pause` commands exist and work,
+  but nothing in the frontend calls them yet — picking a specific source
+  from the media page's episode list isn't built (see PHASES.md Phase 3).
 - `play_magnet` currently always streams file index `0` — needs real file
   selection when a torrent contains multiple files (e.g. batch releases).
 - No download progress / buffering state surfaced to the frontend yet.
-- Frontend (`src/App.tsx`) is still the scaffold template, not wired to any
-  of the backend commands yet.
+- No watch history / continue-watching (the library only tracks *which*
+  anime are saved, not watch progress).
+- Batches without an explicit episode range in their title (most of them)
+  can't be attributed to specific episodes and stay in an undifferentiated
+  per-season "Batch" bucket.
+- Torrent-captured thumbnails only ever use file index `0` and a fixed
+  8-second seek point — same file-selection gap as playback itself.
 
 See `PHASES.md` for the build order.
