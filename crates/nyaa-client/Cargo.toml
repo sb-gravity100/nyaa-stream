@@ -5,10 +5,10 @@ edition.workspace = true
 
 [dependencies]
 reqwest = { workspace = true }
-rss = "2.1.0"
 urlencoding = "2"
 tokio = { workspace = true }
 anyhow = { workspace = true }
 thiserror = { workspace = true }
 serde = { workspace = true }
 tracing = { workspace = true }
+scraper = "0.27.0"
