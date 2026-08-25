@@ -1,18 +1,12 @@
-.logo.vite:hover {
-  filter: drop-shadow(0 0 2em #747bff);
-}
-
-.logo.preact:hover {
-  filter: drop-shadow(0 0 2em #673ab8);
-}
 :root {
   font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
   font-size: 16px;
   line-height: 24px;
   font-weight: 400;
 
+  --page-bg: #f6f6f6;
   color: #0f0f0f;
-  background-color: #f6f6f6;
+  background-color: var(--page-bg);
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -23,94 +17,571 @@
 
 .container {
   margin: 0;
-  padding-top: 10vh;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  text-align: center;
-}
-
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: 0.75s;
-}
-
-.logo.tauri:hover {
-  filter: drop-shadow(0 0 2em #24c8db);
-}
-
-.row {
-  display: flex;
-  justify-content: center;
+  padding: 0;
+  text-align: left;
 }
 
 a {
   font-weight: 500;
-  color: #646cff;
+  color: inherit;
   text-decoration: inherit;
 }
 
-a:hover {
-  color: #535bf2;
+/* --- Search bar, pinned to the very top, centered --- */
+
+.search-bar-wrap {
+  position: relative;
+  width: 640px;
+  max-width: calc(100% - 32px);
+  margin: 24px auto;
 }
 
-h1 {
-  text-align: center;
-}
-
-input,
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
+.search-bar {
+  box-sizing: border-box;
+  display: block;
+  margin: 0;
+  width: 100%;
+  height: 44px;
+  padding: 8px 18px;
   font-family: inherit;
-  color: #0f0f0f;
-  background-color: #ffffff;
-  transition: border-color 0.25s;
-  box-shadow: 0 2px 2px rgba(0, 0, 0, 0.2);
+  font-size: 14px;
+  line-height: 1.5;
+  color: #111;
+  background-color: #e7edf3;
+  border: 2px solid transparent;
+  border-radius: 22px;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-button {
+.search-bar:focus {
+  border-color: #bc0150;
+  box-shadow: 0 0 0 4px rgba(188, 1, 80, 0.15);
+}
+
+/* --- Live-search results dropdown --- */
+
+.search-results-wrap {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  width: 100%;
+  box-sizing: border-box;
+  display: block;
+  overflow: hidden;
+  border-radius: 16px;
+  background-color: #171717;
+  font-family: "Inter", sans-serif;
+  font-size: 0.875rem;
+  color: #667d99;
+  user-select: none;
+  z-index: 20;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.search-status {
+  padding: 10px 12px;
+}
+
+.search-status-error {
+  color: #ff8080;
+}
+
+.search-results {
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  max-height: 60vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
+}
+
+.search-results::-webkit-scrollbar {
+  width: 8px;
+}
+
+.search-results::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.search-results::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.search-results::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.35);
+  background-clip: padding-box;
+}
+
+.search-results a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 10px;
+  border-radius: 10px;
+  color: #eee;
   cursor: pointer;
 }
 
-button:hover {
-  border-color: #396cd8;
-}
-button:active {
-  border-color: #396cd8;
-  background-color: #e8e8e8;
+.search-results a:hover {
+  background-color: rgba(255, 255, 255, 0.06);
 }
 
-input,
-button {
-  outline: none;
+.result-thumbnail {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 56px;
+  border-radius: 6px;
+  overflow: hidden;
+  background-color: #222;
 }
 
-#greet-input {
-  margin-right: 5px;
+.result-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.result-metadata {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.result-title {
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.result-status {
+  font-size: 0.85em;
+  color: #98a9bc;
+}
+
+.search-result-skeleton-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+}
+
+.result-thumbnail-skeleton {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.search-result-skeleton-row .skeleton-line {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.search-result-skeleton-row .skeleton-title {
+  margin-bottom: 6px;
+}
+
+/* --- Media page (Stremio-style detail view) ---
+   Ported from the real stremio-web MetaDetails layout (verified against
+   its source, not guessed): a full-viewport FIXED background image at
+   opacity 0.3 with NO blur sits behind everything; the page is a
+   side-by-side split (info column, flexible spacer, a fixed-width
+   frosted-glass panel docked to the right for the streams/episode list)
+   rather than a stacked banner. One deliberate deviation: stremio-web
+   drops the poster entirely on this page and shows only a transparent
+   title "logo" (falling back to plain text) — but that's because its
+   metadata sources (Cinemeta/Kitsu) don't give it a logo for anime either,
+   not a design choice. We keep our poster since AniList gives us real
+   art and dropping it would be a strict downgrade. */
+
+.media-page {
+  position: relative;
+  min-height: 100vh;
+  color: #eee;
+}
+
+.media-background-layer {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background-color: var(--page-bg);
+  overflow: hidden;
+}
+
+.media-background-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: right;
+  opacity: 0.3;
+  display: block;
+}
+
+.back-button {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 2;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 20px;
+  background-color: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+  transition: background-color 0.15s ease;
+}
+
+.back-button:hover {
+  background-color: rgba(0, 0, 0, 0.7);
+}
+
+.media-content {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  min-height: 100vh;
+  gap: 24px;
+  padding: 72px 16px 24px;
+  box-sizing: border-box;
+}
+
+.media-info-column {
+  flex: 1 1 480px;
+  min-width: 0;
+  max-width: 640px;
+}
+
+.media-poster {
+  width: 140px;
+  aspect-ratio: 2 / 3;
+  border-radius: 10px;
+  overflow: hidden;
+  background-color: #222;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  margin-bottom: 16px;
+}
+
+.media-poster img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.media-title {
+  margin: 0 0 6px;
+  font-size: 1.7em;
+  font-weight: 700;
+}
+
+.media-meta {
+  font-size: 0.9em;
+  opacity: 0.8;
+}
+
+.media-description {
+  max-width: 700px;
+  margin-top: 12px;
+  font-size: 0.9em;
+  line-height: 1.5;
+  opacity: 0.85;
+}
+
+.media-description p {
+  margin: 0 0 0.6em;
+}
+
+.media-spacing {
+  flex: 1;
+}
+
+/* --- Videos list panel: frosted-glass docked side panel ---
+   Ported from stremio-web's actual VideosList/Video components (verified
+   against source), not the raw per-release "Sources" listing we had
+   before. Each row is one episode (or Batch/Unknown bucket), matching
+   stremio-web's real detail page — it shows episodes here and only
+   reveals individual streams/sources after picking one, which for us is
+   deferred to a future video player rather than expanding inline. */
+
+.videos-list-panel {
+  flex: 0 0 30rem;
+  max-width: 100%;
+  align-self: stretch;
+  border-radius: 16px;
+  background-color: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(15px);
+  padding: 12px;
+  box-sizing: border-box;
+  overflow-y: auto;
+}
+
+.error-banner {
+  color: #ff8080;
+  padding: 0 8px;
+}
+
+.video-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 8px;
+  margin-bottom: 8px;
+  border-radius: 10px;
+  transition: background-color 0.15s ease;
+}
+
+.video-row:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.video-thumbnail {
+  flex: none;
+  width: 128px;
+  height: 80px;
+  border-radius: 5px;
+  background-color: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.video-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.video-info {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+}
+
+.video-title {
+  font-size: 0.9em;
+  word-break: break-word;
+}
+
+.video-sources-badge {
+  flex: none;
+  min-width: 1.6em;
+  padding: 0.2em 0.5em;
+  border-radius: 999px;
+  background-color: rgba(255, 255, 255, 0.12);
+  font-size: 0.8em;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* Skeleton loading blocks — mirrors stremio-web's actual loading pattern
+   (MetaPreviewPlaceholder/StreamPlaceholder): solid-color shapes matching
+   the final content's layout, not a spinner. Verified stremio-web has no
+   branded loading animation anywhere in its codebase. */
+
+.video-thumbnail-skeleton {
+  background-color: rgba(255, 255, 255, 0.06);
+}
+
+.skeleton-line {
+  border-radius: 4px;
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
+.skeleton-title {
+  width: 70%;
+  height: 12px;
+}
+
+.skeleton-meta {
+  width: 40%;
+  height: 9px;
+}
+
+/* --- Library toggle button on the media page --- */
+
+.library-toggle-button {
+  display: inline-block;
+  margin-bottom: 10px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 20px;
+  background-color: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.library-toggle-button:hover {
+  background-color: rgba(255, 255, 255, 0.25);
+}
+
+/* --- Home page: latest episodes row + library grid --- */
+
+.home-page {
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 8px 16px 40px;
+  box-sizing: border-box;
+  color: #eee;
+}
+
+.home-section {
+  margin-bottom: 32px;
+}
+
+.home-section h2 {
+  margin: 0 0 12px;
+}
+
+.home-empty {
+  opacity: 0.6;
+  font-size: 0.9em;
+}
+
+.latest-episodes-row {
+  display: flex;
+  gap: 14px;
+  list-style: none;
+  margin: 0;
+  padding: 0 0 10px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
+}
+
+.latest-episodes-row::-webkit-scrollbar {
+  height: 8px;
+}
+
+.latest-episodes-row::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.latest-episodes-row::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+}
+
+.latest-episode-card {
+  flex: 0 0 auto;
+  width: 140px;
+  cursor: pointer;
+}
+
+.latest-episode-thumbnail {
+  position: relative;
+  width: 140px;
+  height: 197px;
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  transition: transform 0.15s ease;
+}
+
+.latest-episode-card:hover .latest-episode-thumbnail {
+  transform: scale(1.03);
+}
+
+.latest-episode-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.latest-episode-thumbnail-skeleton {
+  background-color: rgba(255, 255, 255, 0.06);
+}
+
+.latest-episode-badge {
+  position: absolute;
+  bottom: 6px;
+  left: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background-color: rgba(0, 0, 0, 0.7);
+  font-size: 0.75em;
+  font-weight: 600;
+}
+
+.latest-episode-title {
+  margin-top: 6px;
+  font-size: 0.85em;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.latest-episode-date {
+  font-size: 0.75em;
+  opacity: 0.6;
+}
+
+.library-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.library-card {
+  flex: 0 0 auto;
+  width: 120px;
+  cursor: pointer;
+}
+
+.library-thumbnail {
+  width: 120px;
+  height: 169px;
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  transition: transform 0.15s ease;
+}
+
+.library-card:hover .library-thumbnail {
+  transform: scale(1.03);
+}
+
+.library-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.library-title {
+  margin-top: 6px;
+  font-size: 0.85em;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
+    --page-bg: #2f2f2f;
     color: #f6f6f6;
-    background-color: #2f2f2f;
-  }
-
-  a:hover {
-    color: #24c8db;
-  }
-
-  input,
-  button {
-    color: #ffffff;
-    background-color: #0f0f0f98;
-  }
-  button:active {
-    background-color: #0f0f0f69;
+    background-color: var(--page-bg);
   }
 }
