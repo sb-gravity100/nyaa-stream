@@ -24,8 +24,13 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["full"] }
 dirs = "5"
+base64 = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
 torrent-engine = { path = "../crates/torrent-engine" }
 nyaa-client = { path = "../crates/nyaa-client" }
 anilist-client = { path = "../crates/anilist-client" }
+kitsu-client = { path = "../crates/kitsu-client" }
 mpv-ipc = { path = "../crates/mpv-ipc" }
 
