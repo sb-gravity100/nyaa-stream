@@ -339,6 +339,12 @@ struct PlaySession {
 async fn play_magnet(state: State<'_, Arc<AppState>>, magnet: String, title: String) -> Result<PlaySession, String> {
     tracing::debug!(%title, "play_magnet invoked");
 
+    // Defensive: the frontend calls stop_playback before navigating away or
+    // starting a new stream, but a leftover session (e.g. a previous mpv
+    // exit-watch race, or a client that skipped that call) shouldn't be
+    // allowed to leak alongside a new one.
+    cleanup_playback(&state).await;
+
     let added = match state.torrent_engine.add(&magnet).await {
         Ok(added) => added,
         Err(err) => {
@@ -360,7 +366,72 @@ async fn play_magnet(state: State<'_, Arc<AppState>>, magnet: String, title: Str
     *state.player.lock().await = Some(player);
     *state.current_torrent.lock().await = Some(added.id);
     tracing::info!(%title, "mpv spawned and playing");
+
+    tauri::async_runtime::spawn(watch_mpv_exit(state.inner().clone(), added.id));
+
     Ok(PlaySession { torrent_id: added.id })
+}
+
+/// Polls the active mpv process for the given torrent until it exits on its
+/// own (e.g. the user closed its window rather than using the in-app Stop
+/// button), then cleans up the player/torrent state the same way
+/// `stop_playback` would - otherwise a manually-closed player leaves its
+/// torrent seeding and `AppState` pointing at a dead process indefinitely.
+async fn watch_mpv_exit(state: Arc<AppState>, torrent_id: TorrentId) {
+    const POLL_INTERVAL: Duration = Duration::from_millis(500);
+    loop {
+        tokio::time::sleep(POLL_INTERVAL).await;
+
+        let mut guard = state.player.lock().await;
+        let Some(player) = guard.as_mut() else {
+            // Already cleared by stop_playback or a newer play_magnet call.
+            return;
+        };
+        match player.try_wait() {
+            Ok(None) => continue,
+            Ok(Some(status)) => {
+                tracing::info!(torrent_id, %status, "mpv exited on its own, cleaning up");
+                *guard = None;
+                drop(guard);
+                break;
+            }
+            Err(err) => {
+                tracing::warn!(torrent_id, %err, "watch_mpv_exit: try_wait failed, giving up");
+                return;
+            }
+        }
+    }
+
+    let mut current = state.current_torrent.lock().await;
+    if *current == Some(torrent_id) {
+        current.take();
+    } else {
+        // A newer play_magnet call already replaced current_torrent; that
+        // session owns cleanup for its own torrent, so leave it alone.
+        return;
+    }
+    drop(current);
+
+    if let Err(err) = state.torrent_engine.remove(torrent_id).await {
+        tracing::warn!(torrent_id, %err, "watch_mpv_exit: failed to remove torrent");
+    }
+}
+
+/// Shared teardown for the active mpv instance and its backing torrent
+/// (stop seeding, drop partial files) - used by `stop_playback` and
+/// defensively by `play_magnet` before starting a new session.
+async fn cleanup_playback(state: &AppState) {
+    if let Some(mut player) = state.player.lock().await.take() {
+        if let Err(err) = player.quit().await {
+            tracing::warn!(%err, "cleanup_playback: mpv quit failed, killing process");
+            let _ = player.kill().await;
+        }
+    }
+    if let Some(torrent_id) = state.current_torrent.lock().await.take() {
+        if let Err(err) = state.torrent_engine.remove(torrent_id).await {
+            tracing::warn!(torrent_id, %err, "cleanup_playback: failed to remove torrent");
+        }
+    }
 }
 
 /// Download progress/speed/peer-count snapshot for the currently-playing
@@ -388,23 +459,12 @@ async fn set_pause(state: State<'_, Arc<AppState>>, paused: bool) -> Result<(), 
 }
 
 /// Stops the active mpv instance and removes its backing torrent (stop
-/// seeding, drop partial files) - called when the user closes the
-/// in-app stats/stop overlay. Also called defensively before starting a
-/// new stream in case the previous one wasn't cleanly stopped.
+/// seeding, drop partial files) - called when the user closes the in-app
+/// stats/stop overlay or navigates away from the media page.
 #[tauri::command]
 async fn stop_playback(state: State<'_, Arc<AppState>>) -> Result<(), String> {
     tracing::debug!("stop_playback invoked");
-    if let Some(mut player) = state.player.lock().await.take() {
-        if let Err(err) = player.quit().await {
-            tracing::warn!(%err, "stop_playback: mpv quit failed, killing process");
-            let _ = player.kill().await;
-        }
-    }
-    if let Some(torrent_id) = state.current_torrent.lock().await.take() {
-        if let Err(err) = state.torrent_engine.remove(torrent_id).await {
-            tracing::warn!(torrent_id, %err, "stop_playback: failed to remove torrent");
-        }
-    }
+    cleanup_playback(&state).await;
     tracing::info!("stop_playback completed");
     Ok(())
 }

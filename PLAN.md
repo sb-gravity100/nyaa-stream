@@ -102,7 +102,12 @@ nyaa_stream/
    into a fixed playback overlay (progress %, speed, peers) until the user
    hits Stop or navigates away, which calls `stop_playback` to quit mpv
    and remove the torrent. Playback controls (pause/seek/volume) go
-   through `mpv-ipc` but aren't exposed in the overlay yet.
+   through `mpv-ipc` but aren't exposed in the overlay yet. If the user
+   closes mpv itself instead (its window's X button), a backend
+   `watch_mpv_exit` task polls `MpvPlayer::try_wait` every 500ms and runs
+   the same cleanup once the process exits on its own; `play_magnet` also
+   defensively runs that cleanup before starting a new session, so at most
+   one mpv/torrent pair is ever active.
 
 ## Known gaps / not yet implemented
 
@@ -111,10 +116,6 @@ nyaa_stream/
   that episode's raw torrent releases (see PHASES.md Phase 3).
 - `play_magnet` currently always streams file index `0` — needs real file
   selection when a torrent contains multiple files (e.g. batch releases).
-- If the user closes mpv itself (its window's X button) rather than using
-  the in-app Stop button, the backend has no exit signal: `current_torrent`
-  stays populated and the torrent keeps seeding until the user explicitly
-  stops or navigates away.
 - No watch history / continue-watching (the library only tracks *which*
   anime are saved, not watch progress).
 - Batches without an explicit episode range in their title (most of them)

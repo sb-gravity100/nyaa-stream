@@ -14,7 +14,7 @@
 | `crates/torrent-engine/src/lib.rs` | Wraps librqbit `Session`/`Api`, runs local axum streaming HTTP server with Range support; `stats()` exposes a `StreamStats` progress/speed/peers snapshot mirroring Stremio's streaming-server statistics endpoint | backend, torrent, streaming |
 | `crates/nyaa-client/src/lib.rs` | nyaa.si search: paginated HTML-table scrape (RSS was found to cap at 75 results and ignore `p=`), query sanitization (curly-quote fix), view-page scrape for submitter/batch ground truth | backend, search |
 | `crates/anilist-client/src/lib.rs` | AniList GraphQL client: title search, get-by-id (incl. `streamingEpisodes` thumbnails), batched `airingSchedules` lookup for the latest-episodes feed | backend, metadata |
-| `crates/mpv-ipc/src/lib.rs` | Spawns mpv, talks JSON IPC (pause/seek/volume/quit); `spawn_headless` + `screenshot_to_file` for thumbnail capture | backend, player |
+| `crates/mpv-ipc/src/lib.rs` | Spawns mpv, talks JSON IPC (pause/seek/volume/quit); `try_wait` for non-blocking exit detection; `spawn_headless` + `screenshot_to_file` for thumbnail capture | backend, player |
 | `crates/kitsu-client/src/lib.rs` | Kitsu API client: resolves AniList id → Kitsu id via the mapping endpoint, fetches wide backdrop banner + per-episode thumbnails | backend, metadata |
 | `src/App.tsx` | Frontend root: debounced live-search dropdown, routes between the home page and the media page | frontend, core |
 | `src/HomePage.tsx` | Default view: horizontally-scrollable "Latest Episodes" row (current + previous calendar month, across saved library) and the "Library" grid | frontend |
