@@ -57,6 +57,7 @@ export interface KitsuMetadata {
 
 export interface PlaySession {
   torrentId: number;
+  streamUrl: string;
 }
 
 export interface StreamStats {

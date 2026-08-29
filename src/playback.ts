@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { isTauriAvailable } from "./browserFallback";
 import type { PlaySession, StreamStats } from "./types";
 
-// Torrenting/mpv aren't available in the dev-only browser preview (see
+// Torrenting isn't available in the dev-only browser preview (see
 // browserFallback.ts) - there's no meaningful fallback for actual playback,
 // so these just reject/no-op there rather than pretending to stream.
 

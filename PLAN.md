@@ -96,18 +96,27 @@ nyaa_stream/
    into the "Latest Episodes" row.
 6. Playback: the media page's play button (`src/playback.ts`) picks the
    release with the most seeders out of that episode's group and calls
-   `play_magnet`; backend adds it to the librqbit session, gets a
-   `stream_url` from the local streaming server, and spawns `mpv` pointed
-   at that URL. The frontend then polls `get_stream_stats` every second
-   into a fixed playback overlay (progress %, speed, peers) until the user
-   hits Stop or navigates away, which calls `stop_playback` to quit mpv
-   and remove the torrent. Playback controls (pause/seek/volume) go
-   through `mpv-ipc` but aren't exposed in the overlay yet. If the user
-   closes mpv itself instead (its window's X button), a backend
-   `watch_mpv_exit` task polls `MpvPlayer::try_wait` every 500ms and runs
-   the same cleanup once the process exits on its own; `play_magnet` also
-   defensively runs that cleanup before starting a new session, so at most
-   one mpv/torrent pair is ever active.
+   `play_magnet`; backend adds it to the librqbit session and returns a
+   `stream_url` from the local streaming server. The frontend
+   (`PlayerView.tsx`) plays that URL directly in a plain HTML5 `<video>`
+   element — a PotPlayer-style bottom control bar (play/pause, seek,
+   volume, fullscreen, time) fades in on mouse movement and auto-hides
+   after idle, all driven by the browser's native video API (no IPC round
+   trip for pause/seek/volume). It also polls `get_stream_stats` every
+   second to show a buffering/progress readout until the video has enough
+   data to play. Closing the player or navigating away calls
+   `stop_playback` to remove the torrent (stop seeding, drop partial
+   files).
+
+   **`mpv`/`mpv-ipc` is no longer the real playback engine** — an earlier
+   attempt embedded mpv into the app window via `--wid` and a transparent
+   webview background, but `transparent: true` turned out to break all
+   click input app-wide on this Tauri/WebView2/Windows combination (a
+   known upstream bug, not something fixable from app code). `mpv-ipc` and
+   its `MpvPlayer` are kept only for headless thumbnail capture
+   (`capture_torrent_thumbnail`), where no window/transparency is involved.
+   CLAUDE.md's "player is the user's system mpv" line is now stale for
+   real playback; still accurate for the thumbnail-capture path.
 
 ## Known gaps / not yet implemented
 
@@ -116,6 +125,10 @@ nyaa_stream/
   that episode's raw torrent releases (see PHASES.md Phase 3).
 - `play_magnet` currently always streams file index `0` — needs real file
   selection when a torrent contains multiple files (e.g. batch releases).
+- Playback is limited to whatever codecs/containers the WebView2/Chromium
+  engine can decode natively (e.g. no built-in HEVC in some builds) — a
+  real regression from the mpv-based approach's much broader format
+  support, accepted as the cost of avoiding the transparency bug above.
 - No watch history / continue-watching (the library only tracks *which*
   anime are saved, not watch progress).
 - Batches without an explicit episode range in their title (most of them)

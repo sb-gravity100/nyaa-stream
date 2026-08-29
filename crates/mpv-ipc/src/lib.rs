@@ -23,9 +23,11 @@ struct MpvResponse {
     data: Value,
 }
 
-/// Spawns `mpv` pointed at a URL (e.g. a torrent-engine stream URL) with a
-/// JSON IPC socket enabled, and lets the caller send playback commands
-/// (pause, seek, set volume, etc.) to the running instance.
+/// Spawns a headless `mpv` pointed at a URL (e.g. a torrent-engine stream
+/// URL) with a JSON IPC socket enabled, purely to pull a single frame out of
+/// a torrent's stream as a thumbnail - see `spawn_headless`/
+/// `screenshot_to_file`. Real playback is an HTML5 `<video>` element in the
+/// frontend (see PLAN.md's Known gaps for why mpv isn't the player itself).
 pub struct MpvPlayer {
     child: tokio::process::Child,
     #[cfg(windows)]
@@ -35,15 +37,6 @@ pub struct MpvPlayer {
 }
 
 impl MpvPlayer {
-    pub async fn spawn(stream_url: &str, title: &str) -> anyhow::Result<Self> {
-        Self::spawn_with_args(
-            stream_url,
-            &[format!("--force-media-title={title}"), "--keep-open=yes".to_string()],
-            title,
-        )
-        .await
-    }
-
     /// Spawns `mpv` with no video/audio output window (`--vo=null --ao=null
     /// --no-terminal`), for driving it purely over IPC without ever showing
     /// a player UI - used for pulling a single frame out of a torrent's
@@ -104,19 +97,6 @@ impl MpvPlayer {
         })
     }
 
-    pub async fn set_pause(&self, paused: bool) -> anyhow::Result<()> {
-        self.set_property("pause", Value::Bool(paused)).await
-    }
-
-    pub async fn seek_seconds(&self, seconds: f64) -> anyhow::Result<()> {
-        self.command(&[Value::String("seek".into()), seconds.into(), "absolute".into()])
-            .await
-    }
-
-    pub async fn set_volume(&self, volume_percent: f64) -> anyhow::Result<()> {
-        self.set_property("volume", volume_percent.into()).await
-    }
-
     pub async fn get_time_position(&self) -> anyhow::Result<f64> {
         let data = self.get_property("time-pos").await?;
         Ok(data.as_f64().unwrap_or(0.0))
@@ -145,14 +125,6 @@ impl MpvPlayer {
         Ok(())
     }
 
-    /// Non-blocking check for whether the mpv process has already exited on
-    /// its own (e.g. the user closed its window) - polled by the backend's
-    /// playback-exit watcher rather than blocking on a full `wait()`, since
-    /// the player may still be in active use over IPC.
-    pub fn try_wait(&mut self) -> std::io::Result<Option<std::process::ExitStatus>> {
-        self.child.try_wait()
-    }
-
     pub async fn quit(&mut self) -> anyhow::Result<()> {
         tracing::debug!("quitting mpv");
         let _ = self
@@ -161,11 +133,6 @@ impl MpvPlayer {
         let _ = self.child.wait().await;
         tracing::info!("mpv process exited");
         Ok(())
-    }
-
-    async fn set_property(&self, name: &str, value: Value) -> anyhow::Result<()> {
-        self.command(&[Value::String("set_property".into()), name.into(), value])
-            .await
     }
 
     async fn get_property(&self, name: &str) -> anyhow::Result<Value> {
@@ -207,9 +174,9 @@ impl MpvPlayer {
     }
 }
 
-// Per-instance counter, not just the process id: a headless thumbnail
-// capture (spawn_headless) can run concurrently with real playback
-// (spawn) in the same process, and each needs its own IPC pipe/socket.
+// Per-instance counter, not just the process id: multiple concurrent
+// `spawn_headless` thumbnail captures can run in the same process, and each
+// needs its own IPC pipe/socket.
 static NEXT_INSTANCE_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
 #[cfg(windows)]
