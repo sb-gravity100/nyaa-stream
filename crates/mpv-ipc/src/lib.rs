@@ -145,6 +145,14 @@ impl MpvPlayer {
         Ok(())
     }
 
+    /// Non-blocking check for whether the mpv process has already exited on
+    /// its own (e.g. the user closed its window) - polled by the backend's
+    /// playback-exit watcher rather than blocking on a full `wait()`, since
+    /// the player may still be in active use over IPC.
+    pub fn try_wait(&mut self) -> std::io::Result<Option<std::process::ExitStatus>> {
+        self.child.try_wait()
+    }
+
     pub async fn quit(&mut self) -> anyhow::Result<()> {
         tracing::debug!("quitting mpv");
         let _ = self

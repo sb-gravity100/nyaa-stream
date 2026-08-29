@@ -48,12 +48,12 @@
 - [x] Persist a saved-anime library (`src/library.ts`, `localStorage`) —
       resolves the "TBD: sqlite vs. flat file" note for *this* use case;
       watch-history/continue-watching persistence is still open
-- [ ] Handle mpv exit (user closes player) and clean up the torrent
-      session/player state — `stop_playback` cleans up when the user hits
-      the in-app Stop button or navigates away, but if mpv itself is
-      closed (its window's X button) the backend has no exit signal yet:
-      `current_torrent`/`player` stay populated and the torrent keeps
-      seeding until the user explicitly stops or navigates away
+- [x] Handle mpv exit (user closes player) and clean up the torrent
+      session/player state: `watch_mpv_exit` polls the active mpv process
+      (`MpvPlayer::try_wait`) every 500ms and runs the same cleanup
+      (`cleanup_playback`) as the in-app Stop button when it exits on its
+      own; `play_magnet` also defensively cleans up any leftover session
+      before starting a new one
 
 ## Phase 4 — Library and polish
 - [x] Home page: "Library" grid of saved anime + a "Latest Episodes" row
