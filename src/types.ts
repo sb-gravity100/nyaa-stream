@@ -66,6 +66,8 @@ export interface StreamStats {
   downloadSpeedMbps: number;
   connectedPeers: number;
   finished: boolean;
+  downloadedBytes: number;
+  totalBytes: number;
 }
 
 export function displayTitle(title: AnimeTitle): string {
