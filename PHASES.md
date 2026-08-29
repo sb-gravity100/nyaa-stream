@@ -49,9 +49,20 @@
       embedding needed a transparent webview background, and `transparent:
       true` broke all click input app-wide on this Tauri/WebView2/Windows
       combination (upstream bug, not fixable from app code — see PLAN.md's
-      Known gaps). Replaced with a plain HTML5 `<video>` element playing
-      torrent-engine's stream URL directly; `mpv`/`mpv-ipc` is kept only
-      for headless thumbnail capture now
+      Known gaps). Replaced with a plain HTML5 `<video>` element; `mpv`/
+      `mpv-ipc` is kept only for headless thumbnail capture now
+- [x] Raw torrent bytes aren't reliably playable in a browser `<video>`
+      even with the right codecs/`Content-Type` (verified live - Matroska's
+      seek index/duration commonly live near the file's *end*, which an
+      incrementally-downloading torrent can't provide up front). Fixed by
+      piping through `ffmpeg` into fragmented MP4 (`torrent_engine::
+      remux_handler`/`remux_url`) - `-c:v copy`, audio always transcoded to
+      AAC (several codecs real releases use aren't remux-able into fMP4).
+      Seeking restarts the remux at a new `-ss`/`-copyts` offset rather
+      than seeking within one stream; `probe_duration_seconds` (`ffprobe`)
+      gets the real duration into the output header via `-t`, though this
+      is unreliable on a fresh download for the same structural reason (see
+      PLAN.md's Known gaps)
 - [x] Surface torrent download/buffer progress in the UI while the video
       buffers: ported stremio-web's real Player UI (verified against
       `reference/stremio-web`/`reference/stremio-core`) rather than a
@@ -61,6 +72,13 @@
       `StatisticsMenu.tsx` is a toggleable peers/speed/completed/info-hash
       card mirroring `StatisticsMenu.js` (`StreamStats` gained
       `downloadedBytes`/`totalBytes` to support the weighted score)
+- [x] Seek bar shows a download-progress highlight (`.player-seek-downloaded`
+      in `PlayerView.tsx`) alongside the played-position fill, approximated
+      from the torrent's overall byte-download percent
+- [x] Re-adding a torrent whose destination file already exists (replaying
+      an episode, or a thumbnail capture colliding with a real download)
+      used to fail outright with "allow_overwrite = false" - fixed via
+      `AddTorrentOptions.overwrite`
 - [ ] File selection for multi-file/batch torrents (currently hardcoded to
       file index 0)
 - [x] Persist a saved-anime library (`src/library.ts`, `localStorage`) —

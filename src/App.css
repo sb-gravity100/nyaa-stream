@@ -586,10 +586,83 @@ a {
   pointer-events: auto;
 }
 
-.player-seek {
+/* Layered seek bar: a plain <input type=range>, made fully transparent,
+   sits on top purely for drag interaction, while three stacked divs behind
+   it draw the actual visuals - full-width track, how much of the file has
+   downloaded so far, and how much has played - since native range inputs
+   have no cross-browser way to show a "buffered" segment like <video>'s
+   own .buffered does. */
+
+.player-seek-wrap {
+  position: relative;
   width: 100%;
+  height: 16px;
+  display: flex;
+  align-items: center;
+}
+
+.player-seek-track,
+.player-seek-downloaded,
+.player-seek-played {
+  position: absolute;
+  left: 0;
+  height: 4px;
+  border-radius: 999px;
+  pointer-events: none;
+}
+
+.player-seek-track {
+  width: 100%;
+  background-color: rgba(255, 255, 255, 0.15);
+}
+
+.player-seek-downloaded {
+  background-color: rgba(255, 255, 255, 0.35);
+}
+
+.player-seek-played {
+  background-color: #fff;
+}
+
+.player-seek {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  margin: 0;
   display: block;
-  accent-color: #fff;
+  background: transparent;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.player-seek::-webkit-slider-runnable-track {
+  height: 4px;
+  background: transparent;
+}
+
+.player-seek::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  margin-top: -4px;
+  border-radius: 50%;
+  background-color: #fff;
+  cursor: pointer;
+}
+
+.player-seek::-moz-range-track {
+  height: 4px;
+  background: transparent;
+  border: none;
+}
+
+.player-seek::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: none;
+  border-radius: 50%;
+  background-color: #fff;
   cursor: pointer;
 }
 
