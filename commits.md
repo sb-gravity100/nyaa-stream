@@ -2,6 +2,12 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `e9a85d5` · 2026-08-29 · feat(devtools): forward frontend console/errors to the backend log
+- `src/devLogger.ts`, `src/main.tsx`
+
+### `cdd5136` · 2026-08-29 · feat(playback): replace mpv embedding with an HTML5 video player
+- `CLAUDE.md`, `FILE_INDEX.md`, `PHASES.md`, `PLAN.md`, `crates/mpv-ipc/src/lib.rs`, `src-tauri/Cargo.toml`, `src-tauri/src/lib.rs`, `src-tauri/tauri.conf.json`, `src/App.css`, `src/MediaPage.tsx`, `src/PlayerView.tsx`, `src/playback.ts`, `src/types.ts`
+
 ### `4635087` · 2026-08-29 · feat(playback): detect mpv exit and clean up torrent/player state
 - `crates/mpv-ipc/src/lib.rs`, `src-tauri/src/lib.rs`, `PLAN.md`, `PHASES.md`, `FILE_INDEX.md`
 
