@@ -111,9 +111,14 @@ full architecture; summary:
 - `crates/mpv-ipc` — spawns headless system `mpv` over JSON IPC for
   torrent-thumbnail frame capture only; requires `mpv` on PATH
 - Real playback is a plain HTML5 `<video>` element (`src/PlayerView.tsx`)
-  pointed at torrent-engine's stream URL, not mpv — embedding mpv into the
+  pointed at torrent-engine's `remux_url`, not mpv — embedding mpv into the
   app window was tried and abandoned (a Tauri/WebView2 transparency bug on
   Windows broke click input app-wide; see PLAN.md's Known gaps)
+- `ffmpeg`/`ffprobe` on PATH are required too: raw torrent bytes aren't
+  reliably playable in a browser `<video>` (Matroska's seek index/duration
+  commonly live near the file's end, which an incrementally-downloading
+  torrent can't provide up front), so `torrent_engine::remux_handler` pipes
+  through `ffmpeg` into fragmented MP4 before serving it - see PLAN.md
 - `reference/stremio-core/` is a gitignored, reference-only clone of
   Stremio's core (https://github.com/Stremio/stremio-core) — never a build
   dependency, consult it for architecture ideas only

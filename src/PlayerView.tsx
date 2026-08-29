@@ -51,6 +51,7 @@ export function PlayerView({ title, releases, onClose }: Props) {
   const [selectedRelease, setSelectedRelease] = useState<NyaaResult>(() => bestRelease(releases));
   const [torrentId, setTorrentId] = useState<number | null>(null);
   const [streamUrl, setStreamUrl] = useState<string | null>(null);
+  const [videoSrc, setVideoSrc] = useState<string | null>(null);
   const [stats, setStats] = useState<StreamStats | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
@@ -72,6 +73,7 @@ export function PlayerView({ title, releases, onClose }: Props) {
   useEffect(() => {
     let cancelled = false;
     setStreamUrl(null);
+    setVideoSrc(null);
     setTorrentId(null);
     setStats(null);
     setError(null);
@@ -84,6 +86,7 @@ export function PlayerView({ title, releases, onClose }: Props) {
         if (!cancelled) {
           setTorrentId(session.torrentId);
           setStreamUrl(session.streamUrl);
+          setVideoSrc(session.streamUrl);
         }
       } catch (err) {
         if (!cancelled) setError(String(err));
@@ -147,8 +150,15 @@ export function PlayerView({ title, releases, onClose }: Props) {
   function handleSeekCommit(e: Event) {
     const value = Number((e.target as HTMLInputElement).value);
     setSeekPreview(null);
-    const video = videoRef.current;
-    if (video) video.currentTime = value;
+    if (!streamUrl) return;
+    // A live-piped fragmented MP4 can't be seeked within once bytes have
+    // been sent - setting video.currentTime does nothing useful here.
+    // Instead, restart the remux at the requested offset (ffmpeg's -ss +
+    // -copyts on the backend keeps the new stream's timestamps lined up
+    // with the real duration, so the seek bar doesn't reset to 0).
+    setPosition(value);
+    setReady(false);
+    setVideoSrc(`${streamUrl}?start=${value}`);
   }
 
   function handleVolumeInput(e: Event) {
@@ -168,15 +178,21 @@ export function PlayerView({ title, releases, onClose }: Props) {
 
   const displayPosition = seekPreview ?? position;
   const buffering = !error && !ready;
+  // Approximation: torrent download progress is tracked as an overall
+  // fraction of the file's bytes, not per-region, so this assumes a
+  // roughly even bitrate to translate "% of file downloaded" into "% of
+  // the timeline downloaded" for the seek bar highlight.
+  const downloadedPercent = stats ? Math.min(100, stats.progressPercent) : 0;
+  const playedPercent = duration ? Math.min(100, (displayPosition / duration) * 100) : 0;
 
   return (
     <div class="player-view" onMouseMove={wake} onMouseLeave={() => setControlsVisible(false)}>
-      {streamUrl && (
+      {videoSrc && (
         <video
-          key={streamUrl}
+          key={videoSrc}
           ref={videoRef}
           class="player-video"
-          src={streamUrl}
+          src={videoSrc}
           autoPlay
           onLoadedMetadata={(e) => setDuration((e.target as HTMLVideoElement).duration || 0)}
           onTimeUpdate={(e) => setPosition((e.target as HTMLVideoElement).currentTime)}
@@ -185,7 +201,19 @@ export function PlayerView({ title, releases, onClose }: Props) {
           onCanPlay={() => setReady(true)}
           onWaiting={() => setReady(false)}
           onPlaying={() => setReady(true)}
-          onError={() => setError("Playback failed - the file format may not be supported by this browser engine.")}
+          onError={(e) => {
+            const video = e.target as HTMLVideoElement;
+            const mediaError = video.error;
+            // MediaError.code: 1=ABORTED, 2=NETWORK, 3=DECODE, 4=SRC_NOT_SUPPORTED.
+            // Logged (not just shown) so it reaches the backend log via
+            // devLogger.ts instead of only ever being visible on-screen.
+            console.error("[player] video error", {
+              code: mediaError?.code,
+              message: mediaError?.message,
+              src: video.currentSrc,
+            });
+            setError("Playback failed - the file format may not be supported by this browser engine.");
+          }}
         />
       )}
 
@@ -203,17 +231,22 @@ export function PlayerView({ title, releases, onClose }: Props) {
       )}
 
       <div class={`player-controls${controlsVisible ? " visible" : ""}`}>
-        <input
-          class="player-seek"
-          type="range"
-          min={0}
-          max={duration || 1}
-          step={0.1}
-          value={displayPosition}
-          onInput={handleSeekInput}
-          onChange={handleSeekCommit}
-          disabled={!duration}
-        />
+        <div class="player-seek-wrap">
+          <div class="player-seek-track" />
+          <div class="player-seek-downloaded" style={{ width: `${downloadedPercent}%` }} />
+          <div class="player-seek-played" style={{ width: `${playedPercent}%` }} />
+          <input
+            class="player-seek"
+            type="range"
+            min={0}
+            max={duration || 1}
+            step={0.1}
+            value={displayPosition}
+            onInput={handleSeekInput}
+            onChange={handleSeekCommit}
+            disabled={!duration}
+          />
+        </div>
         <div class="player-controls-row">
           <button class="player-control-button" onClick={togglePause} aria-label={paused ? "Play" : "Pause"}>
             {paused ? "▶" : "❚❚"}

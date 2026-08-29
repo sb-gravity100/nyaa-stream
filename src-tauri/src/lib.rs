@@ -377,7 +377,10 @@ async fn play_magnet(state: State<'_, Arc<AppState>>, magnet: String, title: Str
             return Err(err.to_string());
         }
     };
-    let stream_url = state.torrent_engine.stream_url(added.id, 0);
+    // Remuxed through ffmpeg rather than the raw stream_url - see
+    // torrent-engine's remux_handler doc comment for why the raw container
+    // bytes aren't reliably playable in a browser <video> element.
+    let stream_url = state.torrent_engine.remux_url(added.id, 0);
     *state.current_torrent.lock().await = Some(added.id);
     tracing::info!(%title, torrent_id = added.id, %stream_url, "torrent added, streaming");
 
@@ -425,9 +428,15 @@ pub fn run() {
 
     let app_state = tauri::async_runtime::block_on(async {
         tracing::info!("starting nyaa-stream");
-        let download_dir = dirs::download_dir()
+        // The user's actual Downloads folder isn't the right place for
+        // torrent scratch data the app manages and cleans up itself
+        // (stop_playback removes the torrent, but the on-disk file lingers
+        // until then) - AppData/cache is where transient app-owned data
+        // belongs, same as thumbnail_cache_dir below.
+        let download_dir = dirs::cache_dir()
             .unwrap_or_else(std::env::temp_dir)
-            .join("nyaa-stream");
+            .join("nyaa-stream")
+            .join("downloads");
         tracing::debug!(?download_dir, "torrent download dir");
         let torrent_engine = TorrentEngine::start(download_dir).await.unwrap_or_else(|err| {
             tracing::error!(%err, "failed to start torrent engine");

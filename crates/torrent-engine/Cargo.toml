@@ -6,6 +6,7 @@ edition.workspace = true
 [dependencies]
 librqbit = "9.0.1"
 tokio = { workspace = true }
+tokio-util = { version = "0.7", features = ["io"] }
 axum = "0.8"
 axum-extra = { version = "0.10", features = ["typed-header"] }
 axum-range = "1.0.0"
