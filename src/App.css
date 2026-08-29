@@ -440,6 +440,133 @@ a {
   color: #ff8080;
 }
 
+/* Buffering mark: ported from stremio-web's Player/Buffering — a dim
+   full-opacity copy behind a clip-path-filled foreground copy, so the
+   outline stays visible while the fill grows with loadingProgress.ts's
+   weighted readiness score, plus a pulse while incomplete. */
+
+.player-buffering {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 96px;
+  height: 96px;
+  pointer-events: none;
+}
+
+.player-buffering-mark {
+  position: absolute;
+  inset: 0;
+  color: #fff;
+  animation: player-buffering-pulse 2s infinite;
+  transition: clip-path 0.1s ease-in-out;
+}
+
+.player-buffering-mark svg {
+  width: 100%;
+  height: 100%;
+}
+
+.player-buffering-mark-background {
+  opacity: 0.2;
+  animation: none;
+}
+
+@keyframes player-buffering-pulse {
+  0% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+  100% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+}
+
+/* Statistics menu: ported from stremio-web's Player/StatisticsMenu — a
+   small card floating above the control bar, toggled from it rather than
+   always shown. */
+
+.statistics-menu {
+  position: absolute;
+  right: 18px;
+  bottom: 76px;
+  width: 260px;
+  max-width: calc(100% - 36px);
+  padding: 14px 16px;
+  border-radius: 10px;
+  background-color: rgba(20, 20, 24, 0.92);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+}
+
+.statistics-menu-title {
+  font-weight: 700;
+  font-size: 0.85em;
+  color: #fff;
+  margin-bottom: 12px;
+}
+
+.statistics-menu-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.statistics-menu-label {
+  font-size: 0.7em;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.statistics-menu-value {
+  margin-top: 2px;
+  font-size: 0.85em;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+}
+
+.statistics-menu-hash {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px;
+  border: none;
+  border-radius: 8px;
+  background-color: rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.statistics-menu-hash:hover {
+  background-color: rgba(255, 255, 255, 0.16);
+}
+
+.statistics-menu-hash-value {
+  flex: 1;
+  min-width: 0;
+  font-family: monospace;
+  font-size: 0.7em;
+  color: #fff;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+
+.statistics-menu-hash-label {
+  flex: none;
+  font-size: 0.72em;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.6);
+}
+
 .player-controls {
   position: absolute;
   left: 0;
@@ -481,6 +608,11 @@ a {
   font-size: 1em;
   cursor: pointer;
   padding: 4px 6px;
+  border-radius: 6px;
+}
+
+.player-control-button.active {
+  background-color: rgba(255, 255, 255, 0.18);
 }
 
 .player-time {
@@ -496,6 +628,24 @@ a {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.player-source-select {
+  flex: none;
+  max-width: 220px;
+  padding: 4px 8px;
+  border: none;
+  border-radius: 6px;
+  background-color: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font-family: inherit;
+  font-size: 0.75em;
+  cursor: pointer;
+}
+
+.player-source-select option {
+  background-color: #1a1a1e;
+  color: #fff;
 }
 
 .player-spacer {

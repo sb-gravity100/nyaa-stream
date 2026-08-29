@@ -43,6 +43,13 @@ pub struct StreamStats {
     pub download_speed_mbps: f64,
     pub connected_peers: u32,
     pub finished: bool,
+    /// Raw byte counts (alongside `progress_percent`) so the frontend can
+    /// port stremio-web's own weighted buffering-readiness score
+    /// (`useStatistics.ts`'s `getLoadingProgress`: peers/downloaded-vs-
+    /// threshold/speed, not just raw completion percent) rather than a
+    /// cruder "% of the whole file" estimate.
+    pub downloaded_bytes: u64,
+    pub total_bytes: u64,
 }
 
 impl TorrentEngine {
@@ -142,6 +149,8 @@ impl TorrentEngine {
             download_speed_mbps,
             connected_peers,
             finished: stats.finished,
+            downloaded_bytes: stats.progress_bytes,
+            total_bytes: stats.total_bytes,
         })
     }
 }

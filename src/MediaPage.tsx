@@ -46,16 +46,9 @@ function VideoRowSkeleton() {
   );
 }
 
-// Picks the release to stream out of a group's sources: most seeders, for
-// the fastest/most reliable swarm — same "most seeders wins" heuristic
-// torrentThumbnail.ts already uses for its own candidate picking.
-function bestRelease(releases: NyaaResult[]): NyaaResult {
-  return releases.reduce((best, r) => (r.seeders > best.seeders ? r : best));
-}
-
 interface PlayerSession {
   title: string;
-  release: NyaaResult;
+  releases: NyaaResult[];
 }
 
 export function MediaPage({
@@ -74,7 +67,7 @@ export function MediaPage({
   const [player, setPlayer] = useState<PlayerSession | null>(null);
 
   function handlePlay(title: string, releases: NyaaResult[]) {
-    setPlayer({ title, release: bestRelease(releases) });
+    setPlayer({ title, releases });
   }
   // stremio-web has no separate anime "logo" source (Cinemeta/Fanart.tv
   // supply that for movies/series; AniList and Kitsu, the anime-metadata
@@ -155,9 +148,9 @@ export function MediaPage({
 
       {player && (
         <PlayerView
-          key={`${player.title}:${player.release.magnet}`}
+          key={player.title}
           title={player.title}
-          release={player.release}
+          releases={player.releases}
           onClose={() => setPlayer(null)}
         />
       )}
