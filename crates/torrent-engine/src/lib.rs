@@ -10,6 +10,7 @@ use axum_extra::TypedHeader;
 use axum_range::{KnownSize, Ranged};
 use librqbit::api::{Api, TorrentIdOrHash};
 use librqbit::{AddTorrent, AddTorrentOptions, AddTorrentResponse, Session};
+use serde::Serialize;
 
 /// librqbit's `TorrentId` type alias (`usize`) isn't re-exported from the
 /// crate root, so we mirror it here rather than depend on a private path.
@@ -17,11 +18,31 @@ pub type TorrentId = usize;
 
 pub struct TorrentEngine {
     session: Arc<Session>,
+    api: Api,
     stream_addr: SocketAddr,
 }
 
 pub struct AddedTorrent {
     pub id: TorrentId,
+}
+
+/// Trimmed-down mirror of librqbit's `TorrentStats` - mirrors Stremio's own
+/// streaming-server statistics endpoint (`GET /:infoHash/stats.json`,
+/// see `reference/stremio-core`'s `models::streaming_server`), which the
+/// player UI polls to show download progress/speed/peers while a stream is
+/// buffering, rather than leaving the user staring at a blank window with
+/// no feedback while mpv waits for enough data to start decoding.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StreamStats {
+    /// "initializing" | "live" | "paused" | "error"
+    pub state: String,
+    pub progress_percent: f64,
+    /// Despite the name, librqbit's underlying `Speed::mbps` field is
+    /// actually MiB/s (see its `Display` impl) - mirrored as-is here.
+    pub download_speed_mbps: f64,
+    pub connected_peers: u32,
+    pub finished: bool,
 }
 
 impl TorrentEngine {
@@ -46,7 +67,7 @@ impl TorrentEngine {
             }
         });
 
-        Ok(Self { session, stream_addr })
+        Ok(Self { session, api, stream_addr })
     }
 
     /// Adds a torrent from a magnet link or .torrent URL and starts
@@ -98,6 +119,30 @@ impl TorrentEngine {
     /// start before the whole torrent has downloaded.
     pub fn stream_url(&self, torrent_id: TorrentId, file_idx: usize) -> String {
         format!("http://{}/stream/{}/{}", self.stream_addr, torrent_id, file_idx)
+    }
+
+    /// Download progress/speed/peer-count snapshot for an in-progress
+    /// torrent, polled by the frontend to show buffering feedback while
+    /// mpv waits for enough data to start decoding.
+    pub fn stats(&self, id: TorrentId) -> anyhow::Result<StreamStats> {
+        let stats = self.api.api_stats_v1(TorrentIdOrHash::Id(id))?;
+        let progress_percent = if stats.total_bytes > 0 {
+            stats.progress_bytes as f64 / stats.total_bytes as f64 * 100.0
+        } else {
+            0.0
+        };
+        let (download_speed_mbps, connected_peers) = stats
+            .live
+            .as_ref()
+            .map(|live| (live.download_speed.mbps, live.snapshot.peer_stats.live))
+            .unwrap_or((0.0, 0));
+        Ok(StreamStats {
+            state: stats.state.to_string(),
+            progress_percent,
+            download_speed_mbps,
+            connected_peers,
+            finished: stats.finished,
+        })
     }
 }
 

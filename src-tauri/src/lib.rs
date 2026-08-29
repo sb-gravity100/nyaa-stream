@@ -7,9 +7,10 @@ use base64::Engine;
 use kitsu_client::{KitsuClient, KitsuMetadata};
 use mpv_ipc::MpvPlayer;
 use nyaa_client::{Category, NyaaClient, NyaaResult, TorrentDetails};
+use serde::Serialize;
 use tauri::State;
 use tokio::sync::Mutex;
-use torrent_engine::TorrentEngine;
+use torrent_engine::{StreamStats, TorrentEngine, TorrentId};
 
 struct AppState {
     anilist: AniListClient,
@@ -17,6 +18,11 @@ struct AppState {
     nyaa: NyaaClient,
     torrent_engine: TorrentEngine,
     player: Mutex<Option<MpvPlayer>>,
+    /// The torrent currently backing `player`, if any - tracked separately
+    /// so `stop_playback` can remove it from the session (stop seeding,
+    /// drop partial files) once the user is done, mirroring how the
+    /// thumbnail-capture path already cleans up its own scratch torrents.
+    current_torrent: Mutex<Option<TorrentId>>,
     thumbnail_cache_dir: PathBuf,
 }
 
@@ -323,8 +329,14 @@ async fn get_torrent_details_batch(
     Ok(results)
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PlaySession {
+    torrent_id: TorrentId,
+}
+
 #[tauri::command]
-async fn play_magnet(state: State<'_, Arc<AppState>>, magnet: String, title: String) -> Result<(), String> {
+async fn play_magnet(state: State<'_, Arc<AppState>>, magnet: String, title: String) -> Result<PlaySession, String> {
     tracing::debug!(%title, "play_magnet invoked");
 
     let added = match state.torrent_engine.add(&magnet).await {
@@ -341,12 +353,23 @@ async fn play_magnet(state: State<'_, Arc<AppState>>, magnet: String, title: Str
         Ok(player) => player,
         Err(err) => {
             tracing::error!(%title, %err, "play_magnet failed to spawn mpv");
+            let _ = state.torrent_engine.remove(added.id).await;
             return Err(err.to_string());
         }
     };
     *state.player.lock().await = Some(player);
+    *state.current_torrent.lock().await = Some(added.id);
     tracing::info!(%title, "mpv spawned and playing");
-    Ok(())
+    Ok(PlaySession { torrent_id: added.id })
+}
+
+/// Download progress/speed/peer-count snapshot for the currently-playing
+/// torrent, polled by the frontend to show buffering feedback (mirrors
+/// Stremio's streaming-server statistics endpoint - see
+/// `torrent_engine::StreamStats` doc comment).
+#[tauri::command]
+async fn get_stream_stats(state: State<'_, Arc<AppState>>, torrent_id: TorrentId) -> Result<StreamStats, String> {
+    state.torrent_engine.stats(torrent_id).map_err(|err| err.to_string())
 }
 
 #[tauri::command]
@@ -361,6 +384,28 @@ async fn set_pause(state: State<'_, Arc<AppState>>, paused: bool) -> Result<(), 
         tracing::error!(paused, %err, "set_pause failed");
         return Err(err.to_string());
     }
+    Ok(())
+}
+
+/// Stops the active mpv instance and removes its backing torrent (stop
+/// seeding, drop partial files) - called when the user closes the
+/// in-app stats/stop overlay. Also called defensively before starting a
+/// new stream in case the previous one wasn't cleanly stopped.
+#[tauri::command]
+async fn stop_playback(state: State<'_, Arc<AppState>>) -> Result<(), String> {
+    tracing::debug!("stop_playback invoked");
+    if let Some(mut player) = state.player.lock().await.take() {
+        if let Err(err) = player.quit().await {
+            tracing::warn!(%err, "stop_playback: mpv quit failed, killing process");
+            let _ = player.kill().await;
+        }
+    }
+    if let Some(torrent_id) = state.current_torrent.lock().await.take() {
+        if let Err(err) = state.torrent_engine.remove(torrent_id).await {
+            tracing::warn!(torrent_id, %err, "stop_playback: failed to remove torrent");
+        }
+    }
+    tracing::info!("stop_playback completed");
     Ok(())
 }
 
@@ -397,6 +442,7 @@ pub fn run() {
             nyaa: NyaaClient::new(),
             torrent_engine,
             player: Mutex::new(None),
+            current_torrent: Mutex::new(None),
             thumbnail_cache_dir,
         })
     });
@@ -414,7 +460,9 @@ pub fn run() {
             search_torrents_for_anime,
             get_torrent_details_batch,
             play_magnet,
-            set_pause
+            get_stream_stats,
+            set_pause,
+            stop_playback
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

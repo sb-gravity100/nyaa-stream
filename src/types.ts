@@ -55,6 +55,18 @@ export interface KitsuMetadata {
   episodeThumbnails: Record<number, string>;
 }
 
+export interface PlaySession {
+  torrentId: number;
+}
+
+export interface StreamStats {
+  state: "initializing" | "live" | "paused" | "error";
+  progressPercent: number;
+  downloadSpeedMbps: number;
+  connectedPeers: number;
+  finished: boolean;
+}
+
 export function displayTitle(title: AnimeTitle): string {
   return title.english ?? title.romaji ?? title.native ?? "Untitled";
 }
