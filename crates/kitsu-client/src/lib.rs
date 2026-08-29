@@ -12,6 +12,7 @@ const EPISODES_PER_PAGE: u32 = 20;
 const MAX_EPISODE_PAGES: u32 = 10;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct KitsuMetadata {
     /// Wide (3360x800) banner image, meant for full-bleed backdrops - not to
     /// be confused with Kitsu's `posterImage`, which is a portrait poster
