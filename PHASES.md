@@ -34,19 +34,26 @@
 - [ ] Per-anime preferred fansub group memory — not built
 
 ## Phase 3 — Playback quality of life
-- [ ] Wire a video player to the media page: the docked episode-list panel
-      intentionally shows one row per episode, not raw torrent releases —
-      picking a specific source is meant to be a dropdown on the player,
-      not built yet
-- [ ] Surface torrent download/buffer progress in the UI while mpv is
-      loading
+- [x] Wire a video player to the media page: play button per episode row
+      calls `play_magnet`, auto-picking the release with the most seeders
+      out of that episode's group (`bestRelease` in `MediaPage.tsx`) —
+      a manual source-picker dropdown is still not built, so this doesn't
+      yet let the user override the auto-picked release
+- [x] Surface torrent download/buffer progress in the UI while mpv is
+      loading: `get_stream_stats`/`StreamStats` (torrent-engine + Tauri
+      command), polled every 1s by `MediaPage.tsx` into a fixed playback
+      overlay (progress %, speed, peers)
 - [ ] File selection for multi-file/batch torrents (currently hardcoded to
       file index 0)
 - [x] Persist a saved-anime library (`src/library.ts`, `localStorage`) —
       resolves the "TBD: sqlite vs. flat file" note for *this* use case;
       watch-history/continue-watching persistence is still open
 - [ ] Handle mpv exit (user closes player) and clean up the torrent
-      session/player state
+      session/player state — `stop_playback` cleans up when the user hits
+      the in-app Stop button or navigates away, but if mpv itself is
+      closed (its window's X button) the backend has no exit signal yet:
+      `current_torrent`/`player` stay populated and the torrent keeps
+      seeding until the user explicitly stops or navigates away
 
 ## Phase 4 — Library and polish
 - [x] Home page: "Library" grid of saved anime + a "Latest Episodes" row

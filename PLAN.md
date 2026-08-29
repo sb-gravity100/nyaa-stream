@@ -94,20 +94,27 @@ nyaa_stream/
    home page's "Library" grid and folds its recent episodes (AniList's
    batched `airingSchedules` query, this calendar week + last week)
    into the "Latest Episodes" row.
-6. Playback: frontend would call `play_magnet` with a chosen magnet link;
-   backend adds it to the librqbit session, gets a `stream_url` from the
-   local streaming server, and spawns `mpv` pointed at that URL. Playback
-   controls (pause/seek/volume) go through `mpv-ipc`. **Not wired to the
-   UI yet** — see Known gaps.
+6. Playback: the media page's play button (`src/playback.ts`) picks the
+   release with the most seeders out of that episode's group and calls
+   `play_magnet`; backend adds it to the librqbit session, gets a
+   `stream_url` from the local streaming server, and spawns `mpv` pointed
+   at that URL. The frontend then polls `get_stream_stats` every second
+   into a fixed playback overlay (progress %, speed, peers) until the user
+   hits Stop or navigates away, which calls `stop_playback` to quit mpv
+   and remove the torrent. Playback controls (pause/seek/volume) go
+   through `mpv-ipc` but aren't exposed in the overlay yet.
 
 ## Known gaps / not yet implemented
 
-- No video player UI: `play_magnet`/`set_pause` commands exist and work,
-  but nothing in the frontend calls them yet — picking a specific source
-  from the media page's episode list isn't built (see PHASES.md Phase 3).
+- No manual source picker: the play button auto-picks the most-seeded
+  release per episode group rather than offering a dropdown of all of
+  that episode's raw torrent releases (see PHASES.md Phase 3).
 - `play_magnet` currently always streams file index `0` — needs real file
   selection when a torrent contains multiple files (e.g. batch releases).
-- No download progress / buffering state surfaced to the frontend yet.
+- If the user closes mpv itself (its window's X button) rather than using
+  the in-app Stop button, the backend has no exit signal: `current_torrent`
+  stays populated and the torrent keeps seeding until the user explicitly
+  stops or navigates away.
 - No watch history / continue-watching (the library only tracks *which*
   anime are saved, not watch progress).
 - Batches without an explicit episode range in their title (most of them)

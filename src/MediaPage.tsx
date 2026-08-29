@@ -1,5 +1,9 @@
-import { displayTitle, formatSeason, type AnimeMedia, type KitsuMetadata, type NyaaResult } from "./types";
+import { useEffect, useRef, useState } from "preact/hooks";
+import { displayTitle, formatSeason, type AnimeMedia, type KitsuMetadata, type NyaaResult, type StreamStats } from "./types";
 import type { EpisodeLabel } from "./episodeParser";
+import { getStreamStats, playMagnet, stopPlayback } from "./playback";
+
+const STATS_POLL_MS = 1000;
 
 interface Props {
   anime: AnimeMedia;
@@ -44,6 +48,20 @@ function VideoRowSkeleton() {
   );
 }
 
+// Picks the release to stream out of a group's sources: most seeders, for
+// the fastest/most reliable swarm — same "most seeders wins" heuristic
+// torrentThumbnail.ts already uses for its own candidate picking.
+function bestRelease(releases: NyaaResult[]): NyaaResult {
+  return releases.reduce((best, r) => (r.seeders > best.seeders ? r : best));
+}
+
+interface PlayingState {
+  torrentId: number;
+  title: string;
+  stats: StreamStats | null;
+  error: string | null;
+}
+
 export function MediaPage({
   anime,
   kitsu,
@@ -57,6 +75,47 @@ export function MediaPage({
   onRemoveFromLibrary,
 }: Props) {
   const seasonLabel = formatSeason(anime.season, anime.seasonYear);
+  const [playing, setPlaying] = useState<PlayingState | null>(null);
+  const pollRef = useRef<number | undefined>(undefined);
+
+  // Stop mpv and remove the torrent if the user navigates away mid-stream —
+  // otherwise it would keep seeding/downloading in the background forever.
+  useEffect(() => {
+    return () => {
+      window.clearInterval(pollRef.current);
+      stopPlayback();
+    };
+  }, []);
+
+  async function handlePlay(title: string, releases: NyaaResult[]) {
+    window.clearInterval(pollRef.current);
+    const release = bestRelease(releases);
+    setPlaying({ torrentId: -1, title, stats: null, error: null });
+    try {
+      const session = await playMagnet(release.magnet, title);
+      setPlaying({ torrentId: session.torrentId, title, stats: null, error: null });
+      pollRef.current = window.setInterval(async () => {
+        try {
+          const stats = await getStreamStats(session.torrentId);
+          setPlaying((current) =>
+            current && current.torrentId === session.torrentId ? { ...current, stats } : current,
+          );
+        } catch {
+          // mpv/torrent may have already been torn down (user closed the
+          // player window) — stop polling rather than spamming errors.
+          window.clearInterval(pollRef.current);
+        }
+      }, STATS_POLL_MS);
+    } catch (err) {
+      setPlaying({ torrentId: -1, title, stats: null, error: String(err) });
+    }
+  }
+
+  async function handleStop() {
+    window.clearInterval(pollRef.current);
+    setPlaying(null);
+    await stopPlayback();
+  }
   // stremio-web has no separate anime "logo" source (Cinemeta/Fanart.tv
   // supply that for movies/series; AniList and Kitsu, the anime-metadata
   // sources, don't), so its real detail page falls back to plain text with
@@ -124,12 +183,40 @@ export function MediaPage({
                   <div class="video-info">
                     <div class="video-title">{key}</div>
                   </div>
+                  <button class="video-play-button" onClick={() => handlePlay(key, group.releases)} aria-label={`Play ${key}`}>
+                    ▶
+                  </button>
                   <div class="video-sources-badge">{group.releases.length}</div>
                 </div>
               );
             })}
         </div>
       </div>
+
+      {playing && (
+        <div class="playback-overlay">
+          <div class="playback-overlay-title">{playing.title}</div>
+          {playing.error && <div class="playback-overlay-error">{playing.error}</div>}
+          {!playing.error && !playing.stats && <div class="playback-overlay-status">Adding torrent…</div>}
+          {!playing.error && playing.stats && (
+            <>
+              <div class="playback-progress-track">
+                <div
+                  class="playback-progress-fill"
+                  style={{ width: `${Math.min(100, playing.stats.progressPercent).toFixed(1)}%` }}
+                />
+              </div>
+              <div class="playback-overlay-status">
+                {playing.stats.progressPercent.toFixed(1)}% ∙ {playing.stats.downloadSpeedMbps.toFixed(2)} MiB/s ∙{" "}
+                {playing.stats.connectedPeers} peers
+              </div>
+            </>
+          )}
+          <button class="playback-stop-button" onClick={handleStop}>
+            ■ Stop
+          </button>
+        </div>
+      )}
     </div>
   );
 }
