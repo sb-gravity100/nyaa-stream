@@ -94,18 +94,23 @@ nyaa_stream/
    home page's "Library" grid and folds its recent episodes (AniList's
    batched `airingSchedules` query, this calendar week + last week)
    into the "Latest Episodes" row.
-6. Playback: the media page's play button (`src/playback.ts`) picks the
-   release with the most seeders out of that episode's group and calls
-   `play_magnet`; backend adds it to the librqbit session and returns a
-   `stream_url` from the local streaming server. The frontend
-   (`PlayerView.tsx`) plays that URL directly in a plain HTML5 `<video>`
-   element — a PotPlayer-style bottom control bar (play/pause, seek,
-   volume, fullscreen, time) fades in on mouse movement and auto-hides
+6. Playback: the media page's play button hands `PlayerView.tsx` the full
+   list of that episode's releases; it auto-picks the one with the most
+   seeders (`releases.ts`'s `bestRelease`) and calls `play_magnet`, which
+   adds it to the librqbit session and returns a `stream_url` from the
+   local streaming server. The frontend plays that URL directly in a plain
+   HTML5 `<video>` element — a PotPlayer-style bottom control bar
+   (play/pause, seek, volume, fullscreen, time, a source-picker dropdown
+   over the same release list) fades in on mouse movement and auto-hides
    after idle, all driven by the browser's native video API (no IPC round
-   trip for pause/seek/volume). It also polls `get_stream_stats` every
-   second to show a buffering/progress readout until the video has enough
-   data to play. Closing the player or navigating away calls
-   `stop_playback` to remove the torrent (stop seeding, drop partial
+   trip for pause/seek/volume). Picking a different source just calls
+   `play_magnet` again - its defensive cleanup tears down the previous
+   torrent. Buffering feedback and the statistics panel port stremio-web's
+   real Player UI (`Buffering.tsx`/`StatisticsMenu.tsx`/
+   `loadingProgress.ts`, verified against `reference/stremio-web` and
+   `reference/stremio-core` rather than designed from scratch) polling
+   `get_stream_stats` every second. Closing the player or navigating away
+   calls `stop_playback` to remove the torrent (stop seeding, drop partial
    files).
 
    **`mpv`/`mpv-ipc` is no longer the real playback engine** — an earlier
@@ -120,9 +125,6 @@ nyaa_stream/
 
 ## Known gaps / not yet implemented
 
-- No manual source picker: the play button auto-picks the most-seeded
-  release per episode group rather than offering a dropdown of all of
-  that episode's raw torrent releases (see PHASES.md Phase 3).
 - `play_magnet` currently always streams file index `0` — needs real file
   selection when a torrent contains multiple files (e.g. batch releases).
 - Playback is limited to whatever codecs/containers the WebView2/Chromium

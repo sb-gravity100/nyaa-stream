@@ -2,6 +2,15 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `c979d2d` · 2026-08-29 · feat(player): Stremio-style buffering/stats, source picker, safer play()
+- `crates/torrent-engine/src/lib.rs`, `src/App.css`, `src/Buffering.tsx`, `src/MediaPage.tsx`, `src/PlayerView.tsx`, `src/StatisticsMenu.tsx`, `src/loadingProgress.ts`, `src/releases.ts`, `src/types.ts`
+
+### `0c9b8eb` · 2026-08-29 · feat(window): launch maximized by default
+- `src-tauri/tauri.conf.json`
+
+### `9768c2c` · 2026-08-29 · fix(kitsu): add missing camelCase serde rename to KitsuMetadata
+- `crates/kitsu-client/src/lib.rs`
+
 ### `e9a85d5` · 2026-08-29 · feat(devtools): forward frontend console/errors to the backend log
 - `src/devLogger.ts`, `src/main.tsx`
 

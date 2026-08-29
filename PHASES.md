@@ -36,12 +36,15 @@
 ## Phase 3 — Playback quality of life
 - [x] Wire a video player to the media page: play button per episode row
       calls `play_magnet`, auto-picking the release with the most seeders
-      out of that episode's group (`bestRelease` in `MediaPage.tsx`), and
+      out of that episode's group (`bestRelease` in `releases.ts`), and
       plays it in a full-viewport `PlayerView.tsx` with a PotPlayer-style
       hover-reveal bottom control bar (play/pause, seek, volume,
-      fullscreen, time) — a manual source-picker dropdown is still not
-      built, so this doesn't yet let the user override the auto-picked
-      release
+      fullscreen, time, source picker)
+- [x] Manual source-picker dropdown: `PlayerView.tsx` takes the full
+      release list for an episode and lets the user switch sources
+      mid-session via a `<select>` in the control bar (sorted by seeders) —
+      `play_magnet`'s existing defensive cleanup on the backend tears down
+      the previous torrent automatically
 - [x] ~~Embed mpv into the app window~~ tried and abandoned: `--wid`
       embedding needed a transparent webview background, and `transparent:
       true` broke all click input app-wide on this Tauri/WebView2/Windows
@@ -50,9 +53,14 @@
       torrent-engine's stream URL directly; `mpv`/`mpv-ipc` is kept only
       for headless thumbnail capture now
 - [x] Surface torrent download/buffer progress in the UI while the video
-      buffers: `get_stream_stats`/`StreamStats` (torrent-engine + Tauri
-      command), polled every 1s by `PlayerView.tsx` into a status line
-      shown until the video reports it can play
+      buffers: ported stremio-web's real Player UI (verified against
+      `reference/stremio-web`/`reference/stremio-core`) rather than a
+      from-scratch design — `Buffering.tsx`'s pulsing clip-path-filled mark
+      uses `loadingProgress.ts`'s weighted peers/downloaded/speed readiness
+      score (mirrors `useStatistics.ts`'s `getLoadingProgress`), and
+      `StatisticsMenu.tsx` is a toggleable peers/speed/completed/info-hash
+      card mirroring `StatisticsMenu.js` (`StreamStats` gained
+      `downloadedBytes`/`totalBytes` to support the weighted score)
 - [ ] File selection for multi-file/batch torrents (currently hardcoded to
       file index 0)
 - [x] Persist a saved-anime library (`src/library.ts`, `localStorage`) —
