@@ -108,8 +108,12 @@ full architecture; summary:
   streaming HTTP server with Range support
 - `crates/nyaa-client` — nyaa.si search via RSS
 - `crates/anilist-client` — AniList GraphQL metadata client
-- `crates/mpv-ipc` — spawns system `mpv`, controls it over JSON IPC
-- Player is the user's system `mpv` — not bundled, must be on PATH
+- `crates/mpv-ipc` — spawns headless system `mpv` over JSON IPC for
+  torrent-thumbnail frame capture only; requires `mpv` on PATH
+- Real playback is a plain HTML5 `<video>` element (`src/PlayerView.tsx`)
+  pointed at torrent-engine's stream URL, not mpv — embedding mpv into the
+  app window was tried and abandoned (a Tauri/WebView2 transparency bug on
+  Windows broke click input app-wide; see PLAN.md's Known gaps)
 - `reference/stremio-core/` is a gitignored, reference-only clone of
   Stremio's core (https://github.com/Stremio/stremio-core) — never a build
   dependency, consult it for architecture ideas only

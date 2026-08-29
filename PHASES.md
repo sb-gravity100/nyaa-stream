@@ -36,24 +36,32 @@
 ## Phase 3 — Playback quality of life
 - [x] Wire a video player to the media page: play button per episode row
       calls `play_magnet`, auto-picking the release with the most seeders
-      out of that episode's group (`bestRelease` in `MediaPage.tsx`) —
-      a manual source-picker dropdown is still not built, so this doesn't
-      yet let the user override the auto-picked release
-- [x] Surface torrent download/buffer progress in the UI while mpv is
-      loading: `get_stream_stats`/`StreamStats` (torrent-engine + Tauri
-      command), polled every 1s by `MediaPage.tsx` into a fixed playback
-      overlay (progress %, speed, peers)
+      out of that episode's group (`bestRelease` in `MediaPage.tsx`), and
+      plays it in a full-viewport `PlayerView.tsx` with a PotPlayer-style
+      hover-reveal bottom control bar (play/pause, seek, volume,
+      fullscreen, time) — a manual source-picker dropdown is still not
+      built, so this doesn't yet let the user override the auto-picked
+      release
+- [x] ~~Embed mpv into the app window~~ tried and abandoned: `--wid`
+      embedding needed a transparent webview background, and `transparent:
+      true` broke all click input app-wide on this Tauri/WebView2/Windows
+      combination (upstream bug, not fixable from app code — see PLAN.md's
+      Known gaps). Replaced with a plain HTML5 `<video>` element playing
+      torrent-engine's stream URL directly; `mpv`/`mpv-ipc` is kept only
+      for headless thumbnail capture now
+- [x] Surface torrent download/buffer progress in the UI while the video
+      buffers: `get_stream_stats`/`StreamStats` (torrent-engine + Tauri
+      command), polled every 1s by `PlayerView.tsx` into a status line
+      shown until the video reports it can play
 - [ ] File selection for multi-file/batch torrents (currently hardcoded to
       file index 0)
 - [x] Persist a saved-anime library (`src/library.ts`, `localStorage`) —
       resolves the "TBD: sqlite vs. flat file" note for *this* use case;
       watch-history/continue-watching persistence is still open
-- [x] Handle mpv exit (user closes player) and clean up the torrent
-      session/player state: `watch_mpv_exit` polls the active mpv process
-      (`MpvPlayer::try_wait`) every 500ms and runs the same cleanup
-      (`cleanup_playback`) as the in-app Stop button when it exits on its
-      own; `play_magnet` also defensively cleans up any leftover session
-      before starting a new one
+- [x] Handle the player closing and clean up the torrent session: closing
+      `PlayerView` or navigating away calls `stop_playback`, which removes
+      the active torrent; `play_magnet` also defensively runs the same
+      cleanup before starting a new session
 
 ## Phase 4 — Library and polish
 - [x] Home page: "Library" grid of saved anime + a "Latest Episodes" row

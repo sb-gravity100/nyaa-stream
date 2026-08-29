@@ -1,9 +1,7 @@
-import { useEffect, useRef, useState } from "preact/hooks";
-import { displayTitle, formatSeason, type AnimeMedia, type KitsuMetadata, type NyaaResult, type StreamStats } from "./types";
+import { useState } from "preact/hooks";
+import { displayTitle, formatSeason, type AnimeMedia, type KitsuMetadata, type NyaaResult } from "./types";
 import type { EpisodeLabel } from "./episodeParser";
-import { getStreamStats, playMagnet, stopPlayback } from "./playback";
-
-const STATS_POLL_MS = 1000;
+import { PlayerView } from "./PlayerView";
 
 interface Props {
   anime: AnimeMedia;
@@ -55,11 +53,9 @@ function bestRelease(releases: NyaaResult[]): NyaaResult {
   return releases.reduce((best, r) => (r.seeders > best.seeders ? r : best));
 }
 
-interface PlayingState {
-  torrentId: number;
+interface PlayerSession {
   title: string;
-  stats: StreamStats | null;
-  error: string | null;
+  release: NyaaResult;
 }
 
 export function MediaPage({
@@ -75,46 +71,10 @@ export function MediaPage({
   onRemoveFromLibrary,
 }: Props) {
   const seasonLabel = formatSeason(anime.season, anime.seasonYear);
-  const [playing, setPlaying] = useState<PlayingState | null>(null);
-  const pollRef = useRef<number | undefined>(undefined);
+  const [player, setPlayer] = useState<PlayerSession | null>(null);
 
-  // Stop mpv and remove the torrent if the user navigates away mid-stream —
-  // otherwise it would keep seeding/downloading in the background forever.
-  useEffect(() => {
-    return () => {
-      window.clearInterval(pollRef.current);
-      stopPlayback();
-    };
-  }, []);
-
-  async function handlePlay(title: string, releases: NyaaResult[]) {
-    window.clearInterval(pollRef.current);
-    const release = bestRelease(releases);
-    setPlaying({ torrentId: -1, title, stats: null, error: null });
-    try {
-      const session = await playMagnet(release.magnet, title);
-      setPlaying({ torrentId: session.torrentId, title, stats: null, error: null });
-      pollRef.current = window.setInterval(async () => {
-        try {
-          const stats = await getStreamStats(session.torrentId);
-          setPlaying((current) =>
-            current && current.torrentId === session.torrentId ? { ...current, stats } : current,
-          );
-        } catch {
-          // mpv/torrent may have already been torn down (user closed the
-          // player window) — stop polling rather than spamming errors.
-          window.clearInterval(pollRef.current);
-        }
-      }, STATS_POLL_MS);
-    } catch (err) {
-      setPlaying({ torrentId: -1, title, stats: null, error: String(err) });
-    }
-  }
-
-  async function handleStop() {
-    window.clearInterval(pollRef.current);
-    setPlaying(null);
-    await stopPlayback();
+  function handlePlay(title: string, releases: NyaaResult[]) {
+    setPlayer({ title, release: bestRelease(releases) });
   }
   // stremio-web has no separate anime "logo" source (Cinemeta/Fanart.tv
   // supply that for movies/series; AniList and Kitsu, the anime-metadata
@@ -193,29 +153,13 @@ export function MediaPage({
         </div>
       </div>
 
-      {playing && (
-        <div class="playback-overlay">
-          <div class="playback-overlay-title">{playing.title}</div>
-          {playing.error && <div class="playback-overlay-error">{playing.error}</div>}
-          {!playing.error && !playing.stats && <div class="playback-overlay-status">Adding torrent…</div>}
-          {!playing.error && playing.stats && (
-            <>
-              <div class="playback-progress-track">
-                <div
-                  class="playback-progress-fill"
-                  style={{ width: `${Math.min(100, playing.stats.progressPercent).toFixed(1)}%` }}
-                />
-              </div>
-              <div class="playback-overlay-status">
-                {playing.stats.progressPercent.toFixed(1)}% ∙ {playing.stats.downloadSpeedMbps.toFixed(2)} MiB/s ∙{" "}
-                {playing.stats.connectedPeers} peers
-              </div>
-            </>
-          )}
-          <button class="playback-stop-button" onClick={handleStop}>
-            ■ Stop
-          </button>
-        </div>
+      {player && (
+        <PlayerView
+          key={`${player.title}:${player.release.magnet}`}
+          title={player.title}
+          release={player.release}
+          onClose={() => setPlayer(null)}
+        />
       )}
     </div>
   );
