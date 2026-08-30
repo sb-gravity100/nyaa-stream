@@ -23,6 +23,11 @@ pub struct AnimeMedia {
     pub season: Option<String>,
     #[serde(rename = "seasonYear")]
     pub season_year: Option<i32>,
+    /// Typical per-episode runtime in minutes, per AniList. Used as a
+    /// player duration estimate that doesn't depend on scanning the video
+    /// file itself - see PLAN.md's Known gaps on why `ffprobe`-derived
+    /// duration is unreliable for a freshly-downloading torrent.
+    pub duration: Option<i32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -51,6 +56,7 @@ pub struct AiringMedia {
     pub title: AnimeTitle,
     #[serde(rename = "coverImage")]
     pub cover_image: CoverImage,
+    pub duration: Option<i32>,
 }
 
 #[derive(Deserialize)]
@@ -107,6 +113,7 @@ query ($search: String, $perPage: Int) {
       format
       season
       seasonYear
+      duration
     }
   }
 }
@@ -124,6 +131,7 @@ query ($id: Int) {
     format
     season
     seasonYear
+    duration
   }
 }
 "#;
@@ -138,7 +146,7 @@ query ($ids: [Int], $from: Int, $to: Int, $perPage: Int) {
     airingSchedules(mediaId_in: $ids, airingAt_greater: $from, airingAt_lesser: $to, sort: TIME_DESC) {
       episode
       airingAt
-      media { id title { romaji english native } coverImage { large extraLarge } }
+      media { id title { romaji english native } coverImage { large extraLarge } duration }
     }
   }
 }

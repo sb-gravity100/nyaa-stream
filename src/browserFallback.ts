@@ -19,6 +19,7 @@ query ($search: String, $perPage: Int) {
       format
       season
       seasonYear
+      duration
     }
   }
 }
@@ -51,6 +52,7 @@ query ($id: Int) {
     format
     season
     seasonYear
+    duration
   }
 }
 `;
