@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `409b92a` · 2026-08-30 · style(home): size Latest Episodes cards 16:9 instead of a poster's 2:3
+- `PHASES.md`, `src/App.css`
+
 ### `2979792` · 2026-08-30 · fix(player): seek-bar highlight reflects HLS readiness, not raw download
 - `PHASES.md`, `crates/torrent-engine/src/lib.rs`, `src/PlayerView.tsx`, `src/types.ts`
 
