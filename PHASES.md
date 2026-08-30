@@ -138,8 +138,16 @@
       card mirroring `StatisticsMenu.js` (`StreamStats` gained
       `downloadedBytes`/`totalBytes` to support the weighted score)
 - [x] Seek bar shows a download-progress highlight (`.player-seek-downloaded`
-      in `PlayerView.tsx`) alongside the played-position fill, approximated
-      from the torrent's overall byte-download percent
+      in `PlayerView.tsx`) alongside the played-position fill. Originally
+      approximated from the torrent's overall byte-download percent, which
+      was verified live to actively mislead: a seek target could sit well
+      inside the "downloaded" region and still take 20+ seconds, because
+      that region's specific byte range hadn't actually been read/muxed
+      into an HLS segment yet (raw download and HLS transcode progress can
+      diverge either way). Replaced with `StreamStats.readySeconds`
+      (`HlsJobs::ready_seconds` in torrent-engine) - the real "how far have
+      segments actually been produced" mark, which is what determines
+      whether a seek is instant.
 - [x] Re-adding a torrent whose destination file already exists (replaying
       an episode, or a thumbnail capture colliding with a real download)
       used to fail outright with "allow_overwrite = false" - fixed via

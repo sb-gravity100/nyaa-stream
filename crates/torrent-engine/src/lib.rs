@@ -97,6 +97,35 @@ impl HlsJobs {
         jobs.entry((torrent_id, file_idx)).or_insert_with(|| Arc::new(AsyncMutex::new(None))).clone()
     }
 
+    /// How far into the file playback can seek and get an instant response
+    /// (backed by an already-produced segment file), as a timestamp in
+    /// seconds - not to be confused with raw torrent download progress.
+    /// Those two track different things and can diverge a lot: a byte
+    /// range can be fully downloaded while its segment still needs ffmpeg
+    /// to actually process it, and a restart-at-a-seek-target can leave
+    /// large already-transcoded stretches behind at a lower index than the
+    /// current job's own start_index (still instantly seekable, just not
+    /// "in progress" by the sense HlsJob::start_index tracks) - so this
+    /// deliberately scans for the highest segment file across the whole
+    /// directory, unlike the restart-decision logic elsewhere in this
+    /// impl, which only looks at the *current* job's own progress.
+    fn ready_seconds(&self, torrent_id: TorrentId, file_idx: usize) -> f64 {
+        let dir = self.job_dir(torrent_id, file_idx);
+        let Ok(entries) = std::fs::read_dir(&dir) else {
+            return 0.0;
+        };
+        let highest = entries
+            .flatten()
+            .filter_map(|entry| {
+                entry.file_name().to_str().and_then(|name| name.strip_suffix(".ts")).and_then(|stem| stem.parse::<usize>().ok())
+            })
+            .max();
+        match highest {
+            Some(index) => (index + 1) as f64 * SEGMENT_DURATION_SECONDS,
+            None => 0.0,
+        }
+    }
+
     /// Ensures a background transcode job is producing (or has already
     /// produced) the segment at `segment_index`, restarting it at that
     /// offset first if needed, then waits for the resulting file to land
@@ -362,6 +391,12 @@ pub struct StreamStats {
     /// cruder "% of the whole file" estimate.
     pub downloaded_bytes: u64,
     pub total_bytes: u64,
+    /// How far into the file (in seconds) HLS segments have actually been
+    /// produced and are ready for an instant seek - see
+    /// `HlsJobs::ready_seconds`'s doc comment for why this isn't the same
+    /// thing as `progress_percent`. Frontend seek-bar highlight should use
+    /// this, not `progress_percent`, for "can I seek here instantly".
+    pub ready_seconds: f64,
 }
 
 impl TorrentEngine {
@@ -522,6 +557,10 @@ impl TorrentEngine {
             finished: stats.finished,
             downloaded_bytes: stats.progress_bytes,
             total_bytes: stats.total_bytes,
+            // `play_magnet` only ever streams file index 0 today (see
+            // PLAN.md's Known gaps) - matches that assumption rather than
+            // threading a real file index through this call.
+            ready_seconds: self.hls_jobs.ready_seconds(id, 0),
         })
     }
 }

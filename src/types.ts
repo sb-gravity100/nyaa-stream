@@ -72,6 +72,11 @@ export interface StreamStats {
   finished: boolean;
   downloadedBytes: number;
   totalBytes: number;
+  /** How far into the file (seconds) HLS segments are actually produced
+   * and instantly seekable - not the same as progressPercent, which
+   * tracks raw torrent byte download and can run ahead of or behind
+   * this (see torrent-engine's StreamStats doc comment). */
+  readySeconds: number;
 }
 
 export function displayTitle(title: AnimeTitle): string {

@@ -348,11 +348,15 @@ export function PlayerView({ title, releases, estimatedDurationMinutes, onClose 
 
   const displayPosition = seekPreview ?? position;
   const buffering = !error && !ready;
-  // Approximation: torrent download progress is tracked as an overall
-  // fraction of the file's bytes, not per-region, so this assumes a
-  // roughly even bitrate to translate "% of file downloaded" into "% of
-  // the timeline downloaded" for the seek bar highlight.
-  const downloadedPercent = stats ? Math.min(100, stats.progressPercent) : 0;
+  // stats.readySeconds (how far HLS segments have actually been produced),
+  // not stats.progressPercent (raw torrent byte download) - those two can
+  // diverge a lot, e.g. right after a seek forces a jump in download
+  // priority a stretch of bytes can be fully downloaded well before ffmpeg
+  // has actually processed it into a segment, or vice versa once a
+  // stretch is available a fast -c:v copy pass can race ahead of download.
+  // Using progressPercent here used to make regions look instantly
+  // seekable when they weren't - verified live, see PLAN.md.
+  const downloadedPercent = stats && duration ? Math.min(100, (stats.readySeconds / duration) * 100) : 0;
   const playedPercent = duration ? Math.min(100, (displayPosition / duration) * 100) : 0;
 
   return (
