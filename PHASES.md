@@ -43,9 +43,23 @@
       bucket. Fixed with a dedicated sentinel season value + "Final
       Season" display text (`FINAL_SEASON_PATTERN`/`FINAL_SEASON_NUMBER`)
       instead of defaulting to 1. The audit also confirmed the
-      absolute-vs-season-relative numbering gap already documented in
-      PLAN.md's Known gaps is a real, recurring pattern (not just the one
-      Slime/Doomdos case) - left unfixed, see there for why.
+      absolute-vs-season-relative numbering gap (Jujutsu Kaisen/Kaizoku,
+      Spy x Family, Slime/Doomdos) is a real, recurring pattern - later
+      fixed for real, see the next entry.
+- [x] Absolute-vs-season-relative episode numbering fixed via AniList's
+      relations graph: `get_absolute_episode_offset`
+      (`AniListClient::cumulative_prequel_episodes`) walks the PREQUEL
+      chain backward from the browsed season, summing prior seasons'
+      episode counts, and `App.tsx`'s `groupedSources` uses that to
+      rewrite an absolute episode number back to its real season-relative
+      one. Verified live against Slime Season 4 (user-confirmed ground
+      truth: absolute episode 73 = season 4 episode 1, i.e. offset 72) -
+      the naive walk undercounted to 48 at first because Slime's own
+      relations graph routes Season 2's only PREQUEL edge through an OVA
+      ("Visions of Coleus") rather than directly to Season 1, so the walk
+      now follows through a non-TV prequel without counting it, only
+      stopping when a *counted* (TV/TV_SHORT) prequel's own episode count
+      is unknown.
 - [x] View-page scrape (`get_torrent_details_batch`) as the deterministic
       backstop for the remaining ambiguous titles — real submitter + batch
       file-count ground truth, bounded concurrency, only run for titles the

@@ -82,6 +82,38 @@ struct MediaData {
 }
 
 #[derive(Deserialize)]
+struct RelationsData {
+    #[serde(rename = "Media")]
+    media: MediaRelations,
+}
+
+#[derive(Deserialize)]
+struct MediaRelations {
+    relations: RelationConnection,
+}
+
+#[derive(Deserialize)]
+struct RelationConnection {
+    edges: Vec<RelationEdge>,
+}
+
+#[derive(Deserialize)]
+struct RelationEdge {
+    #[serde(rename = "relationType")]
+    relation_type: String,
+    node: RelationNode,
+}
+
+#[derive(Deserialize)]
+struct RelationNode {
+    id: i64,
+    episodes: Option<i32>,
+    format: Option<String>,
+    #[serde(rename = "type")]
+    media_type: String,
+}
+
+#[derive(Deserialize)]
 struct AiringSchedulesData {
     #[serde(rename = "Page")]
     page: AiringSchedulesPage,
@@ -132,6 +164,22 @@ query ($id: Int) {
     season
     seasonYear
     duration
+  }
+}
+"#;
+
+/// `relationType(version: 2)` (not the bare v1 field) since AniList
+/// corrected PREQUEL/SEQUEL direction for some entries in a schema
+/// revision - the v1 field can report the wrong direction for those.
+const RELATIONS_QUERY: &str = r#"
+query ($id: Int) {
+  Media(id: $id, type: ANIME) {
+    relations {
+      edges {
+        relationType(version: 2)
+        node { id episodes format type }
+      }
+    }
   }
 }
 "#;
@@ -271,5 +319,86 @@ impl AniListClient {
         };
         tracing::debug!(count = parsed.data.page.airing_schedules.len(), "AniList airingSchedules returned results");
         Ok(parsed.data.page.airing_schedules)
+    }
+
+    async fn get_relations(&self, id: i64) -> anyhow::Result<MediaRelations> {
+        let body = serde_json::json!({
+            "query": RELATIONS_QUERY,
+            "variables": { "id": id }
+        });
+        let resp = match self.http.post(ANILIST_URL).json(&body).send().await {
+            Ok(resp) => resp,
+            Err(err) => {
+                tracing::error!(id, %err, "AniList relations request failed to send");
+                return Err(err.into());
+            }
+        };
+        let resp = match resp.error_for_status() {
+            Ok(resp) => resp,
+            Err(err) => {
+                tracing::error!(id, %err, "AniList relations returned an error status");
+                return Err(err.into());
+            }
+        };
+        let parsed: GraphQlResponse<RelationsData> = match resp.json().await {
+            Ok(parsed) => parsed,
+            Err(err) => {
+                tracing::error!(id, %err, "failed to parse AniList relations response body");
+                return Err(err.into());
+            }
+        };
+        Ok(parsed.data.media)
+    }
+
+    /// Walks the PREQUEL chain backward from `media_id`, summing each
+    /// prequel's episode count, to get the number of episodes that air
+    /// *before* this season in absolute (franchise-wide) numbering terms.
+    /// Some fansub groups number releases this way instead of restarting
+    /// from 1 each season - verified live: "[Kaizoku] Jujutsu Kaisen - 25
+    /// ... (Season 2)" where 25 is season 1's 24 episodes + season 2's own
+    /// episode 1, and "[Doomdos] ... Slime Season 4 - 92" where 92 is
+    /// season 4's own episode 20 plus 72 (three prior 24-episode seasons).
+    ///
+    /// Only follows TV/TV_SHORT prequels - an OVA/movie/special prequel
+    /// isn't usually counted in this kind of absolute numbering - and
+    /// stops (returning what it has accumulated so far) the moment a
+    /// prequel's own episode count is unknown, since guessing further back
+    /// would make the whole offset actively wrong rather than merely
+    /// incomplete. Bounded to 20 hops defensively against a pathological
+    /// or cyclic relations graph, not because any real franchise is
+    /// expected to run that deep.
+    pub async fn cumulative_prequel_episodes(&self, media_id: i64) -> anyhow::Result<i32> {
+        let mut total = 0;
+        let mut current_id = media_id;
+        for _ in 0..20 {
+            let media = self.get_relations(current_id).await?;
+            let Some(edge) =
+                media.relations.edges.iter().find(|edge| edge.relation_type == "PREQUEL" && edge.node.media_type == "ANIME")
+            else {
+                break;
+            };
+            // A non-TV prequel (OVA/movie/special) doesn't itself count
+            // toward absolute numbering, but it's still a real link in the
+            // chain that has to be walked *through* to find whatever
+            // (possibly TV) prequel sits behind it - verified live: Slime
+            // Season 2's only PREQUEL edge on AniList points to an OVA
+            // ("Visions of Coleus"), which in turn PREQUELs the real
+            // Season 1 (TV, 24 episodes). Stopping at the OVA instead of
+            // continuing through it undercounted this show's real offset
+            // by a whole season.
+            let counts = matches!(edge.node.format.as_deref(), Some("TV") | Some("TV_SHORT"));
+            if counts {
+                match edge.node.episodes {
+                    // Only a *counted* prequel with an unknown episode
+                    // count actually breaks the math - stop rather than
+                    // silently under/over-counting from here back.
+                    Some(episodes) => total += episodes,
+                    None => break,
+                }
+            }
+            current_id = edge.node.id;
+        }
+        tracing::debug!(media_id, total, "AniList cumulative_prequel_episodes computed");
+        Ok(total)
     }
 }

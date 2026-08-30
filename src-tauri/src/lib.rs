@@ -104,6 +104,31 @@ async fn get_anime_details(state: State<'_, Arc<AppState>>, id: i64) -> Result<A
     }
 }
 
+/// Cumulative episode count of every prior season in the franchise, per
+/// AniList's relations graph - see `anilist_client::AniListClient::
+/// cumulative_prequel_episodes`'s doc comment for the full explanation.
+/// Used to recognize when a release numbers an episode absolutely across
+/// the whole franchise (e.g. "Season 4 Episode 92") instead of relative to
+/// the season being browsed, and correct it (episodeParser.ts can't do
+/// this from title text alone - it has no notion of a franchise's other
+/// seasons). Returns 0 (not an error) if AniList's relations graph has
+/// nothing useful here - same as "no prior seasons found", the correction
+/// step just won't have anything to do for this anime.
+#[tauri::command]
+async fn get_absolute_episode_offset(state: State<'_, Arc<AppState>>, id: i64) -> Result<i32, String> {
+    tracing::debug!(id, "get_absolute_episode_offset invoked");
+    match state.anilist.cumulative_prequel_episodes(id).await {
+        Ok(offset) => {
+            tracing::info!(id, offset, "get_absolute_episode_offset succeeded");
+            Ok(offset)
+        }
+        Err(err) => {
+            tracing::error!(id, %err, "get_absolute_episode_offset failed");
+            Err(err.to_string())
+        }
+    }
+}
+
 /// Fetches Kitsu's backdrop banner and per-episode thumbnails for one
 /// AniList anime. Used instead of AniList's own `streamingEpisodes`/
 /// `coverImage` for this purpose - see kitsu_client::KitsuClient::get_metadata
@@ -500,6 +525,7 @@ pub fn run() {
             log_frontend,
             search_anime,
             get_anime_details,
+            get_absolute_episode_offset,
             get_latest_episodes,
             get_kitsu_metadata,
             capture_torrent_thumbnail,

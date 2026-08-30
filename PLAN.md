@@ -114,7 +114,20 @@ nyaa_stream/
    title actually names a season >1 - an unnumbered "season 1" is exactly
    extractSeasonNumber's ambiguous default for a genuinely unparseable
    title too, so filtering there would risk hiding real matches instead of
-   removing noise.
+   removing noise. It also corrects releases numbered *absolutely* across
+   a whole franchise instead of relative to the season being browsed (e.g.
+   `[Kaizoku] Jujutsu Kaisen - 25 ... (Season 2)`, where 25 is that show's
+   overall episode count, not "episode 25 of season 2" - `episodeParser.ts`
+   has no way to tell from title text alone, verified live across multiple
+   shows/groups as a real, recurring pattern) using
+   `get_absolute_episode_offset` (`AniListClient::cumulative_prequel_episodes`
+   in `crates/anilist-client`): walks the AniList relations graph's
+   PREQUEL chain backward from the browsed season, summing prior seasons'
+   episode counts (skipping through, but not counting, an OVA/movie/special
+   prequel that itself further PREQUELs a real season - verified live that
+   Slime's own relations graph has exactly this gap between its Season 2
+   and Season 1 entries) to recognize and rewrite an absolute episode
+   number back to its real season-relative one before grouping.
 4. The media page's docked panel lists one row per episode (stremio-web's
    real `VideosList` pattern), not a flat list of raw torrent releases —
    picking a specific source is deferred to a future video-player dropdown,
@@ -226,18 +239,4 @@ nyaa_stream/
   still-downloading torrent that seek is best-effort and can land short
   of the target or occasionally not resolve in time, same tradeoff as
   torrent-engine's HLS segment restarts.
-- Some fansub groups number releases *absolutely* across a whole franchise
-  (e.g. `[Kaizoku] Jujutsu Kaisen - 25 ... (Season 2)`, where 25 is that
-  show's overall episode count, not "episode 25 of season 2") with no
-  season-relative number anywhere in the title to fall back on -
-  `episodeParser.ts` has no way to recover the real within-season number
-  from title text alone, so these land in their own bogus single-release
-  "episode" bucket instead of merging with the season-relative releases
-  for the same actual episode. Verified live across multiple shows/groups
-  (Jujutsu Kaisen/Kaizoku, Spy x Family, That Time I Got Reincarnated as a
-  Slime/Doomdos) - a real, recurring pattern, not a one-off. Fixing this
-  properly needs each season's cumulative episode-count offset (from
-  AniList) threaded into the parser, which `parseEpisode(title)` doesn't
-  have access to today - not attempted yet.
-
 See `PHASES.md` for the build order.
