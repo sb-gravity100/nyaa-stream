@@ -2,6 +2,18 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `4038a5f` · 2026-08-30 · docs: sync PLAN/PHASES/FILE_INDEX/CLAUDE with HLS transcode rearchitecture
+- `CLAUDE.md`, `FILE_INDEX.md`, `PHASES.md`, `PLAN.md`
+
+### `92ecc8e` · 2026-08-30 · feat(streaming): real HLS playback via a continuous per-file transcode
+- `crates/torrent-engine/Cargo.toml`, `crates/torrent-engine/src/lib.rs`, `package-lock.json`, `package.json`, `src-tauri/src/lib.rs`, `src/PlayerView.tsx`, `src/types.ts`
+
+### `1062ef4` · 2026-08-30 · feat(playback): autoplay latest-episode clicks straight into the player
+- `src/App.tsx`, `src/HomePage.tsx`, `src/MediaPage.tsx`
+
+### `da6821f` · 2026-08-30 · feat(metadata): add AniList per-episode duration for HLS estimates
+- `crates/anilist-client/src/lib.rs`, `src/browserFallback.ts`
+
 ### `cfacbe6` · 2026-08-29 · feat(playback): remux through ffmpeg for reliable browser playback + seeking
 - `CLAUDE.md`, `FILE_INDEX.md`, `PHASES.md`, `PLAN.md`, `crates/torrent-engine/Cargo.toml`, `crates/torrent-engine/src/lib.rs`, `src-tauri/src/lib.rs`, `src/App.css`, `src/PlayerView.tsx`
 
