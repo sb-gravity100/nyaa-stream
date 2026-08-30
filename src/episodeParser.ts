@@ -145,7 +145,7 @@ const BATCH_PATTERNS: RegExp[] = [/\bseason\s*\d+\b/i, /\bS\d{1,2}\b/, /\bcour\s
 // marker at all is either an explicitly single-season show or (per user
 // input) a long-running, season-less show like One Piece/Naruto/Bleach —
 // both cases are correctly "season 1" for grouping purposes.
-function extractSeasonNumber(title: string): number {
+export function extractSeasonNumber(title: string): number {
   const seasonWordMatch = title.match(/\bseason\s*(\d+)/i);
   if (seasonWordMatch) return parseInt(seasonWordMatch[1], 10);
   const sMatch = title.match(/\bS(\d{1,2})\b/i);
