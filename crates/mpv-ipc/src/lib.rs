@@ -41,26 +41,33 @@ impl MpvPlayer {
     /// --no-terminal`), for driving it purely over IPC without ever showing
     /// a player UI - used for pulling a single frame out of a torrent's
     /// stream as a thumbnail (see `screenshot_to_file`) rather than actual
-    /// playback.
-    pub async fn spawn_headless(stream_url: &str) -> anyhow::Result<Self> {
-        Self::spawn_with_args(
-            stream_url,
-            &[
-                "--vo=null".to_string(),
-                "--ao=null".to_string(),
-                "--no-terminal".to_string(),
-                // Without a real video/audio output consuming frames, mpv
-                // otherwise decides almost immediately that there's
-                // "nothing to do" and quits as if it hit EOF - verified
-                // live (see mpv-ipc's screenshot_test example): playback
-                // position stayed at 0 and the process exited within ~2s
-                // without this flag, even against a normal, fully seekable
-                // remote file.
-                "--keep-open=yes".to_string(),
-            ],
-            "headless",
-        )
-        .await
+    /// playback. `start_seconds`, when given, has mpv attempt to start
+    /// already positioned there (`--start=`) instead of at 0 - callers
+    /// still need to poll `get_time_position` afterward since this is a
+    /// best-effort request, not a guarantee (see its own doc comment for
+    /// why: without a Matroska Cues index on a still-downloading torrent,
+    /// this is the same kind of imprecise/potentially slow seek as
+    /// ffmpeg's `-ss` in torrent-engine - it can land short of the target,
+    /// or occasionally not resolve in time at all, gracefully falling back
+    /// to no thumbnail at the call site rather than failing outright).
+    pub async fn spawn_headless(stream_url: &str, start_seconds: Option<f64>) -> anyhow::Result<Self> {
+        let mut args = vec![
+            "--vo=null".to_string(),
+            "--ao=null".to_string(),
+            "--no-terminal".to_string(),
+            // Without a real video/audio output consuming frames, mpv
+            // otherwise decides almost immediately that there's
+            // "nothing to do" and quits as if it hit EOF - verified
+            // live (see mpv-ipc's screenshot_test example): playback
+            // position stayed at 0 and the process exited within ~2s
+            // without this flag, even against a normal, fully seekable
+            // remote file.
+            "--keep-open=yes".to_string(),
+        ];
+        if let Some(seconds) = start_seconds {
+            args.push(format!("--start={seconds}"));
+        }
+        Self::spawn_with_args(stream_url, &args, "headless").await
     }
 
     async fn spawn_with_args(stream_url: &str, extra_args: &[String], label: &str) -> anyhow::Result<Self> {

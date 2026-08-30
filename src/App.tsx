@@ -174,7 +174,7 @@ function App() {
   async function loadTorrentThumbnail(entry: AiringEntry) {
     const key = `${entry.media.id}-${entry.episode}`;
     if (key in torrentThumbnails) return;
-    const dataUri = await fetchTorrentThumbnail(entry.media.id, entry.episode, entry.media.title);
+    const dataUri = await fetchTorrentThumbnail(entry.media.id, entry.episode, entry.media.title, entry.media.duration);
     setTorrentThumbnails((current) => (key in current ? current : { ...current, [key]: dataUri }));
   }
 

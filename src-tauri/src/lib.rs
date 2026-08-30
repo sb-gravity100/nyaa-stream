@@ -127,14 +127,20 @@ async fn get_kitsu_metadata(state: State<'_, Arc<AppState>>, anilist_id: i64) ->
     }
 }
 
-/// How far into the episode to seek before grabbing a frame - far enough to
-/// usually be past a cold-open/company-logo black frame, still early enough
-/// that reaching it (by just letting playback run, see below) only pulls a
-/// small amount of data. Not seeked-to via mpv's seek command (which can
-/// require data librqbit hasn't prioritized yet for a torrent this fresh);
-/// instead we let mpv play from the start and poll its playback position,
-/// so we only ever consume what streams past sequentially.
+/// Fallback seek target when there's no duration estimate to compute a real
+/// midpoint from (see `capture_thumbnail_uncached`) - far enough to usually
+/// be past a cold-open/company-logo black frame, still early enough that
+/// reaching it by just letting playback run from 0 (no `--start`, avoiding
+/// mpv needing to seek at all) only pulls a small amount of data.
 const THUMBNAIL_SEEK_SECONDS: f64 = 8.0;
+/// Slack allowed when we *do* have a duration estimate and ask mpv to
+/// start already near the midpoint via `--start` (see mpv-ipc's
+/// `spawn_headless` doc comment): without a Matroska Cues index on a
+/// still-downloading torrent, that seek can land on the nearest keyframe
+/// *before* the exact target rather than exactly on it, so the wait loop
+/// below accepts anything within this much of the target instead of
+/// waiting for an exact match that might never come.
+const THUMBNAIL_SEEK_TOLERANCE_SECONDS: f64 = 5.0;
 /// Upper bound on the whole capture attempt (spawn mpv, wait for the swarm
 /// to deliver enough data to reach THUMBNAIL_SEEK_SECONDS, screenshot).
 /// Deliberately short: this is a best-effort background enhancement for a
@@ -146,10 +152,15 @@ const THUMBNAIL_POLL_INTERVAL: Duration = Duration::from_millis(500);
 /// no per-episode art for a show (verified live: happens for lower-profile
 /// currently-airing anime that simply haven't been backfilled into either
 /// database yet). Adds the given single-episode-release magnet, lets mpv
-/// play it headlessly just long enough to reach THUMBNAIL_SEEK_SECONDS
-/// (downloading only that much, not the whole episode), grabs one frame,
-/// then removes the torrent - it only ever existed to produce this one
-/// image. Results are cached to disk by `cache_key` (caller-chosen, e.g.
+/// play it headlessly just long enough to reach roughly the middle of the
+/// episode (a cold-open/black-frame/logo risk at the very start, unlike a
+/// frame from partway through - `duration_minutes` is the frontend's
+/// AniList-derived estimate, same source as the HLS playlist duration;
+/// falls back to a fixed early point if it's unavailable, since waiting
+/// for *actual* real-time playback to reach a real midpoint - many minutes
+/// - isn't practical within this call's timeout), grabs one frame, then
+/// removes the torrent - it only ever existed to produce this one image.
+/// Results are cached to disk by `cache_key` (caller-chosen, e.g.
 /// `{anilist_id}-{episode}`) so this only runs once per episode ever, not
 /// once per app launch. Returns `Ok(None)` rather than `Err` for any
 /// failure in the pipeline (mpv missing, torrent add failed, swarm too
@@ -160,6 +171,7 @@ async fn capture_torrent_thumbnail(
     state: State<'_, Arc<AppState>>,
     magnet: String,
     cache_key: String,
+    duration_minutes: Option<f64>,
 ) -> Result<Option<String>, String> {
     let cache_path = state.thumbnail_cache_dir.join(format!("{cache_key}.jpg"));
 
@@ -169,7 +181,7 @@ async fn capture_torrent_thumbnail(
     }
 
     tracing::info!(cache_key, "capture_torrent_thumbnail cache miss, capturing from torrent");
-    match capture_thumbnail_uncached(&state, &magnet, &cache_path).await {
+    match capture_thumbnail_uncached(&state, &magnet, &cache_path, duration_minutes).await {
         Ok(bytes) => Ok(Some(to_data_uri(&bytes))),
         Err(err) => {
             tracing::warn!(cache_key, %err, "capture_torrent_thumbnail failed, falling back to no thumbnail");
@@ -189,6 +201,7 @@ async fn capture_thumbnail_uncached(
     state: &Arc<AppState>,
     magnet: &str,
     cache_path: &std::path::Path,
+    duration_minutes: Option<f64>,
 ) -> anyhow::Result<Vec<u8>> {
     if let Some(parent) = cache_path.parent() {
         tokio::fs::create_dir_all(parent).await?;
@@ -197,17 +210,28 @@ async fn capture_thumbnail_uncached(
     let added = state.torrent_engine.add(magnet).await?;
     let stream_url = state.torrent_engine.stream_url(added.id, 0);
 
-    let capture_result = tokio::time::timeout(THUMBNAIL_CAPTURE_TIMEOUT, async {
-        let mut player = MpvPlayer::spawn_headless(&stream_url).await?;
+    // Some(_) means "seek there via mpv's --start", None means "no
+    // estimate, just play from 0" - see spawn_headless/the wait loop below
+    // for why these two cases are handled differently rather than always
+    // going through --start with THUMBNAIL_SEEK_SECONDS as its target.
+    let target_seconds = duration_minutes.filter(|m| *m > 0.0).map(|minutes| minutes * 60.0 / 2.0);
 
+    let capture_result = tokio::time::timeout(THUMBNAIL_CAPTURE_TIMEOUT, async {
+        let mut player = MpvPlayer::spawn_headless(&stream_url, target_seconds).await?;
+
+        let effective_target = target_seconds.unwrap_or(THUMBNAIL_SEEK_SECONDS);
         let deadline = tokio::time::Instant::now() + THUMBNAIL_CAPTURE_TIMEOUT;
         loop {
             let position = player.get_time_position().await.unwrap_or(0.0);
-            if position >= THUMBNAIL_SEEK_SECONDS {
+            let reached = match target_seconds {
+                Some(_) => position >= effective_target - THUMBNAIL_SEEK_TOLERANCE_SECONDS,
+                None => position >= effective_target,
+            };
+            if reached {
                 break;
             }
             if tokio::time::Instant::now() >= deadline {
-                anyhow::bail!("timed out waiting for playback to reach {THUMBNAIL_SEEK_SECONDS}s");
+                anyhow::bail!("timed out waiting for playback to reach {effective_target}s");
             }
             tokio::time::sleep(THUMBNAIL_POLL_INTERVAL).await;
         }

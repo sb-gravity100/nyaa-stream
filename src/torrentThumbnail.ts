@@ -30,13 +30,14 @@ function pickCandidate(results: NyaaResult[], episode: number): NyaaResult | nul
 
 // Last-resort thumbnail source — see the doc comment on the Rust
 // `capture_torrent_thumbnail` command (src-tauri/src/lib.rs) for the full
-// pipeline (add torrent, let mpv play headlessly to ~8s in, screenshot,
-// remove torrent). Only runs in the real Tauri app: torrenting isn't
-// available in the dev-only browser preview.
+// pipeline (add torrent, let mpv seek/play headlessly to roughly the
+// episode's midpoint, screenshot, remove torrent). Only runs in the real
+// Tauri app: torrenting isn't available in the dev-only browser preview.
 export async function fetchTorrentThumbnail(
   anilistId: number,
   episode: number,
   title: AnimeTitle,
+  durationMinutes: number | null,
 ): Promise<string | null> {
   if (!isTauriAvailable()) return null;
 
@@ -58,6 +59,7 @@ export async function fetchTorrentThumbnail(
       const dataUri = await invoke<string | null>("capture_torrent_thumbnail", {
         magnet: candidate.magnet,
         cacheKey: key,
+        durationMinutes,
       });
       console.info("[capture_torrent_thumbnail] succeeded", { anilistId, episode, found: dataUri !== null });
       return dataUri;
