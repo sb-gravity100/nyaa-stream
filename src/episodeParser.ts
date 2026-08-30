@@ -116,12 +116,27 @@ function extractEpisodeRange(title: string): [number, number] | null {
   return [min, max];
 }
 
+// "Final Season" (Attack on Titan's actual season 4, and used the same way
+// by other long-running franchises) names a season with no digit attached
+// at all - extractSeasonNumber used to silently default that straight to
+// season 1, which collided every "Final Season" release's episode number
+// with the real season 1's same episode number in the exact same "Episode
+// N" bucket - verified live against real Attack on Titan/Shingeki no
+// Kyojin data. There's no way to recover the *actual* season number from
+// title text alone (that would need AniList/domain knowledge this regex
+// parser doesn't have - see the file's top comment), so this only needs a
+// season value that (a) is consistent across all "Final Season" releases
+// and (b) can't collide with any real numbered season; the exact number
+// is never shown; episodeLabelText renders it back as "Final Season".
+const FINAL_SEASON_PATTERN = /\bfinal\s*season\b/i;
+const FINAL_SEASON_NUMBER = 9001;
+
 // Season/cour markers observed across the real scrape that show up on
 // season-collection titles without the literal word "batch" or a digit
 // range, e.g. "... S1 - BD (1080p) ...", "... (Season 1) ...". Checked
 // only after everything above, so an actual episode is never misread as
 // a batch just because "S01" appears in the title too.
-const BATCH_PATTERNS: RegExp[] = [/\bseason\s*\d+\b/i, /\bS\d{1,2}\b/, /\bcour\s*\d+\b/i];
+const BATCH_PATTERNS: RegExp[] = [/\bseason\s*\d+\b/i, /\bS\d{1,2}\b/, /\bcour\s*\d+\b/i, FINAL_SEASON_PATTERN];
 
 // Finds a season number stated anywhere in the title, independent of
 // where an episode number (if any) was found — so e.g. "Season 2 ...
@@ -135,6 +150,7 @@ function extractSeasonNumber(title: string): number {
   if (seasonWordMatch) return parseInt(seasonWordMatch[1], 10);
   const sMatch = title.match(/\bS(\d{1,2})\b/i);
   if (sMatch) return parseInt(sMatch[1], 10);
+  if (FINAL_SEASON_PATTERN.test(title)) return FINAL_SEASON_NUMBER;
   return 1;
 }
 
@@ -193,11 +209,13 @@ export function parseSubmitterFromTitle(title: string): string | null {
 export function episodeLabelText(label: EpisodeLabel): string {
   switch (label.kind) {
     case "episode":
+      if (label.season === FINAL_SEASON_NUMBER) return `Final Season Episode ${label.number}`;
       // Season 1 is the overwhelmingly common case (either the show
       // genuinely has one season, or it's an unlabeled long-running show
       // like One Piece/Naruto/Bleach) — only call it out when it's not.
       return label.season === 1 ? `Episode ${label.number}` : `Season ${label.season} Episode ${label.number}`;
     case "batch":
+      if (label.season === FINAL_SEASON_NUMBER) return "Final Season Batch";
       return label.season === 1 ? "Batch" : `Season ${label.season} Batch`;
     case "unknown":
       return "Unknown";

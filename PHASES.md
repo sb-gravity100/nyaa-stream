@@ -33,6 +33,19 @@
       through to no match. No regression against a live 160-title Frieren
       re-check. `crates/nyaa-client/examples/search_debug.rs` reruns this
       kind of check against live data without the full app running.
+      Further audit across Attack on Titan/Shingeki no Kyojin, Jujutsu
+      Kaisen, and Spy x Family found and fixed a fourth, more severe
+      mismatch: "Final Season" (Attack on Titan's real season 4, and used
+      the same way by other franchises) has no digit for
+      `extractSeasonNumber` to find, so it silently defaulted to season 1
+      - colliding every "Final Season" release's episode number with the
+      real season 1's same-numbered episode in the same "Episode N"
+      bucket. Fixed with a dedicated sentinel season value + "Final
+      Season" display text (`FINAL_SEASON_PATTERN`/`FINAL_SEASON_NUMBER`)
+      instead of defaulting to 1. The audit also confirmed the
+      absolute-vs-season-relative numbering gap already documented in
+      PLAN.md's Known gaps is a real, recurring pattern (not just the one
+      Slime/Doomdos case) - left unfixed, see there for why.
 - [x] View-page scrape (`get_torrent_details_batch`) as the deterministic
       backstop for the remaining ambiguous titles — real submitter + batch
       file-count ground truth, bounded concurrency, only run for titles the

@@ -201,5 +201,18 @@ nyaa_stream/
   per-season "Batch" bucket.
 - Torrent-captured thumbnails only ever use file index `0` and a fixed
   8-second seek point — same file-selection gap as playback itself.
+- Some fansub groups number releases *absolutely* across a whole franchise
+  (e.g. `[Kaizoku] Jujutsu Kaisen - 25 ... (Season 2)`, where 25 is that
+  show's overall episode count, not "episode 25 of season 2") with no
+  season-relative number anywhere in the title to fall back on -
+  `episodeParser.ts` has no way to recover the real within-season number
+  from title text alone, so these land in their own bogus single-release
+  "episode" bucket instead of merging with the season-relative releases
+  for the same actual episode. Verified live across multiple shows/groups
+  (Jujutsu Kaisen/Kaizoku, Spy x Family, That Time I Got Reincarnated as a
+  Slime/Doomdos) - a real, recurring pattern, not a one-off. Fixing this
+  properly needs each season's cumulative episode-count offset (from
+  AniList) threaded into the parser, which `parseEpisode(title)` doesn't
+  have access to today - not attempted yet.
 
 See `PHASES.md` for the build order.
