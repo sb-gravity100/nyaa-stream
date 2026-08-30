@@ -49,6 +49,11 @@ function App() {
   const [animeResults, setAnimeResults] = useState<AnimeMedia[]>([]);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [selectedAnime, setSelectedAnime] = useState<AnimeMedia | null>(null);
+  // Set when the user clicks a specific episode (the Latest Episodes row)
+  // rather than an anime in general (Library grid, search) - MediaPage
+  // auto-plays this episode once its sources finish loading, then reports
+  // back via onAutoplayHandled so it only fires once per selection.
+  const [autoplayEpisode, setAutoplayEpisode] = useState<number | null>(null);
   const [sources, setSources] = useState<NyaaResult[]>([]);
   const [sourcesLoading, setSourcesLoading] = useState(false);
   const [details, setDetails] = useState<Record<string, TorrentDetails>>({});
@@ -121,6 +126,7 @@ function App() {
     setQuery(releaseQuery);
     setDropdownOpen(false);
     setSelectedAnime(anime);
+    setAutoplayEpisode(null);
     setSources([]);
     setDetails({});
     setSourcesLoading(true);
@@ -142,6 +148,15 @@ function App() {
     // thumbnails once they arrive, doesn't block anything above.
     loadAnimeDetails(anime.id);
     loadKitsuMetadata(anime.id);
+  }
+
+  // Latest Episodes row: jump straight to that episode's player rather than
+  // just opening the anime's page - pickAnime resets autoplayEpisode to
+  // null as part of its own state reset, so this has to set it *after*
+  // calling pickAnime to win the batched update.
+  function selectEpisode(anime: AnimeMedia, episode: number) {
+    pickAnime(anime);
+    setAutoplayEpisode(episode);
   }
 
   async function loadKitsuMetadata(id: number) {
@@ -338,6 +353,8 @@ function App() {
           groupedSources={groupedSources}
           sourcesLoading={sourcesLoading}
           sourcesCount={sources.length}
+          autoplayEpisode={autoplayEpisode}
+          onAutoplayHandled={() => setAutoplayEpisode(null)}
           error={error}
           onBack={backToSearch}
           inLibrary={isInLibrary(selectedAnime.id, library)}
@@ -419,6 +436,7 @@ function App() {
         kitsuByMedia={kitsuByMedia}
         torrentThumbnails={torrentThumbnails}
         onSelectAnime={pickAnime}
+        onSelectEpisode={selectEpisode}
       />
     </main>
   );

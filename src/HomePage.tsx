@@ -7,6 +7,7 @@ interface Props {
   kitsuByMedia: Record<number, KitsuMetadata | null>;
   torrentThumbnails: Record<string, string | null>;
   onSelectAnime: (anime: AnimeMedia) => void;
+  onSelectEpisode: (anime: AnimeMedia, episode: number) => void;
 }
 
 function formatAiringDate(unixSeconds: number): string {
@@ -29,6 +30,7 @@ export function HomePage({
   kitsuByMedia,
   torrentThumbnails,
   onSelectAnime,
+  onSelectEpisode,
 }: Props) {
   return (
     <div class="home-page">
@@ -61,17 +63,21 @@ export function HomePage({
                     key={`${entry.media.id}-${entry.episode}`}
                     class="latest-episode-card"
                     onClick={() =>
-                      onSelectAnime({
-                        id: entry.media.id,
-                        title: entry.media.title,
-                        coverImage: entry.media.coverImage,
-                        description: null,
-                        episodes: null,
-                        averageScore: null,
-                        format: null,
-                        season: null,
-                        seasonYear: null,
-                      })
+                      onSelectEpisode(
+                        {
+                          id: entry.media.id,
+                          title: entry.media.title,
+                          coverImage: entry.media.coverImage,
+                          description: null,
+                          episodes: null,
+                          averageScore: null,
+                          format: null,
+                          season: null,
+                          seasonYear: null,
+                          duration: entry.media.duration,
+                        },
+                        entry.episode,
+                      )
                     }
                   >
                     <div class="latest-episode-thumbnail">

@@ -1,4 +1,4 @@
-import { useState } from "preact/hooks";
+import { useEffect, useState } from "preact/hooks";
 import { displayTitle, formatSeason, type AnimeMedia, type KitsuMetadata, type NyaaResult } from "./types";
 import type { EpisodeLabel } from "./episodeParser";
 import { PlayerView } from "./PlayerView";
@@ -9,6 +9,11 @@ interface Props {
   groupedSources: [string, { label: EpisodeLabel; releases: NyaaResult[] }][];
   sourcesLoading: boolean;
   sourcesCount: number;
+  /** Set when the user clicked a specific episode (the Latest Episodes
+   * row) rather than the anime in general - auto-plays it once sources
+   * finish loading, then reports back via onAutoplayHandled. */
+  autoplayEpisode: number | null;
+  onAutoplayHandled: () => void;
   error: string | null;
   onBack: () => void;
   inLibrary: boolean;
@@ -57,6 +62,8 @@ export function MediaPage({
   groupedSources,
   sourcesLoading,
   sourcesCount,
+  autoplayEpisode,
+  onAutoplayHandled,
   error,
   onBack,
   inLibrary,
@@ -69,6 +76,22 @@ export function MediaPage({
   function handlePlay(title: string, releases: NyaaResult[]) {
     setPlayer({ title, releases });
   }
+
+  // Latest Episodes row: jump straight into the player for the clicked
+  // episode once its sources have loaded, instead of leaving the user on
+  // the episode list to click play themselves.
+  useEffect(() => {
+    if (sourcesLoading || autoplayEpisode == null) return;
+    const match = groupedSources.find(
+      ([, group]) => group.label.kind === "episode" && group.label.number === autoplayEpisode,
+    );
+    if (match) {
+      const [key, group] = match;
+      handlePlay(key, group.releases);
+    }
+    onAutoplayHandled();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sourcesLoading, groupedSources, autoplayEpisode]);
   // stremio-web has no separate anime "logo" source (Cinemeta/Fanart.tv
   // supply that for movies/series; AniList and Kitsu, the anime-metadata
   // sources, don't), so its real detail page falls back to plain text with
@@ -151,6 +174,7 @@ export function MediaPage({
           key={player.title}
           title={player.title}
           releases={player.releases}
+          estimatedDurationMinutes={anime.duration}
           onClose={() => setPlayer(null)}
         />
       )}
