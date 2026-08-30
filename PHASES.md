@@ -24,7 +24,15 @@
       batch (including explicit-range batches spread across the episodes
       they cover), submitter (fansub group tag) — regex-only, verified
       against a 150-title real-world scrape (147/150 correct from title
-      text alone)
+      text alone). Re-verified against live "That Time I Got Reincarnated
+      as a Slime" data and fixed three real mismatches it surfaced: a
+      title carrying both a season-relative and an absolute episode number
+      (fixed with leftmost-match-wins instead of a fixed pattern-priority
+      order), "Season N - M" being misread as a batch range instead of a
+      season/episode pair, and a pipe-terminated dash-number falling
+      through to no match. No regression against a live 160-title Frieren
+      re-check. `crates/nyaa-client/examples/search_debug.rs` reruns this
+      kind of check against live data without the full app running.
 - [x] View-page scrape (`get_torrent_details_batch`) as the deterministic
       backstop for the remaining ambiguous titles — real submitter + batch
       file-count ground truth, bounded concurrency, only run for titles the
