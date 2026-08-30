@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `d2c70e5` · 2026-08-30 · fix(sources): drop cross-season contamination from grouped results
+- `FILE_INDEX.md`, `PLAN.md`, `src/App.tsx`, `src/episodeParser.ts`
+
 ### `d7d45da` · 2026-08-30 · feat(player): hover-only solid control bar + PotPlayer/YouTube keybinds
 - `FILE_INDEX.md`, `PHASES.md`, `PLAN.md`, `src/App.css`, `src/PlayerView.tsx`
 
