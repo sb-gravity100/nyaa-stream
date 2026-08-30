@@ -75,11 +75,17 @@ fn sanitize_query(query: &str) -> String {
 /// means there's nothing more to fetch.
 const RESULTS_PER_PAGE: usize = 75;
 
-/// Cap on how many result pages a single search will fetch (up to 375
-/// results). Bounded deliberately: some long-running shows have hundreds of
-/// scattered releases, and unbounded pagination would mean unbounded
-/// requests to nyaa.si for a single search.
-const MAX_SEARCH_PAGES: u32 = 5;
+/// Cap on how many result pages a single search will fetch (up to 1500
+/// results). Bounded deliberately rather than unbounded: still avoids truly
+/// unbounded requests to nyaa.si for a pathological query. The loop below
+/// already stops as soon as a page comes back short, so this only costs
+/// anything on searches that actually need it - and the old cap of 5 (375
+/// results) was verified live to be far too low: nyaa.si returns 949 total
+/// results for "That Time I Got Reincarnated as a Slime" (4 seasons, movies,
+/// specials, years of overlapping fansub groups), so the old cap silently
+/// dropped roughly 60% of that show's real sources, including most of its
+/// earlier seasons.
+const MAX_SEARCH_PAGES: u32 = 20;
 
 pub struct NyaaClient {
     http: reqwest::Client,
