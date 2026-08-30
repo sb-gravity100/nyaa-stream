@@ -78,10 +78,17 @@ nyaa_stream/
 1. User types in the top search bar → debounced `search_anime` (AniList)
    fills a live dropdown (max 10 results, real ratings/format/season).
 2. Picking a result opens the media page (`MediaPage.tsx`) and, in
-   parallel: `search_torrents_for_anime` searches nyaa.si using the
-   English title first, falling back to romaji if too few results
-   (candidate titles are punctuation-sanitized — a raw AniList curly
-   apostrophe was found to drop nyaa.si matches from 75 to 1); and
+   parallel: `search_torrents_for_anime` searches nyaa.si using both the
+   English and romaji titles and merges the results, deduplicated by view
+   URL (candidate titles are punctuation-sanitized — a raw AniList curly
+   apostrophe was found to drop nyaa.si matches from 75 to 1). Both titles
+   are always searched, not English-first-with-a-romaji-fallback as this
+   used to work: verified live that many fansub groups title releases in
+   romaji only with no English cross-reference text at all, and nyaa.si's
+   per-word AND-matching tokenizer means a real show's English search
+   almost never fell back in the old scheme anyway - together this
+   silently dropped roughly half of "That Time I Got Reincarnated as a
+   Slime"'s real releases regardless of how many pages got fetched. Also
    `get_anime_details` lazily fetches the fuller AniList record (synopsis,
    `streamingEpisodes` thumbnails) that the lightweight dropdown search
    doesn't request.

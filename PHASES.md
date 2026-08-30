@@ -37,8 +37,18 @@
       backstop for the remaining ambiguous titles — real submitter + batch
       file-count ground truth, bounded concurrency, only run for titles the
       regex parser couldn't resolve
-- [x] nyaa.si query fixes: curly-apostrophe sanitization, English→romaji
-      title fallback, paginated HTML scrape (RSS was capped at 75 results)
+- [x] nyaa.si query fixes: curly-apostrophe sanitization, paginated HTML
+      scrape (RSS was capped at 75 results). Two further gaps found via
+      live search against "That Time I Got Reincarnated as a Slime" (950
+      real results): the per-search page cap (`MAX_SEARCH_PAGES`) was 5
+      (375 results), silently dropping ~60% of that show's releases -
+      raised to 20; and the English-title-first-with-romaji-fallback
+      scheme almost never actually fell back to romaji (nyaa.si's search
+      returns "enough" English-title results long before running out),
+      so romaji-only-titled releases (489 of them for this show, from
+      major groups like SubsPlease/Erai-raws/Ironclad) were always missed
+      regardless of the page cap - fixed by always searching both titles
+      and merging/deduplicating the results instead of falling back
 - [ ] Per-anime preferred fansub group memory — not built
 
 ## Phase 3 — Playback quality of life
