@@ -2,7 +2,9 @@
 
 Anime-focused Stremio-like desktop client. Not a full Stremio addon-ecosystem
 clone — a focused tool that searches nyaa.si for torrents, matches them
-against AniList metadata, and streams them straight to mpv.
+against AniList metadata, and streams them via HLS into an in-app HTML5
+`<video>` element (see "Playback" below - `mpv` is used only for headless
+thumbnail capture now, not real playback).
 
 ## Reference
 
@@ -28,12 +30,17 @@ solid-color skeleton blocks, not a spinner).
 ## Stack
 
 - **Shell:** Tauri 2 (Rust backend + Preact/TypeScript frontend via Vite)
-- **Player:** system `mpv` (must be on PATH — not bundled), controlled
-  per-session over its JSON IPC socket/named pipe
+- **Player:** an in-app HTML5 `<video>` element driven by `hls.js`
+  (`src/PlayerView.tsx`) - not `mpv`; see "Playback" below for why and
+  PLAN.md's Known gaps for the history. System `mpv` (must be on PATH — not
+  bundled) is still used, but only for headless thumbnail capture
+  (`crates/mpv-ipc`)
 - **Torrent engine + streaming server:** `librqbit` (Session + Api), fronted
-  by our own `axum` HTTP server that streams a torrent file's bytes with
-  Range support (`axum-range`), so mpv can start playback before the full
-  file is downloaded
+  by our own `axum` HTTP server with two layers: raw Range-capable file
+  bytes (`axum-range`), and an HLS layer on top of that (`ffmpeg`-produced
+  playlist + on-demand segments) that real playback actually uses, since
+  raw torrent bytes aren't reliably playable in a browser `<video>`
+  (system `ffmpeg`/`ffprobe`, also not bundled, must be on PATH)
 - **Torrent source:** nyaa.si search, scraping its paginated HTML results
   table (its RSS feed was found to silently ignore the `p=` page param and
   always cap at 75 results — see `crates/nyaa-client`)
@@ -56,11 +63,11 @@ nyaa_stream/
   Cargo.toml                 workspace root
   src-tauri/                 Tauri app crate (commands, window, app state)
   crates/
-    torrent-engine/          librqbit wrapper + local streaming HTTP server
+    torrent-engine/          librqbit wrapper + local streaming/HLS HTTP server
     nyaa-client/              nyaa.si search client (paginated HTML scrape)
     anilist-client/          AniList GraphQL client
     kitsu-client/            Kitsu API client (backdrop + episode thumbnails)
-    mpv-ipc/                 spawns mpv, talks JSON IPC (pause/seek/volume)
+    mpv-ipc/                 spawns headless mpv for thumbnail capture only
   src/                       Preact + TypeScript frontend
   reference/stremio-core/    reference-only clone, gitignored
   reference/stremio-web/     reference-only clone, gitignored
@@ -94,26 +101,30 @@ nyaa_stream/
    home page's "Library" grid and folds its recent episodes (AniList's
    batched `airingSchedules` query, this calendar week + last week)
    into the "Latest Episodes" row.
-6. Playback: the media page's play button hands `PlayerView.tsx` the full
-   list of that episode's releases; it auto-picks the one with the most
-   seeders (`releases.ts`'s `bestRelease`) and calls `play_magnet`, which
-   adds it to the librqbit session (waiting on `wait_until_initialized()`
-   so the torrent's file list is actually queryable before returning - a
-   magnet's metadata arrives from peers asynchronously, and a request made
-   immediately after `add()` returned used to 404) and returns a
-   `remux_url` from the local streaming server. The frontend plays that
-   URL in a plain HTML5 `<video>` element — a PotPlayer-style bottom
-   control bar (play/pause, seek with a download-progress highlight,
-   volume, fullscreen, time, a source-picker dropdown over the same
-   release list) fades in on mouse movement and auto-hides after idle.
-   Picking a different source just calls `play_magnet` again - its
-   defensive cleanup tears down the previous torrent. Buffering feedback
-   and the statistics panel port stremio-web's real Player UI
-   (`Buffering.tsx`/`StatisticsMenu.tsx`/`loadingProgress.ts`, verified
-   against `reference/stremio-web` and `reference/stremio-core` rather
-   than designed from scratch) polling `get_stream_stats` every second.
-   Closing the player or navigating away calls `stop_playback` to remove
-   the torrent (stop seeding, drop partial files).
+6. Playback: the media page's play button (or clicking an episode directly
+   in the home page's "Latest Episodes" row, which jumps straight into the
+   player via `MediaPage.tsx`'s `autoplayEpisode` prop instead of leaving
+   the user on the episode list) hands `PlayerView.tsx` the full list of
+   that episode's releases; it auto-picks the one with the most seeders
+   (`releases.ts`'s `bestRelease`) and calls `play_magnet`, which adds it
+   to the librqbit session (waiting on `wait_until_initialized()` so the
+   torrent's file list is actually queryable before returning - a magnet's
+   metadata arrives from peers asynchronously, and a request made
+   immediately after `add()` returned used to 404) and returns an HLS
+   playlist URL from the local streaming server. The frontend plays that
+   via `hls.js` in a plain HTML5 `<video>` element — a PotPlayer-style
+   bottom control bar (play/pause, seek with a download-progress
+   highlight, volume, fullscreen, time, a source-picker dropdown over the
+   same release list) fades in on mouse movement and auto-hides after
+   idle. Seeking is a plain `video.currentTime` set - hls.js fetches
+   whichever segment covers it. Picking a different source just calls
+   `play_magnet` again - its defensive cleanup tears down the previous
+   torrent. Buffering feedback and the statistics panel port stremio-web's
+   real Player UI (`Buffering.tsx`/`StatisticsMenu.tsx`/`loadingProgress.ts`,
+   verified against `reference/stremio-web` and `reference/stremio-core`
+   rather than designed from scratch) polling `get_stream_stats` every
+   second. Closing the player or navigating away calls `stop_playback` to
+   remove the torrent (stop seeding, drop partial files).
 
    **Raw torrent bytes aren't served directly to the browser** - verified
    live that real anime releases (MKV, H.264 video, E-AC-3 audio) fail in
@@ -122,16 +133,35 @@ nyaa_stream/
    blocker is structural: Matroska's seek index (Cues/SeekHead) - and
    often its declared duration too - is commonly placed at/near the *end*
    of the file, which an incrementally-downloading torrent can't provide
-   up front. `torrent_engine::remux_handler` fixes this by piping the raw
-   stream through `ffmpeg` into fragmented MP4 (`-c:v copy`, audio always
-   transcoded to `aac` since ffmpeg's fMP4 muxer can't remux several
-   common audio codecs) before serving it. Seeking restarts the whole
-   remux at a new `-ss`/`-copyts` offset (`RemuxQuery`'s `start` param)
-   rather than seeking within one stream, since a live-piped fragmented
-   MP4 can't be seeked within after bytes are sent. `probe_duration_seconds`
-   runs `ffprobe` first so the output header gets the source's real
-   duration via `-t` - ffmpeg's own remux doesn't reliably pick this up on
-   its own (see Known gaps for why this probe isn't fully reliable either).
+   up front, and a browser's own duration-scanning has the identical
+   problem. **HLS solves this properly** (replacing an earlier "remux the
+   whole episode through ffmpeg, restart on every seek" approach, which
+   worked but leaked `ffmpeg.exe` processes under rapid seeking since
+   closing the client side alone doesn't reliably kill it on Windows):
+   `torrent_engine::hls_playlist_handler` serves a VOD `.m3u8` built from a
+   duration the *frontend* supplies (AniList's per-episode runtime -
+   the backend can't reliably determine this itself, for the same
+   Cues-at-the-end reason above). Segments themselves are produced by
+   `HlsJobs`: a single continuous `ffmpeg` process per torrent file
+   (`-c:v copy`, audio always transcoded to `aac` since MPEG-TS/browsers
+   don't reliably handle several codecs real releases use, e.g. E-AC-3;
+   `-map 0:v:0 -map 0:a:0 -sn` to drop any embedded subtitle/attachment
+   streams, which MPEG-TS can't carry and which otherwise got auto-included
+   and corrupted timestamps) reading from `stream_handler` over loopback,
+   writing real segment files to disk (`-f hls -hls_flags temp_file` -
+   atomic rename on completion, so a request never sees a half-written
+   file). A segment request waits for that job's sequential progress to
+   reach it, or restarts the job at a new offset only when the request is
+   a real seek (far from current progress), not ordinary buffering.
+   Replaced an earlier "one `ffmpeg -ss`/`-t` invocation per segment"
+   design: each independent process reinitialized its own AAC encoder and
+   timestamp timeline from zero, producing audible artifacts at every
+   segment boundary and, combined with the embedded-subtitle issue above,
+   occasional outright muxer failures that dropped whole segments
+   (verified live). A single continuous process per file has one
+   timestamp timeline for the whole episode and its sequential HTTP reads
+   line up with librqbit's own sequential piece-priority download
+   strategy instead of fighting it with scattered probe reads.
 
    **`mpv`/`mpv-ipc` is no longer the real playback engine** — an earlier
    attempt embedded mpv into the app window via `--wid` and a transparent
@@ -152,18 +182,11 @@ nyaa_stream/
 
 - `play_magnet` currently always streams file index `0` — needs real file
   selection when a torrent contains multiple files (e.g. batch releases).
-- Duration on a **fresh** play is often wrong (whatever ffmpeg's own
-  fallback guess is, e.g. a few seconds instead of the real length):
-  `probe_duration_seconds`'s `ffprobe` call reliably succeeds once a
-  torrent is fully downloaded (probably reading data already resident from
-  an earlier play) but reliably times out on a fresh one, since many real
-  MKV releases don't declare duration upfront either and ffprobe needs to
-  scan toward the file's end just like the browser would. Self-corrects on
-  a later play/seek of the same file once more of it is on disk.
-- ffmpeg remux is CPU-light (video is `-c:v copy`, only audio is
-  transcoded) but still a real per-stream process; nothing currently caps
-  how many can run concurrently or cleans up an orphaned one if the client
-  disconnects uncleanly.
+- The HLS playlist's declared duration is only as good as the frontend's
+  AniList-derived estimate (falls back to a generic 24-minute guess if
+  even that's missing) - not the file's real, exact length. Good enough
+  for a working seek bar; the last segment may be trimmed slightly short
+  or read past EOF if the estimate is off by more than a few seconds.
 - No watch history / continue-watching (the library only tracks *which*
   anime are saved, not watch progress).
 - Batches without an explicit episode range in their title (most of them)
