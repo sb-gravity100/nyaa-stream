@@ -71,6 +71,17 @@
       plays it in a full-viewport `PlayerView.tsx` with a PotPlayer-style
       hover-reveal bottom control bar (play/pause, seek, volume,
       fullscreen, time, source picker)
+- [x] Solid-black control bar shown only on direct hover (a dedicated
+      `.player-controls-hover-zone` the same footprint as the bar, since
+      the bar itself has `pointer-events: none` while hidden and so can't
+      receive the hover that would reveal it) instead of the old "any
+      mouse movement over the video, then auto-hide after an idle timer"
+      behavior, plus a mute button and PotPlayer/YouTube-style keybinds
+      (space/K play-pause, arrows ±5s / J/L ±10s seek, up/down ±5 volume,
+      M mute, F fullscreen, Esc close) that work whether or not the mouse
+      is anywhere near the bar - a keybind press flashes the bar briefly
+      so its effect (new time/volume/pause state) is visible without
+      requiring the mouse to be there too.
 - [x] Manual source-picker dropdown: `PlayerView.tsx` takes the full
       release list for an episode and lets the user switch sources
       mid-session via a `<select>` in the control bar (sorted by seeders) —

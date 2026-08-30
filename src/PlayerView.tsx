@@ -8,7 +8,19 @@ import { Buffering } from "./Buffering";
 import { StatisticsMenu } from "./StatisticsMenu";
 
 const STATS_POLL_MS = 1000;
-const CONTROLS_IDLE_MS = 2500;
+// How long a keybind-triggered flash of the controls stays up before
+// auto-hiding again - only applies to that flash, not to hovering: while
+// the mouse is actually over the controls (or their hover zone), they stay
+// up indefinitely regardless of this.
+const KEYBIND_FLASH_MS = 1200;
+// Small grace delay before hiding on mouse-leave, so moving from the
+// invisible hover zone onto the now-visible control bar (or vice versa -
+// two separate, exactly-overlapping elements, see the render below) can't
+// flicker shut between the two elements' enter/leave events.
+const HOVER_HIDE_GRACE_MS = 150;
+const SEEK_STEP_SECONDS = 5;
+const SEEK_STEP_SECONDS_LARGE = 10;
+const VOLUME_STEP = 5;
 
 interface Props {
   title: string;
@@ -46,8 +58,12 @@ function infoHashFromMagnet(magnet: string): string | null {
 }
 
 // An HLS stream (via hls.js) pointed at torrent-engine's playlist endpoint,
-// with a PotPlayer-style bottom control bar that fades in on mouse movement
-// and auto-hides after idle rather than staying on screen. mpv/native-window
+// with a solid-black bottom control bar that only appears while the mouse
+// is actually over it (not on any mouse movement over the video the way
+// this used to work), plus PotPlayer/YouTube-style keybinds (space/K
+// play-pause, arrows/J/L seek, up/down volume, M mute, F fullscreen, Esc
+// close) that work regardless of whether the bar is currently shown.
+// mpv/native-window
 // embedding was tried first but hit a Tauri/WebView2 transparency bug on
 // Windows that broke click-through app-wide; a single ffmpeg remux per play
 // (restarted on every seek) was tried next but leaked processes under rapid
@@ -63,16 +79,24 @@ export function PlayerView({ title, releases, estimatedDurationMinutes, onClose 
   const [stats, setStats] = useState<StreamStats | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
-  const [controlsVisible, setControlsVisible] = useState(true);
+  // Starts hidden, not shown-then-auto-hidden-after-idle like this used to
+  // work - hover is now the only thing that reveals it (a keybind press
+  // still flashes it briefly regardless, see flashControls).
+  const [controlsVisible, setControlsVisible] = useState(false);
   const [paused, setPaused] = useState(true);
   const estimatedDurationSeconds = estimatedDurationMinutes != null ? estimatedDurationMinutes * 60 : null;
   const [duration, setDuration] = useState(0);
   const [position, setPosition] = useState(0);
   const [seekPreview, setSeekPreview] = useState<number | null>(null);
   const [volume, setVolumeState] = useState(100);
+  const [muted, setMuted] = useState(false);
   const [statsMenuOpen, setStatsMenuOpen] = useState(false);
   const idleTimerRef = useRef<number | undefined>(undefined);
   const statsPollRef = useRef<number | undefined>(undefined);
+  // Whether the pointer is currently over the controls or their hover zone
+  // - read by the keybind flash's own hide timer so it doesn't yank the
+  // bar away while the mouse is legitimately sitting on it.
+  const hoveringControlsRef = useRef(false);
   const infoHash = useMemo(() => infoHashFromMagnet(selectedRelease.magnet), [selectedRelease.magnet]);
   const sortedReleases = useMemo(() => [...releases].sort((a, b) => b.seeders - a.seeders), [releases]);
 
@@ -166,10 +190,29 @@ export function PlayerView({ title, releases, estimatedDurationMinutes, onClose 
     };
   }, []);
 
-  function wake() {
+  // Controls are purely hover-driven now (not "any mouse movement over the
+  // video, then auto-hide after idle" - moving the mouse elsewhere on the
+  // video no longer reveals them at all, only entering the bottom strip
+  // does), plus a brief flash on keybind use so e.g. a seek/volume keybind
+  // is visible without requiring the mouse to be there too.
+  function showControls() {
+    hoveringControlsRef.current = true;
+    window.clearTimeout(idleTimerRef.current);
+    setControlsVisible(true);
+  }
+
+  function scheduleHideControls() {
+    hoveringControlsRef.current = false;
+    window.clearTimeout(idleTimerRef.current);
+    idleTimerRef.current = window.setTimeout(() => setControlsVisible(false), HOVER_HIDE_GRACE_MS);
+  }
+
+  function flashControls() {
     setControlsVisible(true);
     window.clearTimeout(idleTimerRef.current);
-    idleTimerRef.current = window.setTimeout(() => setControlsVisible(false), CONTROLS_IDLE_MS);
+    idleTimerRef.current = window.setTimeout(() => {
+      if (!hoveringControlsRef.current) setControlsVisible(false);
+    }, KEYBIND_FLASH_MS);
   }
 
   function togglePause() {
@@ -209,6 +252,30 @@ export function PlayerView({ title, releases, estimatedDurationMinutes, onClose 
     if (video) video.volume = value / 100;
   }
 
+  function changeVolumeBy(delta: number) {
+    const video = videoRef.current;
+    if (!video) return;
+    const next = Math.min(100, Math.max(0, volume + delta));
+    setVolumeState(next);
+    video.volume = next / 100;
+  }
+
+  // Mute is the <video> element's own separate `.muted` flag, not zeroing
+  // the volume slider - matches PotPlayer/every native player: unmuting
+  // restores playback at whatever level the slider was already at, rather
+  // than the slider itself needing to remember and restore a value.
+  function toggleMute() {
+    const video = videoRef.current;
+    if (!video) return;
+    video.muted = !video.muted;
+  }
+
+  function seekBy(deltaSeconds: number) {
+    const video = videoRef.current;
+    if (!video || !duration) return;
+    video.currentTime = Math.min(Math.max(video.currentTime + deltaSeconds, 0), duration);
+  }
+
   function toggleFullscreen() {
     if (document.fullscreenElement) {
       void document.exitFullscreen();
@@ -216,6 +283,68 @@ export function PlayerView({ title, releases, estimatedDurationMinutes, onClose 
       videoRef.current?.parentElement?.requestFullscreen();
     }
   }
+
+  // Player-wide keybinds (PotPlayer/YouTube-style): active whenever the
+  // player is mounted, i.e. for the whole time it's open. Ignored while
+  // focus is on an actual form control (the source-select dropdown, the
+  // seek/volume range inputs) so typing/interacting with those doesn't
+  // double-fire a keybind too.
+  useEffect(() => {
+    function isFormControl(target: EventTarget | null): boolean {
+      if (!(target instanceof HTMLElement)) return false;
+      return target.tagName === "INPUT" || target.tagName === "SELECT" || target.tagName === "TEXTAREA";
+    }
+
+    function handleKeyDown(e: KeyboardEvent) {
+      if (isFormControl(e.target)) return;
+      switch (e.key.toLowerCase()) {
+        case " ":
+        case "k":
+          togglePause();
+          break;
+        case "arrowleft":
+          seekBy(-SEEK_STEP_SECONDS);
+          break;
+        case "arrowright":
+          seekBy(SEEK_STEP_SECONDS);
+          break;
+        case "j":
+          seekBy(-SEEK_STEP_SECONDS_LARGE);
+          break;
+        case "l":
+          seekBy(SEEK_STEP_SECONDS_LARGE);
+          break;
+        case "arrowup":
+          changeVolumeBy(VOLUME_STEP);
+          break;
+        case "arrowdown":
+          changeVolumeBy(-VOLUME_STEP);
+          break;
+        case "m":
+          toggleMute();
+          break;
+        case "f":
+          toggleFullscreen();
+          break;
+        case "escape":
+          // Escape's own browser-native behavior already exits fullscreen
+          // first if that's active - only close the player on a second
+          // press once there's nothing left for the browser to do with it.
+          if (!document.fullscreenElement) onClose();
+          return;
+        default:
+          return;
+      }
+      // Space/arrows would otherwise scroll the page or (for a focused
+      // button) re-trigger a click.
+      e.preventDefault();
+      flashControls();
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [duration, volume, onClose]);
 
   const displayPosition = seekPreview ?? position;
   const buffering = !error && !ready;
@@ -227,7 +356,7 @@ export function PlayerView({ title, releases, estimatedDurationMinutes, onClose 
   const playedPercent = duration ? Math.min(100, (displayPosition / duration) * 100) : 0;
 
   return (
-    <div class="player-view" onMouseMove={wake} onMouseLeave={() => setControlsVisible(false)}>
+    <div class="player-view">
       {streamUrl && (
         <video
           ref={videoRef}
@@ -237,6 +366,7 @@ export function PlayerView({ title, releases, estimatedDurationMinutes, onClose 
           onTimeUpdate={(e) => setPosition((e.target as HTMLVideoElement).currentTime)}
           onPlay={() => setPaused(false)}
           onPause={() => setPaused(true)}
+          onVolumeChange={(e) => setMuted((e.target as HTMLVideoElement).muted)}
           onCanPlay={() => setReady(true)}
           onWaiting={() => setReady(false)}
           onPlaying={() => setReady(true)}
@@ -269,7 +399,19 @@ export function PlayerView({ title, releases, estimatedDurationMinutes, onClose 
         />
       )}
 
-      <div class={`player-controls${controlsVisible ? " visible" : ""}`}>
+      {/* Always-present, invisible strip the same size/position as the
+          control bar below - the only thing that reveals the controls now
+          (see showControls/scheduleHideControls's doc comment). Needs to
+          exist separately from .player-controls itself because that has
+          pointer-events:none while hidden and so can never receive the
+          hover that would reveal it in the first place. */}
+      <div class="player-controls-hover-zone" onMouseEnter={showControls} onMouseLeave={scheduleHideControls} />
+
+      <div
+        class={`player-controls${controlsVisible ? " visible" : ""}`}
+        onMouseEnter={showControls}
+        onMouseLeave={scheduleHideControls}
+      >
         <div class="player-seek-wrap">
           <div class="player-seek-track" />
           <div class="player-seek-downloaded" style={{ width: `${downloadedPercent}%` }} />
@@ -281,13 +423,19 @@ export function PlayerView({ title, releases, estimatedDurationMinutes, onClose 
             max={duration || 1}
             step={0.1}
             value={displayPosition}
+            title="Seek (←/→ 5s, J/L 10s)"
             onInput={handleSeekInput}
             onChange={handleSeekCommit}
             disabled={!duration}
           />
         </div>
         <div class="player-controls-row">
-          <button class="player-control-button" onClick={togglePause} aria-label={paused ? "Play" : "Pause"}>
+          <button
+            class="player-control-button"
+            onClick={togglePause}
+            aria-label={paused ? "Play" : "Pause"}
+            title={`${paused ? "Play" : "Pause"} (Space/K)`}
+          >
             {paused ? "▶" : "❚❚"}
           </button>
           <div class="player-time">
@@ -313,6 +461,14 @@ export function PlayerView({ title, releases, estimatedDurationMinutes, onClose 
               ))}
             </select>
           )}
+          <button
+            class="player-control-button"
+            onClick={toggleMute}
+            aria-label={muted ? "Unmute" : "Mute"}
+            title={`${muted ? "Unmute" : "Mute"} (M)`}
+          >
+            {muted || volume === 0 ? "🔇" : "🔊"}
+          </button>
           <input
             class="player-volume"
             type="range"
@@ -322,6 +478,7 @@ export function PlayerView({ title, releases, estimatedDurationMinutes, onClose 
             value={volume}
             onInput={handleVolumeInput}
             aria-label="Volume"
+            title="Volume (↑/↓)"
           />
           {stats && (
             <button
@@ -332,10 +489,15 @@ export function PlayerView({ title, releases, estimatedDurationMinutes, onClose 
               📊
             </button>
           )}
-          <button class="player-control-button" onClick={toggleFullscreen} aria-label="Fullscreen">
+          <button
+            class="player-control-button"
+            onClick={toggleFullscreen}
+            aria-label="Fullscreen"
+            title="Fullscreen (F)"
+          >
             ⛶
           </button>
-          <button class="player-control-button" onClick={onClose} aria-label="Close player">
+          <button class="player-control-button" onClick={onClose} aria-label="Close player" title="Close (Esc)">
             ✕
           </button>
         </div>

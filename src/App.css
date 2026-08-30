@@ -404,8 +404,9 @@ a {
 /* --- Player view: full-viewport takeover while a stream is active, a
    plain HTML5 <video> pointed at torrent-engine's stream URL. The control
    bar mirrors PotPlayer/most native players rather than Stremio's own
-   always-visible statistics panel: hidden until the mouse moves, and
-   auto-hiding again after a short idle period. --- */
+   always-visible statistics panel: a solid black bar that only appears
+   while the mouse is directly over it (see .player-controls-hover-zone
+   below), not on any mouse movement over the video. --- */
 
 .player-view {
   position: fixed;
@@ -567,16 +568,31 @@ a {
   color: rgba(255, 255, 255, 0.6);
 }
 
+/* Invisible strip the same footprint as .player-controls below - the only
+   thing that actually receives the hover that reveals the bar, since the
+   bar itself has pointer-events:none while hidden (see PlayerView.tsx's
+   showControls/scheduleHideControls doc comment for why both this and the
+   bar need the same hover handlers). */
+.player-controls-hover-zone {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 84px;
+  z-index: 1;
+}
+
 .player-controls {
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
+  z-index: 2;
   padding: 10px 18px 14px;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.75), transparent);
+  background: #000;
   opacity: 0;
   transform: translateY(6px);
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  transition: opacity 0.15s ease, transform 0.15s ease;
   pointer-events: none;
 }
 
