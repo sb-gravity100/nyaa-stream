@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
+import Hls from "hls.js";
 import type { NyaaResult, StreamStats } from "./types";
 import { getStreamStats, playMagnet, stopPlayback } from "./playback";
 import { loadingProgress } from "./loadingProgress";
@@ -12,6 +13,11 @@ const CONTROLS_IDLE_MS = 2500;
 interface Props {
   title: string;
   releases: NyaaResult[];
+  /** AniList's typical per-episode runtime, in minutes - sent to the
+   * backend as the HLS playlist's declared duration, since it can't
+   * reliably determine this itself for a still-downloading torrent (see
+   * PLAN.md's Known gaps). */
+  estimatedDurationMinutes: number | null;
   onClose: () => void;
 }
 
@@ -39,24 +45,27 @@ function infoHashFromMagnet(magnet: string): string | null {
   return magnet.match(/xt=urn:btih:([a-zA-Z0-9]+)/)?.[1]?.toLowerCase() ?? null;
 }
 
-// A plain HTML5 <video> pointed at torrent-engine's local Range-capable
-// stream URL, with a PotPlayer-style bottom control bar that fades in on
-// mouse movement and auto-hides after idle rather than staying on screen.
-// mpv/native-window embedding was tried first but hit a Tauri/WebView2
-// transparency bug on Windows that broke click-through app-wide (see
-// PLAN.md's Known gaps) - this sidesteps that entirely since the video is
-// just page content.
-export function PlayerView({ title, releases, onClose }: Props) {
+// An HLS stream (via hls.js) pointed at torrent-engine's playlist endpoint,
+// with a PotPlayer-style bottom control bar that fades in on mouse movement
+// and auto-hides after idle rather than staying on screen. mpv/native-window
+// embedding was tried first but hit a Tauri/WebView2 transparency bug on
+// Windows that broke click-through app-wide; a single ffmpeg remux per play
+// (restarted on every seek) was tried next but leaked processes under rapid
+// seeking - HLS replaces both: hls.js requests whichever short segment
+// covers a seek target directly, no restarting anything (see PLAN.md's
+// Known gaps for the full history).
+export function PlayerView({ title, releases, estimatedDurationMinutes, onClose }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const hlsRef = useRef<Hls | null>(null);
   const [selectedRelease, setSelectedRelease] = useState<NyaaResult>(() => bestRelease(releases));
   const [torrentId, setTorrentId] = useState<number | null>(null);
   const [streamUrl, setStreamUrl] = useState<string | null>(null);
-  const [videoSrc, setVideoSrc] = useState<string | null>(null);
   const [stats, setStats] = useState<StreamStats | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [paused, setPaused] = useState(true);
+  const estimatedDurationSeconds = estimatedDurationMinutes != null ? estimatedDurationMinutes * 60 : null;
   const [duration, setDuration] = useState(0);
   const [position, setPosition] = useState(0);
   const [seekPreview, setSeekPreview] = useState<number | null>(null);
@@ -73,7 +82,6 @@ export function PlayerView({ title, releases, onClose }: Props) {
   useEffect(() => {
     let cancelled = false;
     setStreamUrl(null);
-    setVideoSrc(null);
     setTorrentId(null);
     setStats(null);
     setError(null);
@@ -85,8 +93,7 @@ export function PlayerView({ title, releases, onClose }: Props) {
         const session = await playMagnet(selectedRelease.magnet, title);
         if (!cancelled) {
           setTorrentId(session.torrentId);
-          setStreamUrl(session.streamUrl);
-          setVideoSrc(session.streamUrl);
+          setStreamUrl(session.hlsUrl);
         }
       } catch (err) {
         if (!cancelled) setError(String(err));
@@ -96,6 +103,44 @@ export function PlayerView({ title, releases, onClose }: Props) {
       cancelled = true;
     };
   }, [selectedRelease, title]);
+
+  // Attaches hls.js to the video element once a playlist URL is available,
+  // and tears it down on source switch/unmount. The declared duration is
+  // baked into the playlist request itself (see torrent-engine's
+  // hls_playlist_handler) - if a better estimate arrives late (e.g.
+  // get_anime_details resolving after mount, common from a Library/Latest-
+  // Episodes card that starts with a partial AnimeMedia), this re-loads the
+  // source with the corrected value rather than being stuck with the first
+  // guess for the rest of the session.
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !streamUrl) return;
+    const hlsSrc = estimatedDurationSeconds != null ? `${streamUrl}?duration=${estimatedDurationSeconds}` : streamUrl;
+
+    if (Hls.isSupported()) {
+      const hls = new Hls();
+      hlsRef.current = hls;
+      hls.loadSource(hlsSrc);
+      hls.attachMedia(video);
+      hls.on(Hls.Events.ERROR, (_event, data) => {
+        if (!data.fatal) return;
+        console.error("[player] hls.js fatal error", { type: data.type, details: data.details });
+        setError("Playback failed - the file format may not be supported by this browser engine.");
+      });
+      return () => {
+        hls.destroy();
+        hlsRef.current = null;
+      };
+    }
+
+    if (video.canPlayType("application/vnd.apple.mpegurl")) {
+      video.src = hlsSrc;
+      return undefined;
+    }
+
+    setError("This browser engine can't play HLS streams.");
+    return undefined;
+  }, [streamUrl, estimatedDurationSeconds]);
 
   useEffect(() => {
     if (torrentId == null) return;
@@ -150,15 +195,11 @@ export function PlayerView({ title, releases, onClose }: Props) {
   function handleSeekCommit(e: Event) {
     const value = Number((e.target as HTMLInputElement).value);
     setSeekPreview(null);
-    if (!streamUrl) return;
-    // A live-piped fragmented MP4 can't be seeked within once bytes have
-    // been sent - setting video.currentTime does nothing useful here.
-    // Instead, restart the remux at the requested offset (ffmpeg's -ss +
-    // -copyts on the backend keeps the new stream's timestamps lined up
-    // with the real duration, so the seek bar doesn't reset to 0).
-    setPosition(value);
-    setReady(false);
-    setVideoSrc(`${streamUrl}?start=${value}`);
+    // hls.js intercepts this and fetches whichever segment covers `value` -
+    // no restarting anything, unlike the single-ffmpeg-process approach
+    // this replaced.
+    const video = videoRef.current;
+    if (video) video.currentTime = value;
   }
 
   function handleVolumeInput(e: Event) {
@@ -187,12 +228,10 @@ export function PlayerView({ title, releases, onClose }: Props) {
 
   return (
     <div class="player-view" onMouseMove={wake} onMouseLeave={() => setControlsVisible(false)}>
-      {videoSrc && (
+      {streamUrl && (
         <video
-          key={videoSrc}
           ref={videoRef}
           class="player-video"
-          src={videoSrc}
           autoPlay
           onLoadedMetadata={(e) => setDuration((e.target as HTMLVideoElement).duration || 0)}
           onTimeUpdate={(e) => setPosition((e.target as HTMLVideoElement).currentTime)}

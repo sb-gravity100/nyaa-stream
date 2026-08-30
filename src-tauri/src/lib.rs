@@ -353,14 +353,14 @@ async fn get_torrent_details_batch(
 #[serde(rename_all = "camelCase")]
 struct PlaySession {
     torrent_id: TorrentId,
-    stream_url: String,
+    hls_url: String,
 }
 
-/// Adds `magnet` to the torrent session and returns a stream URL for it.
-/// Playback itself is an HTML5 `<video>` element in the frontend pointed
-/// straight at that URL (torrent-engine's local Range-capable HTTP server)
-/// - there's no player process to spawn or drive over IPC here, unlike the
-/// mpv-based approach this replaced (see PLAN.md's Known gaps).
+/// Adds `magnet` to the torrent session and returns an HLS playlist URL for
+/// it. Playback itself is an HTML5 `<video>` element driven by `hls.js` in
+/// the frontend - there's no player process to spawn or drive over IPC
+/// here, unlike the mpv-based approach this replaced (see PLAN.md's Known
+/// gaps).
 #[tauri::command]
 async fn play_magnet(state: State<'_, Arc<AppState>>, magnet: String, title: String) -> Result<PlaySession, String> {
     tracing::debug!(%title, "play_magnet invoked");
@@ -377,14 +377,14 @@ async fn play_magnet(state: State<'_, Arc<AppState>>, magnet: String, title: Str
             return Err(err.to_string());
         }
     };
-    // Remuxed through ffmpeg rather than the raw stream_url - see
-    // torrent-engine's remux_handler doc comment for why the raw container
-    // bytes aren't reliably playable in a browser <video> element.
-    let stream_url = state.torrent_engine.remux_url(added.id, 0);
+    // HLS (via ffmpeg-produced segments) rather than the raw stream_url -
+    // see torrent-engine's hls_playlist_handler doc comment for why the raw
+    // container bytes aren't reliably playable in a browser <video> element.
+    let hls_url = state.torrent_engine.hls_playlist_url(added.id, 0);
     *state.current_torrent.lock().await = Some(added.id);
-    tracing::info!(%title, torrent_id = added.id, %stream_url, "torrent added, streaming");
+    tracing::info!(%title, torrent_id = added.id, %hls_url, "torrent added, streaming");
 
-    Ok(PlaySession { torrent_id: added.id, stream_url })
+    Ok(PlaySession { torrent_id: added.id, hls_url })
 }
 
 /// Removes the backing torrent (stop seeding, drop partial files) - used by
