@@ -110,15 +110,17 @@ full architecture; summary:
 - `crates/anilist-client` — AniList GraphQL metadata client
 - `crates/mpv-ipc` — spawns headless system `mpv` over JSON IPC for
   torrent-thumbnail frame capture only; requires `mpv` on PATH
-- Real playback is a plain HTML5 `<video>` element (`src/PlayerView.tsx`)
-  pointed at torrent-engine's `remux_url`, not mpv — embedding mpv into the
-  app window was tried and abandoned (a Tauri/WebView2 transparency bug on
-  Windows broke click input app-wide; see PLAN.md's Known gaps)
+- Real playback is a plain HTML5 `<video>` element driven by `hls.js`
+  (`src/PlayerView.tsx`) against torrent-engine's HLS playlist, not mpv —
+  embedding mpv into the app window was tried and abandoned (a
+  Tauri/WebView2 transparency bug on Windows broke click input app-wide;
+  see PLAN.md's Known gaps)
 - `ffmpeg`/`ffprobe` on PATH are required too: raw torrent bytes aren't
   reliably playable in a browser `<video>` (Matroska's seek index/duration
   commonly live near the file's end, which an incrementally-downloading
-  torrent can't provide up front), so `torrent_engine::remux_handler` pipes
-  through `ffmpeg` into fragmented MP4 before serving it - see PLAN.md
+  torrent can't provide up front), so `torrent_engine::HlsJobs` runs one
+  continuous `ffmpeg` transcode per torrent file, writing real HLS segment
+  files to disk that `hls_segment_handler` serves - see PLAN.md
 - `reference/stremio-core/` is a gitignored, reference-only clone of
   Stremio's core (https://github.com/Stremio/stremio-core) — never a build
   dependency, consult it for architecture ideas only

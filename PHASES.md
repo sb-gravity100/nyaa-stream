@@ -54,15 +54,38 @@
 - [x] Raw torrent bytes aren't reliably playable in a browser `<video>`
       even with the right codecs/`Content-Type` (verified live - Matroska's
       seek index/duration commonly live near the file's *end*, which an
-      incrementally-downloading torrent can't provide up front). Fixed by
-      piping through `ffmpeg` into fragmented MP4 (`torrent_engine::
-      remux_handler`/`remux_url`) - `-c:v copy`, audio always transcoded to
-      AAC (several codecs real releases use aren't remux-able into fMP4).
-      Seeking restarts the remux at a new `-ss`/`-copyts` offset rather
-      than seeking within one stream; `probe_duration_seconds` (`ffprobe`)
-      gets the real duration into the output header via `-t`, though this
-      is unreliable on a fresh download for the same structural reason (see
-      PLAN.md's Known gaps)
+      incrementally-downloading torrent can't provide up front). First
+      fixed with a whole-episode `ffmpeg` remux restarted on every seek -
+      worked, but leaked `ffmpeg.exe` processes under rapid seeking
+      (closing the client side alone doesn't reliably kill it on Windows).
+      Replaced with real HLS: `torrent_engine::hls_playlist_handler` serves
+      a VOD `.m3u8` (duration supplied by the frontend, from AniList - see
+      PLAN.md's Known gaps for why the backend can't determine this
+      reliably itself); the frontend plays it via `hls.js`. Seeking is a
+      plain `video.currentTime` set - hls.js fetches whichever segment
+      covers it
+- [x] First HLS segment-serving design (one `ffmpeg -ss/-t` invocation per
+      segment) caused audible audio artifacts at every segment boundary and
+      occasional dropped segments (`Error submitting a packet to the muxer:
+      Invalid argument`) - each independent invocation reinitialized its
+      own AAC encoder/timestamp timeline, and `-ss` before `-i` only
+      approximately seeks without a Matroska Cues index. Replaced with
+      `HlsJobs`: a single continuous `ffmpeg` process per torrent file
+      (one AAC encoder/timestamp timeline for the whole episode) that
+      writes real segment files to disk (`-f hls -hls_flags temp_file` -
+      atomic rename on completion, never serves a partial file); segment
+      requests wait for the job's sequential progress to reach them, or
+      restart the job at a new offset only for a real forward/backward
+      seek (more than `RESTART_LOOKAHEAD_SEGMENTS` away from current
+      progress), not for ordinary buffering. Also stopped ffmpeg from
+      auto-including embedded subtitle/attachment streams (`-map 0:v:0
+      -map 0:a:0 -sn`) - MPEG-TS can't carry them and leaving them in
+      produced non-monotonic-DTS spam and was implicated in the dropped
+      segments above
+- [x] Latest Episodes row jumps straight into the player for the clicked
+      episode (`App.tsx`'s `autoplayEpisode`/`selectEpisode`, `MediaPage.tsx`
+      auto-triggers play once that episode's sources have loaded) instead
+      of leaving the user on the episode list to click play themselves
 - [x] Surface torrent download/buffer progress in the UI while the video
       buffers: ported stremio-web's real Player UI (verified against
       `reference/stremio-web`/`reference/stremio-core`) rather than a
