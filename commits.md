@@ -2,6 +2,12 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `8724436` · 2026-08-30 · fix(search): always search both English and romaji titles, not fallback
+- `PHASES.md`, `PLAN.md`, `src-tauri/src/lib.rs`, `src/browserFallback.ts`
+
+### `86e46b5` · 2026-08-30 · fix(search): raise nyaa.si search page cap from 5 to 20
+- `crates/nyaa-client/src/lib.rs`
+
 ### `268fc86` · 2026-08-30 · fix(parser): fix three real episode-parsing mismatches found live
 - `FILE_INDEX.md`, `PHASES.md`, `crates/nyaa-client/examples/search_debug.rs`, `src/episodeParser.ts`
 
