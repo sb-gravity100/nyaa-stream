@@ -105,8 +105,6 @@ function sanitizeQuery(query: string): string {
   return normalized.split(/\s+/).filter(Boolean).join(" ");
 }
 
-const MIN_ACCEPTABLE_RESULTS = 3;
-
 export async function fallbackSearchTorrents(query: string): Promise<any[]> {
   const sanitized = sanitizeQuery(query);
   const url = `${NYAA_BASE_URL}/?page=rss&c=1_2&f=0&q=${encodeURIComponent(sanitized)}`;
@@ -137,9 +135,14 @@ export async function fallbackSearchTorrents(query: string): Promise<any[]> {
   });
 }
 
-// Deterministic fallback chain: try the English title, then fall back to
-// romaji if English returned too few results. Mirrors
-// search_torrents_for_anime on the Rust side.
+// Searches both the English and romaji titles and merges the results
+// (deduplicated by view_url). Mirrors search_torrents_for_anime on the Rust
+// side - that used to search English first and only fall back to romaji if
+// it returned too few results, but many fansub groups title releases in
+// romaji only with no English cross-reference text at all, so a real show's
+// English-title search almost never triggered the fallback in practice
+// while still missing a large fraction of its actual releases (verified
+// live - see search_torrents_for_anime's doc comment for the numbers).
 export async function fallbackSearchTorrentsForAnime(title: {
   english: string | null;
   romaji: string | null;
@@ -149,13 +152,16 @@ export async function fallbackSearchTorrentsForAnime(title: {
   );
   if (candidates.length === 0) return [];
 
-  let lastResults: any[] = [];
-  for (let i = 0; i < candidates.length; i++) {
-    const results = await fallbackSearchTorrents(candidates[i]);
-    if (results.length >= MIN_ACCEPTABLE_RESULTS || i === candidates.length - 1) {
-      return results;
+  const seenViewUrls = new Set<string>();
+  const merged: any[] = [];
+  for (const candidate of candidates) {
+    const results = await fallbackSearchTorrents(candidate);
+    for (const result of results) {
+      if (!seenViewUrls.has(result.view_url)) {
+        seenViewUrls.add(result.view_url);
+        merged.push(result);
+      }
     }
-    lastResults = results;
   }
-  return lastResults;
+  return merged;
 }

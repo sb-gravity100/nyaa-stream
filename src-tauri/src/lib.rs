@@ -246,19 +246,22 @@ async fn search_torrents(state: State<'_, Arc<AppState>>, query: String) -> Resu
     }
 }
 
-/// Minimum result count before we consider a title's search "good enough"
-/// and stop trying further candidate queries. Chosen empirically: nyaa.si's
-/// own tokenizer is per-word AND matching, so a title that actually has
-/// releases will typically return well above this once the query string
-/// isn't mangled by unnormalized punctuation (see nyaa_client::sanitize_query).
-const MIN_ACCEPTABLE_RESULTS: usize = 3;
-
-/// Searches nyaa.si for an AniList anime, trying the English title first and
-/// falling back to the romaji title if the English title returns too few
-/// results. This is deterministic (fixed candidate order, fixed threshold),
-/// not fuzzy matching. Verified against nyaa.si's live search: fansub groups
-/// overwhelmingly use the romaji title (e.g. "Sousou no Frieren") even when
-/// AniList's English title exists, so English-only search under-matches.
+/// Searches nyaa.si for an AniList anime using both its English and romaji
+/// titles and merges the results (deduplicated by view URL, since a release
+/// whose own title happens to contain both would otherwise show up twice).
+///
+/// This used to search English first and only fall back to romaji if
+/// English returned fewer than a handful of results - but nyaa.si's own
+/// per-word AND-matching tokenizer means a real show's English-title search
+/// almost always clears that threshold on its own, so the romaji fallback
+/// essentially never fired in practice. Verified live against "That Time I
+/// Got Reincarnated as a Slime": many fansub groups (SubsPlease, Erai-raws,
+/// Ironclad, ASW, and others) title their releases in romaji only, with no
+/// English cross-reference text at all - 489 of that show's 950 real
+/// releases were being silently dropped by English-only search, entirely
+/// missed regardless of how many result pages got fetched. Searching both
+/// unconditionally (not as a fallback) is the only way to actually get all
+/// of a show's sources.
 #[tauri::command]
 async fn search_torrents_for_anime(
     state: State<'_, Arc<AppState>>,
@@ -280,25 +283,31 @@ async fn search_torrents_for_anime(
 
     tracing::debug!(?candidates, "search_torrents_for_anime invoked");
 
-    let mut last_results = Vec::new();
-    for (i, candidate) in candidates.iter().enumerate() {
+    let mut seen_view_urls = std::collections::HashSet::new();
+    let mut merged = Vec::new();
+    let mut last_err = None;
+    for candidate in &candidates {
         match state.nyaa.search(candidate, Category::AnimeEnglishTranslated).await {
             Ok(results) => {
-                tracing::info!(query = candidate, count = results.len(), attempt = i, "candidate search completed");
-                if results.len() >= MIN_ACCEPTABLE_RESULTS || i == candidates.len() - 1 {
-                    return Ok(results);
+                tracing::info!(query = candidate, count = results.len(), "candidate search completed");
+                for result in results {
+                    if seen_view_urls.insert(result.view_url.clone()) {
+                        merged.push(result);
+                    }
                 }
-                last_results = results;
             }
             Err(err) => {
                 tracing::error!(query = candidate, %err, "candidate search failed");
-                if i == candidates.len() - 1 {
-                    return Err(err.to_string());
-                }
+                last_err = Some(err);
             }
         }
     }
-    Ok(last_results)
+    if merged.is_empty() {
+        if let Some(err) = last_err {
+            return Err(err.to_string());
+        }
+    }
+    Ok(merged)
 }
 
 /// Cap on simultaneous view-page fetches. Bounded deliberately: a search can
