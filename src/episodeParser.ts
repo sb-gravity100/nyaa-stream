@@ -11,6 +11,16 @@
 // Journey's End [Dual Audio 10bit BD1080p][HEVC-x265]") and rely on the
 // view-page file-count scrape (nyaa-client's fetch_details) as the
 // deterministic backstop — confirmed those 3 do resolve correctly there.
+//
+// Re-verified against 160 live Frieren titles plus a live "That Time I
+// Got Reincarnated as a Slime" search after fixing three mismatches found
+// in the latter (dual season-relative/absolute numbering in one title,
+// "Season N - M" misread as a batch range, and a pipe-terminated dash
+// number falling through to no match at all) — see findEpisodeNumber and
+// SEASON_DASH_EPISODE_PATTERN below. 156/160 Frieren titles episode,
+// 4/160 batch (all correctly), 0 unknown - no regression from the fix.
+// crates/nyaa-client/examples/search_debug.rs re-runs this kind of check
+// against live nyaa.si data without needing the full app running.
 
 // Checked separately from EPISODE_PATTERNS below because it's the only
 // pattern that also captures a season number. Allows an optional "v2"/"v3"
@@ -20,12 +30,65 @@
 // whole title silently fell to "Unknown".
 const SEASON_EPISODE_PATTERN = /\bS(\d{1,2})E(\d{1,4})(?:v\d+)?\b/i;
 
+// Checked leftmost-match-wins (see findEpisodeNumber below), not in fixed
+// priority order: a title can carry two different numbering schemes at
+// once, e.g. Asakura's "...4th Season - 02 [1080p...] | ... Season 4 |
+// Episode 74" - "02" is the season-relative number every other fansub
+// group's release for the same episode uses, "74" is an absolute-episode
+// cross-reference appended near the end. Checking "Episode" before the
+// dash patterns unconditionally (the old behavior) always grabbed the
+// absolute number instead, filing the release under a bogus episode
+// bucket disconnected from every other group's - verified live against
+// real nyaa.si data for "That Time I Got Reincarnated as a Slime". The
+// season-relative number is reliably the one right after the title, so
+// leftmost-wins fixes this without needing to special-case the group.
 const EPISODE_PATTERNS: RegExp[] = [
   /\bEp(?:isode)?\.?\s*(\d{1,4})\b/i, // Episode 12 / Ep 12 / Ep.12
-  / - (\d{1,4})(?:v\d)?\s*[[(]/, // "Title - 12 [1080p]" / "Title - 12 (v2)"
+  // "Title - 12 [1080p]" / "Title - 12 (v2)" / "Title - 12 | Alt Title" -
+  // the "|" terminator matters: without it, a title like "3rd Season - 21
+  // | That Time I Got Reincarnated as a Slime Season 3 | S3 [English
+  // Dub][1080p]" (real nyaa.si data) had no pattern match its episode
+  // number at all (the bracket/end-of-string terminators don't cover a
+  // pipe-separated alt title following it) and silently fell through to
+  // the season-only batch fallback below, hiding a real single episode
+  // behind a bogus "Season 3 Batch" bucket - verified live.
+  / - (\d{1,4})(?:v\d)?\s*[[(|]/,
   / - (\d{1,4})(?:v\d)?\s*$/, // "Title - 12" at end of string
-  /\bE(\d{1,4})(?:v\d+)?\b/i, // E12 / E12v2
 ];
+
+// Some groups (e.g. Doomdos) write "Season 4 - 92" instead of "S04E92" -
+// a season number and an episode number joined by a dash, not a range.
+// EPISODE_RANGE_PATTERN below can't tell the difference and would
+// misread this as "episodes 4 through 92", filing a single episode as a
+// giant batch - verified live. Checked before the batch/range check so
+// this wins for exactly this shape; a real range following a bare season
+// marker without "Season" directly attached to the first number is
+// unaffected.
+const SEASON_DASH_EPISODE_PATTERN = /\bseason\s*\d{1,2}\s*-\s*(\d{1,4})\b/i;
+
+// Weakest, most false-positive-prone signal (a bare "E" + digits can
+// coincidentally appear in unrelated bracketed metadata) - kept as a
+// strict last resort rather than part of the leftmost-wins comparison
+// above, so it only ever fires when nothing more specific matched at all.
+const FALLBACK_EPISODE_PATTERN = /\bE(\d{1,4})(?:v\d+)?\b/i;
+
+// Leftmost match among EPISODE_PATTERNS, falling back to the weaker bare
+// "E12" pattern only if none of them matched anywhere in the title.
+function findEpisodeNumber(title: string): number | null {
+  let best: { index: number; number: number } | null = null;
+  for (const pattern of EPISODE_PATTERNS) {
+    const match = title.match(pattern);
+    if (!match || match.index == null) continue;
+    const number = parseInt(match[match.length - 1], 10);
+    if (Number.isNaN(number)) continue;
+    if (best === null || match.index < best.index) {
+      best = { index: match.index, number };
+    }
+  }
+  if (best) return best.number;
+  const fallback = title.match(FALLBACK_EPISODE_PATTERN);
+  return fallback ? parseInt(fallback[1], 10) : null;
+}
 
 // Checked before EPISODE_PATTERNS' bare "E12" case: a title like "S01
 // E15-E28 ... [Batch - Part 2]" contains "E15", which the bare-episode
@@ -89,17 +152,22 @@ export function parseEpisode(title: string): EpisodeLabel {
       return { kind: "episode", season, number };
     }
   }
-  if (BATCH_KEYWORD_PATTERN.test(title) || EPISODE_RANGE_PATTERN.test(title)) {
+  if (BATCH_KEYWORD_PATTERN.test(title)) {
     return { kind: "batch", season: extractSeasonNumber(title), episodeRange: extractEpisodeRange(title) };
   }
-  for (const pattern of EPISODE_PATTERNS) {
-    const match = title.match(pattern);
-    if (match) {
-      const number = parseInt(match[match.length - 1], 10);
-      if (!Number.isNaN(number)) {
-        return { kind: "episode", season: extractSeasonNumber(title), number };
-      }
+  const seasonDashMatch = title.match(SEASON_DASH_EPISODE_PATTERN);
+  if (seasonDashMatch) {
+    const number = parseInt(seasonDashMatch[1], 10);
+    if (!Number.isNaN(number)) {
+      return { kind: "episode", season: extractSeasonNumber(title), number };
     }
+  }
+  if (EPISODE_RANGE_PATTERN.test(title)) {
+    return { kind: "batch", season: extractSeasonNumber(title), episodeRange: extractEpisodeRange(title) };
+  }
+  const episodeNumber = findEpisodeNumber(title);
+  if (episodeNumber !== null) {
+    return { kind: "episode", season: extractSeasonNumber(title), number: episodeNumber };
   }
   for (const pattern of BATCH_PATTERNS) {
     if (pattern.test(title)) {
