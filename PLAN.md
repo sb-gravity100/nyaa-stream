@@ -99,7 +99,18 @@ nyaa_stream/
    titles fall back to `get_torrent_details_batch`, which scrapes each
    torrent's own nyaa.si view page for its real file count (batch or not)
    and submitter — only for titles the regex couldn't already resolve, to
-   keep request volume down.
+   keep request volume down. `App.tsx`'s `groupedSources` then drops any
+   result whose own parsed season doesn't match the currently-browsed
+   anime's season (from its own AniList title, via the same
+   `extractSeasonNumber`) - nyaa.si's search isn't a strict phrase match,
+   verified live that browsing a specific numbered season (e.g. "That Time
+   I Got Reincarnated as a Slime Season 4") still returns plenty of other
+   seasons' releases too, which would otherwise show up mixed into that
+   season's own episode list. Only applied when the browsed anime's own
+   title actually names a season >1 - an unnumbered "season 1" is exactly
+   extractSeasonNumber's ambiguous default for a genuinely unparseable
+   title too, so filtering there would risk hiding real matches instead of
+   removing noise.
 4. The media page's docked panel lists one row per episode (stremio-web's
    real `VideosList` pattern), not a flat list of raw torrent releases —
    picking a specific source is deferred to a future video-player dropdown,

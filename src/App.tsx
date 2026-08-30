@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { invoke } from "@tauri-apps/api/core";
-import { episodeLabelText, parseEpisode, parseSubmitterFromTitle, type EpisodeLabel } from "./episodeParser";
+import {
+  episodeLabelText,
+  extractSeasonNumber,
+  parseEpisode,
+  parseSubmitterFromTitle,
+  type EpisodeLabel,
+} from "./episodeParser";
 import {
   fallbackGetAnimeDetails,
   fallbackGetLatestEpisodes,
@@ -288,6 +294,23 @@ function App() {
     blurTimeout.current = window.setTimeout(() => setDropdownOpen(false), 150);
   }
 
+  // nyaa.si's search isn't a strict phrase match - verified live that
+  // browsing e.g. "That Time I Got Reincarnated as a Slime Season 4"
+  // still returns plenty of season 1/2/3 releases too (its own titles
+  // parse to their own correct season via the same logic below, but they
+  // don't belong on THIS anime's page at all). Only treated as a real
+  // filter when the currently-browsed anime's own title text actually
+  // names a season >1 - a franchise's unnumbered "season 1" entry is
+  // exactly the ambiguous default extractSeasonNumber falls back to for
+  // genuinely unparseable titles too, so filtering there would risk
+  // hiding real matches instead of removing wrong-season noise.
+  const currentAnimeSeason = useMemo(() => {
+    if (!selectedAnime) return 1;
+    const fromEnglish = selectedAnime.title.english ? extractSeasonNumber(selectedAnime.title.english) : 1;
+    if (fromEnglish !== 1) return fromEnglish;
+    return selectedAnime.title.romaji ? extractSeasonNumber(selectedAnime.title.romaji) : 1;
+  }, [selectedAnime]);
+
   const groupedSources = useMemo(() => {
     const groups = new Map<string, { label: EpisodeLabel; releases: NyaaResult[] }>();
     const addToGroup = (label: EpisodeLabel, source: NyaaResult) => {
@@ -308,6 +331,13 @@ function App() {
         parsed.kind === "unknown" && details[source.view_url]?.is_batch
           ? { kind: "batch", season: 1, episodeRange: null }
           : parsed;
+
+      // See currentAnimeSeason's doc comment - drop releases we're
+      // confident belong to a different season of the same franchise
+      // rather than this anime's own episodes.
+      if (currentAnimeSeason !== 1 && label.kind !== "unknown" && label.season !== currentAnimeSeason) {
+        continue;
+      }
 
       // A batch with an explicit episode range (e.g. "E15-E28") actually
       // covers those specific episodes, so spread it into each of those
@@ -342,7 +372,7 @@ function App() {
       }
       return 0;
     });
-  }, [sources, details]);
+  }, [sources, details, currentAnimeSeason]);
 
   if (selectedAnime) {
     return (
