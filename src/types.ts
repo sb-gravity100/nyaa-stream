@@ -19,6 +19,8 @@ export interface AnimeMedia {
   format: string | null;
   season: string | null;
   seasonYear: number | null;
+  /** Typical per-episode runtime in minutes, per AniList. */
+  duration: number | null;
 }
 
 export interface NyaaResult {
@@ -42,6 +44,7 @@ export interface AiringMedia {
   id: number;
   title: AnimeTitle;
   coverImage: CoverImage;
+  duration: number | null;
 }
 
 export interface AiringEntry {
@@ -57,7 +60,8 @@ export interface KitsuMetadata {
 
 export interface PlaySession {
   torrentId: number;
-  streamUrl: string;
+  /** Base HLS playlist URL - append `?duration=<seconds>` before use. */
+  hlsUrl: string;
 }
 
 export interface StreamStats {
