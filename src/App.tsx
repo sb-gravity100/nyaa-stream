@@ -76,6 +76,11 @@ function App() {
   // Kitsu and AniList both came up completely empty (see loadTorrentThumbnail
   // below); most cards never touch this at all.
   const [torrentThumbnails, setTorrentThumbnails] = useState<Record<string, string | null>>({});
+  // Cumulative prior-season episode count for the anime currently being
+  // browsed (see get_absolute_episode_offset/groupedSources) - keyed by
+  // AniList id, 0 meaning either "no prior seasons" or "not loaded yet",
+  // which are both safe defaults for the correction to be a no-op.
+  const [episodeOffsetByMedia, setEpisodeOffsetByMedia] = useState<Record<number, number>>({});
 
   const skipNextSearch = useRef(false);
   const blurTimeout = useRef<number | undefined>(undefined);
@@ -154,6 +159,21 @@ function App() {
     // thumbnails once they arrive, doesn't block anything above.
     loadAnimeDetails(anime.id);
     loadKitsuMetadata(anime.id);
+    loadEpisodeOffset(anime.id);
+  }
+
+  // Some fansub groups number episodes absolutely across a whole franchise
+  // instead of restarting from 1 each season (e.g. "Season 4 Episode 92"
+  // meaning the franchise's 92nd episode overall, not the 92nd of season
+  // 4) - episodeParser.ts can't detect or correct this from title text
+  // alone, since it has no notion of a franchise's other seasons. This
+  // fetches how many episodes aired before the currently-browsed season,
+  // from AniList's relations graph (see get_absolute_episode_offset's doc
+  // comment), so groupedSources can recognize and correct it.
+  async function loadEpisodeOffset(id: number) {
+    if (id in episodeOffsetByMedia) return;
+    const offset = isTauriAvailable() ? await invoke<number>("get_absolute_episode_offset", { id }).catch(() => 0) : 0;
+    setEpisodeOffsetByMedia((current) => (id in current ? current : { ...current, [id]: offset }));
   }
 
   // Latest Episodes row: jump straight to that episode's player rather than
@@ -311,6 +331,8 @@ function App() {
     return selectedAnime.title.romaji ? extractSeasonNumber(selectedAnime.title.romaji) : 1;
   }, [selectedAnime]);
 
+  const currentEpisodeOffset = selectedAnime ? (episodeOffsetByMedia[selectedAnime.id] ?? 0) : 0;
+
   const groupedSources = useMemo(() => {
     const groups = new Map<string, { label: EpisodeLabel; releases: NyaaResult[] }>();
     const addToGroup = (label: EpisodeLabel, source: NyaaResult) => {
@@ -337,6 +359,26 @@ function App() {
       // rather than this anime's own episodes.
       if (currentAnimeSeason !== 1 && label.kind !== "unknown" && label.season !== currentAnimeSeason) {
         continue;
+      }
+
+      // See loadEpisodeOffset's doc comment - a release numbered
+      // absolutely across the whole franchise (its own season is right,
+      // but its episode number is too high to be season-relative and
+      // matches "offset + a real in-season number" instead) gets
+      // corrected to that in-season number so it merges into the same
+      // bucket as every other group's correctly-numbered release for the
+      // same actual episode, rather than sitting alone in a bogus
+      // "Episode 92"-style bucket.
+      if (
+        label.kind === "episode" &&
+        currentEpisodeOffset > 0 &&
+        selectedAnime?.episodes != null &&
+        label.number > selectedAnime.episodes
+      ) {
+        const relative = label.number - currentEpisodeOffset;
+        if (relative >= 1 && relative <= selectedAnime.episodes) {
+          label.number = relative;
+        }
       }
 
       // A batch with an explicit episode range (e.g. "E15-E28") actually
@@ -372,7 +414,7 @@ function App() {
       }
       return 0;
     });
-  }, [sources, details, currentAnimeSeason]);
+  }, [sources, details, currentAnimeSeason, currentEpisodeOffset, selectedAnime?.episodes]);
 
   if (selectedAnime) {
     return (
