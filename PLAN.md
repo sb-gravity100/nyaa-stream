@@ -119,12 +119,17 @@ nyaa_stream/
    metadata arrives from peers asynchronously, and a request made
    immediately after `add()` returned used to 404) and returns an HLS
    playlist URL from the local streaming server. The frontend plays that
-   via `hls.js` in a plain HTML5 `<video>` element — a PotPlayer-style
-   bottom control bar (play/pause, seek with a download-progress
-   highlight, volume, fullscreen, time, a source-picker dropdown over the
-   same release list) fades in on mouse movement and auto-hides after
-   idle. Seeking is a plain `video.currentTime` set - hls.js fetches
-   whichever segment covers it. Picking a different source just calls
+   via `hls.js` in a plain HTML5 `<video>` element — a solid-black bottom
+   control bar (play/pause, seek with a download-progress highlight,
+   mute, volume, fullscreen, time, a source-picker dropdown over the same
+   release list) that only appears while the mouse is directly over it
+   (a dedicated invisible hover zone the same size as the bar, not "any
+   mouse movement over the video" the way this used to work - see
+   PlayerView.tsx), plus PotPlayer/YouTube-style keybinds (space/K
+   play-pause, arrows/J/L seek, up/down volume, M mute, F fullscreen, Esc
+   close) that work whether or not the bar is currently shown. Seeking is
+   a plain `video.currentTime` set - hls.js fetches whichever segment
+   covers it. Picking a different source just calls
    `play_magnet` again - its defensive cleanup tears down the previous
    torrent. Buffering feedback and the statistics panel port stremio-web's
    real Player UI (`Buffering.tsx`/`StatisticsMenu.tsx`/`loadingProgress.ts`,
