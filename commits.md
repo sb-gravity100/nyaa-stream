@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `7da48e9` · 2026-08-30 · fix(parser): stop "Final Season" colliding with real season 1
+- `PHASES.md`, `PLAN.md`, `src/episodeParser.ts`
+
 ### `8724436` · 2026-08-30 · fix(search): always search both English and romaji titles, not fallback
 - `PHASES.md`, `PLAN.md`, `src-tauri/src/lib.rs`, `src/browserFallback.ts`
 
