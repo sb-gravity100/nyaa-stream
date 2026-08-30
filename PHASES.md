@@ -170,6 +170,10 @@
       → AniList `streamingEpisodes` → torrent-captured frame
       (`capture_torrent_thumbnail`, headless mpv + on-disk cache) for shows
       neither metadata source has art for
+- [x] Latest Episodes cards sized 16:9 (`.latest-episode-thumbnail` in
+      App.css) instead of a poster's 2:3 - unlike the Library grid below,
+      these show an actual episode still (that same fallback chain), not
+      poster art, so they should be sized for that kind of image
 - [ ] Watch progress / continue-watching (distinct from the library
       save-list above)
 - [ ] Local library backed by AniList's own list if the user authenticates
