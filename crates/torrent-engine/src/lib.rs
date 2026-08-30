@@ -119,7 +119,18 @@ impl HlsJobs {
             let needs_restart = match job_slot.as_ref() {
                 None => true,
                 Some(job) => {
-                    let highest_existing = highest_existing_segment(&job.dir).await.unwrap_or(job.start_index);
+                    // Only counts files at or after this job's own
+                    // start_index - the directory isn't cleared on
+                    // restart, so lower-numbered segments from an earlier,
+                    // already-superseded run can still be sitting there.
+                    // Counting those as "progress" made a request for a
+                    // fresh restart's own (not-yet-produced) target look
+                    // like it was still far ahead of "current progress",
+                    // triggering another pointless restart to the exact
+                    // same offset - verified live: a single seek restarted
+                    // the job 5+ times in a row before it was ever left
+                    // alone long enough to produce a single segment.
+                    let highest_existing = highest_existing_segment_from(&job.dir, job.start_index).await.unwrap_or(job.start_index);
                     // Below the current job's start: it belongs to an
                     // earlier, already-superseded run and was never
                     // produced (a backward seek into a gap a forward seek
@@ -196,7 +207,11 @@ impl HlsJobs {
     }
 }
 
-async fn highest_existing_segment(dir: &FsPath) -> Option<usize> {
+/// Highest `.ts` segment index present in `dir` at or after `min_index` -
+/// callers pass the current job's own `start_index` so a lower-numbered
+/// leftover from an earlier, already-superseded job run (the directory is
+/// never cleared on restart) can't be mistaken for that job's own progress.
+async fn highest_existing_segment_from(dir: &FsPath, min_index: usize) -> Option<usize> {
     let mut entries = tokio::fs::read_dir(dir).await.ok()?;
     let mut highest = None;
     while let Ok(Some(entry)) = entries.next_entry().await {
@@ -206,7 +221,9 @@ async fn highest_existing_segment(dir: &FsPath) -> Option<usize> {
             .and_then(|name| name.strip_suffix(".ts"))
             .and_then(|stem| stem.parse::<usize>().ok())
         {
-            highest = Some(highest.map_or(index, |h: usize| h.max(index)));
+            if index >= min_index {
+                highest = Some(highest.map_or(index, |h: usize| h.max(index)));
+            }
         }
     }
     highest
