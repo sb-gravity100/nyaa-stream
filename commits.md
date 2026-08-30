@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `d7d45da` · 2026-08-30 · feat(player): hover-only solid control bar + PotPlayer/YouTube keybinds
+- `FILE_INDEX.md`, `PHASES.md`, `PLAN.md`, `src/App.css`, `src/PlayerView.tsx`
+
 ### `7da48e9` · 2026-08-30 · fix(parser): stop "Final Season" colliding with real season 1
 - `PHASES.md`, `PLAN.md`, `src/episodeParser.ts`
 
