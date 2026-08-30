@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `508a137` · 2026-08-30 · feat(sources): fix absolute-numbered episodes via AniList's relations graph
+- `FILE_INDEX.md`, `PHASES.md`, `PLAN.md`, `crates/anilist-client/src/lib.rs`, `crates/anilist-client/examples/offset_debug.rs`, `crates/anilist-client/examples/relations_debug.rs`, `src-tauri/src/lib.rs`, `src/App.tsx`
+
 ### `41c41f7` · 2026-08-30 · feat(thumbnails): capture torrent thumbnails near the episode midpoint
 - `FILE_INDEX.md`, `PHASES.md`, `PLAN.md`, `crates/mpv-ipc/src/lib.rs`, `src-tauri/src/lib.rs`, `src/App.tsx`, `src/torrentThumbnail.ts`
 
