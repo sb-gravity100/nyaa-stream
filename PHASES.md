@@ -162,6 +162,14 @@
       (`HlsJobs::ready_seconds` in torrent-engine) - the real "how far have
       segments actually been produced" mark, which is what determines
       whether a seek is instant.
+- [x] hls.js configured with longer fragment-load timeouts/retries
+      (`fragLoadingTimeOut`/`fragLoadingMaxRetry` in `PlayerView.tsx`) and
+      a fatal-error recovery handler (`hls.startLoad()`/
+      `recoverMediaError()`, hls.js's own recommended pattern, capped at 8
+      attempts) - verified live: a slow segment (see the entry above)
+      triggered hls.js's own default, shorter-than-our-server's-budget
+      fragment timeout, which it treated as *fatal* and killed playback
+      outright rather than just needing one more retry.
 - [x] Re-adding a torrent whose destination file already exists (replaying
       an episode, or a thumbnail capture colliding with a real download)
       used to fail outright with "allow_overwrite = false" - fixed via

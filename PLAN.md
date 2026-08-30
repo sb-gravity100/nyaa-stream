@@ -157,7 +157,14 @@ nyaa_stream/
    play-pause, arrows/J/L seek, up/down volume, M mute, F fullscreen, Esc
    close) that work whether or not the bar is currently shown. Seeking is
    a plain `video.currentTime` set - hls.js fetches whichever segment
-   covers it. Picking a different source just calls
+   covers it, configured with longer-than-default fragment-load
+   timeouts/retries and a fatal-error recovery handler (`hls.startLoad()`/
+   `recoverMediaError()`, hls.js's own recommended pattern, capped at 8
+   attempts to avoid retrying forever on a fault recovery can't actually
+   fix) - verified live that hls.js's own default fragment timeout was
+   shorter than torrent-engine's segment-wait budget, so it was declaring
+   a *fatal* error and killing playback outright before the server would
+   have actually delivered a slow segment. Picking a different source just calls
    `play_magnet` again - its defensive cleanup tears down the previous
    torrent. Buffering feedback and the statistics panel port stremio-web's
    real Player UI (`Buffering.tsx`/`StatisticsMenu.tsx`/`loadingProgress.ts`,

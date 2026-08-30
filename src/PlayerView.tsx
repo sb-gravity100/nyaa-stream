@@ -142,13 +142,49 @@ export function PlayerView({ title, releases, estimatedDurationMinutes, onClose 
     const hlsSrc = estimatedDurationSeconds != null ? `${streamUrl}?duration=${estimatedDurationSeconds}` : streamUrl;
 
     if (Hls.isSupported()) {
-      const hls = new Hls();
+      const hls = new Hls({
+        // A segment can legitimately take tens of seconds to become
+        // available (torrent-engine's HlsJobs waits up to 45s server-side
+        // when a seek lands on a not-yet-downloaded region) - hls.js's own
+        // default fragment timeout is well under that, so it was giving
+        // up and firing a *fatal* networkError ("fragLoadTimeOut") well
+        // before our server would actually have delivered the segment -
+        // verified live. These are generous enough to cover that server
+        // budget with room for retries, not just raised arbitrarily.
+        fragLoadingTimeOut: 60_000,
+        fragLoadingMaxRetry: 4,
+        manifestLoadingTimeOut: 20_000,
+      });
       hlsRef.current = hls;
       hls.loadSource(hlsSrc);
       hls.attachMedia(video);
+      // Caps hls.js's own recommended fatal-error recovery pattern
+      // (below) so a fault that recovery genuinely can't fix (rather than
+      // a slow segment that just needed one more retry) doesn't retry
+      // silently forever with a permanently-stuck spinner and no
+      // indication to the user that anything's wrong.
+      let recoveryAttempts = 0;
+      const MAX_RECOVERY_ATTEMPTS = 8;
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (!data.fatal) return;
-        console.error("[player] hls.js fatal error", { type: data.type, details: data.details });
+        console.error("[player] hls.js fatal error", { type: data.type, details: data.details, recoveryAttempts });
+        // A "fatal" network or media error usually just means hls.js's own
+        // retry budget ran out, not that the stream is actually
+        // unplayable - restarting the load (or, for a media/decode
+        // error, recovering the <video> element) from here typically
+        // succeeds rather than needing to give up and show an error.
+        if (recoveryAttempts < MAX_RECOVERY_ATTEMPTS) {
+          if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+            recoveryAttempts++;
+            hls.startLoad();
+            return;
+          }
+          if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+            recoveryAttempts++;
+            hls.recoverMediaError();
+            return;
+          }
+        }
         setError("Playback failed - the file format may not be supported by this browser engine.");
       });
       return () => {
