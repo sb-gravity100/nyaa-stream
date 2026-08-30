@@ -50,8 +50,12 @@ solid-color skeleton blocks, not a spinner).
   resolved from an AniList id via Kitsu's crowdsourced mapping table
 - **Thumbnails:** backdrop/episode art falls back Kitsu → AniList
   `streamingEpisodes` → a torrent-captured frame (`capture_torrent_thumbnail`
-  spawns a headless mpv against the episode's stream, grabs one frame after
-  a few seconds of playback, caches it to disk) when neither has coverage
+  spawns a headless mpv against the episode's stream, seeks it to roughly
+  the episode's midpoint using the same AniList duration estimate the HLS
+  playlist uses, grabs one frame, caches it to disk) when neither has
+  coverage - falls back to a fixed early point when no duration estimate
+  is available, since waiting for real-time playback to reach an actual
+  multi-minute midpoint isn't practical within the capture's timeout
 - **Persistence:** browser `localStorage` for the saved-anime library
   (`src/library.ts`) — deliberately not committing to the sqlite-vs-flat-file
   backend store decision below, which is still open
@@ -215,8 +219,13 @@ nyaa_stream/
 - Batches without an explicit episode range in their title (most of them)
   can't be attributed to specific episodes and stay in an undifferentiated
   per-season "Batch" bucket.
-- Torrent-captured thumbnails only ever use file index `0` and a fixed
-  8-second seek point — same file-selection gap as playback itself.
+- Torrent-captured thumbnails only ever use file index `0` — same
+  file-selection gap as playback itself. The seek point targets roughly
+  the episode's midpoint when a duration estimate is available (a fixed
+  early point otherwise), but without a Matroska Cues index on a
+  still-downloading torrent that seek is best-effort and can land short
+  of the target or occasionally not resolve in time, same tradeoff as
+  torrent-engine's HLS segment restarts.
 - Some fansub groups number releases *absolutely* across a whole franchise
   (e.g. `[Kaizoku] Jujutsu Kaisen - 25 ... (Season 2)`, where 25 is that
   show's overall episode count, not "episode 25 of season 2") with no

@@ -170,6 +170,14 @@
       → AniList `streamingEpisodes` → torrent-captured frame
       (`capture_torrent_thumbnail`, headless mpv + on-disk cache) for shows
       neither metadata source has art for
+- [x] Torrent-captured thumbnails seek to roughly the episode's midpoint
+      (mpv-ipc's `spawn_headless` gained a `start_seconds`/`--start` param)
+      instead of a fixed early point, using the same AniList duration
+      estimate the HLS playlist uses - avoids grabbing an early cold-open/
+      logo frame. Falls back to the old fixed-early-point behavior when no
+      duration estimate is available, since waiting for real-time playback
+      to reach an actual multi-minute midpoint isn't practical within the
+      capture's short timeout
 - [x] Latest Episodes cards sized 16:9 (`.latest-episode-thumbnail` in
       App.css) instead of a poster's 2:3 - unlike the Library grid below,
       these show an actual episode still (that same fallback chain), not
