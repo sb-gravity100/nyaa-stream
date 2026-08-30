@@ -2,6 +2,12 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `268fc86` · 2026-08-30 · fix(parser): fix three real episode-parsing mismatches found live
+- `FILE_INDEX.md`, `PHASES.md`, `crates/nyaa-client/examples/search_debug.rs`, `src/episodeParser.ts`
+
+### `54e6320` · 2026-08-30 · fix(streaming): stop HLS transcode restart livelock on far seeks
+- `crates/torrent-engine/src/lib.rs`
+
 ### `4038a5f` · 2026-08-30 · docs: sync PLAN/PHASES/FILE_INDEX/CLAUDE with HLS transcode rearchitecture
 - `CLAUDE.md`, `FILE_INDEX.md`, `PHASES.md`, `PLAN.md`
 
