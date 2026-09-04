@@ -509,6 +509,19 @@ export function PlayerView({ title, releases, estimatedDurationMinutes, onClose 
         <video
           ref={videoRef}
           class="player-video"
+          // Required for the <track> elements below to actually render:
+          // the video/audio itself streams fine cross-origin without this
+          // (hls.js fetches segments manually over XHR/fetch, not as a
+          // native subresource load), but a <track>'s WebVTT fetch is a
+          // native browser subresource load gated by the media element's
+          // own CORS settings attribute - without `crossOrigin` set, a
+          // cross-origin track (our torrent-engine server is a different
+          // origin/port than the app itself) loads as opaque and its cues
+          // are silently never exposed, even though the file downloads
+          // fine and torrent-engine already sends a permissive CORS
+          // header - verified live (extraction/serving both worked, only
+          // rendering didn't).
+          crossOrigin="anonymous"
           autoPlay
           onLoadedMetadata={(e) => setDuration((e.target as HTMLVideoElement).duration || 0)}
           onTimeUpdate={(e) => setPosition((e.target as HTMLVideoElement).currentTime)}
