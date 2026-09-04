@@ -63,6 +63,16 @@ function App() {
   const [sources, setSources] = useState<NyaaResult[]>([]);
   const [sourcesLoading, setSourcesLoading] = useState(false);
   const [details, setDetails] = useState<Record<string, TorrentDetails>>({});
+  // Session-lifetime cache of both the nyaa.si search and the per-torrent
+  // view-page scrape (see loadDetails), keyed by AniList id - same
+  // never-invalidated-within-a-session pattern as kitsuByMedia/
+  // episodeOffsetByMedia below. Revisiting an anime (back-and-forth from
+  // the library/latest-episodes, or picking the same search result twice)
+  // used to re-run the full nyaa.si search (now up to three queries, see
+  // strip_season_suffix) and re-scrape every ambiguous title's view page
+  // from scratch every single time.
+  const [sourcesByMedia, setSourcesByMedia] = useState<Record<number, NyaaResult[]>>({});
+  const [detailsByMedia, setDetailsByMedia] = useState<Record<number, Record<string, TorrentDetails>>>({});
   const [library, setLibrary] = useState<AnimeMedia[]>([]);
   const [latestEpisodes, setLatestEpisodes] = useState<AiringEntry[]>([]);
   const [latestEpisodesLoading, setLatestEpisodesLoading] = useState(false);
@@ -132,28 +142,38 @@ function App() {
 
   async function pickAnime(anime: AnimeMedia) {
     const releaseQuery = displayTitle(anime.title);
-    console.debug("[search_torrents_for_anime] invoked", { anime: releaseQuery, title: anime.title });
     skipNextSearch.current = true;
     setQuery(releaseQuery);
     setDropdownOpen(false);
     setSelectedAnime(anime);
     setAutoplayEpisode(null);
-    setSources([]);
-    setDetails({});
-    setSourcesLoading(true);
     setError(null);
-    try {
-      const results = isTauriAvailable()
-        ? await invoke<NyaaResult[]>("search_torrents_for_anime", { title: anime.title })
-        : await fallbackSearchTorrentsForAnime(anime.title);
-      console.info("[search_torrents_for_anime] succeeded", { anime: releaseQuery, count: results.length });
-      setSources(results);
+
+    const cachedSources = sourcesByMedia[anime.id];
+    if (cachedSources) {
+      console.debug("[search_torrents_for_anime] served from cache", { anime: releaseQuery, count: cachedSources.length });
+      setSources(cachedSources);
+      setDetails(detailsByMedia[anime.id] ?? {});
       setSourcesLoading(false);
-      await loadDetails(results);
-    } catch (err) {
-      console.error("[search_torrents_for_anime] failed", { anime: releaseQuery, err });
-      setError(String(err));
-      setSourcesLoading(false);
+    } else {
+      console.debug("[search_torrents_for_anime] invoked", { anime: releaseQuery, title: anime.title });
+      setSources([]);
+      setDetails({});
+      setSourcesLoading(true);
+      try {
+        const results = isTauriAvailable()
+          ? await invoke<NyaaResult[]>("search_torrents_for_anime", { title: anime.title })
+          : await fallbackSearchTorrentsForAnime(anime.title);
+        console.info("[search_torrents_for_anime] succeeded", { anime: releaseQuery, count: results.length });
+        setSources(results);
+        setSourcesByMedia((current) => ({ ...current, [anime.id]: results }));
+        setSourcesLoading(false);
+        await loadDetails(anime.id, results);
+      } catch (err) {
+        console.error("[search_torrents_for_anime] failed", { anime: releaseQuery, err });
+        setError(String(err));
+        setSourcesLoading(false);
+      }
     }
     // Fire-and-forget: enriches the already-shown page with per-episode
     // thumbnails once they arrive, doesn't block anything above.
@@ -269,7 +289,7 @@ function App() {
     setLibrary((current) => removeFromLibrary(id, current));
   }
 
-  async function loadDetails(results: NyaaResult[]) {
+  async function loadDetails(mediaId: number, results: NyaaResult[]) {
     if (!isTauriAvailable()) return;
     // A view-page scrape is only worth its cost when the title itself
     // doesn't already tell us what we need: the group tag covers
@@ -299,6 +319,7 @@ function App() {
         skipped: results.length - viewUrls.length,
       });
       setDetails(merged);
+      setDetailsByMedia((current) => ({ ...current, [mediaId]: merged }));
     } catch (err) {
       console.error("[get_torrent_details_batch] failed", { err });
     }
