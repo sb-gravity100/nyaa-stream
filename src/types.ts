@@ -65,6 +65,18 @@ export interface PlaySession {
   hlsUrl: string;
 }
 
+export interface SubtitleTrack {
+  /** Absolute demuxer stream index - also the `<track>` element's key and
+   * what identifies this track to the backend (see torrent-engine's
+   * `SubtitleTrack` doc comment). */
+  index: number;
+  language: string | null;
+  title: string | null;
+  /** WebVTT content URL for this track - fetched directly by the
+   * browser's own `<track>` element, not via `invoke`. */
+  url: string;
+}
+
 export interface StreamStats {
   state: "initializing" | "live" | "paused" | "error";
   progressPercent: number;
