@@ -93,6 +93,8 @@ export function PlayerView({ title, releases, estimatedDurationMinutes, onClose 
   const [statsMenuOpen, setStatsMenuOpen] = useState(false);
   const idleTimerRef = useRef<number | undefined>(undefined);
   const statsPollRef = useRef<number | undefined>(undefined);
+  const statsMenuRef = useRef<HTMLDivElement>(null);
+  const statsButtonRef = useRef<HTMLButtonElement>(null);
   // Whether the pointer is currently over the controls or their hover zone
   // - read by the keybind flash's own hide timer so it doesn't yank the
   // bar away while the mouse is legitimately sitting on it.
@@ -225,6 +227,18 @@ export function PlayerView({ title, releases, estimatedDurationMinutes, onClose 
       stopPlayback();
     };
   }, []);
+
+  useEffect(() => {
+    if (!statsMenuOpen) return;
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target as Node;
+      if (statsMenuRef.current?.contains(target)) return;
+      if (statsButtonRef.current?.contains(target)) return;
+      setStatsMenuOpen(false);
+    }
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [statsMenuOpen]);
 
   // Controls are purely hover-driven now (not "any mouse movement over the
   // video, then auto-hide after idle" - moving the mouse elsewhere on the
@@ -431,12 +445,14 @@ export function PlayerView({ title, releases, estimatedDurationMinutes, onClose 
       {buffering && !error && <Buffering progress={loadingProgress(stats)} />}
 
       {statsMenuOpen && stats && (
-        <StatisticsMenu
-          peers={stats.connectedPeers}
-          speedMbps={stats.downloadSpeedMbps}
-          completedPercent={stats.progressPercent}
-          infoHash={infoHash}
-        />
+        <div ref={statsMenuRef}>
+          <StatisticsMenu
+            peers={stats.connectedPeers}
+            speedMbps={stats.downloadSpeedMbps}
+            completedPercent={stats.progressPercent}
+            infoHash={infoHash}
+          />
+        </div>
       )}
 
       {/* Always-present, invisible strip the same size/position as the
@@ -522,6 +538,7 @@ export function PlayerView({ title, releases, estimatedDurationMinutes, onClose 
           />
           {stats && (
             <button
+              ref={statsButtonRef}
               class={`player-control-button${statsMenuOpen ? " active" : ""}`}
               onClick={() => setStatsMenuOpen((open) => !open)}
               aria-label="Statistics"
