@@ -45,6 +45,7 @@ pub struct TorrentEngine {
     efs: Arc<EngineFS>,
     stream_addr: SocketAddr,
     hls_jobs: HlsJobs,
+    subtitle_jobs: SubtitleJobs,
 }
 
 /// One in-progress `ffmpeg` HLS transcode for a specific torrent file -
@@ -363,6 +364,184 @@ fn spawn_hls_transcode(
     Ok(child)
 }
 
+/// One embedded subtitle track discovered in a torrent file, as reported by
+/// `ffprobe` - `index` is the absolute demuxer stream index, which doubles
+/// as the exact `-map 0:<index>` argument `spawn_subtitle_extraction` uses
+/// and as the URL segment `subtitle_handler` serves it under, so it's never
+/// renumbered anywhere along the way.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SubtitleTrack {
+    pub index: usize,
+    pub language: Option<String>,
+    pub title: Option<String>,
+}
+
+/// Lists a torrent file's embedded subtitle tracks via `ffprobe` (reading
+/// only the container header, same as `spawn_hls_transcode`'s `-i` does -
+/// doesn't wait for the whole file). Doesn't require `enginefs`'s parsed
+/// track list because it doesn't have one: subtitle streams aren't
+/// something the streaming-server layer looks at at all, only ffmpeg/
+/// ffprobe do.
+async fn probe_subtitle_tracks(stream_addr: SocketAddr, torrent_id: &TorrentId, file_idx: usize) -> anyhow::Result<Vec<SubtitleTrack>> {
+    let input_url = format!("http://{stream_addr}/stream/{torrent_id}/{file_idx}");
+    let output = tokio::process::Command::new("ffprobe")
+        .args(["-v", "error", "-print_format", "json", "-show_streams", "-select_streams", "s"])
+        .arg(&input_url)
+        .stdin(Stdio::null())
+        .output()
+        .await
+        .map_err(|err| anyhow::anyhow!("failed to spawn ffprobe (is it installed and on PATH?): {err}"))?;
+    if !output.status.success() {
+        anyhow::bail!("ffprobe exited with {}: {}", output.status, String::from_utf8_lossy(&output.stderr));
+    }
+
+    #[derive(Deserialize)]
+    struct FfprobeStream {
+        index: usize,
+        tags: Option<HashMap<String, String>>,
+    }
+    #[derive(Deserialize, Default)]
+    struct FfprobeOutput {
+        #[serde(default)]
+        streams: Vec<FfprobeStream>,
+    }
+    let parsed: FfprobeOutput = serde_json::from_slice(&output.stdout)
+        .map_err(|err| anyhow::anyhow!("failed to parse ffprobe output: {err}"))?;
+    Ok(parsed
+        .streams
+        .into_iter()
+        .map(|stream| {
+            let mut tags = stream.tags.unwrap_or_default();
+            SubtitleTrack {
+                index: stream.index,
+                language: tags.remove("language"),
+                title: tags.remove("title"),
+            }
+        })
+        .collect())
+}
+
+/// Tracks the single background subtitle-extraction `ffmpeg` process per
+/// torrent file, keyed the same way as `HlsJobs`. Unlike `HlsJobs`, this is
+/// never restarted at an offset: a subtitle track needs to cover the whole
+/// episode regardless of where playback currently is, so the job is simply
+/// started once (covering every track in one `ffmpeg` invocation, one
+/// output per track) and left to run to completion in the background.
+/// `subtitle_handler` just serves whatever bytes are on disk for a given
+/// track at request time - since ffmpeg flushes WebVTT cues as it demuxes
+/// them, an in-progress extraction still serves a valid (if incomplete)
+/// prefix of the track rather than nothing.
+///
+/// Reads the same `stream_handler` input as the video `HlsJobs` transcode,
+/// independently and from byte 0 regardless of the video job's own current
+/// position - a real seek forward in the video leaves this job still
+/// working through earlier bytes it's already read past for video. Left
+/// as a known tradeoff rather than solved here: subtitle text is a tiny
+/// fraction of a release's total bytes, so its share of the resulting
+/// piece-priority contention is minor, and it still finishes catching up
+/// well before a real download does.
+#[derive(Clone)]
+struct SubtitleJobs {
+    jobs: Arc<AsyncMutex<HashMap<(TorrentId, usize), Arc<AsyncMutex<Option<tokio::process::Child>>>>>>,
+    cache_root: PathBuf,
+}
+
+impl SubtitleJobs {
+    fn new(cache_root: PathBuf) -> Self {
+        Self { jobs: Arc::new(AsyncMutex::new(HashMap::new())), cache_root }
+    }
+
+    fn job_dir(&self, torrent_id: &TorrentId, file_idx: usize) -> PathBuf {
+        self.cache_root.join(format!("{torrent_id}_{file_idx}"))
+    }
+
+    fn track_path(&self, torrent_id: &TorrentId, file_idx: usize, stream_index: usize) -> PathBuf {
+        self.job_dir(torrent_id, file_idx).join(format!("{stream_index}.vtt"))
+    }
+
+    /// Starts the extraction job for `tracks` if one hasn't already been
+    /// started for this file - a no-op on every call after the first
+    /// (including once the job has already finished), since there's never
+    /// a reason to restart it.
+    async fn ensure_running(&self, torrent_id: &TorrentId, file_idx: usize, tracks: &[SubtitleTrack], stream_addr: SocketAddr) -> anyhow::Result<()> {
+        if tracks.is_empty() {
+            return Ok(());
+        }
+        let job_lock = {
+            let mut jobs = self.jobs.lock().await;
+            jobs.entry((torrent_id.clone(), file_idx)).or_insert_with(|| Arc::new(AsyncMutex::new(None))).clone()
+        };
+        let mut job_slot = job_lock.lock().await;
+        if job_slot.is_some() {
+            return Ok(());
+        }
+        let dir = self.job_dir(torrent_id, file_idx);
+        tokio::fs::create_dir_all(&dir).await?;
+        let child = spawn_subtitle_extraction(torrent_id, file_idx, tracks, stream_addr, &dir)?;
+        *job_slot = Some(child);
+        tracing::info!(torrent_id = %torrent_id, file_idx, track_count = tracks.len(), "started subtitle extraction job");
+        Ok(())
+    }
+
+    /// Kills and forgets any extraction job for `torrent_id` (any file
+    /// index) and deletes its cached tracks - mirrors `HlsJobs::remove_torrent`.
+    async fn remove_torrent(&self, torrent_id: &TorrentId) {
+        let mut jobs = self.jobs.lock().await;
+        let keys: Vec<_> = jobs.keys().filter(|(id, _)| id == torrent_id).cloned().collect();
+        for key in keys {
+            if let Some(job_lock) = jobs.remove(&key) {
+                let mut job_slot = job_lock.lock().await;
+                if let Some(mut child) = job_slot.take() {
+                    let _ = child.start_kill();
+                }
+                let _ = tokio::fs::remove_dir_all(self.job_dir(&key.0, key.1)).await;
+            }
+        }
+    }
+}
+
+/// Spawns one `ffmpeg` process that extracts every track in `tracks` to its
+/// own WebVTT file in `dir` (named `<stream_index>.vtt`), in a single pass
+/// over the input - one `-map`/`-c:s webvtt` output per track, all reading
+/// the same demux instead of one process per track re-reading the file
+/// from scratch each time.
+fn spawn_subtitle_extraction(
+    torrent_id: &TorrentId,
+    file_idx: usize,
+    tracks: &[SubtitleTrack],
+    stream_addr: SocketAddr,
+    dir: &FsPath,
+) -> anyhow::Result<tokio::process::Child> {
+    let input_url = format!("http://{stream_addr}/stream/{torrent_id}/{file_idx}");
+    let mut command = tokio::process::Command::new("ffmpeg");
+    command.args(["-loglevel", "warning", "-i", &input_url]);
+    for track in tracks {
+        command.args(["-map", &format!("0:{}", track.index), "-c:s", "webvtt", "-f", "webvtt"]);
+        command.arg(dir.join(format!("{}.vtt", track.index)).to_string_lossy().to_string());
+    }
+
+    let mut child = command
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|err| anyhow::anyhow!("failed to spawn ffmpeg for subtitle extraction (is it installed and on PATH?): {err}"))?;
+
+    if let Some(stderr) = child.stderr.take() {
+        let torrent_id = torrent_id.clone();
+        tokio::spawn(async move {
+            use tokio::io::{AsyncBufReadExt, BufReader};
+            let mut lines = BufReader::new(stderr).lines();
+            while let Ok(Some(line)) = lines.next_line().await {
+                tracing::warn!(torrent_id = %torrent_id, file_idx, ffmpeg_stderr = %line, "ffmpeg subtitle extraction stderr");
+            }
+        });
+    }
+
+    Ok(child)
+}
+
 pub struct AddedTorrent {
     pub id: TorrentId,
 }
@@ -372,6 +551,7 @@ struct StreamRouterState {
     efs: Arc<EngineFS>,
     stream_addr: SocketAddr,
     hls_jobs: HlsJobs,
+    subtitle_jobs: SubtitleJobs,
 }
 
 /// Trimmed-down mirror of librqbit's `TorrentStats` - mirrors Stremio's own
@@ -424,6 +604,11 @@ impl TorrentEngine {
             .map(|parent| parent.join("hls_cache"))
             .unwrap_or_else(|| download_dir.join("hls_cache"));
         let hls_jobs = HlsJobs::new(hls_cache_root);
+        let subtitles_cache_root = download_dir
+            .parent()
+            .map(|parent| parent.join("subtitles_cache"))
+            .unwrap_or_else(|| download_dir.join("subtitles_cache"));
+        let subtitle_jobs = SubtitleJobs::new(subtitles_cache_root);
         let cache_dir = download_dir
             .parent()
             .map(|parent| parent.join("engine_cache"))
@@ -437,7 +622,8 @@ impl TorrentEngine {
         let stream_addr = listener.local_addr()?;
         tracing::info!(%stream_addr, "streaming server listening");
 
-        let router_state = StreamRouterState { efs: efs.clone(), stream_addr, hls_jobs: hls_jobs.clone() };
+        let router_state =
+            StreamRouterState { efs: efs.clone(), stream_addr, hls_jobs: hls_jobs.clone(), subtitle_jobs: subtitle_jobs.clone() };
         let app = Router::new()
             .route("/stream/{torrent_id}/{file_idx}", get(stream_handler))
             .route("/hls/{torrent_id}/{file_idx}/playlist.m3u8", get(hls_playlist_handler))
@@ -448,6 +634,7 @@ impl TorrentEngine {
             // convention anyway; Content-Type is set explicitly below and
             // hls.js doesn't care what the segment URI looks like.
             .route("/hls/{torrent_id}/{file_idx}/{segment_index}", get(hls_segment_handler))
+            .route("/subtitles/{torrent_id}/{file_idx}/{stream_index}", get(subtitle_handler))
             .with_state(router_state)
             // hls.js loads the playlist/segments via fetch/XHR rather than
             // a plain <video src> element, which - unlike media-element
@@ -463,7 +650,7 @@ impl TorrentEngine {
             }
         });
 
-        Ok(Self { efs, stream_addr, hls_jobs })
+        Ok(Self { efs, stream_addr, hls_jobs, subtitle_jobs })
     }
 
     /// Adds a torrent from a magnet link or .torrent URL and starts
@@ -498,6 +685,7 @@ impl TorrentEngine {
     pub async fn remove(&self, id: TorrentId) -> anyhow::Result<()> {
         tracing::debug!(torrent_id = %id, "removing torrent");
         self.hls_jobs.remove_torrent(&id).await;
+        self.subtitle_jobs.remove_torrent(&id).await;
         self.efs.remove_engine(&id).await;
         self.efs.get_backend().remove_torrent(&id).await
     }
@@ -519,6 +707,25 @@ impl TorrentEngine {
     /// estimate) to know how many segments to declare.
     pub fn hls_playlist_url(&self, torrent_id: &TorrentId, file_idx: usize) -> String {
         format!("http://{}/hls/{}/{}/playlist.m3u8", self.stream_addr, torrent_id, file_idx)
+    }
+
+    /// Lists a torrent file's embedded subtitle tracks and kicks off (if not
+    /// already running) the background job that extracts all of them to
+    /// WebVTT - see `SubtitleJobs`' doc comment for why that's a
+    /// fire-and-forget job rather than something awaited here. Safe to call
+    /// repeatedly (e.g. once per player mount): the extraction job itself is
+    /// only ever started once per file.
+    pub async fn list_subtitle_tracks(&self, torrent_id: &TorrentId, file_idx: usize) -> anyhow::Result<Vec<SubtitleTrack>> {
+        let tracks = probe_subtitle_tracks(self.stream_addr, torrent_id, file_idx).await?;
+        self.subtitle_jobs.ensure_running(torrent_id, file_idx, &tracks, self.stream_addr).await?;
+        Ok(tracks)
+    }
+
+    /// URL a `<track>` element can fetch a specific subtitle track's WebVTT
+    /// content from - `stream_index` is the same absolute demuxer index
+    /// `SubtitleTrack::index` reports.
+    pub fn subtitle_url(&self, torrent_id: &TorrentId, file_idx: usize, stream_index: usize) -> String {
+        format!("http://{}/subtitles/{}/{}/{}", self.stream_addr, torrent_id, file_idx, stream_index)
     }
 
     /// Download progress/speed/peer-count snapshot for an in-progress
@@ -714,4 +921,22 @@ async fn hls_segment_handler(
     })?;
 
     Ok(([(axum::http::header::CONTENT_TYPE, "video/mp2t")], bytes))
+}
+
+/// Serves whatever bytes the background subtitle-extraction job (see
+/// `SubtitleJobs`) has written for one track so far. Unlike
+/// `hls_segment_handler`, this never waits for or restarts anything - the
+/// job was already started by `list_subtitle_tracks`, and a `<track>`
+/// element's one-shot fetch just gets a (possibly still-growing, but valid)
+/// prefix of the full WebVTT file if extraction hasn't finished yet.
+async fn subtitle_handler(
+    State(state): State<StreamRouterState>,
+    Path((torrent_id, file_idx, stream_index)): Path<(TorrentId, usize, usize)>,
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let path = state.subtitle_jobs.track_path(&torrent_id, file_idx, stream_index);
+    let bytes = tokio::fs::read(&path).await.map_err(|err| {
+        tracing::warn!(torrent_id = %torrent_id, file_idx, stream_index, %err, "subtitle track unavailable");
+        axum::http::StatusCode::NOT_FOUND
+    })?;
+    Ok(([(axum::http::header::CONTENT_TYPE, "text/vtt")], bytes))
 }
