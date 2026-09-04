@@ -2,6 +2,21 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `0384c5f` · 2026-09-05 · docs: sync PLAN.md with the episode-mapping fixes
+- `PLAN.md`
+
+### `c7abb07` · 2026-09-05 · fix(search): also search nyaa.si without a "Season N" suffix
+- `src-tauri/src/lib.rs`
+
+### `6f4c99d` · 2026-09-05 · fix(search): recognize absolute-numbered episodes with no season marker
+- `src/App.tsx`
+
+### `c1bfe7b` · 2026-09-05 · fix(player): close statistics box on outside click
+- `src/PlayerView.tsx`
+
+### `62a1bec` · 2026-09-05 · fix(ui): remove stray body-margin scrollbar
+- `src/App.css`
+
 ### `835bac3` · 2026-09-05 · docs: sync PLAN.md/FILE_INDEX.md with the libtorrent backend swap
 - `PLAN.md`, `FILE_INDEX.md`
 
