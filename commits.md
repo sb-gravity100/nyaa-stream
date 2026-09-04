@@ -2,6 +2,18 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `50a6264` · 2026-09-05 · docs: sync PLAN.md/FILE_INDEX.md with subtitle support
+- `PLAN.md`, `FILE_INDEX.md`
+
+### `d6e816b` · 2026-09-05 · feat(player): add subtitle track picker
+- `src/types.ts`, `src/playback.ts`, `src/PlayerView.tsx`
+
+### `68832f5` · 2026-09-05 · feat(tauri): add get_subtitle_tracks command
+- `src-tauri/src/lib.rs`
+
+### `bb29f17` · 2026-09-05 · feat(torrent-engine): extract embedded subtitle tracks to WebVTT
+- `crates/torrent-engine/Cargo.toml`, `crates/torrent-engine/src/lib.rs`
+
 ### `0384c5f` · 2026-09-05 · docs: sync PLAN.md with the episode-mapping fixes
 - `PLAN.md`
 
