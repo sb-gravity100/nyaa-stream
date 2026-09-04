@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import Hls from "hls.js";
-import type { NyaaResult, StreamStats } from "./types";
-import { getStreamStats, playMagnet, stopPlayback } from "./playback";
+import type { NyaaResult, StreamStats, SubtitleTrack } from "./types";
+import { getStreamStats, getSubtitleTracks, playMagnet, stopPlayback } from "./playback";
 import { loadingProgress } from "./loadingProgress";
 import { bestRelease } from "./releases";
 import { Buffering } from "./Buffering";
@@ -57,6 +57,21 @@ function infoHashFromMagnet(magnet: string): string | null {
   return magnet.match(/xt=urn:btih:([a-zA-Z0-9]+)/)?.[1]?.toLowerCase() ?? null;
 }
 
+function subtitleTrackLabel(track: SubtitleTrack, position: number): string {
+  return track.title ?? track.language ?? `Track ${position + 1}`;
+}
+
+// Most fansub releases that carry more than one subtitle track use the
+// extra one(s) for signs/songs commentary rather than a second language -
+// defaulting to the first plain "eng"/"en" track (rather than just the
+// first track outright) avoids landing on one of those by chance. Off
+// (null) otherwise: nothing in the track list says which one - if any -
+// is the "main" dialogue track for a non-English default.
+function defaultSubtitleIndex(tracks: SubtitleTrack[]): number | null {
+  const english = tracks.find((t) => t.language?.toLowerCase().startsWith("en"));
+  return english?.index ?? null;
+}
+
 // An HLS stream (via hls.js) pointed at torrent-engine's playlist endpoint,
 // with a solid-black bottom control bar that only appears while the mouse
 // is actually over it (not on any mouse movement over the video the way
@@ -91,6 +106,10 @@ export function PlayerView({ title, releases, estimatedDurationMinutes, onClose 
   const [volume, setVolumeState] = useState(100);
   const [muted, setMuted] = useState(false);
   const [statsMenuOpen, setStatsMenuOpen] = useState(false);
+  const [subtitleTracks, setSubtitleTracks] = useState<SubtitleTrack[]>([]);
+  // null = subtitles off - also the initial state before tracks have even
+  // been fetched, so no <track> is marked "showing" prematurely.
+  const [activeSubtitleIndex, setActiveSubtitleIndex] = useState<number | null>(null);
   const idleTimerRef = useRef<number | undefined>(undefined);
   const statsPollRef = useRef<number | undefined>(undefined);
   const statsMenuRef = useRef<HTMLDivElement>(null);
@@ -114,6 +133,8 @@ export function PlayerView({ title, releases, estimatedDurationMinutes, onClose 
     setReady(false);
     setDuration(0);
     setPosition(0);
+    setSubtitleTracks([]);
+    setActiveSubtitleIndex(null);
     (async () => {
       try {
         const session = await playMagnet(selectedRelease.magnet, title);
@@ -227,6 +248,41 @@ export function PlayerView({ title, releases, estimatedDurationMinutes, onClose 
       stopPlayback();
     };
   }, []);
+
+  // Fetched once the torrent's added rather than only once its container
+  // header has fully downloaded - the backend just returns an empty list
+  // (or a quietly-ignored error, see get_subtitle_tracks's doc comment)
+  // until ffprobe can actually read it, so there's nothing to gate this on
+  // client-side.
+  useEffect(() => {
+    if (torrentId == null) return;
+    let cancelled = false;
+    (async () => {
+      const tracks = await getSubtitleTracks(torrentId).catch(() => [] as SubtitleTrack[]);
+      if (cancelled) return;
+      setSubtitleTracks(tracks);
+      setActiveSubtitleIndex(defaultSubtitleIndex(tracks));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [torrentId]);
+
+  // <track> elements only apply their `default` attribute once, on load -
+  // switching the active track later has to be done by hand through the
+  // native TextTrackList API instead of re-rendering the `default` prop.
+  // `video.textTracks` order matches the DOM order of the <track> elements
+  // rendered below, which is the same order as `subtitleTracks` itself, so
+  // position (not label - two untitled same-language tracks would collide
+  // on that) is what ties a TextTrack back to its SubtitleTrack.
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    for (let i = 0; i < video.textTracks.length; i++) {
+      const track = subtitleTracks[i];
+      video.textTracks[i].mode = track && track.index === activeSubtitleIndex ? "showing" : "disabled";
+    }
+  }, [subtitleTracks, activeSubtitleIndex]);
 
   useEffect(() => {
     if (!statsMenuOpen) return;
@@ -437,7 +493,17 @@ export function PlayerView({ title, releases, estimatedDurationMinutes, onClose 
             });
             setError("Playback failed - the file format may not be supported by this browser engine.");
           }}
-        />
+        >
+          {subtitleTracks.map((track, i) => (
+            <track
+              key={track.index}
+              kind="subtitles"
+              src={track.url}
+              srcLang={track.language ?? undefined}
+              label={subtitleTrackLabel(track, i)}
+            />
+          ))}
+        </video>
       )}
 
       {error && <div class="player-message player-error">{error}</div>}
@@ -536,6 +602,25 @@ export function PlayerView({ title, releases, estimatedDurationMinutes, onClose 
             aria-label="Volume"
             title="Volume (↑/↓)"
           />
+          {subtitleTracks.length > 0 && (
+            <select
+              class="player-source-select"
+              value={activeSubtitleIndex ?? "off"}
+              onChange={(e) => {
+                const value = (e.target as HTMLSelectElement).value;
+                setActiveSubtitleIndex(value === "off" ? null : Number(value));
+              }}
+              aria-label="Subtitles"
+              title="Subtitles"
+            >
+              <option value="off">Subtitles: Off</option>
+              {subtitleTracks.map((track, i) => (
+                <option key={track.index} value={track.index}>
+                  {subtitleTrackLabel(track, i)}
+                </option>
+              ))}
+            </select>
+          )}
           {stats && (
             <button
               ref={statsButtonRef}

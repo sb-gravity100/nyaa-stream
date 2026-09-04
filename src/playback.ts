@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { isTauriAvailable } from "./browserFallback";
-import type { PlaySession, StreamStats } from "./types";
+import type { PlaySession, StreamStats, SubtitleTrack } from "./types";
 
 // Torrenting isn't available in the dev-only browser preview (see
 // browserFallback.ts) - there's no meaningful fallback for actual playback,
@@ -16,6 +16,13 @@ export async function playMagnet(magnet: string, title: string): Promise<PlaySes
 
 export async function getStreamStats(torrentId: string): Promise<StreamStats> {
   return invoke<StreamStats>("get_stream_stats", { torrentId });
+}
+
+// No browser-fallback path (see this file's top comment): a torrent-less
+// dev preview has no subtitle tracks to list either.
+export async function getSubtitleTracks(torrentId: string): Promise<SubtitleTrack[]> {
+  if (!isTauriAvailable()) return [];
+  return invoke<SubtitleTrack[]>("get_subtitle_tracks", { torrentId });
 }
 
 export async function stopPlayback(): Promise<void> {
