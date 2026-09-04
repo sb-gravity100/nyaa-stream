@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `ab03493` · 2026-09-05 · fix(media-page): scroll episode panel independently of the page
+- `src/App.css`
+
 ### `67be02e` · 2026-08-30 · fix(player): stop hls.js killing playback on a slow-but-recoverable segment
 - `PHASES.md`, `PLAN.md`, `src/PlayerView.tsx`
 
