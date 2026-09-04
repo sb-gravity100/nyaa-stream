@@ -59,7 +59,8 @@ export interface KitsuMetadata {
 }
 
 export interface PlaySession {
-  torrentId: number;
+  /** Torrent info-hash (not a numeric session id - see torrent-engine's `TorrentId`). */
+  torrentId: string;
   /** Base HLS playlist URL - append `?duration=<seconds>` before use. */
   hlsUrl: string;
 }

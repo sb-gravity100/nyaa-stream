@@ -74,7 +74,7 @@ export function PlayerView({ title, releases, estimatedDurationMinutes, onClose 
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const [selectedRelease, setSelectedRelease] = useState<NyaaResult>(() => bestRelease(releases));
-  const [torrentId, setTorrentId] = useState<number | null>(null);
+  const [torrentId, setTorrentId] = useState<string | null>(null);
   const [streamUrl, setStreamUrl] = useState<string | null>(null);
   const [stats, setStats] = useState<StreamStats | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -206,7 +206,7 @@ export function PlayerView({ title, releases, estimatedDurationMinutes, onClose 
     if (torrentId == null) return;
     async function poll() {
       try {
-        const s = await getStreamStats(torrentId as number);
+        const s = await getStreamStats(torrentId as string);
         setStats(s);
         if (s.finished) window.clearInterval(statsPollRef.current);
       } catch {
