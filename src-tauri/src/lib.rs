@@ -312,6 +312,43 @@ async fn search_torrents(state: State<'_, Arc<AppState>>, query: String) -> Resu
 /// missed regardless of how many result pages got fetched. Searching both
 /// unconditionally (not as a fallback) is the only way to actually get all
 /// of a show's sources.
+/// Strips a trailing "Season N"/"Nth Season"/"Part N"/"Final Season"
+/// qualifier off an AniList title, e.g. "That Time I Got Reincarnated as a
+/// Slime Season 4" -> Some("That Time I Got Reincarnated as a Slime"). Used
+/// to build an extra, unqualified search candidate alongside the full
+/// title - see search_torrents_for_anime's doc comment: nyaa.si's search is
+/// per-word AND-matching, so a query carrying literal "Season 4" only
+/// matches releases whose *title text* also contains "Season" and "4" as
+/// separate words. Verified live: ToonsHub numbers this exact show
+/// "S04E21" (no "Season" token at all), so the full-title query returns
+/// zero of its ~100 real Season 4 releases even though a plain "Slime"
+/// search finds every one of them on the first page. Returns None when no
+/// such suffix is found, so the caller can skip adding a redundant
+/// duplicate candidate.
+fn strip_season_suffix(title: &str) -> Option<String> {
+    let words: Vec<&str> = title.split_whitespace().collect();
+    for (i, word) in words.iter().enumerate() {
+        let lower = word.trim_end_matches(|c: char| !c.is_alphanumeric()).to_lowercase();
+        if lower == "season" || lower == "cour" {
+            // A leading ordinal/number ("4th Season", "2nd Season") or
+            // "Final" (e.g. "Final Season") belongs to the suffix too, not
+            // the show's own name - cut before it.
+            let prev_is_qualifier = i > 0
+                && (words[i - 1].chars().next().is_some_and(|c| c.is_ascii_digit())
+                    || words[i - 1].eq_ignore_ascii_case("final"));
+            let cut = if prev_is_qualifier { i - 1 } else { i };
+            if cut == 0 {
+                return None; // "Season" is the whole title - nothing to strip.
+            }
+            return Some(words[..cut].join(" "));
+        }
+        if lower == "part" && i > 0 {
+            return Some(words[..i].join(" "));
+        }
+    }
+    None
+}
+
 #[tauri::command]
 async fn search_torrents_for_anime(
     state: State<'_, Arc<AppState>>,
@@ -324,6 +361,13 @@ async fn search_torrents_for_anime(
     if let Some(romaji) = &title.romaji {
         if Some(romaji) != title.english.as_ref() {
             candidates.push(romaji.clone());
+        }
+    }
+    for base in [title.english.as_deref(), title.romaji.as_deref()].into_iter().flatten() {
+        if let Some(stripped) = strip_season_suffix(base) {
+            if !candidates.iter().any(|c| c.eq_ignore_ascii_case(&stripped)) {
+                candidates.push(stripped);
+            }
         }
     }
     if candidates.is_empty() {
