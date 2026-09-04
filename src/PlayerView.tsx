@@ -20,6 +20,15 @@ const KEYBIND_FLASH_MS = 1200;
 const HOVER_HIDE_GRACE_MS = 150;
 const SEEK_STEP_SECONDS = 5;
 const SEEK_STEP_SECONDS_LARGE = 10;
+// Keyboard seeking (arrows/J/L) only actually moves the video once this
+// long has passed since the last key press, rather than on every single
+// press - stremio-web's own useKeyboardSeek hook does the same. Holding or
+// rapidly tapping a seek key used to fire a real hls.js seek (buffer
+// flush + new segment fetch) on every press, which stutters/"jitters"
+// visible playback well before the user's actually done seeking; this
+// keeps the seek bar/time display moving smoothly off local state
+// (seekPreview) in the meantime and only commits once input settles.
+const KEYBOARD_SEEK_COMMIT_MS = 300;
 const VOLUME_STEP = 5;
 
 interface Props {
@@ -112,6 +121,10 @@ export function PlayerView({ title, releases, estimatedDurationMinutes, onClose 
   const [activeSubtitleIndex, setActiveSubtitleIndex] = useState<number | null>(null);
   const idleTimerRef = useRef<number | undefined>(undefined);
   const statsPollRef = useRef<number | undefined>(undefined);
+  // Pending arrow/J-L keyboard-seek target, not yet applied to the video -
+  // see seekBy's doc comment.
+  const keyboardSeekTargetRef = useRef<number | null>(null);
+  const keyboardSeekTimerRef = useRef<number | undefined>(undefined);
   const statsMenuRef = useRef<HTMLDivElement>(null);
   const statsButtonRef = useRef<HTMLButtonElement>(null);
   // Whether the pointer is currently over the controls or their hover zone
@@ -245,6 +258,7 @@ export function PlayerView({ title, releases, estimatedDurationMinutes, onClose 
     return () => {
       window.clearInterval(statsPollRef.current);
       window.clearTimeout(idleTimerRef.current);
+      window.clearTimeout(keyboardSeekTimerRef.current);
       stopPlayback();
     };
   }, []);
@@ -337,11 +351,21 @@ export function PlayerView({ title, releases, estimatedDurationMinutes, onClose 
     }
   }
 
+  // Dragging the slider by hand overrides any still-pending keyboard-seek
+  // commit (see seekBy) rather than letting that timer fire later and jump
+  // the video back to its own stale target.
+  function cancelPendingKeyboardSeek() {
+    keyboardSeekTargetRef.current = null;
+    window.clearTimeout(keyboardSeekTimerRef.current);
+  }
+
   function handleSeekInput(e: Event) {
+    cancelPendingKeyboardSeek();
     setSeekPreview(Number((e.target as HTMLInputElement).value));
   }
 
   function handleSeekCommit(e: Event) {
+    cancelPendingKeyboardSeek();
     const value = Number((e.target as HTMLInputElement).value);
     setSeekPreview(null);
     // hls.js intercepts this and fetches whichever segment covers `value` -
@@ -376,10 +400,24 @@ export function PlayerView({ title, releases, estimatedDurationMinutes, onClose 
     video.muted = !video.muted;
   }
 
+  // See KEYBOARD_SEEK_COMMIT_MS's doc comment - accumulates onto any
+  // already-pending (not yet committed) target rather than the video's own
+  // currentTime, so repeated presses within the debounce window stack
+  // correctly instead of each one re-reading a currentTime that hasn't
+  // moved yet.
   function seekBy(deltaSeconds: number) {
     const video = videoRef.current;
     if (!video || !duration) return;
-    video.currentTime = Math.min(Math.max(video.currentTime + deltaSeconds, 0), duration);
+    const base = keyboardSeekTargetRef.current ?? video.currentTime;
+    const target = Math.min(Math.max(base + deltaSeconds, 0), duration);
+    keyboardSeekTargetRef.current = target;
+    setSeekPreview(target);
+    window.clearTimeout(keyboardSeekTimerRef.current);
+    keyboardSeekTimerRef.current = window.setTimeout(() => {
+      keyboardSeekTargetRef.current = null;
+      setSeekPreview(null);
+      video.currentTime = target;
+    }, KEYBOARD_SEEK_COMMIT_MS);
   }
 
   function toggleFullscreen() {
