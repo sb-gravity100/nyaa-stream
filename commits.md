@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `0b6be20` · 2026-09-04 · fix(player): add crossOrigin so <track> subtitles actually render
+- `src/PlayerView.tsx`
+
 ### `d48b97e` · 2026-09-05 · docs: sync PLAN.md/FILE_INDEX.md with per-anime results caching
 - `PLAN.md`, `FILE_INDEX.md`
 
