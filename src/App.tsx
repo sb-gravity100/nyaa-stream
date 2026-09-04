@@ -354,21 +354,21 @@ function App() {
           ? { kind: "batch", season: 1, episodeRange: null }
           : parsed;
 
-      // See currentAnimeSeason's doc comment - drop releases we're
-      // confident belong to a different season of the same franchise
-      // rather than this anime's own episodes.
-      if (currentAnimeSeason !== 1 && label.kind !== "unknown" && label.season !== currentAnimeSeason) {
-        continue;
-      }
-
       // See loadEpisodeOffset's doc comment - a release numbered
-      // absolutely across the whole franchise (its own season is right,
-      // but its episode number is too high to be season-relative and
-      // matches "offset + a real in-season number" instead) gets
-      // corrected to that in-season number so it merges into the same
-      // bucket as every other group's correctly-numbered release for the
-      // same actual episode, rather than sitting alone in a bogus
-      // "Episode 92"-style bucket.
+      // absolutely across the whole franchise (its episode number is too
+      // high to be season-relative and matches "offset + a real in-season
+      // number" instead) gets corrected to that in-season number so it
+      // merges into the same bucket as every other group's
+      // correctly-numbered release for the same actual episode, rather
+      // than sitting alone in a bogus "Episode 92"-style bucket. Checked
+      // *before* the season filter below: a release like ToonsHub's, which
+      // carries no season marker in the title at all (so extractSeasonNumber
+      // defaulted label.season to 1), would otherwise get dropped as
+      // "wrong season" noise before ever reaching this correction -
+      // verified live against real Tensura Season 4 data (absolute episode
+      // 93 = Season 4's episode 21, offset 72). Once the math confirms it
+      // belongs to the currently-browsed season, snap label.season to match
+      // so the filter below doesn't then drop it anyway.
       if (
         label.kind === "episode" &&
         currentEpisodeOffset > 0 &&
@@ -378,7 +378,15 @@ function App() {
         const relative = label.number - currentEpisodeOffset;
         if (relative >= 1 && relative <= selectedAnime.episodes) {
           label.number = relative;
+          label.season = currentAnimeSeason;
         }
+      }
+
+      // See currentAnimeSeason's doc comment - drop releases we're
+      // confident belong to a different season of the same franchise
+      // rather than this anime's own episodes.
+      if (currentAnimeSeason !== 1 && label.kind !== "unknown" && label.season !== currentAnimeSeason) {
+        continue;
       }
 
       // A batch with an explicit episode range (e.g. "E15-E28") actually
