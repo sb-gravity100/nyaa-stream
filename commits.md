@@ -2,6 +2,12 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `d48b97e` · 2026-09-05 · docs: sync PLAN.md/FILE_INDEX.md with per-anime results caching
+- `PLAN.md`, `FILE_INDEX.md`
+
+### `5456ad3` · 2026-09-05 · feat(search): cache nyaa.si results and torrent-detail scrapes per anime
+- `src/App.tsx`
+
 ### `4678e02` · 2026-09-05 · fix(player): debounce keyboard seeking to stop stutter
 - `src/PlayerView.tsx`
 
