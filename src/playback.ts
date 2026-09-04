@@ -14,7 +14,7 @@ export async function playMagnet(magnet: string, title: string): Promise<PlaySes
   return session;
 }
 
-export async function getStreamStats(torrentId: number): Promise<StreamStats> {
+export async function getStreamStats(torrentId: string): Promise<StreamStats> {
   return invoke<StreamStats>("get_stream_stats", { torrentId });
 }
 

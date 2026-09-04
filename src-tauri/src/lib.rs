@@ -233,7 +233,7 @@ async fn capture_thumbnail_uncached(
     }
 
     let added = state.torrent_engine.add(magnet).await?;
-    let stream_url = state.torrent_engine.stream_url(added.id, 0);
+    let stream_url = state.torrent_engine.stream_url(&added.id, 0);
 
     // Some(_) means "seek there via mpv's --start", None means "no
     // estimate, just play from 0" - see spawn_headless/the wait loop below
@@ -269,8 +269,9 @@ async fn capture_thumbnail_uncached(
     .await;
 
     // Always clean up the scratch torrent, regardless of how capture went.
-    if let Err(err) = state.torrent_engine.remove(added.id).await {
-        tracing::warn!(torrent_id = added.id, %err, "failed to remove scratch thumbnail torrent");
+    let torrent_id = added.id;
+    if let Err(err) = state.torrent_engine.remove(torrent_id.clone()).await {
+        tracing::warn!(torrent_id = %torrent_id, %err, "failed to remove scratch thumbnail torrent");
     }
 
     match capture_result {
@@ -438,9 +439,9 @@ async fn play_magnet(state: State<'_, Arc<AppState>>, magnet: String, title: Str
     // HLS (via ffmpeg-produced segments) rather than the raw stream_url -
     // see torrent-engine's hls_playlist_handler doc comment for why the raw
     // container bytes aren't reliably playable in a browser <video> element.
-    let hls_url = state.torrent_engine.hls_playlist_url(added.id, 0);
-    *state.current_torrent.lock().await = Some(added.id);
-    tracing::info!(%title, torrent_id = added.id, %hls_url, "torrent added, streaming");
+    let hls_url = state.torrent_engine.hls_playlist_url(&added.id, 0);
+    *state.current_torrent.lock().await = Some(added.id.clone());
+    tracing::info!(%title, torrent_id = %added.id, %hls_url, "torrent added, streaming");
 
     Ok(PlaySession { torrent_id: added.id, hls_url })
 }
@@ -450,8 +451,8 @@ async fn play_magnet(state: State<'_, Arc<AppState>>, magnet: String, title: Str
 /// session.
 async fn cleanup_playback(state: &AppState) {
     if let Some(torrent_id) = state.current_torrent.lock().await.take() {
-        if let Err(err) = state.torrent_engine.remove(torrent_id).await {
-            tracing::warn!(torrent_id, %err, "cleanup_playback: failed to remove torrent");
+        if let Err(err) = state.torrent_engine.remove(torrent_id.clone()).await {
+            tracing::warn!(torrent_id = %torrent_id, %err, "cleanup_playback: failed to remove torrent");
         }
     }
 }
@@ -462,7 +463,7 @@ async fn cleanup_playback(state: &AppState) {
 /// `torrent_engine::StreamStats` doc comment).
 #[tauri::command]
 async fn get_stream_stats(state: State<'_, Arc<AppState>>, torrent_id: TorrentId) -> Result<StreamStats, String> {
-    state.torrent_engine.stats(torrent_id).map_err(|err| err.to_string())
+    state.torrent_engine.stats(&torrent_id).await.map_err(|err| err.to_string())
 }
 
 /// Removes the active torrent (stop seeding, drop partial files) - called
