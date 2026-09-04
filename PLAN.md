@@ -306,6 +306,29 @@ nyaa_stream/
    line up with librqbit's own sequential piece-priority download
    strategy instead of fighting it with scattered probe reads.
 
+   **Subtitles are extracted to WebVTT sidecars, not muxed into the HLS
+   stream** - MPEG-TS can't carry them (see `-sn` above), and burning them
+   into the video would fix one language/style in at transcode time with no
+   way to toggle or switch it. Instead, `torrent_engine::probe_subtitle_tracks`
+   runs `ffprobe` against the same `stream_handler` input the video job
+   reads (container header only, doesn't wait for the whole file) to list
+   embedded tracks, and `SubtitleJobs` starts one background `ffmpeg`
+   process per file - independent of `HlsJobs`, never restarted on a video
+   seek - with one `-map 0:<index> -c:s webvtt` output per track, all in a
+   single pass over the input. `subtitle_handler` serves whatever's on disk
+   for a track at request time, so a `<track>` element's one-shot fetch
+   gets a valid (if the extraction job hasn't finished, incomplete) prefix
+   rather than nothing. `get_subtitle_tracks` (frontend: `PlayerView.tsx`)
+   lists tracks and kicks off extraction as soon as `play_magnet` resolves;
+   `<video>` gets one `<track kind="subtitles">` per track, and a picker in
+   the control bar flips the active one via the native `TextTrackList` API
+   (`<track default>` only applies once, on load). Known tradeoff: this
+   extraction job reads the same input independently and from byte 0
+   regardless of where the video job's own (seek-restartable) read
+   currently is, contending for piece priority with it - accepted rather
+   than solved, since subtitle text is a tiny fraction of a release's total
+   bytes.
+
    **`mpv`/`mpv-ipc` is no longer the real playback engine** — an earlier
    attempt embedded mpv into the app window via `--wid` and a transparent
    webview background, but `transparent: true` turned out to break all
