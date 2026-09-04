@@ -10,7 +10,7 @@ use nyaa_client::{Category, NyaaClient, NyaaResult, TorrentDetails};
 use serde::Serialize;
 use tauri::State;
 use tokio::sync::Mutex;
-use torrent_engine::{StreamStats, TorrentEngine, TorrentId};
+use torrent_engine::{StreamStats, SubtitleTrack, TorrentEngine, TorrentId};
 
 struct AppState {
     anilist: AniListClient,
@@ -510,6 +510,43 @@ async fn get_stream_stats(state: State<'_, Arc<AppState>>, torrent_id: TorrentId
     state.torrent_engine.stats(&torrent_id).await.map_err(|err| err.to_string())
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SubtitleTrackInfo {
+    index: usize,
+    language: Option<String>,
+    title: Option<String>,
+    url: String,
+}
+
+/// Lists `torrent_id`'s embedded subtitle tracks (file index 0, matching
+/// `play_magnet`'s own hardcoded single-file-per-torrent assumption) and
+/// kicks off their background WebVTT extraction - see
+/// `TorrentEngine::list_subtitle_tracks`'s doc comment. Safe to call as
+/// soon as `play_magnet` resolves; a torrent whose container header hasn't
+/// downloaded yet just returns an error the frontend can quietly ignore
+/// (no subtitle UI) rather than something worth surfacing to the user -
+/// unlike a real playback error, plenty of releases simply have no
+/// subtitle tracks at all, which looks identical to ffprobe failing early.
+#[tauri::command]
+async fn get_subtitle_tracks(state: State<'_, Arc<AppState>>, torrent_id: TorrentId) -> Result<Vec<SubtitleTrackInfo>, String> {
+    tracing::debug!(torrent_id = %torrent_id, "get_subtitle_tracks invoked");
+    let tracks: Vec<SubtitleTrack> = state.torrent_engine.list_subtitle_tracks(&torrent_id, 0).await.map_err(|err| {
+        tracing::warn!(torrent_id = %torrent_id, %err, "get_subtitle_tracks failed");
+        err.to_string()
+    })?;
+    tracing::info!(torrent_id = %torrent_id, count = tracks.len(), "get_subtitle_tracks succeeded");
+    Ok(tracks
+        .into_iter()
+        .map(|track| SubtitleTrackInfo {
+            url: state.torrent_engine.subtitle_url(&torrent_id, 0, track.index),
+            index: track.index,
+            language: track.language,
+            title: track.title,
+        })
+        .collect())
+}
+
 /// Removes the active torrent (stop seeding, drop partial files) - called
 /// when the user closes the player or navigates away from the media page.
 #[tauri::command]
@@ -579,6 +616,7 @@ pub fn run() {
             get_torrent_details_batch,
             play_magnet,
             get_stream_stats,
+            get_subtitle_tracks,
             stop_playback
         ])
         .run(tauri::generate_context!())
