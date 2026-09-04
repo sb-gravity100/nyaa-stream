@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `835bac3` · 2026-09-05 · docs: sync PLAN.md/FILE_INDEX.md with the libtorrent backend swap
+- `PLAN.md`, `FILE_INDEX.md`
+
 ### `6a177fe` · 2026-09-05 · fix(playback): propagate TorrentId's numeric -> info-hash string change
 - `src-tauri/src/lib.rs`, `src/PlayerView.tsx`, `src/playback.ts`, `src/types.ts`
 
