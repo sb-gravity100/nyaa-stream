@@ -16,6 +16,19 @@ aggregation patterns), `src/types/resource/meta_item.rs` (confirms
 `Video.series_info` is always `{season, episode}` — validates defaulting
 unlabeled releases to season 1 rather than leaving season unknown).
 
+`reference/stream-server/` — clone of https://github.com/stremio-native/stream-server,
+kept for reference (gitignored) - but unlike the other two `reference/`
+clones, this one is also the source of a real build dependency: the
+`enginefs` crate torrent-engine depends on is a pinned git dependency
+pointing at this same repo (not this local clone - see
+`crates/torrent-engine/Cargo.toml`), and this project's own
+`vcpkg.json`/`triplets/x64-windows-v3-static-md-release.cmake` were copied
+from this clone's own build config. Useful for understanding `enginefs`
+internals beyond its public API (e.g. `enginefs/src/backend/libtorrent/
+playback.rs`'s `LibtorrentPlaybackCoordinator`, which owns real hot-file
+piece-priority scheduling) since its own doc comments are the only
+documentation for a lot of this.
+
 `reference/stremio-web/` — shallow clone of https://github.com/Stremio/stremio-web
 (there is no separate `stremio-desktop` repo — the desktop app is this same
 UI wrapped by a native shell). Gitignored, reference-only. Used to verify
@@ -35,12 +48,68 @@ solid-color skeleton blocks, not a spinner).
   PLAN.md's Known gaps for the history. System `mpv` (must be on PATH — not
   bundled) is still used, but only for headless thumbnail capture
   (`crates/mpv-ipc`)
-- **Torrent engine + streaming server:** `librqbit` (Session + Api), fronted
-  by our own `axum` HTTP server with two layers: raw Range-capable file
-  bytes (`axum-range`), and an HLS layer on top of that (`ffmpeg`-produced
-  playlist + on-demand segments) that real playback actually uses, since
-  raw torrent bytes aren't reliably playable in a browser `<video>`
-  (system `ffmpeg`/`ffprobe`, also not bundled, must be on PATH)
+- **Torrent engine:** `enginefs`'s libtorrent backend (vendored via git
+  dependency from https://github.com/stremio-native/stream-server, pinned
+  to a specific commit - see `crates/torrent-engine/Cargo.toml`), replacing
+  an earlier librqbit-based implementation. Chosen for its real per-file
+  hot-piece prioritization (a batch torrent's actively-watched episode gets
+  the swarm's attention, others don't), RTT-ranked tracker probing, and a
+  working `remove_torrent` - librqbit's equivalent methods in the same
+  `enginefs` crate turned out to be mostly stub/no-op implementations, only
+  the libtorrent backend actually does this work (verified by reading its
+  source before adopting it). Building this crate now requires a C++
+  toolchain: CMake, MSVC, and `vcpkg` (see "Build prerequisites" below) -
+  `enginefs` compiles libtorrent-rasterbar + OpenSSL from source via a
+  vcpkg manifest (`vcpkg.json`/`triplets/` at the project root, copied from
+  stream-server's own build config) the first time it's built.
+  Torrents are keyed by info-hash `String` (`torrent_engine::TorrentId`),
+  not a numeric session id like librqbit's - this ripples into
+  `PlaySession.torrentId`/`get_stream_stats` on the frontend, which just
+  treat it as an opaque id.
+  Storage is disk-backed (`LibtorrentBackend::new_disk_backed`, not
+  `enginefs`'s memory-only mode) so partial downloads still survive an app
+  restart, matching the previous librqbit-based behavior.
+  **Known regression:** unlike the previous librqbit-based `remove()`,
+  `enginefs`'s libtorrent `remove_torrent` does not delete a torrent's
+  downloaded files from disk (verified in its vendored source - it calls
+  libtorrent's own removal with `delete_files = false`) - only our own HLS
+  transcode cache is guaranteed cleaned up on `remove()` today.
+- **Streaming server:** our own `axum` HTTP server (unchanged by the
+  torrent-engine swap above - it talks to the torrent engine only through
+  `enginefs`'s `Engine`/`TorrentHandle` API, not to librqbit or libtorrent
+  directly) with two layers: raw Range-capable file bytes (`axum-range`),
+  and an HLS layer on top of that (`ffmpeg`-produced playlist + on-demand
+  segments, one continuous stream-copied (`-c:v copy`) process per file)
+  that real playback actually uses, since raw torrent bytes aren't reliably
+  playable in a browser `<video>` (system `ffmpeg`/`ffprobe`, also not
+  bundled, must be on PATH). Deliberately did **not** adopt `enginefs`'s own
+  HLS module (`hls.rs`) - it always re-encodes video (no stream-copy path)
+  and spawns one `ffmpeg` process per segment, which is the design this
+  project already tried and moved away from (see `torrent-engine/src/lib.rs`'s
+  `HlsJobs` doc comment for the documented audio-discontinuity/muxer-error
+  history). The two layers are decoupled by design - `enginefs`'s HLS
+  module could be swapped in later without touching the torrent engine, or
+  vice versa.
+
+### Build prerequisites (new, added with the libtorrent backend)
+
+Building `torrent-engine` (and therefore the whole workspace) now additionally
+requires, beyond Rust/Node:
+- CMake
+- A working MSVC C++ toolchain (Visual Studio 2022 Build Tools or full IDE)
+- [`vcpkg`](https://github.com/microsoft/vcpkg), bootstrapped, with
+  `VCPKG_ROOT` pointed at it. On the dev machine this is `C:\vcpkg` - this
+  is a machine-local path, not something this repo can fully automate; a
+  fresh clone needs `vcpkg` bootstrapped once before its first
+  `cargo build`.
+- The first build compiles libtorrent-rasterbar 2.1.1 + OpenSSL from source
+  via `vcpkg install` against this project's `vcpkg.json`/`triplets/`
+  (took ~10 minutes on the dev machine; cached by vcpkg afterward).
+- `.cargo/config.toml` at the project root sets `target-cpu=x86-64-v3`
+  (Haswell/2013+ CPUs) for both Rust and the vendored C++ code, matching
+  stream-server's own build config - this is a real minimum CPU
+  requirement for anyone building or running this app, not just a compiler
+  hint.
 - **Torrent source:** nyaa.si search, scraping its paginated HTML results
   table (its RSS feed was found to silently ignore the `p=` page param and
   always cap at 75 results — see `crates/nyaa-client`)
@@ -65,9 +134,12 @@ solid-color skeleton blocks, not a spinner).
 ```
 nyaa_stream/
   Cargo.toml                 workspace root
+  vcpkg.json                 vcpkg manifest (libtorrent + openssl, for torrent-engine)
+  triplets/                  custom vcpkg triplet (x64-windows-v3-static-md-release)
+  .cargo/config.toml         vcpkg env vars + target-cpu=x86-64-v3 rustflags
   src-tauri/                 Tauri app crate (commands, window, app state)
   crates/
-    torrent-engine/          librqbit wrapper + local streaming/HLS HTTP server
+    torrent-engine/          enginefs (libtorrent backend) wrapper + local streaming/HLS HTTP server
     nyaa-client/              nyaa.si search client (paginated HTML scrape)
     anilist-client/          AniList GraphQL client
     kitsu-client/            Kitsu API client (backdrop + episode thumbnails)
@@ -75,6 +147,8 @@ nyaa_stream/
   src/                       Preact + TypeScript frontend
   reference/stremio-core/    reference-only clone, gitignored
   reference/stremio-web/     reference-only clone, gitignored
+  reference/stream-server/   reference-only clone, gitignored - source of the vendored
+                              `enginefs` git dependency + vcpkg.json/triplets/ above
 ```
 
 ## Data flow (search → browse → play)
@@ -142,11 +216,16 @@ nyaa_stream/
    the user on the episode list) hands `PlayerView.tsx` the full list of
    that episode's releases; it auto-picks the one with the most seeders
    (`releases.ts`'s `bestRelease`) and calls `play_magnet`, which adds it
-   to the librqbit session (waiting on `wait_until_initialized()` so the
-   torrent's file list is actually queryable before returning - a magnet's
-   metadata arrives from peers asynchronously, and a request made
-   immediately after `add()` returned used to 404) and returns an HLS
-   playlist URL from the local streaming server. The frontend plays that
+   to the `enginefs` libtorrent engine and returns an HLS playlist URL from
+   the local streaming server. **Known gap from the librqbit→libtorrent
+   swap**: the previous implementation explicitly waited on librqbit's
+   `handle.wait_until_initialized()` before returning, since a magnet's
+   metadata arrives from peers asynchronously and a request made
+   immediately after `add()` used to 404 without that wait. `enginefs`'s
+   `BackendEngineFS::add_torrent` has no equivalent documented wait step -
+   this hasn't yet been verified live to confirm the race doesn't
+   reappear; test a fresh magnet add → immediate play before considering
+   this fully done. The frontend plays that
    via `hls.js` in a plain HTML5 `<video>` element — a solid-black bottom
    control bar (play/pause, seek with a download-progress highlight,
    mute, volume, fullscreen, time, a source-picker dropdown over the same
