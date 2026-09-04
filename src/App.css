@@ -201,7 +201,8 @@ a {
 
 .media-page {
   position: relative;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   color: #eee;
 }
 
@@ -248,7 +249,7 @@ a {
   display: flex;
   flex-direction: row;
   align-items: stretch;
-  min-height: 100vh;
+  height: 100vh;
   gap: 24px;
   padding: 72px 16px 24px;
   box-sizing: border-box;
@@ -258,6 +259,7 @@ a {
   flex: 1 1 480px;
   min-width: 0;
   max-width: 640px;
+  overflow-y: auto;
 }
 
 .media-poster {
