@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `4678e02` · 2026-09-05 · fix(player): debounce keyboard seeking to stop stutter
+- `src/PlayerView.tsx`
+
 ### `50a6264` · 2026-09-05 · docs: sync PLAN.md/FILE_INDEX.md with subtitle support
 - `PLAN.md`, `FILE_INDEX.md`
 
