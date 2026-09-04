@@ -155,8 +155,15 @@ nyaa_stream/
 
 1. User types in the top search bar → debounced `search_anime` (AniList)
    fills a live dropdown (max 10 results, real ratings/format/season).
-2. Picking a result opens the media page (`MediaPage.tsx`) and, in
-   parallel: `search_torrents_for_anime` searches nyaa.si using both the
+2. Picking a result opens the media page (`MediaPage.tsx`). `App.tsx`'s
+   `pickAnime` caches both the nyaa.si search results and the per-torrent
+   view-page scrape (`sourcesByMedia`/`detailsByMedia`, keyed by AniList id,
+   never invalidated within a session - same pattern as `kitsuByMedia`/
+   `episodeOffsetByMedia`) - revisiting an anime already browsed this
+   session (back-and-forth from the library/latest-episodes, or picking the
+   same search result twice) reuses that instantly instead of re-running the
+   search and re-scraping every ambiguous title's view page from scratch.
+   On a cache miss, in parallel: `search_torrents_for_anime` searches nyaa.si using both the
    English and romaji titles and merges the results, deduplicated by view
    URL (candidate titles are punctuation-sanitized — a raw AniList curly
    apostrophe was found to drop nyaa.si matches from 75 to 1). Both titles
