@@ -166,7 +166,16 @@ nyaa_stream/
    per-word AND-matching tokenizer means a real show's English search
    almost never fell back in the old scheme anyway - together this
    silently dropped roughly half of "That Time I Got Reincarnated as a
-   Slime"'s real releases regardless of how many pages got fetched. Also
+   Slime"'s real releases regardless of how many pages got fetched. A third
+   candidate, `strip_season_suffix`'s output, is also searched whenever the
+   English/romaji title carries a trailing "Season N"/"Nth Season"/"Part
+   N"/"Final Season" qualifier: that same per-word AND-matching tokenizer
+   means a literal "Season 4" in the query only matches releases whose own
+   title text also spells out "Season" and "4" - verified live that
+   ToonsHub numbers Slime Season 4 as plain "S04E21" with no "Season" token
+   anywhere, so the full-title query returned zero of its ~100 real Season
+   4 releases even though the season-stripped "That Time I Got Reincarnated
+   as a Slime" query finds every one of them. Also
    `get_anime_details` lazily fetches the fuller AniList record (synopsis,
    `streamingEpisodes` thumbnails) that the lightweight dropdown search
    doesn't request.
@@ -201,7 +210,15 @@ nyaa_stream/
    prequel that itself further PREQUELs a real season - verified live that
    Slime's own relations graph has exactly this gap between its Season 2
    and Season 1 entries) to recognize and rewrite an absolute episode
-   number back to its real season-relative one before grouping.
+   number back to its real season-relative one before grouping. This
+   absolute-offset correction runs *before* the season-mismatch drop above,
+   not after: a release with no season marker in its title text at all
+   (`extractSeasonNumber` then defaults its season to 1) would otherwise get
+   dropped as "wrong season" noise before the offset math ever got a chance
+   to recognize it as the browsed season's own episode. Once the offset
+   math confirms a release's absolute number resolves to a valid in-season
+   episode, its season is snapped to the browsed season so the drop check
+   doesn't then remove it anyway.
 4. The media page's docked panel lists one row per episode (stremio-web's
    real `VideosList` pattern), not a flat list of raw torrent releases —
    picking a specific source is deferred to a future video-player dropdown,
