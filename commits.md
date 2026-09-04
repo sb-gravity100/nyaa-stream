@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `a9af84a` · 2026-09-05 · feat(torrent-engine): replace librqbit session with enginefs's libtorrent backend
+- `crates/torrent-engine/Cargo.toml`, `crates/torrent-engine/src/lib.rs`
+
 ### `aa934d3` · 2026-09-05 · build: add vcpkg manifest + triplet for libtorrent-rasterbar
 - `.gitignore`, `.cargo/config.toml`, `triplets/x64-windows-v3-static-md-release.cmake`, `vcpkg.json`
 
