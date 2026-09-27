@@ -516,35 +516,47 @@ struct SubtitleTrackInfo {
     index: usize,
     language: Option<String>,
     title: Option<String>,
+    codec: String,
+    default: bool,
     url: String,
 }
 
-/// Lists `torrent_id`'s embedded subtitle tracks (file index 0, matching
-/// `play_magnet`'s own hardcoded single-file-per-torrent assumption) and
-/// kicks off their background WebVTT extraction - see
-/// `TorrentEngine::list_subtitle_tracks`'s doc comment. Safe to call as
-/// soon as `play_magnet` resolves; a torrent whose container header hasn't
-/// downloaded yet just returns an error the frontend can quietly ignore
-/// (no subtitle UI) rather than something worth surfacing to the user -
-/// unlike a real playback error, plenty of releases simply have no
-/// subtitle tracks at all, which looks identical to ffprobe failing early.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SubtitleInfo {
+    tracks: Vec<SubtitleTrackInfo>,
+    /// Embedded font attachment URLs, for the frontend's libass renderer.
+    fonts: Vec<String>,
+}
+
+/// Lists `torrent_id`'s embedded text subtitle tracks and font attachments
+/// (file index 0, matching `play_magnet`'s own hardcoded
+/// single-file-per-torrent assumption) - see
+/// `TorrentEngine::media_probe`. Errors while the container header hasn't
+/// downloaded yet; the frontend retries until this succeeds, since that
+/// failure is transient and never cached.
 #[tauri::command]
-async fn get_subtitle_tracks(state: State<'_, Arc<AppState>>, torrent_id: TorrentId) -> Result<Vec<SubtitleTrackInfo>, String> {
+async fn get_subtitle_tracks(state: State<'_, Arc<AppState>>, torrent_id: TorrentId) -> Result<SubtitleInfo, String> {
     tracing::debug!(torrent_id = %torrent_id, "get_subtitle_tracks invoked");
-    let tracks: Vec<SubtitleTrack> = state.torrent_engine.list_subtitle_tracks(&torrent_id, 0).await.map_err(|err| {
+    let probe = state.torrent_engine.media_probe(&torrent_id, 0).await.map_err(|err| {
         tracing::warn!(torrent_id = %torrent_id, %err, "get_subtitle_tracks failed");
         err.to_string()
     })?;
-    tracing::info!(torrent_id = %torrent_id, count = tracks.len(), "get_subtitle_tracks succeeded");
-    Ok(tracks
+    tracing::info!(torrent_id = %torrent_id, count = probe.subtitles.len(), fonts = probe.fonts.len(), "get_subtitle_tracks succeeded");
+    let tracks = probe
+        .subtitles
         .into_iter()
-        .map(|track| SubtitleTrackInfo {
+        .map(|track: SubtitleTrack| SubtitleTrackInfo {
             url: state.torrent_engine.subtitle_url(&torrent_id, 0, track.index),
             index: track.index,
             language: track.language,
             title: track.title,
+            codec: track.codec,
+            default: track.default,
         })
-        .collect())
+        .collect();
+    let fonts = probe.fonts.iter().map(|font| state.torrent_engine.font_url(&torrent_id, 0, font.index)).collect();
+    Ok(SubtitleInfo { tracks, fonts })
 }
 
 /// Removes the active torrent (stop seeding, drop partial files) - called
