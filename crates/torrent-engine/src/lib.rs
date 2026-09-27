@@ -41,11 +41,20 @@ const RESTART_LOOKAHEAD_SEGMENTS: usize = 20;
 const SEGMENT_WAIT_TIMEOUT: Duration = Duration::from_secs(45);
 const SEGMENT_POLL_INTERVAL: Duration = Duration::from_millis(250);
 
+/// How long a stream probe (`ffprobe` over loopback) may block waiting for
+/// the container header to download before the caller gives up - the HLS
+/// job then starts without subtitle outputs rather than stalling playback.
+const PROBE_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// How long `font_handler` waits for the background attachment dump to
+/// land a requested font on disk.
+const FONT_WAIT_TIMEOUT: Duration = Duration::from_secs(30);
+
 pub struct TorrentEngine {
     efs: Arc<EngineFS>,
     stream_addr: SocketAddr,
     hls_jobs: HlsJobs,
-    subtitle_jobs: SubtitleJobs,
+    probes: MediaProbes,
 }
 
 /// One in-progress `ffmpeg` HLS transcode for a specific torrent file -
@@ -140,6 +149,7 @@ impl HlsJobs {
         file_idx: usize,
         segment_index: usize,
         stream_addr: SocketAddr,
+        probes: &MediaProbes,
     ) -> anyhow::Result<PathBuf> {
         let path = self.segment_path(torrent_id, file_idx, segment_index);
         if tokio::fs::try_exists(&path).await.unwrap_or(false) {
@@ -181,7 +191,19 @@ impl HlsJobs {
                 }
                 let dir = self.job_dir(torrent_id, file_idx);
                 tokio::fs::create_dir_all(&dir).await?;
-                let child = spawn_hls_transcode(torrent_id, file_idx, segment_index, stream_addr, &dir)?;
+                // Subtitle tracks ride along in this same ffmpeg process
+                // (see spawn_hls_transcode) so they're extracted at the
+                // playhead, not from byte 0. A failed/timed-out probe just
+                // means this run has no subtitle outputs - never worth
+                // stalling video for.
+                let subtitles = match probes.get(torrent_id, file_idx, stream_addr, dir.clone()).await {
+                    Ok(probe) => probe.subtitles,
+                    Err(err) => {
+                        tracing::warn!(torrent_id = %torrent_id, file_idx, %err, "media probe failed, starting hls job without subtitles");
+                        Vec::new()
+                    }
+                };
+                let child = spawn_hls_transcode(torrent_id, file_idx, segment_index, stream_addr, &dir, &subtitles)?;
                 *job_slot = Some(HlsJob { child, dir, start_index: segment_index });
                 tracing::info!(torrent_id = %torrent_id, file_idx, segment_index, "started hls transcode job");
             }
@@ -279,6 +301,7 @@ fn spawn_hls_transcode(
     start_segment_index: usize,
     stream_addr: SocketAddr,
     dir: &FsPath,
+    subtitles: &[SubtitleTrack],
 ) -> anyhow::Result<tokio::process::Child> {
     let start_seconds = start_segment_index as f64 * SEGMENT_DURATION_SECONDS;
     let input_url = format!("http://{stream_addr}/stream/{torrent_id}/{file_idx}");
@@ -298,11 +321,19 @@ fn spawn_hls_transcode(
     if start_seconds > 0.0 {
         command.args(["-ss", &start_seconds.to_string()]);
     }
-    command.args(["-i", &input_url]);
+    // `-copyts` keeps the source's own timestamps instead of re-basing
+    // every run to 0. Without it, a seek-restart (`-ss N`) produced
+    // segments whose PTS started near 0 again, so hls.js placed them at
+    // the wrong point on the timeline, and subtitle cues (absolute
+    // source times) drifted out of sync with video after any seek. With
+    // it, every run - sequential or restarted - shares one timeline.
+    // `-muxdelay 0`/`-muxpreload 0` drop MPEG-TS's default 1.4s offset so
+    // that timeline starts where the source does.
+    command.args(["-copyts", "-i", &input_url]);
     command.args([
         // Real releases commonly carry an embedded subtitle track (e.g.
-        // WebVTT) alongside video/audio. MPEG-TS/HLS can't carry that
-        // (there's no subtitle UI here to feed it to anyway), and leaving
+        // ASS) alongside video/audio. MPEG-TS/HLS can't carry that
+        // (subtitles get their own ASS outputs below instead), and leaving
         // ffmpeg to auto-select "best of every stream type" made it try
         // to mux the subtitle track into the TS output anyway, which
         // spammed non-monotonic-DTS warnings and was implicated in at
@@ -325,6 +356,10 @@ fn spawn_hls_transcode(
         // artifacts at segment boundaries.
         "-c:a",
         "aac",
+        "-muxdelay",
+        "0",
+        "-muxpreload",
+        "0",
         "-f",
         "hls",
         "-hls_time",
@@ -339,6 +374,19 @@ fn spawn_hls_transcode(
     ]);
     command.arg(segment_filename.to_string_lossy().to_string());
     command.arg(discarded_playlist_path.to_string_lossy().to_string());
+    // One extra ASS output per text subtitle track, from the same demux.
+    // This replaced a separate extraction process that read the file from
+    // byte 0: after a forward seek that process didn't reach the playhead
+    // until everything before it had downloaded, so subtitles were
+    // missing/late. Here they're produced alongside the video segments
+    // they belong to. Everything converts to ASS (not WebVTT) so real
+    // fansub styling survives for the frontend's libass renderer;
+    // `-flush_packets 1` writes each event as it's demuxed so
+    // `subtitle_handler` can serve a growing file.
+    for track in subtitles {
+        command.args(["-map", &format!("0:{}", track.index), "-c:s", "ass", "-flush_packets", "1", "-f", "ass"]);
+        command.arg(dir.join(format!("sub_{}_{}.ass", track.index, start_segment_index)).to_string_lossy().to_string());
+    }
 
     let mut child = command
         .stdin(Stdio::null())
@@ -364,31 +412,74 @@ fn spawn_hls_transcode(
     Ok(child)
 }
 
-/// One embedded subtitle track discovered in a torrent file, as reported by
-/// `ffprobe` - `index` is the absolute demuxer stream index, which doubles
-/// as the exact `-map 0:<index>` argument `spawn_subtitle_extraction` uses
-/// and as the URL segment `subtitle_handler` serves it under, so it's never
-/// renumbered anywhere along the way.
+/// Subtitle codecs ffmpeg can convert to ASS text. Everything else a real
+/// release carries (PGS/VobSub/DVB - bitmap formats) can't become ASS
+/// without OCR, and asking ffmpeg to try fails the *whole* process it's
+/// part of - which, since subtitle extraction now runs inside the HLS
+/// transcode (see `spawn_hls_transcode`), would take video down with it.
+const TEXT_SUBTITLE_CODECS: &[&str] = &["ass", "ssa", "subrip", "srt", "webvtt", "mov_text", "text"];
+
+/// One embedded, text-based subtitle track discovered in a torrent file, as
+/// reported by `ffprobe` - `index` is the absolute demuxer stream index,
+/// which doubles as the exact `-map 0:<index>` argument
+/// `spawn_hls_transcode` uses and as the URL segment `subtitle_handler`
+/// serves it under, so it's never renumbered anywhere along the way.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SubtitleTrack {
     pub index: usize,
     pub language: Option<String>,
     pub title: Option<String>,
+    /// Source codec as ffprobe names it (`ass`, `subrip`, ...). Everything
+    /// is served as ASS regardless; this only tells the frontend whether
+    /// the track carries its own real styling (`ass`/`ssa`) or is plain
+    /// text ffmpeg gave a generic `Default` style, which is what the
+    /// user's default-subtitle-style setting is allowed to restyle.
+    pub codec: String,
+    /// Matroska's per-track default flag - fansub releases set it on the
+    /// main dialogue track, which is a better auto-pick than "first
+    /// English one" when a release carries several.
+    pub default: bool,
 }
 
-/// Lists a torrent file's embedded subtitle tracks via `ffprobe` (reading
-/// only the container header, same as `spawn_hls_transcode`'s `-i` does -
-/// doesn't wait for the whole file). Doesn't require `enginefs`'s parsed
-/// track list because it doesn't have one: subtitle streams aren't
-/// something the streaming-server layer looks at at all, only ffmpeg/
-/// ffprobe do.
-async fn probe_subtitle_tracks(stream_addr: SocketAddr, torrent_id: &TorrentId, file_idx: usize) -> anyhow::Result<Vec<SubtitleTrack>> {
+/// One embedded font attachment (Matroska `Attachments`), needed for
+/// typeset ASS signs/dialogue to render with the fonts the fansubber
+/// actually used rather than a generic fallback.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FontAttachment {
+    pub index: usize,
+    pub filename: String,
+}
+
+/// What `ffprobe` found in a torrent file's container header - probed once
+/// per file and cached (see `MediaProbes`).
+#[derive(Debug, Clone, Default)]
+pub struct MediaProbe {
+    pub subtitles: Vec<SubtitleTrack>,
+    pub fonts: Vec<FontAttachment>,
+}
+
+fn is_font_attachment(codec: Option<&str>, mimetype: Option<&str>, filename: &str) -> bool {
+    let lower = filename.to_ascii_lowercase();
+    matches!(codec, Some("ttf" | "otf"))
+        || mimetype.is_some_and(|m| m.contains("font") || m.contains("truetype") || m.contains("opentype"))
+        || lower.ends_with(".ttf")
+        || lower.ends_with(".otf")
+        || lower.ends_with(".ttc")
+}
+
+/// Reads a torrent file's stream list via `ffprobe` over the same loopback
+/// `stream_handler` URL the transcode uses. Blocks until the container
+/// header has actually downloaded - callers bound it with `PROBE_TIMEOUT`.
+async fn probe_media(stream_addr: SocketAddr, torrent_id: &TorrentId, file_idx: usize) -> anyhow::Result<MediaProbe> {
+    tracing::debug!(torrent_id = %torrent_id, file_idx, "probing media streams");
     let input_url = format!("http://{stream_addr}/stream/{torrent_id}/{file_idx}");
     let output = tokio::process::Command::new("ffprobe")
-        .args(["-v", "error", "-print_format", "json", "-show_streams", "-select_streams", "s"])
+        .args(["-v", "error", "-print_format", "json", "-show_streams"])
         .arg(&input_url)
         .stdin(Stdio::null())
+        .kill_on_drop(true)
         .output()
         .await
         .map_err(|err| anyhow::anyhow!("failed to spawn ffprobe (is it installed and on PATH?): {err}"))?;
@@ -397,9 +488,17 @@ async fn probe_subtitle_tracks(stream_addr: SocketAddr, torrent_id: &TorrentId, 
     }
 
     #[derive(Deserialize)]
+    struct FfprobeDisposition {
+        #[serde(default)]
+        default: u8,
+    }
+    #[derive(Deserialize)]
     struct FfprobeStream {
         index: usize,
+        codec_type: Option<String>,
+        codec_name: Option<String>,
         tags: Option<HashMap<String, String>>,
+        disposition: Option<FfprobeDisposition>,
     }
     #[derive(Deserialize, Default)]
     struct FfprobeOutput {
@@ -408,138 +507,168 @@ async fn probe_subtitle_tracks(stream_addr: SocketAddr, torrent_id: &TorrentId, 
     }
     let parsed: FfprobeOutput = serde_json::from_slice(&output.stdout)
         .map_err(|err| anyhow::anyhow!("failed to parse ffprobe output: {err}"))?;
-    Ok(parsed
-        .streams
-        .into_iter()
-        .map(|stream| {
-            let mut tags = stream.tags.unwrap_or_default();
-            SubtitleTrack {
-                index: stream.index,
-                language: tags.remove("language"),
-                title: tags.remove("title"),
-            }
-        })
-        .collect())
-}
 
-/// Tracks the single background subtitle-extraction `ffmpeg` process per
-/// torrent file, keyed the same way as `HlsJobs`. Unlike `HlsJobs`, this is
-/// never restarted at an offset: a subtitle track needs to cover the whole
-/// episode regardless of where playback currently is, so the job is simply
-/// started once (covering every track in one `ffmpeg` invocation, one
-/// output per track) and left to run to completion in the background.
-/// `subtitle_handler` just serves whatever bytes are on disk for a given
-/// track at request time - since ffmpeg flushes WebVTT cues as it demuxes
-/// them, an in-progress extraction still serves a valid (if incomplete)
-/// prefix of the track rather than nothing.
-///
-/// Reads the same `stream_handler` input as the video `HlsJobs` transcode,
-/// independently and from byte 0 regardless of the video job's own current
-/// position - a real seek forward in the video leaves this job still
-/// working through earlier bytes it's already read past for video. Left
-/// as a known tradeoff rather than solved here: subtitle text is a tiny
-/// fraction of a release's total bytes, so its share of the resulting
-/// piece-priority contention is minor, and it still finishes catching up
-/// well before a real download does.
-#[derive(Clone)]
-struct SubtitleJobs {
-    jobs: Arc<AsyncMutex<HashMap<(TorrentId, usize), Arc<AsyncMutex<Option<tokio::process::Child>>>>>>,
-    cache_root: PathBuf,
-}
-
-impl SubtitleJobs {
-    fn new(cache_root: PathBuf) -> Self {
-        Self { jobs: Arc::new(AsyncMutex::new(HashMap::new())), cache_root }
-    }
-
-    fn job_dir(&self, torrent_id: &TorrentId, file_idx: usize) -> PathBuf {
-        self.cache_root.join(format!("{torrent_id}_{file_idx}"))
-    }
-
-    fn track_path(&self, torrent_id: &TorrentId, file_idx: usize, stream_index: usize) -> PathBuf {
-        self.job_dir(torrent_id, file_idx).join(format!("{stream_index}.vtt"))
-    }
-
-    /// Starts the extraction job for `tracks` if one hasn't already been
-    /// started for this file - a no-op on every call after the first
-    /// (including once the job has already finished), since there's never
-    /// a reason to restart it.
-    async fn ensure_running(&self, torrent_id: &TorrentId, file_idx: usize, tracks: &[SubtitleTrack], stream_addr: SocketAddr) -> anyhow::Result<()> {
-        if tracks.is_empty() {
-            return Ok(());
-        }
-        let job_lock = {
-            let mut jobs = self.jobs.lock().await;
-            jobs.entry((torrent_id.clone(), file_idx)).or_insert_with(|| Arc::new(AsyncMutex::new(None))).clone()
-        };
-        let mut job_slot = job_lock.lock().await;
-        if job_slot.is_some() {
-            return Ok(());
-        }
-        let dir = self.job_dir(torrent_id, file_idx);
-        tokio::fs::create_dir_all(&dir).await?;
-        let child = spawn_subtitle_extraction(torrent_id, file_idx, tracks, stream_addr, &dir)?;
-        *job_slot = Some(child);
-        tracing::info!(torrent_id = %torrent_id, file_idx, track_count = tracks.len(), "started subtitle extraction job");
-        Ok(())
-    }
-
-    /// Kills and forgets any extraction job for `torrent_id` (any file
-    /// index) and deletes its cached tracks - mirrors `HlsJobs::remove_torrent`.
-    async fn remove_torrent(&self, torrent_id: &TorrentId) {
-        let mut jobs = self.jobs.lock().await;
-        let keys: Vec<_> = jobs.keys().filter(|(id, _)| id == torrent_id).cloned().collect();
-        for key in keys {
-            if let Some(job_lock) = jobs.remove(&key) {
-                let mut job_slot = job_lock.lock().await;
-                if let Some(mut child) = job_slot.take() {
-                    let _ = child.start_kill();
+    let mut probe = MediaProbe::default();
+    for stream in parsed.streams {
+        let mut tags = stream.tags.unwrap_or_default();
+        match stream.codec_type.as_deref() {
+            Some("subtitle") => {
+                let codec = stream.codec_name.unwrap_or_default();
+                if !TEXT_SUBTITLE_CODECS.contains(&codec.as_str()) {
+                    tracing::info!(torrent_id = %torrent_id, file_idx, index = stream.index, %codec, "skipping non-text subtitle track");
+                    continue;
                 }
-                let _ = tokio::fs::remove_dir_all(self.job_dir(&key.0, key.1)).await;
+                probe.subtitles.push(SubtitleTrack {
+                    index: stream.index,
+                    language: tags.remove("language"),
+                    title: tags.remove("title"),
+                    codec,
+                    default: stream.disposition.is_some_and(|d| d.default == 1),
+                });
             }
+            Some("attachment") => {
+                let filename = tags.remove("filename").unwrap_or_default();
+                let mimetype = tags.remove("mimetype");
+                if is_font_attachment(stream.codec_name.as_deref(), mimetype.as_deref(), &filename) {
+                    probe.fonts.push(FontAttachment { index: stream.index, filename });
+                }
+            }
+            _ => {}
         }
+    }
+    tracing::info!(
+        torrent_id = %torrent_id,
+        file_idx,
+        subtitle_count = probe.subtitles.len(),
+        font_count = probe.fonts.len(),
+        "media probe succeeded"
+    );
+    Ok(probe)
+}
+
+/// Per-file cache of `probe_media` results. Only successes are cached
+/// (`OnceCell::get_or_try_init`), so a probe that ran before the header had
+/// downloaded (timed out) is simply retried by the next caller. The first
+/// success also kicks off a one-shot font-attachment dump into the file's
+/// HLS job directory (`fonts/<stream_index>`), served by `font_handler`.
+#[derive(Clone)]
+struct MediaProbes {
+    cells: Arc<AsyncMutex<HashMap<(TorrentId, usize), Arc<tokio::sync::OnceCell<MediaProbe>>>>>,
+}
+
+impl MediaProbes {
+    fn new() -> Self {
+        Self { cells: Arc::new(AsyncMutex::new(HashMap::new())) }
+    }
+
+    async fn get(&self, torrent_id: &TorrentId, file_idx: usize, stream_addr: SocketAddr, job_dir: PathBuf) -> anyhow::Result<MediaProbe> {
+        let cell = {
+            let mut cells = self.cells.lock().await;
+            cells.entry((torrent_id.clone(), file_idx)).or_insert_with(|| Arc::new(tokio::sync::OnceCell::new())).clone()
+        };
+        let probe = cell
+            .get_or_try_init(|| async {
+                let probe = tokio::time::timeout(PROBE_TIMEOUT, probe_media(stream_addr, torrent_id, file_idx))
+                    .await
+                    .map_err(|_| anyhow::anyhow!("timed out probing media streams"))??;
+                spawn_font_dump(torrent_id.clone(), file_idx, &probe.fonts, stream_addr, job_dir.join("fonts"));
+                Ok::<_, anyhow::Error>(probe)
+            })
+            .await?;
+        Ok(probe.clone())
+    }
+
+    async fn remove_torrent(&self, torrent_id: &TorrentId) {
+        self.cells.lock().await.retain(|(id, _), _| id != torrent_id);
     }
 }
 
-/// Spawns one `ffmpeg` process that extracts every track in `tracks` to its
-/// own WebVTT file in `dir` (named `<stream_index>.vtt`), in a single pass
-/// over the input - one `-map`/`-c:s webvtt` output per track, all reading
-/// the same demux instead of one process per track re-reading the file
-/// from scratch each time.
-fn spawn_subtitle_extraction(
-    torrent_id: &TorrentId,
-    file_idx: usize,
-    tracks: &[SubtitleTrack],
-    stream_addr: SocketAddr,
-    dir: &FsPath,
-) -> anyhow::Result<tokio::process::Child> {
-    let input_url = format!("http://{stream_addr}/stream/{torrent_id}/{file_idx}");
-    let mut command = tokio::process::Command::new("ffmpeg");
-    command.args(["-loglevel", "warning", "-i", &input_url]);
-    for track in tracks {
-        command.args(["-map", &format!("0:{}", track.index), "-c:s", "webvtt", "-f", "webvtt"]);
-        command.arg(dir.join(format!("{}.vtt", track.index)).to_string_lossy().to_string());
+/// Dumps every font attachment to `<fonts_dir>/<stream_index>` in one
+/// background `ffmpeg` pass (`-dump_attachment` happens while opening the
+/// input; `-t 0 -f null` makes it exit right after). Written under a
+/// `.part` name and renamed only once the process exits, so `font_handler`
+/// never serves a half-written font.
+fn spawn_font_dump(torrent_id: TorrentId, file_idx: usize, fonts: &[FontAttachment], stream_addr: SocketAddr, fonts_dir: PathBuf) {
+    if fonts.is_empty() {
+        return;
     }
-
-    let mut child = command
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|err| anyhow::anyhow!("failed to spawn ffmpeg for subtitle extraction (is it installed and on PATH?): {err}"))?;
-
-    if let Some(stderr) = child.stderr.take() {
-        let torrent_id = torrent_id.clone();
-        tokio::spawn(async move {
-            use tokio::io::{AsyncBufReadExt, BufReader};
-            let mut lines = BufReader::new(stderr).lines();
-            while let Ok(Some(line)) = lines.next_line().await {
-                tracing::warn!(torrent_id = %torrent_id, file_idx, ffmpeg_stderr = %line, "ffmpeg subtitle extraction stderr");
+    let indices: Vec<usize> = fonts.iter().map(|f| f.index).collect();
+    tokio::spawn(async move {
+        if let Err(err) = tokio::fs::create_dir_all(&fonts_dir).await {
+            tracing::error!(torrent_id = %torrent_id, file_idx, %err, "failed to create font directory");
+            return;
+        }
+        let input_url = format!("http://{stream_addr}/stream/{torrent_id}/{file_idx}");
+        let mut command = tokio::process::Command::new("ffmpeg");
+        command.args(["-loglevel", "error", "-y"]);
+        for index in &indices {
+            command.arg(format!("-dump_attachment:{index}"));
+            command.arg(fonts_dir.join(format!("{index}.part")).to_string_lossy().to_string());
+        }
+        command.args(["-i", &input_url, "-t", "0", "-f", "null", "-"]);
+        tracing::debug!(torrent_id = %torrent_id, file_idx, count = indices.len(), "dumping font attachments");
+        match command.stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::piped()).kill_on_drop(true).output().await {
+            Ok(output) => {
+                if !output.stderr.is_empty() {
+                    tracing::warn!(torrent_id = %torrent_id, file_idx, stderr = %String::from_utf8_lossy(&output.stderr), "ffmpeg font dump stderr");
+                }
+                let mut dumped = 0;
+                for index in &indices {
+                    let part = fonts_dir.join(format!("{index}.part"));
+                    if tokio::fs::rename(&part, fonts_dir.join(index.to_string())).await.is_ok() {
+                        dumped += 1;
+                    }
+                }
+                tracing::info!(torrent_id = %torrent_id, file_idx, dumped, expected = indices.len(), "font attachment dump finished");
             }
-        });
-    }
+            Err(err) => tracing::error!(torrent_id = %torrent_id, file_idx, %err, "failed to spawn ffmpeg for font dump"),
+        }
+    });
+}
 
-    Ok(child)
+/// Merges every per-run ASS file the HLS transcode has written for one
+/// subtitle track (`sub_<stream_index>_<start_segment>.ass` - one per
+/// transcode run, since a seek restarts the job at a new offset) into a
+/// single script: header from the earliest run, then the union of all
+/// `Dialogue:` lines, de-duplicated. Every run shares one timeline thanks
+/// to `-copyts`, so overlapping runs produce byte-identical event lines.
+/// The last line of a file still being written may be partial, so only
+/// newline-terminated lines are taken.
+fn merge_ass_runs(mut runs: Vec<(usize, String)>) -> Option<String> {
+    runs.sort_by_key(|(start, _)| *start);
+    let mut header: Option<String> = None;
+    let mut seen = std::collections::HashSet::new();
+    let mut events = Vec::new();
+    for (_, content) in &runs {
+        let complete = match content.rfind('\n') {
+            Some(end) => &content[..=end],
+            None => continue,
+        };
+        if header.is_none() {
+            if let Some(events_pos) = complete.find("[Events]") {
+                // Header runs through the `Format:` line that follows
+                // `[Events]`.
+                let after = &complete[events_pos..];
+                if let Some(format_pos) = after.find("Format:") {
+                    if let Some(eol) = after[format_pos..].find('\n') {
+                        header = Some(complete[..events_pos + format_pos + eol + 1].to_string());
+                    }
+                }
+            }
+        }
+        for line in complete.lines() {
+            let line = line.trim_end_matches('\r');
+            if line.starts_with("Dialogue:") && seen.insert(line.to_string()) {
+                events.push(line.to_string());
+            }
+        }
+    }
+    let mut merged = header?;
+    for event in events {
+        merged.push_str(&event);
+        merged.push('\n');
+    }
+    Some(merged)
 }
 
 pub struct AddedTorrent {
@@ -551,7 +680,7 @@ struct StreamRouterState {
     efs: Arc<EngineFS>,
     stream_addr: SocketAddr,
     hls_jobs: HlsJobs,
-    subtitle_jobs: SubtitleJobs,
+    probes: MediaProbes,
 }
 
 /// Trimmed-down mirror of librqbit's `TorrentStats` - mirrors Stremio's own
@@ -604,11 +733,7 @@ impl TorrentEngine {
             .map(|parent| parent.join("hls_cache"))
             .unwrap_or_else(|| download_dir.join("hls_cache"));
         let hls_jobs = HlsJobs::new(hls_cache_root);
-        let subtitles_cache_root = download_dir
-            .parent()
-            .map(|parent| parent.join("subtitles_cache"))
-            .unwrap_or_else(|| download_dir.join("subtitles_cache"));
-        let subtitle_jobs = SubtitleJobs::new(subtitles_cache_root);
+        let probes = MediaProbes::new();
         let cache_dir = download_dir
             .parent()
             .map(|parent| parent.join("engine_cache"))
@@ -623,7 +748,7 @@ impl TorrentEngine {
         tracing::info!(%stream_addr, "streaming server listening");
 
         let router_state =
-            StreamRouterState { efs: efs.clone(), stream_addr, hls_jobs: hls_jobs.clone(), subtitle_jobs: subtitle_jobs.clone() };
+            StreamRouterState { efs: efs.clone(), stream_addr, hls_jobs: hls_jobs.clone(), probes: probes.clone() };
         let app = Router::new()
             .route("/stream/{torrent_id}/{file_idx}", get(stream_handler))
             .route("/hls/{torrent_id}/{file_idx}/playlist.m3u8", get(hls_playlist_handler))
@@ -635,6 +760,7 @@ impl TorrentEngine {
             // hls.js doesn't care what the segment URI looks like.
             .route("/hls/{torrent_id}/{file_idx}/{segment_index}", get(hls_segment_handler))
             .route("/subtitles/{torrent_id}/{file_idx}/{stream_index}", get(subtitle_handler))
+            .route("/fonts/{torrent_id}/{file_idx}/{stream_index}", get(font_handler))
             .with_state(router_state)
             // hls.js loads the playlist/segments via fetch/XHR rather than
             // a plain <video src> element, which - unlike media-element
@@ -650,7 +776,7 @@ impl TorrentEngine {
             }
         });
 
-        Ok(Self { efs, stream_addr, hls_jobs, subtitle_jobs })
+        Ok(Self { efs, stream_addr, hls_jobs, probes })
     }
 
     /// Adds a torrent from a magnet link or .torrent URL and starts
@@ -685,7 +811,7 @@ impl TorrentEngine {
     pub async fn remove(&self, id: TorrentId) -> anyhow::Result<()> {
         tracing::debug!(torrent_id = %id, "removing torrent");
         self.hls_jobs.remove_torrent(&id).await;
-        self.subtitle_jobs.remove_torrent(&id).await;
+        self.probes.remove_torrent(&id).await;
         self.efs.remove_engine(&id).await;
         self.efs.get_backend().remove_torrent(&id).await
     }
@@ -709,21 +835,23 @@ impl TorrentEngine {
         format!("http://{}/hls/{}/{}/playlist.m3u8", self.stream_addr, torrent_id, file_idx)
     }
 
-    /// Lists a torrent file's embedded subtitle tracks and kicks off (if not
-    /// already running) the background job that extracts all of them to
-    /// WebVTT - see `SubtitleJobs`' doc comment for why that's a
-    /// fire-and-forget job rather than something awaited here. Safe to call
-    /// repeatedly (e.g. once per player mount): the extraction job itself is
-    /// only ever started once per file.
-    pub async fn list_subtitle_tracks(&self, torrent_id: &TorrentId, file_idx: usize) -> anyhow::Result<Vec<SubtitleTrack>> {
-        let tracks = probe_subtitle_tracks(self.stream_addr, torrent_id, file_idx).await?;
-        self.subtitle_jobs.ensure_running(torrent_id, file_idx, &tracks, self.stream_addr).await?;
-        Ok(tracks)
+    /// Probes (or returns the cached probe of) a torrent file's embedded
+    /// text subtitle tracks and font attachments. Extraction itself isn't
+    /// started here - it runs inside the HLS transcode job (see
+    /// `spawn_hls_transcode`). Errors (header not downloaded yet within
+    /// `PROBE_TIMEOUT`) aren't cached, so the frontend can just retry.
+    pub async fn media_probe(&self, torrent_id: &TorrentId, file_idx: usize) -> anyhow::Result<MediaProbe> {
+        self.probes.get(torrent_id, file_idx, self.stream_addr, self.hls_jobs.job_dir(torrent_id, file_idx)).await
     }
 
-    /// URL a `<track>` element can fetch a specific subtitle track's WebVTT
-    /// content from - `stream_index` is the same absolute demuxer index
-    /// `SubtitleTrack::index` reports.
+    /// URL a font attachment (see `FontAttachment`) is served from.
+    pub fn font_url(&self, torrent_id: &TorrentId, file_idx: usize, stream_index: usize) -> String {
+        format!("http://{}/fonts/{}/{}/{}", self.stream_addr, torrent_id, file_idx, stream_index)
+    }
+
+    /// URL serving a subtitle track as one merged ASS script, growing as
+    /// the transcode job progresses - the frontend polls it (see
+    /// `subtitle_handler`). `stream_index` is `SubtitleTrack::index`.
     pub fn subtitle_url(&self, torrent_id: &TorrentId, file_idx: usize, stream_index: usize) -> String {
         format!("http://{}/subtitles/{}/{}/{}", self.stream_addr, torrent_id, file_idx, stream_index)
     }
@@ -908,7 +1036,7 @@ async fn hls_segment_handler(
 
     let path = state
         .hls_jobs
-        .ensure_segment_available(&torrent_id, file_idx, segment_index, state.stream_addr)
+        .ensure_segment_available(&torrent_id, file_idx, segment_index, state.stream_addr, &state.probes)
         .await
         .map_err(|err| {
             tracing::warn!(torrent_id = %torrent_id, file_idx, segment_index, %err, "hls segment unavailable");
@@ -923,20 +1051,83 @@ async fn hls_segment_handler(
     Ok(([(axum::http::header::CONTENT_TYPE, "video/mp2t")], bytes))
 }
 
-/// Serves whatever bytes the background subtitle-extraction job (see
-/// `SubtitleJobs`) has written for one track so far. Unlike
-/// `hls_segment_handler`, this never waits for or restarts anything - the
-/// job was already started by `list_subtitle_tracks`, and a `<track>`
-/// element's one-shot fetch just gets a (possibly still-growing, but valid)
-/// prefix of the full WebVTT file if extraction hasn't finished yet.
+/// Serves one subtitle track as a single ASS script merged from every
+/// transcode run's output so far (see `merge_ass_runs`). Never waits: 404
+/// until the first run has written its header, after which the frontend's
+/// poll just gets a longer script each time as the job advances.
 async fn subtitle_handler(
     State(state): State<StreamRouterState>,
     Path((torrent_id, file_idx, stream_index)): Path<(TorrentId, usize, usize)>,
 ) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
-    let path = state.subtitle_jobs.track_path(&torrent_id, file_idx, stream_index);
-    let bytes = tokio::fs::read(&path).await.map_err(|err| {
-        tracing::warn!(torrent_id = %torrent_id, file_idx, stream_index, %err, "subtitle track unavailable");
+    let dir = state.hls_jobs.job_dir(&torrent_id, file_idx);
+    let prefix = format!("sub_{stream_index}_");
+    let mut runs = Vec::new();
+    if let Ok(mut entries) = tokio::fs::read_dir(&dir).await {
+        while let Ok(Some(entry)) = entries.next_entry().await {
+            let name = entry.file_name().to_string_lossy().to_string();
+            let Some(start) = name.strip_prefix(&prefix).and_then(|rest| rest.strip_suffix(".ass")).and_then(|n| n.parse::<usize>().ok())
+            else {
+                continue;
+            };
+            match tokio::fs::read(entry.path()).await {
+                Ok(bytes) => runs.push((start, String::from_utf8_lossy(&bytes).into_owned())),
+                Err(err) => tracing::warn!(torrent_id = %torrent_id, file_idx, stream_index, %err, "failed to read subtitle run file"),
+            }
+        }
+    }
+    let run_count = runs.len();
+    let merged = merge_ass_runs(runs).ok_or_else(|| {
+        tracing::debug!(torrent_id = %torrent_id, file_idx, stream_index, run_count, "subtitle track not available yet");
         axum::http::StatusCode::NOT_FOUND
     })?;
-    Ok(([(axum::http::header::CONTENT_TYPE, "text/vtt")], bytes))
+    tracing::debug!(torrent_id = %torrent_id, file_idx, stream_index, run_count, bytes = merged.len(), "serving merged subtitle track");
+    Ok((
+        [(axum::http::header::CONTENT_TYPE, "text/x-ssa; charset=utf-8"), (axum::http::header::CACHE_CONTROL, "no-store")],
+        merged,
+    ))
+}
+
+/// Serves one dumped font attachment (see `spawn_font_dump`), waiting up
+/// to `FONT_WAIT_TIMEOUT` for the dump to finish if it's still running.
+async fn font_handler(
+    State(state): State<StreamRouterState>,
+    Path((torrent_id, file_idx, stream_index)): Path<(TorrentId, usize, usize)>,
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let path = state.hls_jobs.job_dir(&torrent_id, file_idx).join("fonts").join(stream_index.to_string());
+    let deadline = tokio::time::Instant::now() + FONT_WAIT_TIMEOUT;
+    loop {
+        if let Ok(bytes) = tokio::fs::read(&path).await {
+            tracing::debug!(torrent_id = %torrent_id, file_idx, stream_index, bytes = bytes.len(), "serving font attachment");
+            return Ok(([(axum::http::header::CONTENT_TYPE, "application/octet-stream")], bytes));
+        }
+        if tokio::time::Instant::now() >= deadline {
+            tracing::warn!(torrent_id = %torrent_id, file_idx, stream_index, "font attachment unavailable");
+            return Err(axum::http::StatusCode::NOT_FOUND);
+        }
+        tokio::time::sleep(SEGMENT_POLL_INTERVAL).await;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::merge_ass_runs;
+
+    const HEADER: &str = "[Script Info]\nScriptType: v4.00+\n\n[V4+ Styles]\nStyle: Default,Arial,16\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n";
+
+    #[test]
+    fn merges_runs_dedupes_and_drops_partial_lines() {
+        let run0 = format!("{HEADER}Dialogue: 0,0:00:01.00,0:00:04.00,Default,,0,0,0,,a\nDialogue: 0,0:00:35.00,0:00:38.00,Default,,0,0,0,,b\n");
+        // A later seek-restart run overlapping run0, with a partially-written last line.
+        let run5 = format!("{HEADER}Dialogue: 0,0:00:35.00,0:00:38.00,Default,,0,0,0,,b\nDialogue: 0,0:00:50.00,0:00:53.00,Default,,0,0,0,,c\nDialogue: 0,0:00:5");
+        let merged = merge_ass_runs(vec![(5, run5), (0, run0)]).unwrap();
+        assert!(merged.starts_with("[Script Info]"));
+        assert_eq!(merged.matches("Dialogue:").count(), 3);
+        assert!(merged.ends_with(",,c\n"));
+    }
+
+    #[test]
+    fn no_header_yet_is_none() {
+        assert!(merge_ass_runs(vec![(0, "[Script Info]\n".to_string())]).is_none());
+        assert!(merge_ass_runs(Vec::new()).is_none());
+    }
 }
