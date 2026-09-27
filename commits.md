@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `fdcdf07` · 2026-09-28 · feat(engine): extract subtitles as ASS inside the HLS job, copyts timeline
+- `crates/torrent-engine/src/lib.rs`
+- `src-tauri/src/lib.rs`
+
 ### `0b6be20` · 2026-09-04 · fix(player): add crossOrigin so <track> subtitles actually render
 - `src/PlayerView.tsx`
 
