@@ -89,6 +89,33 @@ export function getCachedKitsuMetadata(anilistId: number): KitsuMetadata | null 
   return cache.get(anilistId);
 }
 
+// Last known metadata per anime, persisted so the home page can paint card
+// art on the very first frame after launch instead of after the backend
+// lookup (which waits behind the AniList requests). Refreshed by every
+// successful fetch.
+const SNAPSHOT_KEY = "nyaa-stream:kitsu-snapshot";
+
+/** Every anime's last known Kitsu metadata - synchronous, for initial state. */
+export function kitsuSnapshot(): Record<number, KitsuMetadata | null> {
+  try {
+    const raw = localStorage.getItem(SNAPSHOT_KEY);
+    return raw ? (JSON.parse(raw) as Record<number, KitsuMetadata | null>) : {};
+  } catch (err) {
+    console.warn("[kitsu] unreadable snapshot", { err: String(err) });
+    return {};
+  }
+}
+
+function saveToSnapshot(anilistId: number, metadata: KitsuMetadata | null) {
+  try {
+    const snapshot = kitsuSnapshot();
+    snapshot[anilistId] = metadata;
+    localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snapshot));
+  } catch (err) {
+    console.warn("[kitsu] failed to save snapshot", { err: String(err) });
+  }
+}
+
 export async function fetchKitsuMetadata(anilistId: number): Promise<KitsuMetadata | null> {
   if (cache.has(anilistId)) return cache.get(anilistId)!;
   const existing = inFlight.get(anilistId);
@@ -102,6 +129,7 @@ export async function fetchKitsuMetadata(anilistId: number): Promise<KitsuMetada
     .then((metadata) => {
       console.info("[get_kitsu_metadata] succeeded", { anilistId, found: metadata !== null });
       cache.set(anilistId, metadata);
+      saveToSnapshot(anilistId, metadata);
       return metadata;
     })
     .catch((err) => {

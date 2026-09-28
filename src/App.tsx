@@ -15,7 +15,7 @@ import {
   isTauriAvailable,
 } from "./browserFallback";
 import { addToLibrary, getLibrary, isInLibrary, removeFromLibrary } from "./library";
-import { fetchKitsuMetadata } from "./kitsu";
+import { fetchKitsuMetadata, kitsuSnapshot } from "./kitsu";
 import { cachedTorrentThumbnail, fetchTorrentThumbnail } from "./torrentThumbnail";
 import { MediaPage } from "./MediaPage";
 import { HomePage } from "./HomePage";
@@ -83,7 +83,9 @@ function App() {
   // HomePage (per-library-anime latest-episode thumbnails) - keyed by
   // AniList id, `null` meaning "fetched, Kitsu has no mapping" so callers
   // don't re-fetch a known miss.
-  const [kitsuByMedia, setKitsuByMedia] = useState<Record<number, KitsuMetadata | null>>({});
+  // Seeded from the last session's snapshot so card art shows on the first
+  // paint; loadKitsuMetadata refreshes each entry once per session.
+  const [kitsuByMedia, setKitsuByMedia] = useState<Record<number, KitsuMetadata | null>>(kitsuSnapshot);
   // Last-resort thumbnails pulled from the torrent itself, keyed by
   // "{mediaId}-{episode}" - only populated for latest-episode cards where
   // Kitsu and AniList both came up completely empty (see loadTorrentThumbnail
@@ -209,9 +211,10 @@ function App() {
   }
 
   async function loadKitsuMetadata(id: number) {
-    if (id in kitsuByMedia) return;
+    // Not skipped when the snapshot already has this id: fetchKitsuMetadata
+    // dedupes per session, and the refresh picks up new episode art.
     const metadata = await fetchKitsuMetadata(id);
-    setKitsuByMedia((current) => (id in current ? current : { ...current, [id]: metadata }));
+    setKitsuByMedia((current) => (JSON.stringify(current[id]) === JSON.stringify(metadata) ? current : { ...current, [id]: metadata }));
   }
 
   async function loadTorrentThumbnail(entry: AiringEntry) {
