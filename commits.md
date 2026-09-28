@@ -2,6 +2,15 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `a6aef81` · 2026-09-28 · feat(player): play through embedded mpv instead of hls.js <video>
+- `src-tauri/capabilities/default.json`
+- `src/App.css`
+- `src/PlayerView.tsx`
+- `src/StatisticsMenu.tsx`
+- `src/mpvVideo.ts`
+- `src/subtitles.ts`
+- `src/types.ts`
+
 ### `b82564b` · 2026-09-28 · feat(player): mpv frame grabs, clipboard copy, bundled sub fonts, raw stream URLs
 - `crates/mpv-ipc/src/embedded.rs`
 - `src-tauri/Cargo.toml`
