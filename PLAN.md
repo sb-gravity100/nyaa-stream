@@ -316,12 +316,20 @@ nyaa_stream/
    and corrupted timestamps) reading from `stream_handler` over loopback,
    writing real segment files to disk (`-f hls -hls_flags temp_file` -
    atomic rename on completion, so a request never sees a half-written
-   file). A segment request waits for that job's sequential progress to
+   file). Segments are **fMP4** (`<index>.m4s` + one `init.mp4` per run,
+   served by `hls_init_handler`; the playlist's `EXT-X-MAP` carries the
+   resume segment as a start hint), not MPEG-TS: hls.js appends fMP4 to MSE
+   without transmuxing in JavaScript, and copied HEVC needs it (tagged
+   `hvc1`). The HLS muxer's paths are passed with forward slashes - it finds
+   the init file's directory by splitting on `/` only. Aborting a run for a
+   seek restart still finalizes its in-progress segment cut short;
+   `HlsJob::kill` deletes that tail segment so it's never served as
+   complete. A segment request waits for that job's sequential progress to
    reach it only if the job's measured production rate says it will get
    there within ~4s (`job_will_reach_soon`); otherwise it's a seek and the
    job restarts at the target (a fixed 20-segment lookahead used to make
    short forward seeks wait for everything in between to download). Every
-   run uses `-copyts` (+ `-muxdelay 0 -muxpreload 0`) so segments keep the
+   run uses `-copyts` so segments keep the
    source's own timestamps: without it a seek-restarted run re-based PTS to
    0 and hls.js placed it at the wrong point on the timeline. hls.js still
    anchors media time 0 to the first fragment it loads, so a mid-file start
