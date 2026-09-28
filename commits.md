@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `2dfc1d5` · 2026-09-29 · docs: document the Kitsu metadata fallback
+- `FILE_INDEX.md`
+- `PLAN.md`
+
 ### `f991579` · 2026-09-29 · feat: fall back to Kitsu for anime search/details when AniList is unavailable
 - `src-tauri/Cargo.toml`
 - `src-tauri/src/lib.rs`
