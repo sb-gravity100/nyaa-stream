@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `314de1d` · 2026-09-28 · fix(enginefs): wait up to 8s for real bytes instead of accepting zeros
+- `vendor/enginefs/VENDORED.md`
+- `vendor/enginefs/src/backend/libtorrent/disk_stream.rs`
+
 ### `4afa9c8` · 2026-09-28 · feat(player): 60fps seek bar/clock, animated chrome, ambient glass dock
 - `src/App.css`
 - `src/PlayerPlaylist.tsx`
