@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `a2dc946` · 2026-09-28 · chore(mpv-ipc): log expected 'property unavailable' replies at debug
+- `crates/mpv-ipc/src/lib.rs`
+
 ### `ff42d6e` · 2026-09-28 · fix(thumbnails): defer torrent thumbnail capture while a stream plays
 - `src-tauri/src/lib.rs`
 - `src/torrentThumbnail.ts`
