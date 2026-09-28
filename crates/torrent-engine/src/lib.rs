@@ -191,10 +191,41 @@ struct HlsJob {
 
 impl HlsJob {
     fn kill(&mut self) {
+        let was_running = !self.child.is_ended();
+        // Returns once the run's workers have released (ez-ffmpeg's drop
+        // waits for them), so its playlist below is final.
         self.child.abort();
         if let Some(child) = self.subtitle_child.as_mut() {
             child.abort();
         }
+        if was_running {
+            drop_aborted_tail_segment(&self.dir);
+        }
+    }
+}
+
+/// Deletes the last segment of the run whose `ffmpeg_internal.m3u8` is in
+/// `dir`. Aborting a run still finalizes its in-progress segment and renames
+/// it into place, cut short (0.0s-0.9s seen in the cache), and
+/// `ensure_segment_available` treats any existing file as complete - so a
+/// seek restart left a hole of up to a segment that was served forever.
+/// Only called for a run aborted while still running, where the last entry
+/// is by definition that truncated segment.
+fn drop_aborted_tail_segment(dir: &FsPath) {
+    let playlist = match std::fs::read_to_string(dir.join("ffmpeg_internal.m3u8")) {
+        Ok(playlist) => playlist,
+        Err(err) => {
+            tracing::debug!(?dir, %err, "no playlist for aborted hls run");
+            return;
+        }
+    };
+    let Some(last) = playlist.lines().rev().map(str::trim).find(|line| line.ends_with(".ts")) else {
+        tracing::debug!(?dir, "aborted hls run produced no segments");
+        return;
+    };
+    match std::fs::remove_file(dir.join(last)) {
+        Ok(()) => tracing::info!(?dir, segment = last, "dropped truncated segment of aborted hls run"),
+        Err(err) => tracing::warn!(?dir, segment = last, %err, "failed to drop truncated segment of aborted hls run"),
     }
 }
 
