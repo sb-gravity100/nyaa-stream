@@ -45,7 +45,7 @@
 | `src/icons.tsx` | Inline SVG icon set used by the player and pages | frontend |
 | `src/types.ts` | Shared TS interfaces mirroring the Rust structs (`AnimeMedia`, `NyaaResult`, `TorrentDetails`, `AiringEntry`, `PlaySession`/`PlayFile`, `SubtitleInfo`, ...) | frontend |
 | `src/browserFallback.ts` | Dev-only path used when no Tauri IPC bridge is present (plain browser preview): direct AniList/nyaa fetches mirroring the Rust client logic | frontend, dev-tool |
-| `src/kitsu.ts` | Frontend wrapper around `get_kitsu_metadata`, used by `MediaPage.tsx` for the backdrop/thumbnail fallback chain | frontend |
+| `src/kitsu.ts` | Frontend wrapper around `get_kitsu_metadata`, used by `MediaPage.tsx` for the backdrop/thumbnail fallback chain; `localStorage` snapshot (`kitsuSnapshot`) seeds card art on the first paint after launch | frontend |
 | `src/torrentThumbnail.ts` | Frontend wrapper around `capture_torrent_thumbnail`, the last-resort thumbnail source when Kitsu and AniList both lack episode art; asks the disk cache (`cached_torrent_thumbnail`) before any nyaa search | frontend |
 | `src/playback.ts` | Frontend wrapper around `play_magnet`/`get_stream_stats`/`get_subtitle_tracks` (both per file index)/`stop_playback`; rejects/no-ops in the dev-only browser preview since torrenting has no meaningful fallback there | frontend |
 | `src/devLogger.ts` | Forwards frontend `console.*`/uncaught errors into the Rust backend's `tracing` log (`log_frontend` command) - the native window has no accessible devtools console during development | frontend, dev-tool |
