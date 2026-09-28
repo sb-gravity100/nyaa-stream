@@ -8,6 +8,19 @@ use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 use tracing::debug;
 
+/// (nyaa-stream) See `hidden_command` in torrent-engine: stops ffmpeg/ffprobe
+/// children from opening console windows in a GUI-subsystem release build.
+pub fn hidden_command(program: &str) -> tokio::process::Command {
+    #[allow(unused_mut)]
+    let mut command = tokio::process::Command::new(program);
+    #[cfg(windows)]
+    {
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+    command
+}
+
 pub mod backend;
 pub mod cache;
 pub mod disk_cache;

@@ -75,6 +75,11 @@ impl MpvPlayer {
         tracing::debug!(label, stream_url, socket_path, "spawning mpv");
 
         let mut command = Command::new("mpv");
+        // Hidden like every other child the release build spawns - see
+        // torrent-engine's `hidden_command`. mpv is headless here anyway
+        // (`--vo=null`-style thumbnail capture), so no window is lost.
+        #[cfg(windows)]
+        command.creation_flags(0x0800_0000);
         command
             .arg(format!("--input-ipc-server={socket_path}"))
             .args(extra_args)
