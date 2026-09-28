@@ -688,6 +688,51 @@ export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNe
     }
   }
 
+  /** Copies the current frame (at the video's native resolution, with
+   * the rendered subtitles when the libass canvas can be read) to the
+   * clipboard as PNG - Ctrl+C. */
+  async function copyFrame() {
+    const video = videoRef.current;
+    if (!video || video.videoWidth === 0) return;
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const subtitleCanvas = rootRef.current?.querySelector<HTMLCanvasElement>("canvas.JASSUB");
+    let withSubtitles = false;
+    if (subtitleCanvas && activeSubtitleIndex != null) {
+      try {
+        // The libass canvas is sized to the displayed video box; map it
+        // onto the frame.
+        const videoBox = video.getBoundingClientRect();
+        const subBox = subtitleCanvas.getBoundingClientRect();
+        const scale = canvas.width / videoBox.width;
+        ctx.drawImage(
+          subtitleCanvas,
+          (subBox.left - videoBox.left) * scale,
+          (subBox.top - videoBox.top) * scale,
+          subBox.width * scale,
+          subBox.height * scale,
+        );
+        withSubtitles = true;
+      } catch (err) {
+        console.debug("[player] subtitle layer not capturable, copying bare frame", { err: String(err) });
+      }
+    }
+    try {
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+      if (!blob) throw new Error("frame encode failed");
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+      console.info("[player] frame copied", { width: canvas.width, height: canvas.height, withSubtitles, bytes: blob.size });
+      showToast("Frame copied");
+    } catch (err) {
+      console.error("[player] frame copy failed", { err: String(err) });
+      showToast("Couldn't copy the frame");
+    }
+  }
+
   function cycleSubtitles() {
     const order: (number | null)[] = [null, ...subtitleTracks.map((t) => t.index)];
     const next = order[(order.indexOf(activeSubtitleIndex) + 1) % order.length];
@@ -712,7 +757,15 @@ export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNe
     }
 
     function handleKeyDown(e: KeyboardEvent) {
-      if (isFormControl(e.target) || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (isFormControl(e.target)) return;
+      // Ctrl+C: copy the current frame - unless text is selected, where the
+      // user means an ordinary copy.
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === "c" && !window.getSelection()?.toString()) {
+        e.preventDefault();
+        void copyFrame();
+        return;
+      }
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
       switch (e.key.toLowerCase()) {
         case " ":
         case "k":
