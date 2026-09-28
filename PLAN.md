@@ -313,8 +313,9 @@ nyaa_stream/
    don't reliably handle several codecs real releases use, e.g. E-AC-3;
    `-map 0:v:0 -map 0:a:0 -sn` to drop any embedded subtitle/attachment
    streams, which MPEG-TS can't carry and which otherwise got auto-included
-   and corrupted timestamps) reading from `stream_handler` over loopback,
-   writing real segment files to disk (`-f hls -hls_flags temp_file` -
+   and corrupted timestamps) reading the torrent directly through AVIO
+   callbacks (`direct_input.rs`: reopen-on-early-end, cancellable reads so
+   an abort never waits on an undownloaded piece), writing real segment files to disk (`-f hls -hls_flags temp_file` -
    atomic rename on completion, so a request never sees a half-written
    file). Segments are **fMP4** (`<index>.m4s` + one `init.mp4` per run,
    served by `hls_init_handler`; the playlist's `EXT-X-MAP` carries the
@@ -437,11 +438,12 @@ nyaa_stream/
   CPUs may not keep real time for 1080p HEVC sources.
 - mpv is still required on PATH for torrent-captured thumbnails (the only
   remaining external binary).
-- FFmpeg inputs still read `stream_handler` over loopback HTTP; reading
-  the torrent file handle directly (ez-ffmpeg read/seek callbacks) is the
-  planned next step.
-- enginefs' playback coordinator can end an HTTP body early (permit
-  cancellation/lease expiry); handled with ffmpeg `-reconnect`, not fixed
+- The one-time media probe (`probe_media`, ffmpeg-next) still reads
+  `stream_handler` over loopback HTTP; HLS and subtitle runs read the
+  torrent directly (`direct_input.rs`).
+- enginefs' playback coordinator can end a file stream early (permit
+  cancellation/lease expiry); `direct_input` reopens at the same byte
+  offset (the HTTP probe relies on ffmpeg `-reconnect`), not fixed
   upstream.
 - Torrent-captured thumbnails use the torrent's largest video file. The seek point targets roughly
   the episode's midpoint when a duration estimate is available (a fixed
