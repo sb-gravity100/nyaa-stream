@@ -343,7 +343,19 @@ nyaa_stream/
    single `Default` style that the user's default-subtitle-style setting
    rewrites (`subtitles.ts`'s `applySubtitleStyle`); real ASS tracks keep
    their styling unless the user opts in, and then only dialogue-looking
-   styles change. Z/X shift subtitle delay by 0.1s.
+   styles change. Z/X shift subtitle delay by 0.1s. Video never waits on
+   the probe: a run that starts before it finishes gets a subtitle-only
+   ffmpeg attached (`HlsJobs::attach_subtitles`). A separate full-file
+   subtitle pass (`sub_<index>_bg.ass`) reads `stream_handler` with
+   `?intent=background` (no playback-lease refresh, libtorrent piece
+   priority 1) so the whole track fills in as the torrent downloads
+   without pulling priority from the playhead. hls.js `initPTS` is a raw
+   33-bit PTS and is unwrapped before use (B-frame DTS just below zero
+   wraps to ~95443s). A transcode whose ffmpeg exited is restarted on the
+   next request, and every ffmpeg/ffprobe read uses `-reconnect` flags:
+   enginefs' disk reader ends the HTTP body early when a piece isn't ready
+   (and has been seen returning zero bytes for a not-yet-flushed piece) -
+   both upstream issues in the vendored crate, worked around here.
 
    **`mpv`/`mpv-ipc` is no longer the real playback engine** — an earlier
    attempt embedded mpv into the app window via `--wid` and a transparent
@@ -375,6 +387,12 @@ nyaa_stream/
 - Batches without an explicit episode range in their title (most of them)
   can't be attributed to specific episodes and stay in an undifferentiated
   per-season "Batch" bucket.
+- HEVC releases can't play unless the OS provides an HEVC decoder to
+  WebView2 (verified: `MediaSource.isTypeSupported` false here) - they're
+  ranked last and flagged rather than transcoded.
+- enginefs' libtorrent disk reader: premature EOF when a verified piece
+  reports 0 bytes, and occasional zero-filled reads right after a piece
+  verifies. Mitigated with ffmpeg reconnects; a real fix needs a fork.
 - Torrent-captured thumbnails use the torrent's largest video file. The seek point targets roughly
   the episode's midpoint when a duration estimate is available (a fixed
   early point otherwise), but without a Matroska Cues index on a
