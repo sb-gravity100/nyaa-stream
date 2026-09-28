@@ -32,6 +32,16 @@
   --health: #79d4a4;
   --danger: #ff8a8a;
 
+  /* Frosted glass: a translucent ink fill, a heavy backdrop blur and a
+     one-pixel top highlight so panels read as lit from above. */
+  --glass: rgba(26, 29, 49, 0.58);
+  --glass-strong: rgba(24, 27, 46, 0.82);
+  --glass-rim: rgba(236, 234, 246, 0.1);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  --glass-blur: blur(22px) saturate(1.4);
+  --glow: 0 10px 34px -8px rgba(240, 122, 166, 0.55);
+  --lift-shadow: 0 22px 40px -14px rgba(4, 5, 12, 0.85);
+
   --radius-s: 6px;
   --radius-m: 10px;
   --radius-l: 16px;
@@ -147,8 +157,8 @@ a {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  height: 40px;
-  padding: 0 18px;
+  height: 42px;
+  padding: 0 20px;
   border: 1px solid transparent;
   border-radius: 999px;
   font-size: 0.9rem;
@@ -163,21 +173,25 @@ a {
 }
 
 .button-primary {
-  background: var(--accent);
+  background: linear-gradient(180deg, var(--accent-strong), var(--accent));
   color: var(--accent-ink);
+  box-shadow: var(--glow), inset 0 1px 0 rgba(255, 255, 255, 0.35);
 }
 
 .button-primary:hover {
-  background: var(--accent-strong);
+  background: linear-gradient(180deg, #ffa9c8, var(--accent-strong));
+  box-shadow: 0 12px 40px -6px rgba(240, 122, 166, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.4);
 }
 
 .button-secondary {
   background: rgba(236, 234, 246, 0.1);
-  border-color: rgba(236, 234, 246, 0.14);
+  border-color: var(--glass-rim);
+  box-shadow: var(--glass-highlight);
+  backdrop-filter: var(--glass-blur);
 }
 
 .button-secondary:hover {
-  background: rgba(236, 234, 246, 0.16);
+  background: rgba(236, 234, 246, 0.17);
 }
 
 .button-quiet {
@@ -283,18 +297,31 @@ a {
   grid-template-columns: 1fr minmax(0, 620px) 1fr;
   align-items: center;
   gap: 16px;
-  padding: 16px 32px;
-  background: linear-gradient(var(--ink) 70%, transparent);
+  padding: 12px 32px;
+  background: var(--glass);
+  backdrop-filter: var(--glass-blur);
+  border-bottom: 1px solid var(--glass-rim);
+  box-shadow: 0 10px 30px -18px rgba(4, 5, 12, 0.9);
 }
 
 .app-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
   font-size: 1.15rem;
   font-weight: 700;
   letter-spacing: -0.02em;
   color: var(--text);
 }
 
-.app-brand span {
+.app-brand-mark {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  filter: drop-shadow(0 4px 12px rgba(240, 122, 166, 0.55));
+}
+
+.app-brand-word span {
   color: var(--accent);
   margin-left: 1px;
 }
@@ -311,8 +338,10 @@ a {
 }
 
 .media-settings-anchor .icon-button {
-  background: rgba(16, 18, 31, 0.55);
-  backdrop-filter: blur(8px);
+  background: var(--glass);
+  border: 1px solid var(--glass-rim);
+  box-shadow: var(--glass-highlight);
+  backdrop-filter: var(--glass-blur);
 }
 
 .search-bar-wrap {
@@ -332,16 +361,17 @@ a {
 .search-bar {
   display: block;
   width: 100%;
-  height: 46px;
+  height: 44px;
   padding: 0 18px 0 44px;
   font: inherit;
   font-size: 0.95rem;
   color: var(--text);
-  background-color: var(--surface);
-  border: 1px solid var(--line);
+  background-color: rgba(236, 234, 246, 0.06);
+  border: 1px solid var(--glass-rim);
   border-radius: 999px;
   outline: none;
-  transition: border-color 0.15s var(--ease), background-color 0.15s var(--ease);
+  box-shadow: inset 0 1px 2px rgba(4, 5, 12, 0.35);
+  transition: border-color 0.2s var(--ease), background-color 0.2s var(--ease), box-shadow 0.2s var(--ease);
 }
 
 .search-bar::placeholder {
@@ -350,7 +380,8 @@ a {
 
 .search-bar:focus {
   border-color: rgba(240, 122, 166, 0.6);
-  background-color: var(--raised);
+  background-color: rgba(236, 234, 246, 0.09);
+  box-shadow: 0 0 0 4px rgba(240, 122, 166, 0.14), 0 8px 30px -10px rgba(240, 122, 166, 0.45);
 }
 
 .search-results-wrap {
@@ -360,11 +391,21 @@ a {
   width: 100%;
   overflow: hidden;
   border-radius: var(--radius-l);
-  border: 1px solid var(--line);
-  background-color: var(--surface);
+  border: 1px solid var(--glass-rim);
+  background-color: var(--glass-strong);
+  backdrop-filter: var(--glass-blur);
   font-size: 0.9rem;
   z-index: 20;
-  box-shadow: 0 24px 48px rgba(6, 7, 14, 0.55);
+  box-shadow: 0 30px 60px -12px rgba(4, 5, 12, 0.75), var(--glass-highlight);
+  animation: drop-in 0.22s var(--ease-out);
+  transform-origin: top center;
+}
+
+@keyframes drop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.985);
+  }
 }
 
 .search-status {
@@ -393,8 +434,16 @@ a {
   cursor: pointer;
 }
 
+.search-results a {
+  transition: background-color 0.15s var(--ease);
+}
+
 .search-results a:hover {
-  background-color: var(--raised);
+  background-color: rgba(236, 234, 246, 0.07);
+}
+
+.search-results a:hover .result-thumbnail {
+  box-shadow: 0 6px 16px -4px rgba(240, 122, 166, 0.5);
 }
 
 .result-thumbnail {
