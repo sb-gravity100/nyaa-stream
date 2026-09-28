@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `609864c` · 2026-09-29 · docs: index router, fullscreen and keyboard modules
+- `FILE_INDEX.md`
+
 ### `772737c` · 2026-09-29 · fix(player): pointer-driven seek bar commits once and never shows stale time
 - `src/App.css`
 - `src/PlayerView.tsx`
