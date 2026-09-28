@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `4ef5c5b` · 2026-09-28 · fix(parser): recognize ordinal seasons ('2nd Season')
+- `src/episodeParser.ts`
+
 ### `e81dd4a` · 2026-09-28 · fix(player): copy frames through the native clipboard (arboard)
 - `src-tauri/Cargo.toml`
 - `src-tauri/src/lib.rs`
