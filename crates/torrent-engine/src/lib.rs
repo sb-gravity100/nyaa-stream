@@ -25,7 +25,9 @@ pub type TorrentId = String;
 
 mod direct_input;
 mod media;
+mod subtitle_log;
 use direct_input::TorrentSources;
+use subtitle_log::SubtitleLogs;
 pub use media::H264Encoder;
 
 
@@ -101,6 +103,7 @@ pub struct TorrentEngine {
     stream_addr: SocketAddr,
     hls_jobs: HlsJobs,
     probes: MediaProbes,
+    subtitle_logs: SubtitleLogs,
 }
 
 /// What the frontend's WebView can decode natively through MSE, reported
@@ -967,51 +970,6 @@ impl MediaProbes {
 }
 
 
-/// Merges every per-run ASS file the HLS transcode has written for one
-/// subtitle track (`sub_<stream_index>_<start_segment>.ass` - one per
-/// transcode run, since a seek restarts the job at a new offset) into a
-/// single script: header from the earliest run, then the union of all
-/// `Dialogue:` lines, de-duplicated. Every run shares one timeline thanks
-/// to `-copyts`, so overlapping runs produce byte-identical event lines.
-/// The last line of a file still being written may be partial, so only
-/// newline-terminated lines are taken.
-fn merge_ass_runs(mut runs: Vec<(usize, String)>) -> Option<String> {
-    runs.sort_by_key(|(start, _)| *start);
-    let mut header: Option<String> = None;
-    let mut seen = std::collections::HashSet::new();
-    let mut events = Vec::new();
-    for (_, content) in &runs {
-        let complete = match content.rfind('\n') {
-            Some(end) => &content[..=end],
-            None => continue,
-        };
-        if header.is_none() {
-            if let Some(events_pos) = complete.find("[Events]") {
-                // Header runs through the `Format:` line that follows
-                // `[Events]`.
-                let after = &complete[events_pos..];
-                if let Some(format_pos) = after.find("Format:") {
-                    if let Some(eol) = after[format_pos..].find('\n') {
-                        header = Some(complete[..events_pos + format_pos + eol + 1].to_string());
-                    }
-                }
-            }
-        }
-        for line in complete.lines() {
-            let line = line.trim_end_matches('\r');
-            if line.starts_with("Dialogue:") && seen.insert(line.to_string()) {
-                events.push(line.to_string());
-            }
-        }
-    }
-    let mut merged = header?;
-    for event in events {
-        merged.push_str(&event);
-        merged.push('\n');
-    }
-    Some(merged)
-}
-
 pub struct AddedTorrent {
     pub id: TorrentId,
 }
@@ -1022,6 +980,7 @@ struct StreamRouterState {
     stream_addr: SocketAddr,
     hls_jobs: HlsJobs,
     probes: MediaProbes,
+    subtitle_logs: SubtitleLogs,
 }
 
 /// Trimmed-down mirror of librqbit's `TorrentStats` - mirrors Stremio's own
@@ -1093,13 +1052,14 @@ impl TorrentEngine {
         let sources = TorrentSources::new(efs.clone());
         let hls_jobs = HlsJobs::new(hls_cache_root, sources.clone());
         let probes = MediaProbes::new(sources);
+        let subtitle_logs = SubtitleLogs::default();
 
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
         let stream_addr = listener.local_addr()?;
         tracing::info!(%stream_addr, "streaming server listening");
 
         let router_state =
-            StreamRouterState { efs: efs.clone(), stream_addr, hls_jobs: hls_jobs.clone(), probes: probes.clone() };
+            StreamRouterState { efs: efs.clone(), stream_addr, hls_jobs: hls_jobs.clone(), probes: probes.clone(), subtitle_logs: subtitle_logs.clone() };
         let app = Router::new()
             .route("/stream/{torrent_id}/{file_idx}", get(stream_handler))
             .route("/hls/{torrent_id}/{file_idx}/playlist.m3u8", get(hls_playlist_handler))
@@ -1129,7 +1089,7 @@ impl TorrentEngine {
             }
         });
 
-        Ok(Self { efs, stream_addr, hls_jobs, probes })
+        Ok(Self { efs, stream_addr, hls_jobs, probes, subtitle_logs })
     }
 
     /// Adds a torrent from a magnet link or .torrent URL and starts
@@ -1165,6 +1125,7 @@ impl TorrentEngine {
         tracing::debug!(torrent_id = %id, "removing torrent");
         self.hls_jobs.remove_torrent(&id).await;
         self.probes.remove_torrent(&id).await;
+        self.subtitle_logs.remove_torrent(&id).await;
         self.efs.remove_engine(&id).await;
         self.efs.get_backend().remove_torrent(&id).await
     }
@@ -1494,46 +1455,37 @@ async fn serve_hls_file(
     Ok(([(axum::http::header::CONTENT_TYPE, "video/mp4")], bytes))
 }
 
-/// Serves one subtitle track as a single ASS script merged from every
-/// transcode run's output so far (see `merge_ass_runs`). Never waits: 404
-/// until the first run has written its header, after which the frontend's
-/// poll just gets a longer script each time as the job advances.
+#[derive(Deserialize)]
+struct SubtitleQuery {
+    /// Events the client already has (`X-Subtitle-Events` of its last
+    /// poll). 0/absent = the whole script, header included.
+    from: Option<usize>,
+}
+
+/// Serves one subtitle track from its append-only event log (see
+/// `subtitle_log`): the whole script for `from=0`, otherwise only the
+/// `Dialogue:` lines added since, with the new total in
+/// `X-Subtitle-Events`. Never waits: 404 until a run has written its
+/// header.
 async fn subtitle_handler(
     State(state): State<StreamRouterState>,
     Path((torrent_id, file_idx, stream_index)): Path<(TorrentId, usize, usize)>,
+    Query(query): Query<SubtitleQuery>,
 ) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
     let dir = state.hls_jobs.job_dir(&torrent_id, file_idx);
-    let prefix = format!("sub_{stream_index}_");
-    let mut runs = Vec::new();
-    if let Ok(mut entries) = tokio::fs::read_dir(&dir).await {
-        while let Ok(Some(entry)) = entries.next_entry().await {
-            let name = entry.file_name().to_string_lossy().to_string();
-            // `<start>` for a transcode run, `bg` for the full-file pass
-            // (sorted first: it starts at byte 0).
-            let Some(start) = name.strip_prefix(&prefix).and_then(|rest| rest.strip_suffix(".ass")).and_then(|n| {
-                if n == "bg" {
-                    Some(0)
-                } else {
-                    n.parse::<usize>().ok()
-                }
-            }) else {
-                continue;
-            };
-            match tokio::fs::read(entry.path()).await {
-                Ok(bytes) => runs.push((start, String::from_utf8_lossy(&bytes).into_owned())),
-                Err(err) => tracing::warn!(torrent_id = %torrent_id, file_idx, stream_index, %err, "failed to read subtitle run file"),
-            }
-        }
-    }
-    let run_count = runs.len();
-    let merged = merge_ass_runs(runs).ok_or_else(|| {
-        tracing::debug!(torrent_id = %torrent_id, file_idx, stream_index, run_count, "subtitle track not available yet");
+    let from = query.from.unwrap_or(0);
+    let slice = state.subtitle_logs.poll(&dir, &torrent_id, file_idx, stream_index, from).await.ok_or_else(|| {
+        tracing::debug!(torrent_id = %torrent_id, file_idx, stream_index, "subtitle track not available yet");
         axum::http::StatusCode::NOT_FOUND
     })?;
-    tracing::debug!(torrent_id = %torrent_id, file_idx, stream_index, run_count, bytes = merged.len(), "serving merged subtitle track");
+    tracing::debug!(torrent_id = %torrent_id, file_idx, stream_index, from, total = slice.total, bytes = slice.body.len(), "serving subtitle events");
     Ok((
-        [(axum::http::header::CONTENT_TYPE, "text/x-ssa; charset=utf-8"), (axum::http::header::CACHE_CONTROL, "no-store")],
-        merged,
+        [
+            (axum::http::header::CONTENT_TYPE, "text/x-ssa; charset=utf-8".to_string()),
+            (axum::http::header::CACHE_CONTROL, "no-store".to_string()),
+            (axum::http::HeaderName::from_static("x-subtitle-events"), slice.total.to_string()),
+        ],
+        slice.body,
     ))
 }
 
@@ -1555,29 +1507,5 @@ async fn font_handler(
             return Err(axum::http::StatusCode::NOT_FOUND);
         }
         tokio::time::sleep(SEGMENT_POLL_INTERVAL).await;
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::merge_ass_runs;
-
-    const HEADER: &str = "[Script Info]\nScriptType: v4.00+\n\n[V4+ Styles]\nStyle: Default,Arial,16\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n";
-
-    #[test]
-    fn merges_runs_dedupes_and_drops_partial_lines() {
-        let run0 = format!("{HEADER}Dialogue: 0,0:00:01.00,0:00:04.00,Default,,0,0,0,,a\nDialogue: 0,0:00:35.00,0:00:38.00,Default,,0,0,0,,b\n");
-        // A later seek-restart run overlapping run0, with a partially-written last line.
-        let run5 = format!("{HEADER}Dialogue: 0,0:00:35.00,0:00:38.00,Default,,0,0,0,,b\nDialogue: 0,0:00:50.00,0:00:53.00,Default,,0,0,0,,c\nDialogue: 0,0:00:5");
-        let merged = merge_ass_runs(vec![(5, run5), (0, run0)]).unwrap();
-        assert!(merged.starts_with("[Script Info]"));
-        assert_eq!(merged.matches("Dialogue:").count(), 3);
-        assert!(merged.ends_with(",,c\n"));
-    }
-
-    #[test]
-    fn no_header_yet_is_none() {
-        assert!(merge_ass_runs(vec![(0, "[Script Info]\n".to_string())]).is_none());
-        assert!(merge_ass_runs(Vec::new()).is_none());
     }
 }
