@@ -499,15 +499,210 @@ a {
 /* ---------- Home ---------- */
 
 .home-page {
-  padding: 8px 32px 48px;
+  position: relative;
+  padding: 0 32px 56px;
   display: flex;
   flex-direction: column;
-  gap: 36px;
+  gap: 40px;
 }
 
-.home-section h2 {
-  font-size: 1.25rem;
+.home-page > :not(.ambient) {
+  position: relative;
+  z-index: 1;
+}
+
+/* Ambient art: the featured show's key art, blurred into a wash of its
+   own colors behind the whole page - the page takes on the show. */
+.ambient {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.ambient img {
+  position: absolute;
+  inset: -12%;
+  width: 124%;
+  height: 124%;
+  object-fit: cover;
+  filter: blur(90px) saturate(1.7);
+  opacity: 0.32;
+  animation: ambient-in 1.2s var(--ease-out);
+}
+
+.ambient::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(120% 90% at 30% 0%, transparent 30%, var(--ink) 85%);
+}
+
+@keyframes ambient-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* ---- Hero ---- */
+
+.home-hero {
+  display: flex;
+  align-items: flex-end;
+  /* Runs up under the translucent app bar. */
+  margin: -70px -32px 0;
+  min-height: clamp(360px, 58vh, 580px);
+  padding: 110px 32px 36px;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.home-hero-art {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 25%;
+  /* Melts into the page (and its ambient wash) instead of ending on an edge. */
+  mask-image: linear-gradient(#000 55%, transparent);
+  -webkit-mask-image: linear-gradient(#000 55%, transparent);
+  animation: hero-art-in 1.4s var(--ease-out);
+}
+
+/* Scrims: the left side stays dark enough for the title, the bottom
+   melts into the page. */
+.home-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(90deg, rgba(19, 22, 38, 0.9) 0%, rgba(19, 22, 38, 0.55) 38%, transparent 72%);
+}
+
+@keyframes hero-art-in {
+  from {
+    opacity: 0;
+    transform: scale(1.06);
+  }
+}
+
+.home-hero-body {
+  max-width: 620px;
+  animation: hero-body-in 0.9s 0.15s var(--ease-out) backwards;
+}
+
+@keyframes hero-body-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+
+.home-hero-reason {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   margin-bottom: 14px;
+  padding: 4px 12px 4px 10px;
+  border-radius: 999px;
+  background: rgba(240, 122, 166, 0.14);
+  border: 1px solid rgba(240, 122, 166, 0.3);
+  color: var(--accent-strong);
+  font-size: 0.8rem;
+  font-weight: 700;
+  backdrop-filter: blur(10px);
+}
+
+.home-hero-reason::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--accent);
+}
+
+.home-hero-title {
+  font-size: clamp(2.2rem, 4.6vw, 4rem);
+  line-height: 1.02;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+  text-shadow: 0 4px 30px rgba(4, 5, 12, 0.6);
+}
+
+.home-hero-native {
+  margin-top: 10px;
+  font-size: 1.05rem;
+  color: rgba(236, 234, 246, 0.7);
+  letter-spacing: 0.08em;
+}
+
+.home-hero-meta {
+  margin: 14px 0 0;
+  max-width: 52ch;
+  color: #c9c8dc;
+  font-size: 0.95rem;
+}
+
+.home-hero-progress {
+  width: min(320px, 100%);
+  height: 4px;
+  margin-top: 14px;
+  border-radius: 999px;
+  background: rgba(236, 234, 246, 0.16);
+  overflow: hidden;
+}
+
+.home-hero-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  box-shadow: 0 0 12px var(--accent);
+}
+
+.home-hero-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.home-hero-empty {
+  min-height: clamp(300px, 44vh, 440px);
+  background:
+    radial-gradient(55% 70% at 85% 20%, rgba(240, 122, 166, 0.22), transparent 70%),
+    radial-gradient(45% 60% at 60% 70%, rgba(120, 132, 230, 0.16), transparent 70%);
+}
+
+
+.home-hero-empty::after {
+  display: none;
+}
+
+/* ---- Sections ---- */
+
+.home-section h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1.3rem;
+  margin-bottom: 16px;
+}
+
+.home-section-count {
+  min-width: 24px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: rgba(236, 234, 246, 0.08);
+  border: 1px solid var(--glass-rim);
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-align: center;
 }
 
 .card-button {
@@ -522,8 +717,8 @@ a {
 
 .card-row {
   list-style: none;
-  margin: 0 -32px;
-  padding: 4px 32px 12px;
+  margin: -12px -32px -8px;
+  padding: 12px 32px 20px;
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: minmax(260px, 300px);
@@ -539,9 +734,32 @@ a {
 .episode-card-thumbnail {
   position: relative;
   aspect-ratio: 16 / 9;
-  border-radius: var(--radius-m);
+  border-radius: var(--radius-l);
   overflow: hidden;
   background: var(--surface);
+  box-shadow: 0 12px 26px -14px rgba(4, 5, 12, 0.9);
+  transition: transform 0.35s var(--ease-out), box-shadow 0.35s var(--ease-out);
+}
+
+/* Hairline rim on top of the art so dark thumbnails keep an edge. */
+.episode-card-thumbnail::after,
+.library-thumbnail::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px rgba(236, 234, 246, 0.09);
+  pointer-events: none;
+}
+
+.card-button:hover .episode-card-thumbnail,
+.card-button:focus-visible .episode-card-thumbnail {
+  transform: translateY(-4px);
+  box-shadow: var(--lift-shadow), 0 0 0 1px rgba(240, 122, 166, 0.45), 0 14px 38px -12px rgba(240, 122, 166, 0.45);
+}
+
+.card-button:focus-visible {
+  outline: none;
 }
 
 .episode-card-thumbnail img {
@@ -553,8 +771,8 @@ a {
 }
 
 .card-button:hover .episode-card-thumbnail img {
-  transform: scale(1.03);
-  filter: brightness(0.75);
+  transform: scale(1.05);
+  filter: brightness(0.7);
 }
 
 .episode-card-play,
@@ -565,7 +783,18 @@ a {
   place-items: center;
   color: #fff;
   opacity: 0;
-  transition: opacity 0.2s var(--ease);
+  transform: scale(0.8);
+  transition: opacity 0.2s var(--ease), transform 0.3s var(--ease-spring);
+}
+
+.episode-card-play svg {
+  width: 52px;
+  height: 52px;
+  padding: 14px 12px 14px 16px;
+  border-radius: 50%;
+  background: rgba(240, 122, 166, 0.9);
+  color: var(--accent-ink);
+  box-shadow: 0 8px 26px rgba(240, 122, 166, 0.55);
 }
 
 .card-button:hover .episode-card-play,
@@ -573,6 +802,7 @@ a {
 .video-row-main:hover .video-thumbnail-play,
 .video-row-main:focus-visible .video-thumbnail-play {
   opacity: 1;
+  transform: none;
 }
 
 .episode-card-badge {
@@ -581,7 +811,9 @@ a {
   bottom: 8px;
   padding: 2px 8px;
   border-radius: 999px;
-  background: rgba(16, 18, 31, 0.8);
+  background: rgba(16, 18, 31, 0.6);
+  border: 1px solid var(--glass-rim);
+  backdrop-filter: blur(10px);
   font-size: 0.75rem;
   font-weight: 700;
 }
@@ -599,6 +831,7 @@ a {
   display: block;
   height: 100%;
   background: var(--accent);
+  box-shadow: 0 0 10px var(--accent);
 }
 
 .episode-card-title {
@@ -619,16 +852,18 @@ a {
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 22px 18px;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 26px 20px;
 }
 
 .library-thumbnail {
+  position: relative;
   aspect-ratio: 2 / 3;
-  border-radius: var(--radius-m);
+  border-radius: var(--radius-l);
   overflow: hidden;
   background: var(--surface);
-  box-shadow: 0 10px 24px rgba(6, 7, 14, 0.35);
+  box-shadow: 0 14px 30px -12px rgba(4, 5, 12, 0.85);
+  transition: transform 0.4s var(--ease-out), box-shadow 0.4s var(--ease-out);
 }
 
 .library-thumbnail img {
@@ -636,15 +871,48 @@ a {
   height: 100%;
   object-fit: cover;
   display: block;
-  transition: transform 0.3s var(--ease);
+  transition: transform 0.5s var(--ease-out);
+}
+
+/* A diagonal sheen sweeps across the poster on hover, like foil. */
+.library-thumbnail::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(115deg, transparent 35%, rgba(255, 255, 255, 0.22) 50%, transparent 65%);
+  transform: translateX(-120%);
+  transition: transform 0.8s var(--ease-out);
+  pointer-events: none;
+}
+
+.card-button:hover .library-thumbnail,
+.card-button:focus-visible .library-thumbnail {
+  transform: translateY(-6px);
+  box-shadow: var(--lift-shadow), 0 0 0 1px rgba(240, 122, 166, 0.45), 0 18px 44px -14px rgba(240, 122, 166, 0.5);
+}
+
+.card-button:hover .library-thumbnail::before {
+  transform: translateX(120%);
 }
 
 .card-button:hover .library-thumbnail img {
-  transform: scale(1.04);
+  transform: scale(1.06);
+}
+
+.episode-card-title,
+.library-title {
+  transition: color 0.2s var(--ease);
+}
+
+.card-button:hover .library-title,
+.card-button:hover .episode-card-title {
+  color: var(--accent-strong);
 }
 
 .library-title {
-  margin-top: 8px;
+  margin-top: 10px;
+
   font-size: 0.9rem;
   font-weight: 500;
   line-height: 1.35;

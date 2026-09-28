@@ -1,7 +1,7 @@
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useMemo, useState } from "preact/hooks";
 import { displayTitle, type AiringEntry, type AnimeMedia, type KitsuMetadata } from "./types";
 import { continueWatching, subscribeProgress, type ProgressEntry } from "./watchProgress";
-import { PlayIcon } from "./icons";
+import { PlayIcon, SearchIcon } from "./icons";
 import { cachedTorrentThumbnail, subscribeFrameSaved } from "./torrentThumbnail";
 
 interface Props {
@@ -42,6 +42,82 @@ function asAnime(entry: ProgressEntry): AnimeMedia {
   return { ...entry.anime };
 }
 
+/** What the hero features: where the user left off, else the newest
+ * episode from their library, else a library show. */
+interface Featured {
+  reason: string;
+  anime: AnimeMedia;
+  art: string | null;
+  meta: string;
+  progress: number | null;
+  action: string;
+  onPlay: () => void;
+}
+
+function focusSearch() {
+  document.getElementById("anime-search-input")?.focus();
+}
+
+function Hero({ featured }: { featured: Featured | null }) {
+  if (!featured) {
+    return (
+      <section class="home-hero home-hero-empty">
+        <div class="home-hero-body">
+          <h1 class="home-hero-title">Find something to watch</h1>
+          <p class="home-hero-meta">Search AniList for a show, add it to your library, and new episodes from nyaa.si will show up here as they air.</p>
+          <div class="home-hero-actions">
+            <button class="button button-primary" onClick={focusSearch}>
+              <SearchIcon size={16} /> Search anime
+            </button>
+          </div>
+        </div>
+      </section>
+    );
+  }
+  const { anime } = featured;
+  const title = displayTitle(anime.title);
+  return (
+    <section class="home-hero" key={anime.id}>
+      {featured.art && <img class="home-hero-art" src={featured.art} alt="" />}
+      <div class="home-hero-body">
+        <div class="home-hero-reason">{featured.reason}</div>
+        <h1 class="home-hero-title">{title}</h1>
+        {anime.title.native && anime.title.native !== title && (
+          <div class="home-hero-native" lang="ja">
+            {anime.title.native}
+          </div>
+        )}
+        <p class="home-hero-meta">{featured.meta}</p>
+        {featured.progress != null && (
+          <div class="home-hero-progress">
+            <span style={{ width: `${featured.progress * 100}%` }} />
+          </div>
+        )}
+        <div class="home-hero-actions">
+          <button class="button button-primary" onClick={featured.onPlay}>
+            <PlayIcon size={16} /> {featured.action}
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function airingAsAnime(entry: AiringEntry): AnimeMedia {
+  return {
+    id: entry.media.id,
+    title: entry.media.title,
+    coverImage: entry.media.coverImage,
+    description: null,
+    episodes: null,
+    averageScore: null,
+    format: null,
+    season: null,
+    seasonYear: null,
+    duration: entry.media.duration,
+  };
+}
+
 export function HomePage({
   library,
   latestEpisodes,
@@ -69,11 +145,65 @@ export function HomePage({
     [],
   );
 
+  const featured = useMemo((): Featured | null => {
+    const resume = inProgress[0];
+    if (resume) {
+      const kitsu = kitsuByMedia[resume.animeId];
+      const anime = asAnime(resume);
+      return {
+        reason: "Pick up where you left off",
+        anime,
+        art: kitsu?.background ?? anime.coverImage.extraLarge ?? anime.coverImage.large,
+        meta: `${resume.episodeKey} · ${Math.max(1, Math.round((resume.duration - resume.position) / 60))} min left`,
+        progress: Math.min(1, resume.position / resume.duration),
+        action: `Resume ${resume.episodeKey}`,
+        onPlay: () => (resume.episode != null ? onSelectEpisode(anime, resume.episode) : onSelectAnime(anime)),
+      };
+    }
+    const latest = latestEpisodes[0];
+    if (latest) {
+      const kitsu = kitsuByMedia[latest.media.id];
+      const anime = airingAsAnime(latest);
+      return {
+        reason: "New episode",
+        anime,
+        art: kitsu?.background ?? anime.coverImage.extraLarge ?? anime.coverImage.large,
+        meta: `Episode ${latest.episode} · aired ${formatAiringDate(latest.airingAt).toLowerCase()}`,
+        progress: null,
+        action: `Play episode ${latest.episode}`,
+        onPlay: () => onSelectEpisode(anime, latest.episode),
+      };
+    }
+    const saved = library[0];
+    if (saved) {
+      const kitsu = kitsuByMedia[saved.id];
+      return {
+        reason: "From your library",
+        anime: saved,
+        art: kitsu?.background ?? saved.coverImage.extraLarge ?? saved.coverImage.large,
+        meta: [saved.format?.replace("_", " "), saved.episodes != null ? `${saved.episodes} episodes` : null].filter(Boolean).join(" · "),
+        progress: null,
+        action: "View episodes",
+        onPlay: () => onSelectAnime(saved),
+      };
+    }
+    return null;
+  }, [inProgress, latestEpisodes, library, kitsuByMedia]);
+
   return (
     <div class="home-page">
+      {featured?.art && (
+        <div class="ambient" aria-hidden="true">
+          <img key={featured.art} src={featured.art} alt="" />
+        </div>
+      )}
+      <Hero featured={featured} />
+
       {inProgress.length > 0 && (
         <section class="home-section">
-          <h2>Continue watching</h2>
+          <h2>
+            Continue watching <span class="home-section-count">{inProgress.length}</span>
+          </h2>
           <ul class="card-row">
             {inProgress.map((entry) => {
               const kitsu = kitsuByMedia[entry.animeId];
@@ -112,7 +242,9 @@ export function HomePage({
       )}
 
       <section class="home-section">
-        <h2>New episodes</h2>
+        <h2>
+          New episodes {latestEpisodes.length > 0 && <span class="home-section-count">{latestEpisodes.length}</span>}
+        </h2>
         {library.length === 0 && (
           <p class="empty-state">Add shows to your library and their newest episodes will show up here as they air.</p>
         )}
@@ -135,23 +267,7 @@ export function HomePage({
                   <li key={`${entry.media.id}-${entry.episode}`} class="episode-card">
                     <button
                       class="card-button"
-                      onClick={() =>
-                        onSelectEpisode(
-                          {
-                            id: entry.media.id,
-                            title: entry.media.title,
-                            coverImage: entry.media.coverImage,
-                            description: null,
-                            episodes: null,
-                            averageScore: null,
-                            format: null,
-                            season: null,
-                            seasonYear: null,
-                            duration: entry.media.duration,
-                          },
-                          entry.episode,
-                        )
-                      }
+                      onClick={() => onSelectEpisode(airingAsAnime(entry), entry.episode)}
                     >
                       <div class="episode-card-thumbnail">
                         {thumbnail && <img src={thumbnail} alt="" loading="lazy" />}
@@ -171,7 +287,9 @@ export function HomePage({
       </section>
 
       <section class="home-section">
-        <h2>Library</h2>
+        <h2>
+          Library {library.length > 0 && <span class="home-section-count">{library.length}</span>}
+        </h2>
         {library.length === 0 && <p class="empty-state">Search for a show above, then add it to your library from its page.</p>}
         {library.length > 0 && (
           <ul class="library-grid">
