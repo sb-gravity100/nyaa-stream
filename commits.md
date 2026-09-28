@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `b97d691` · 2026-09-29 · fix(settings): dark native dropdown lists for selects
+- `src/App.css`
+
 ### `36cd574` · 2026-09-29 · docs: note home hero and brand mark in FILE_INDEX
 - `FILE_INDEX.md`
 
