@@ -472,7 +472,6 @@ export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNe
     styled: activeSubtitle ? isStyledTrack(activeSubtitle) : false,
     style: settings.subtitleStyle,
     bottomInsetPx: subtitleInset,
-    supersample: settings.subtitleSupersample,
     timeOffset,
     delay: subtitleDelay,
   });
