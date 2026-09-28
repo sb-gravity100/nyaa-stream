@@ -7,6 +7,8 @@ import workerUrl from "jassub/dist/worker/worker.js?worker&url";
 import wasmUrl from "jassub/dist/wasm/jassub-worker.wasm?url";
 import modernWasmUrl from "jassub/dist/wasm/jassub-worker-modern.wasm?url";
 import defaultFontUrl from "jassub/dist/default.woff2?url";
+import gandhiSansBoldUrl from "./assets/fonts/GandhiSans-Bold.otf?url";
+import gandhiSansBoldItalicUrl from "./assets/fonts/GandhiSans-BoldItalic.otf?url";
 import type { SubtitleStyle } from "./settings";
 import type { ASSStyle } from "jassub/dist/worker/util";
 import { applySubtitleStyle, playResY } from "./subtitles";
@@ -107,7 +109,15 @@ export function useAssRenderer({ video, url, fonts, styled, style, timeOffset, d
       wasmUrl,
       modernWasmUrl,
       fonts,
-      availableFonts: { "liberation sans": defaultFontUrl },
+      // Gandhi Sans: the default (Crunchyroll) subtitle style's font.
+      availableFonts: {
+        "liberation sans": defaultFontUrl,
+        "gandhi sans": gandhiSansBoldUrl,
+        "gandhi sans bold": gandhiSansBoldUrl,
+        "gandhisans-bold": gandhiSansBoldUrl,
+        "gandhi sans bold italic": gandhiSansBoldItalicUrl,
+        "gandhisans-bolditalic": gandhiSansBoldItalicUrl,
+      },
       queryFonts: "local",
       timeOffset: offsetRef.current,
       prescaleFactor: 1,
