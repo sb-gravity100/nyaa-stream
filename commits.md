@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `9f111c3` · 2026-09-28 · fix(enginefs): re-read all-zero disk chunks through read_piece
+- `vendor/enginefs/src/backend/libtorrent/disk_stream.rs`
+
 ### `20492dc` · 2026-09-28 · build: vendor enginefs (upstream f585ab6, MIT) via [patch]
 - `Cargo.toml`
 - `vendor/enginefs/Cargo.toml`
