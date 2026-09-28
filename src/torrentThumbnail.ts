@@ -47,8 +47,14 @@ export async function fetchTorrentThumbnail(
   if (existing) return existing;
 
   const promise = (async () => {
-    console.debug("[capture_torrent_thumbnail] resolving candidate release", { anilistId, episode });
     try {
+      // A frame captured in any earlier session: no nyaa search needed.
+      const cached = await invoke<string | null>("cached_torrent_thumbnail", { cacheKey: key });
+      if (cached) {
+        console.debug("[capture_torrent_thumbnail] served from disk cache", { anilistId, episode });
+        return cached;
+      }
+      console.debug("[capture_torrent_thumbnail] resolving candidate release", { anilistId, episode });
       const results = await invoke<NyaaResult[]>("search_torrents_for_anime", { title });
       const candidate = pickCandidate(results, episode);
       if (!candidate) {

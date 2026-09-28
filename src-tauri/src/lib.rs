@@ -140,14 +140,66 @@ async fn get_absolute_episode_offset(state: State<'_, Arc<AppState>>, id: i64) -
 #[tauri::command]
 async fn get_kitsu_metadata(state: State<'_, Arc<AppState>>, anilist_id: i64) -> Result<Option<KitsuMetadata>, String> {
     tracing::debug!(anilist_id, "get_kitsu_metadata invoked");
+    // Disk cache: episode thumbnails and backdrops belong to a fixed
+    // episode/show, so a day-old copy is served without asking Kitsu (new
+    // episodes gaining thumbnails is the only reason to refetch at all), and
+    // any copy is served when Kitsu fails.
+    let cache_path = state.thumbnail_cache_dir.join("kitsu").join(format!("{anilist_id}.json"));
+    let cached: Option<(Option<KitsuMetadata>, std::time::Duration)> = async {
+        let modified = tokio::fs::metadata(&cache_path).await.ok()?.modified().ok()?;
+        let bytes = tokio::fs::read(&cache_path).await.ok()?;
+        Some((serde_json::from_slice(&bytes).ok()?, modified.elapsed().unwrap_or_default()))
+    }
+    .await;
+    if let Some((metadata, age)) = &cached {
+        if *age < KITSU_CACHE_FRESH_FOR {
+            tracing::debug!(anilist_id, age_s = age.as_secs(), "get_kitsu_metadata served from cache");
+            return Ok(metadata.clone());
+        }
+    }
     match state.kitsu.get_metadata(anilist_id).await {
         Ok(metadata) => {
             tracing::info!(anilist_id, found = metadata.is_some(), "get_kitsu_metadata succeeded");
+            let write = async {
+                tokio::fs::create_dir_all(cache_path.parent().expect("has parent")).await?;
+                tokio::fs::write(&cache_path, serde_json::to_vec(&metadata)?).await?;
+                anyhow::Ok(())
+            };
+            if let Err(err) = write.await {
+                tracing::warn!(anilist_id, %err, "failed to cache kitsu metadata");
+            }
             Ok(metadata)
         }
-        Err(err) => {
-            tracing::error!(anilist_id, %err, "get_kitsu_metadata failed");
-            Err(err.to_string())
+        Err(err) => match cached {
+            Some((metadata, age)) => {
+                tracing::warn!(anilist_id, %err, age_s = age.as_secs(), "get_kitsu_metadata failed, serving cached copy");
+                Ok(metadata)
+            }
+            None => {
+                tracing::error!(anilist_id, %err, "get_kitsu_metadata failed");
+                Err(err.to_string())
+            }
+        },
+    }
+}
+
+/// How long cached Kitsu metadata is used without refetching.
+const KITSU_CACHE_FRESH_FOR: std::time::Duration = std::time::Duration::from_secs(24 * 3600);
+
+/// A torrent-captured thumbnail from the disk cache only - never captures.
+/// The frontend asks this first so a cached frame comes back without the
+/// nyaa search it needs to pick a release for a real capture.
+#[tauri::command]
+async fn cached_torrent_thumbnail(state: State<'_, Arc<AppState>>, cache_key: String) -> Result<Option<String>, String> {
+    let cache_path = state.thumbnail_cache_dir.join(format!("{cache_key}.jpg"));
+    match tokio::fs::read(&cache_path).await {
+        Ok(bytes) => {
+            tracing::debug!(cache_key, "cached_torrent_thumbnail hit");
+            Ok(Some(to_data_uri(&bytes)))
+        }
+        Err(_) => {
+            tracing::debug!(cache_key, "cached_torrent_thumbnail miss");
+            Ok(None)
         }
     }
 }
@@ -734,6 +786,7 @@ pub fn run() {
             get_latest_episodes,
             get_kitsu_metadata,
             capture_torrent_thumbnail,
+            cached_torrent_thumbnail,
             search_torrents,
             search_torrents_for_anime,
             get_torrent_details_batch,
