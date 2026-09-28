@@ -2,6 +2,11 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `16dd815` · 2026-09-28 · docs: transcoding, vendored enginefs, player polish; note ffmpeg-next for later
+- `FILE_INDEX.md`
+- `PHASES.md`
+- `PLAN.md`
+
 ### `888a1bb` · 2026-09-28 · chore(bundle): name the app nyaa-stream instead of the template's tauri-app
 - `src-tauri/tauri.conf.json`
 
