@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `e621dae` · 2026-09-28 · docs(code): update comments for mpv playback
+- `crates/mpv-ipc/src/lib.rs`
+- `src-tauri/src/lib.rs`
+
 ### `5ca4ac9` · 2026-09-28 · fix(player): keep mpv when the availability check itself fails
 - `src/PlayerView.tsx`
 
