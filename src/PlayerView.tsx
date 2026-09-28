@@ -221,6 +221,8 @@ function MpvPlayerView({
    const [controlsVisible, setControlsVisible] = useState(false);
    const [cursorHidden, setCursorHidden] = useState(false);
    const [paused, setPaused] = useState(true);
+   // Target of a seek still waiting on data - the loading overlay says so.
+   const [seekingTo, setSeekingTo] = useState<number | null>(null);
    const [duration, setDuration] = useState(0);
    // Media time as mpv reports it (real episode time).
    const [position, setPosition] = useState(0);
@@ -382,9 +384,13 @@ function MpvPlayerView({
       on("ended", () => handleEndedRef.current());
       on("volumechange", () => setMuted(video.muted));
       on("canplay", () => setReady(true));
-      on("waiting", () => setReady(false));
+      on("waiting", () => {
+         setReady(false);
+         setSeekingTo(video.seekingTo);
+      });
       on("playing", () => {
          setReady(true);
+         setSeekingTo(null);
          setHasPlayed(true);
          rememberGroupOnPlay();
       });
@@ -1001,6 +1007,19 @@ function MpvPlayerView({
       return () => window.clearTimeout(timer);
    }, [buffering, hasPlayed]);
 
+   // The overlay stays mounted through its fade-out instead of vanishing.
+   const LOADING_EXIT_MS = 450;
+   const loadingVisible = showBuffering && buffering && !error;
+   const [loadingMounted, setLoadingMounted] = useState(loadingVisible);
+   useEffect(() => {
+      if (loadingVisible) {
+         setLoadingMounted(true);
+         return;
+      }
+      const timer = window.setTimeout(() => setLoadingMounted(false), LOADING_EXIT_MS);
+      return () => window.clearTimeout(timer);
+   }, [loadingVisible]);
+
    // Keeps a closing menu mounted for its exit animation.
    const MENU_EXIT_MS = 180;
    const [renderedMenu, setRenderedMenu] = useState<Menu>(null);
@@ -1064,15 +1083,21 @@ function MpvPlayerView({
             </div>
          )}
 
-         {showBuffering && buffering && !error && (
-            <div class="player-loading">
-               <Buffering progress={loadingProgress(stats)} />
+         {loadingMounted && !error && (
+            <div class={`player-loading player-loading-fade${loadingVisible ? " shown" : ""}`}>
+               {/* Mid-episode the readiness fill would sit near full, so a
+                seek wait shows a sweeping arc instead. */}
+               <Buffering progress={loadingProgress(stats)} indeterminate={hasPlayed} />
                <div class="player-loading-status">
-                  {selectedFile
-                     ? resumeAtRef.current != null && !duration
-                        ? `Resuming at ${formatTime(resumeAtRef.current)}`
-                        : status
-                     : status}
+                  {seekingTo != null && hasPlayed
+                     ? `Seeking to ${formatTime(seekingTo)}`
+                     : hasPlayed
+                       ? "Buffering…"
+                       : selectedFile
+                         ? resumeAtRef.current != null && !duration
+                            ? `Resuming at ${formatTime(resumeAtRef.current)}`
+                            : status
+                         : status}
                   {stats && stats.connectedPeers > 0 && (
                      <span>
                         {stats.connectedPeers} peers ·{" "}

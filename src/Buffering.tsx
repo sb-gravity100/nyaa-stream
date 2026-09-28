@@ -6,6 +6,9 @@ import { useRef } from "preact/hooks";
 
 interface Props {
   progress: number;
+  /** No meaningful readiness figure (waiting mid-episode, e.g. a seek):
+   * a sweeping arc around the ring instead of the fill. */
+  indeterminate?: boolean;
 }
 
 function Mark() {
@@ -17,11 +20,23 @@ function Mark() {
   );
 }
 
-export function Buffering({ progress }: Props) {
+export function Buffering({ progress, indeterminate = false }: Props) {
   // Readiness can dip (a peer drops); the fill only ever grows while this
   // indicator is up, so it never visibly runs backwards.
   const shown = useRef(0);
   shown.current = Math.max(shown.current, progress);
+  if (indeterminate) {
+    return (
+      <div class="player-buffering">
+        <div class="player-buffering-mark player-buffering-mark-background">
+          <Mark />
+        </div>
+        <svg class="player-buffering-arc" viewBox="0 0 100 100" aria-hidden="true">
+          <circle cx="50" cy="50" r="44" pathLength="100" />
+        </svg>
+      </div>
+    );
+  }
   return (
     <div class="player-buffering">
       <div class="player-buffering-mark player-buffering-mark-background">
