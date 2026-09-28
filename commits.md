@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `888a1bb` · 2026-09-28 · chore(bundle): name the app nyaa-stream instead of the template's tauri-app
+- `src-tauri/tauri.conf.json`
+
 ### `77e2bb3` · 2026-09-28 · feat(player): Ctrl+C copies the current frame (with subtitles) as PNG
 - `src/PlayerView.tsx`
 - `src/SettingsPanel.tsx`
