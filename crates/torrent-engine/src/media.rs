@@ -359,6 +359,12 @@ pub fn start_hls_run(run: HlsRun<'_>) -> anyhow::Result<MediaJob> {
         .set_format_opt("hls_flags", "temp_file+independent_segments")
         .set_format_opt("hls_segment_type", "fmp4")
         .set_format_opt("hls_fmp4_init_filename", INIT_SEGMENT)
+        // Absolute decode times in every fragment (tfdt). Without it the mp4
+        // muxer rebases each run to 0 and keeps the source offset only in
+        // the init segment's edit list, which MSE/hls.js ignore - every
+        // seek restart would then start its own timeline at 0 instead of
+        // sharing the -copyts one (verified by parsing tfdt and in hls.js).
+        .set_format_opt("hls_segment_options", "movflags=+frag_discont")
         .set_format_opt("start_number", run.start_segment_index.to_string())
         .set_format_opt("hls_segment_filename", muxer_path(&run.dir.join(format!("%d.{SEGMENT_EXTENSION}"))));
     match run.video {
