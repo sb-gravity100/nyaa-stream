@@ -60,8 +60,19 @@ function isTypingTarget(target: EventTarget | null): boolean {
   return false;
 }
 
-/** F toggles fullscreen anywhere in the app, unless typing. */
+/** F toggles fullscreen anywhere in the app, unless typing. Also adopts
+ * the window's real state - a page reload keeps the window fullscreen. */
 export function installFullscreenHotkey(): void {
+  if (isTauri()) {
+    getCurrentWindow()
+      .isFullscreen()
+      .then((on) => {
+        current = on;
+        for (const listener of listeners) listener(on);
+        console.debug("[fullscreen] initial state", { on });
+      })
+      .catch((err) => console.warn("[fullscreen] state read failed", { err: String(err) }));
+  }
   window.addEventListener("keydown", (e) => {
     if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.key.toLowerCase() !== "f" || isTypingTarget(e.target)) return;
