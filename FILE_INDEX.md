@@ -34,7 +34,7 @@
 | `src/router.ts` | Hash routes (`#/`, `#/anime/:id`, `#/anime/:id/episode/:n`, `#/anime/:id/play/:key`): `useRoute`, `navigate` (push/replace), `goBack` with an in-app history depth so back never leaves the app | frontend, routing |
 | `src/fullscreen.ts` | App-wide window fullscreen state (`useFullscreen`/`setFullscreen`/`toggleFullscreen`), adopts the window's real state on load, installs the global F hotkey | frontend, fullscreen |
 | `src/keyboard.ts` | `isTypingTarget`: whether a keydown is text entry (text inputs/textarea/contenteditable) - the one rule every hotkey handler uses | frontend, keyboard |
-| `src/HomePage.tsx` | Default view: Continue watching row (from `watchProgress.ts`), New episodes row (current + previous calendar month, across saved library), Library poster grid | frontend |
+| `src/HomePage.tsx` | Default view: featured hero (resume target, else newest library episode, else a library show) whose key art also tints the page as a blurred ambient layer, Continue watching row (from `watchProgress.ts`), New episodes row (current + previous calendar month, across saved library), Library poster grid | frontend |
 | `src/MediaPage.tsx` | Per-anime detail page (or, when entered from an episode card, a player-only view that returns home on close): key-art backdrop, facts, Resume/Play and library buttons, episode list with progress bars and watched toggles; renders `PlayerView` for the chosen group (or `autoplayEpisode`) and wires next-episode | frontend |
 | `src/PlayerView.tsx` | Full-viewport player over the embedded mpv (transparent overlay, `html.mpv-active`): controls, keybinds, subtitle menu (mpv `track-list`/`sid`/`sub-delay`), source/file menus, resume/progress, window fullscreen, last-frame thumbnail + Ctrl+C via mpv screenshots; exported `PlayerView` picks it or `HlsPlayerView` via `mpv_available` | frontend, player |
 | `src/HlsPlayerView.tsx` | Fallback player when mpv isn't installed: HTML5 `<video>` + `hls.js` against torrent-engine's HLS playlist, JASSUB subtitles, canvas frame capture (the pre-mpv player, unchanged) | frontend, player, fallback |
@@ -52,7 +52,7 @@
 | `src/assRenderer.ts` | `useAssRenderer` (HLS fallback player only): JASSUB (libass WASM) renderer over the `<video>`, loads a track once then appends new events from the backend's delta endpoint (`processData`), applies style/time offset/delay | frontend |
 | `src/PlayerPlaylist.tsx` | Slide-in episode list inside the player (toggled via control-bar button): thumbnails, progress, watched state, now-playing meter | frontend |
 | `src/assets/fonts/GandhiSans-Bold*.otf` | Bundled Gandhi Sans (unmodified, freely redistributable) - font of the default Crunchyroll subtitle style | frontend, subtitles, asset |
-| `src/icons.tsx` | Inline SVG icon set used by the player and pages | frontend |
+| `src/icons.tsx` | Inline SVG icon set used by the player and pages, plus the app-bar `BrandMark` logo | frontend |
 | `src/types.ts` | Shared TS interfaces mirroring the Rust structs (`AnimeMedia`, `NyaaResult`, `TorrentDetails`, `AiringEntry`, `PlaySession`/`PlayFile`, `SubtitleInfo`, ...) | frontend |
 | `src/browserFallback.ts` | Dev-only path used when no Tauri IPC bridge is present (plain browser preview): direct AniList/nyaa fetches mirroring the Rust client logic | frontend, dev-tool |
 | `src/kitsu.ts` | Frontend wrapper around `get_kitsu_metadata`, used by `MediaPage.tsx` for the backdrop/thumbnail fallback chain; `localStorage` snapshot (`kitsuSnapshot`) seeds card art on the first paint after launch | frontend |
