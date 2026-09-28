@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `628fc53` · 2026-09-28 · feat(player): lift subtitles above the control dock while it's shown
+- `src/App.css`
+- `src/PlayerView.tsx`
+
 ### `93e952d` · 2026-09-28 · fix(engine): don't cache a copy fallback when the probe is slow
 - `crates/torrent-engine/src/lib.rs`
 
