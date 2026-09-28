@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `9b164a0` · 2026-09-28 · feat(library): watch-progress store and preferred fansub group ranking
+- `src/releases.ts`
+- `src/watchProgress.ts`
+
 ### `d29b0bc` · 2026-09-28 · feat(engine): expose torrent file list and per-file stats/subtitles
 - `crates/torrent-engine/src/lib.rs`
 - `src-tauri/src/lib.rs`
