@@ -131,7 +131,8 @@ pub async fn detect_h264_encoder() -> H264Encoder {
 #[derive(Debug, Clone)]
 enum VideoPlan {
     /// Stream-copy: the source is something the WebView decodes natively.
-    Copy,
+    /// `hvc1`: it's HEVC (see `media::VideoCodec::Copy`).
+    Copy { hvc1: bool },
     /// Re-encode to 8-bit H.264 High. `reason` is for logs/UI.
     Transcode { encoder: H264Encoder, reason: String },
 }
@@ -139,33 +140,45 @@ enum VideoPlan {
 impl VideoPlan {
     fn label(&self) -> String {
         match self {
-            Self::Copy => "direct".to_string(),
+            Self::Copy { .. } => "direct".to_string(),
             Self::Transcode { encoder, reason } => format!("{reason} -> H.264 ({})", encoder.ffmpeg_name()),
         }
     }
 }
 
-/// Decides copy vs. transcode from the probed video stream. Browsers (and
-/// hls.js's MPEG-TS demuxer) only reliably handle 8-bit 4:2:0 H.264;
-/// 10-bit "Hi10P" H.264 - still common in anime fansub releases - fails to
-/// decode even though the codec name matches, and AV1/VP9/MPEG-4 can't be
-/// carried in MPEG-TS for hls.js at all. HEVC is copied only when the
-/// frontend reported native HEVC decode.
+/// Decides copy vs. transcode from the probed video stream. Browsers only
+/// reliably decode 8-bit 4:2:0 H.264; 10-bit "Hi10P" H.264 - still common
+/// in anime fansub releases - fails to decode even though the codec name
+/// matches. AV1/VP9/MPEG-4 are transcoded too (these segments were MPEG-TS
+/// until the fMP4 switch, which couldn't carry them for hls.js; copying AV1
+/// now would also need a frontend decode check). HEVC is copied only when
+/// the frontend reported native HEVC decode.
 async fn plan_video(video: Option<&VideoStreamInfo>, support: DecoderSupport) -> VideoPlan {
     let Some(video) = video else {
         // Unknown (probe failed): copying is what always worked before.
-        return VideoPlan::Copy;
+        return VideoPlan::Copy { hvc1: false };
     };
     let eight_bit_420 = matches!(video.pix_fmt.as_deref(), None | Some("yuv420p" | "yuvj420p"));
     let reason = match video.codec.as_str() {
-        "h264" if eight_bit_420 => return VideoPlan::Copy,
+        "h264" if eight_bit_420 => return VideoPlan::Copy { hvc1: false },
         "h264" => format!("H.264 {}", video.pix_fmt.as_deref().unwrap_or("high bit depth")),
-        "hevc" if support.hevc && eight_bit_420 => return VideoPlan::Copy,
+        "hevc" if support.hevc && eight_bit_420 => return VideoPlan::Copy { hvc1: true },
         "hevc" => "HEVC".to_string(),
         "av1" => "AV1".to_string(),
         other => other.to_uppercase(),
     };
     VideoPlan::Transcode { encoder: detect_h264_encoder().await, reason }
+}
+
+/// A file an HLS run produces.
+#[derive(Debug, Clone, Copy)]
+enum HlsFile {
+    Segment(usize),
+    /// The fMP4 init segment. `start_hint` is where to start a run if none
+    /// is live - the segment playback will ask for first (see
+    /// `PlaylistQuery::start`), so a resume doesn't start a run at 0 only
+    /// to restart it for the first real segment request.
+    Init { start_hint: usize },
 }
 
 /// One in-progress `ffmpeg` HLS transcode for a specific torrent file -
@@ -207,7 +220,7 @@ impl HlsJob {
 /// Deletes the last segment of the run whose `ffmpeg_internal.m3u8` is in
 /// `dir`. Aborting a run still finalizes its in-progress segment and renames
 /// it into place, cut short (0.0s-0.9s seen in the cache), and
-/// `ensure_segment_available` treats any existing file as complete - so a
+/// `ensure_available` treats any existing file as complete - so a
 /// seek restart left a hole of up to a segment that was served forever.
 /// Only called for a run aborted while still running, where the last entry
 /// is by definition that truncated segment.
@@ -219,7 +232,7 @@ fn drop_aborted_tail_segment(dir: &FsPath) {
             return;
         }
     };
-    let Some(last) = playlist.lines().rev().map(str::trim).find(|line| line.ends_with(".ts")) else {
+    let Some(last) = playlist.lines().rev().map(str::trim).find(|line| segment_index_of(line).is_some()) else {
         tracing::debug!(?dir, "aborted hls run produced no segments");
         return;
     };
@@ -264,7 +277,7 @@ impl HlsJobs {
     }
 
     fn segment_path(&self, torrent_id: &TorrentId, file_idx: usize, segment_index: usize) -> PathBuf {
-        self.job_dir(torrent_id, file_idx).join(format!("{segment_index}.ts"))
+        self.job_dir(torrent_id, file_idx).join(format!("{segment_index}.{}", media::SEGMENT_EXTENSION))
     }
 
     async fn key_lock(&self, torrent_id: &TorrentId, file_idx: usize) -> Arc<AsyncMutex<Option<HlsJob>>> {
@@ -289,12 +302,8 @@ impl HlsJobs {
         let Ok(entries) = std::fs::read_dir(&dir) else {
             return Vec::new();
         };
-        let mut indices: Vec<usize> = entries
-            .flatten()
-            .filter_map(|entry| {
-                entry.file_name().to_str().and_then(|name| name.strip_suffix(".ts")).and_then(|stem| stem.parse::<usize>().ok())
-            })
-            .collect();
+        let mut indices: Vec<usize> =
+            entries.flatten().filter_map(|entry| entry.file_name().to_str().and_then(segment_index_of)).collect();
         indices.sort_unstable();
         // Contiguous runs of segment indices -> [start, end) in seconds.
         // Seek-restarts leave several disjoint runs; reporting them all
@@ -319,21 +328,24 @@ impl HlsJobs {
     }
 
     /// Ensures a background transcode job is producing (or has already
-    /// produced) the segment at `segment_index`, restarting it at that
-    /// offset first if needed, then waits for the resulting file to land
-    /// on disk.
-    async fn ensure_segment_available(
+    /// produced) `wanted`, restarting it first if needed, then waits for
+    /// the resulting file to land on disk.
+    async fn ensure_available(
         &self,
         torrent_id: &TorrentId,
         file_idx: usize,
-        segment_index: usize,
+        wanted: HlsFile,
         stream_addr: SocketAddr,
         probes: &MediaProbes,
     ) -> anyhow::Result<PathBuf> {
         // Decided (and the on-disk cache validated against it) before any
         // cached segment is served - see plan_for.
         let plan = self.plan_for(torrent_id, file_idx, stream_addr, probes).await;
-        let path = self.segment_path(torrent_id, file_idx, segment_index);
+        let (path, segment_index) = match wanted {
+            HlsFile::Segment(index) => (self.segment_path(torrent_id, file_idx, index), index),
+            HlsFile::Init { start_hint } => (self.job_dir(torrent_id, file_idx).join(media::INIT_SEGMENT), start_hint),
+        };
+        let wants_init = matches!(wanted, HlsFile::Init { .. });
         if tokio::fs::try_exists(&path).await.unwrap_or(false) {
             return Ok(path);
         }
@@ -360,6 +372,8 @@ impl HlsJobs {
                     tracing::info!(torrent_id = %torrent_id, file_idx, running = %job.video_mode, planned = %plan.label(), "hls job video plan changed, restarting");
                     true
                 }
+                // Any live run writes the init segment - never restart for it.
+                Some(_) if wants_init => false,
                 Some(job) => {
                     // Only counts files at or after this job's own
                     // start_index - the directory isn't cleared on
@@ -448,13 +462,13 @@ impl HlsJobs {
                 let mut job_slot = job_lock.lock().await;
                 if let Some(job) = job_slot.as_mut() {
                     if job.child.is_ended() {
-                        anyhow::bail!("hls transcode job for segment {segment_index} ended before producing it");
+                        anyhow::bail!("hls transcode job ended before producing {wanted:?}");
                     }
                 }
             }
             tokio::time::sleep(SEGMENT_POLL_INTERVAL).await;
         }
-        anyhow::bail!("timed out waiting for hls segment {segment_index} to be generated")
+        anyhow::bail!("timed out waiting for hls {wanted:?} to be generated")
     }
 
     /// The video plan for `(torrent_id, file_idx)`, decided on first use in
@@ -479,16 +493,22 @@ impl HlsJobs {
                 .and_then(|result| result.ok()),
         };
         let marker = dir.join("video_mode");
-        let previous = tokio::fs::read_to_string(&marker).await.ok();
+        // `<plan label>\n<segment format>`: a cache from an older segment
+        // format (MPEG-TS, before fMP4) reads as a different mode and is
+        // cleared below like any other stale plan.
+        let previous = tokio::fs::read_to_string(&marker)
+            .await
+            .ok()
+            .and_then(|text| text.split_once('\n').filter(|(_, format)| *format == media::SEGMENT_EXTENSION).map(|(label, _)| label.to_string()));
         let Some(probe) = probe else {
             // No probe yet: use a provisional plan - whatever an earlier
             // session decided for this file (its marker), else copy - and
             // don't cache it or touch the cache, so the next request
             // re-plans once the probe lands. A running job whose mode
             // differs from the real plan is restarted (see
-            // ensure_segment_available).
+            // ensure_available).
             let provisional = match previous.as_deref() {
-                None | Some("direct") => VideoPlan::Copy,
+                None | Some("direct") => VideoPlan::Copy { hvc1: false },
                 Some(label) => VideoPlan::Transcode {
                     encoder: detect_h264_encoder().await,
                     reason: label.split(" -> ").next().unwrap_or(label).to_string(),
@@ -504,12 +524,15 @@ impl HlsJobs {
             let mut removed = 0usize;
             if let Ok(mut entries) = tokio::fs::read_dir(&dir).await {
                 while let Ok(Some(entry)) = entries.next_entry().await {
-                    if entry.file_name().to_string_lossy().ends_with(".ts") && tokio::fs::remove_file(entry.path()).await.is_ok() {
+                    let name = entry.file_name().to_string_lossy().to_string();
+                    let media_file = [".ts", ".m4s", ".mp4", ".m3u8"].iter().any(|ext| name.ends_with(ext));
+                    if media_file && tokio::fs::remove_file(entry.path()).await.is_ok() {
                         removed += 1;
                     }
                 }
             }
-            if let Err(err) = tokio::fs::create_dir_all(&dir).await.and(tokio::fs::write(&marker, &label).await) {
+            let marker_text = format!("{label}\n{}", media::SEGMENT_EXTENSION);
+            if let Err(err) = tokio::fs::create_dir_all(&dir).await.and(tokio::fs::write(&marker, &marker_text).await) {
                 tracing::warn!(torrent_id = %torrent_id, file_idx, %err, "failed to write video mode marker");
             }
             tracing::info!(torrent_id = %torrent_id, file_idx, previous = ?previous, current = %label, removed, "hls cache video mode changed, dropped stale segments");
@@ -592,7 +615,12 @@ fn job_will_reach_soon(job: &HlsJob, highest_existing: Option<usize>, target: us
     soon
 }
 
-/// Highest `.ts` segment index present in `dir` at or after `min_index` -
+/// Segment index of a produced segment file name (`<index>.m4s`).
+fn segment_index_of(file_name: &str) -> Option<usize> {
+    file_name.strip_suffix(media::SEGMENT_EXTENSION)?.strip_suffix('.')?.parse().ok()
+}
+
+/// Highest segment index present in `dir` at or after `min_index` -
 /// callers pass the current job's own `start_index` so a lower-numbered
 /// leftover from an earlier, already-superseded job run (the directory is
 /// never cleared on restart) can't be mistaken for that job's own progress.
@@ -600,12 +628,7 @@ async fn highest_existing_segment_from(dir: &FsPath, min_index: usize) -> Option
     let mut entries = tokio::fs::read_dir(dir).await.ok()?;
     let mut highest = None;
     while let Ok(Some(entry)) = entries.next_entry().await {
-        if let Some(index) = entry
-            .file_name()
-            .to_str()
-            .and_then(|name| name.strip_suffix(".ts"))
-            .and_then(|stem| stem.parse::<usize>().ok())
-        {
+        if let Some(index) = entry.file_name().to_str().and_then(segment_index_of) {
             if index >= min_index {
                 highest = Some(highest.map_or(index, |h: usize| h.max(index)));
             }
@@ -639,7 +662,7 @@ async fn spawn_hls_transcode(
     let dir = dir.to_path_buf();
     let subtitle_streams = subtitle_streams(subtitles);
     let video = match plan {
-        VideoPlan::Copy => media::VideoCodec::Copy,
+        VideoPlan::Copy { hvc1 } => media::VideoCodec::Copy { hvc1: *hvc1 },
         VideoPlan::Transcode { encoder, .. } => media::VideoCodec::Transcode(*encoder),
     };
     tracing::debug!(torrent_id = %torrent_id, file_idx, start_segment_index, subtitles = subtitle_streams.len(), "starting in-process hls run");
@@ -1048,12 +1071,14 @@ impl TorrentEngine {
         let app = Router::new()
             .route("/stream/{torrent_id}/{file_idx}", get(stream_handler))
             .route("/hls/{torrent_id}/{file_idx}/playlist.m3u8", get(hls_playlist_handler))
-            // No `.ts` suffix here: axum's router rejects a literal suffix
+            // No `.m4s` suffix here: axum's router rejects a literal suffix
             // mixed with a param in the same path segment ("Only one
             // parameter is allowed per path segment") - verified live, this
             // panics at startup, not just a lint. The extension is only a
             // convention anyway; Content-Type is set explicitly below and
             // hls.js doesn't care what the segment URI looks like.
+            // The static init route takes priority over the param route.
+            .route("/hls/{torrent_id}/{file_idx}/init.mp4", get(hls_init_handler))
             .route("/hls/{torrent_id}/{file_idx}/{segment_index}", get(hls_segment_handler))
             .route("/subtitles/{torrent_id}/{file_idx}/{stream_index}", get(subtitle_handler))
             .route("/fonts/{torrent_id}/{file_idx}/{stream_index}", get(font_handler))
@@ -1314,6 +1339,9 @@ struct PlaylistQuery {
     /// instead (AniList's per-episode runtime). Falls back to a generic
     /// guess if the frontend has none.
     duration: Option<f64>,
+    /// Where playback starts (seconds, a resume point) - passed through to
+    /// the init segment URI so the run that produces it starts there.
+    start: Option<f64>,
 }
 
 /// A show's typical episode length, used only when the frontend has no
@@ -1341,13 +1369,20 @@ async fn hls_playlist_handler(
 ) -> impl axum::response::IntoResponse {
     let total_duration = query.duration.filter(|d| *d > 0.0).unwrap_or(DEFAULT_DURATION_SECONDS);
     let segment_count = (total_duration / SEGMENT_DURATION_SECONDS).ceil().max(1.0) as usize;
+    let start_segment = query
+        .start
+        .filter(|s| s.is_finite() && *s > 0.0)
+        .map_or(0, |s| ((s / SEGMENT_DURATION_SECONDS) as usize).min(segment_count - 1));
+    tracing::debug!(total_duration, segment_count, start_segment, "hls playlist request");
 
     let mut playlist = String::new();
     playlist.push_str("#EXTM3U\n");
-    playlist.push_str("#EXT-X-VERSION:3\n");
+    playlist.push_str("#EXT-X-VERSION:7\n");
     playlist.push_str(&format!("#EXT-X-TARGETDURATION:{}\n", SEGMENT_DURATION_SECONDS.ceil() as u64));
     playlist.push_str("#EXT-X-MEDIA-SEQUENCE:0\n");
     playlist.push_str("#EXT-X-PLAYLIST-TYPE:VOD\n");
+    playlist.push_str("#EXT-X-INDEPENDENT-SEGMENTS\n");
+    playlist.push_str(&format!("#EXT-X-MAP:URI=\"{}?start={start_segment}\"\n", media::INIT_SEGMENT));
 
     let mut remaining = total_duration;
     for index in 0..segment_count {
@@ -1383,21 +1418,42 @@ async fn hls_segment_handler(
     // per segment poll.
     state.efs.refresh_hls_playback(&torrent_id, file_idx, "hls-segment").await;
 
-    let path = state
-        .hls_jobs
-        .ensure_segment_available(&torrent_id, file_idx, segment_index, state.stream_addr, &state.probes)
-        .await
-        .map_err(|err| {
-            tracing::warn!(torrent_id = %torrent_id, file_idx, segment_index, %err, "hls segment unavailable");
-            axum::http::StatusCode::SERVICE_UNAVAILABLE
-        })?;
+    serve_hls_file(&state, &torrent_id, file_idx, HlsFile::Segment(segment_index)).await
+}
 
+#[derive(Deserialize)]
+struct InitQuery {
+    /// `HlsFile::Init::start_hint`, from the playlist's `EXT-X-MAP` URI.
+    start: Option<usize>,
+}
+
+/// Serves the fMP4 init segment (codec configuration) hls.js loads before
+/// the first media segment - see `HlsFile::Init`.
+async fn hls_init_handler(
+    State(state): State<StreamRouterState>,
+    Path((torrent_id, file_idx)): Path<(TorrentId, usize)>,
+    Query(query): Query<InitQuery>,
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    tracing::debug!(torrent_id = %torrent_id, file_idx, start = ?query.start, "hls init request received");
+    state.efs.refresh_hls_playback(&torrent_id, file_idx, "hls-segment").await;
+    serve_hls_file(&state, &torrent_id, file_idx, HlsFile::Init { start_hint: query.start.unwrap_or(0) }).await
+}
+
+async fn serve_hls_file(
+    state: &StreamRouterState,
+    torrent_id: &TorrentId,
+    file_idx: usize,
+    wanted: HlsFile,
+) -> Result<([(axum::http::header::HeaderName, &'static str); 1], Vec<u8>), axum::http::StatusCode> {
+    let path = state.hls_jobs.ensure_available(torrent_id, file_idx, wanted, state.stream_addr, &state.probes).await.map_err(|err| {
+        tracing::warn!(torrent_id = %torrent_id, file_idx, ?wanted, %err, "hls file unavailable");
+        axum::http::StatusCode::SERVICE_UNAVAILABLE
+    })?;
     let bytes = tokio::fs::read(&path).await.map_err(|err| {
-        tracing::error!(torrent_id = %torrent_id, file_idx, segment_index, %err, "failed to read generated hls segment file");
+        tracing::error!(torrent_id = %torrent_id, file_idx, ?wanted, %err, "failed to read generated hls file");
         axum::http::StatusCode::INTERNAL_SERVER_ERROR
     })?;
-
-    Ok(([(axum::http::header::CONTENT_TYPE, "video/mp2t")], bytes))
+    Ok(([(axum::http::header::CONTENT_TYPE, "video/mp4")], bytes))
 }
 
 /// Serves one subtitle track as a single ASS script merged from every
