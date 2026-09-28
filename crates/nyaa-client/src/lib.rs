@@ -1,9 +1,12 @@
 use scraper::{Html, Selector};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+
+mod cache;
+use cache::DiskCache;
 
 const NYAA_BASE_URL: &str = "https://nyaa.si";
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NyaaResult {
     pub title: String,
     pub magnet: String,
@@ -22,7 +25,7 @@ pub struct NyaaResult {
 /// `.torrent-file-list` has exactly one `<li><i class="fa-file">` entry,
 /// while a season batch has one per episode (optionally nested under a
 /// `<li><a class="folder">` wrapper).
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TorrentDetails {
     pub submitter: String,
     pub is_batch: bool,
@@ -89,6 +92,8 @@ const MAX_SEARCH_PAGES: u32 = 20;
 
 pub struct NyaaClient {
     http: reqwest::Client,
+    /// See `cache` - None for an uncached client (dev tools).
+    cache: Option<DiskCache>,
 }
 
 impl Default for NyaaClient {
@@ -101,6 +106,16 @@ impl NyaaClient {
     pub fn new() -> Self {
         Self {
             http: reqwest::Client::new(),
+            cache: None,
+        }
+    }
+
+    /// A client that caches responses under `dir` and falls back to them
+    /// when nyaa.si fails or rate-limits (see `cache`).
+    pub fn with_cache(dir: std::path::PathBuf) -> Self {
+        Self {
+            http: reqwest::Client::new(),
+            cache: Some(DiskCache::new(dir)),
         }
     }
 
@@ -119,6 +134,34 @@ impl NyaaClient {
         if sanitized != query {
             tracing::debug!(query, sanitized, "sanitized smart punctuation for nyaa.si search");
         }
+        let Some(cache) = &self.cache else {
+            return self.search_uncached(&sanitized, category).await;
+        };
+        let key = format!("{}|{sanitized}", category.code());
+        let cached = cache.get::<Vec<NyaaResult>>("search", &key).await;
+        if let Some(hit) = &cached {
+            if hit.age < cache::SEARCH_FRESH_FOR {
+                tracing::debug!(query = sanitized, age_s = hit.age.as_secs(), count = hit.value.len(), "nyaa.si search served from cache");
+                return Ok(hit.value.clone());
+            }
+        }
+        match self.search_uncached(&sanitized, category).await {
+            Ok(results) => {
+                cache.put("search", &key, &results).await;
+                Ok(results)
+            }
+            Err(err) => match cached {
+                Some(stale) => {
+                    tracing::warn!(query = sanitized, %err, age_s = stale.age.as_secs(), "nyaa.si search failed, serving cached results");
+                    Ok(stale.value)
+                }
+                None => Err(err),
+            },
+        }
+    }
+
+    async fn search_uncached(&self, sanitized: &str, category: Category) -> anyhow::Result<Vec<NyaaResult>> {
+        let sanitized = sanitized.to_string();
 
         let mut all_results = Vec::new();
         for page in 1..=MAX_SEARCH_PAGES {
@@ -142,7 +185,9 @@ impl NyaaClient {
         );
         tracing::debug!(query = sanitized_query, url, page, "fetching nyaa.si search page");
 
-        let body = match self.http.get(&url).send().await {
+        // A rate-limited (429) or failing page parses to zero rows - it must
+        // be an error, not "no results", or it would be cached as such.
+        let body = match self.http.get(&url).send().await.and_then(|resp| resp.error_for_status()) {
             Ok(resp) => match resp.text().await {
                 Ok(body) => body,
                 Err(err) => {
@@ -217,9 +262,24 @@ impl NyaaClient {
     /// Fetches and parses a torrent's view page to determine its real
     /// submitter and batch status (see `TorrentDetails` doc comment).
     pub async fn fetch_details(&self, view_url: &str) -> anyhow::Result<TorrentDetails> {
+        // A torrent's submitter and file list never change after upload.
+        if let Some(cache) = &self.cache {
+            if let Some(hit) = cache.get::<TorrentDetails>("details", view_url).await {
+                tracing::debug!(view_url, "nyaa.si torrent details served from cache");
+                return Ok(hit.value);
+            }
+        }
+        let details = self.fetch_details_uncached(view_url).await?;
+        if let Some(cache) = &self.cache {
+            cache.put("details", view_url, &details).await;
+        }
+        Ok(details)
+    }
+
+    async fn fetch_details_uncached(&self, view_url: &str) -> anyhow::Result<TorrentDetails> {
         tracing::debug!(view_url, "fetching nyaa.si torrent view page");
 
-        let body = match self.http.get(view_url).send().await {
+        let body = match self.http.get(view_url).send().await.and_then(|resp| resp.error_for_status()) {
             Ok(resp) => match resp.text().await {
                 Ok(body) => body,
                 Err(err) => {
