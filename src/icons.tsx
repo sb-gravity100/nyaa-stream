@@ -120,3 +120,17 @@ export const ExitFullscreenIcon = (p: IconProps) => (
     <path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" />
   </Svg>
 );
+
+/** App logo: a cat-eared tile with a play triangle - "nyaa" + "stream". */
+export const BrandMark = () => (
+  <svg class="app-brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+    <defs>
+      <linearGradient id="brand-fill" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#ffa9c8" />
+        <stop offset="1" stop-color="#d9578a" />
+      </linearGradient>
+    </defs>
+    <path d="M5 11 L7.5 2.5 L13 8 H19 L24.5 2.5 L27 11 V24 A5 5 0 0 1 22 29 H10 A5 5 0 0 1 5 24 Z" fill="url(#brand-fill)" />
+    <path d="M13.5 13.5 v9 l7.5 -4.5 z" fill="#2a0f1c" stroke="#2a0f1c" stroke-width="1.5" stroke-linejoin="round" />
+  </svg>
+);

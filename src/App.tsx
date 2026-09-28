@@ -20,7 +20,7 @@ import { cachedTorrentThumbnail, fetchTorrentThumbnail } from "./torrentThumbnai
 import { MediaPage } from "./MediaPage";
 import { HomePage } from "./HomePage";
 import { SettingsPanel } from "./SettingsPanel";
-import { SearchIcon, SettingsIcon } from "./icons";
+import { BrandMark, SearchIcon, SettingsIcon } from "./icons";
 import { Buffering } from "./Buffering";
 import { goBack, navigate, useRoute, type WatchTarget } from "./router";
 import {
@@ -588,7 +588,10 @@ function App() {
     <main class="container home-container">
       <header class="app-bar">
         <div class="app-brand" aria-label="nyaa-stream">
-          nyaa<span>stream</span>
+          <BrandMark />
+          <span class="app-brand-word">
+            nyaa<span>stream</span>
+          </span>
         </div>
         <div class="search-bar-wrap">
           <SearchIcon size={18} class="search-bar-icon" />
