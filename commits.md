@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `efca10f` · 2026-09-28 · fix(enginefs): finish an in-flight file read before seeking
+- `vendor/enginefs/src/backend/libtorrent/disk_stream.rs`
+- `vendor/enginefs/VENDORED.md`
+
 ### `2e16012` · 2026-09-28 · fix(hls): serve init.mp4 only once complete, reopen direct reads on seek
 - `crates/torrent-engine/src/lib.rs`
 - `crates/torrent-engine/src/direct_input.rs`
