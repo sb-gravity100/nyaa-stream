@@ -2,7 +2,7 @@ import { useEffect, useState } from "preact/hooks";
 import { displayTitle, type AiringEntry, type AnimeMedia, type KitsuMetadata } from "./types";
 import { continueWatching, subscribeProgress, type ProgressEntry } from "./watchProgress";
 import { PlayIcon } from "./icons";
-import { cachedTorrentThumbnail } from "./torrentThumbnail";
+import { cachedTorrentThumbnail, subscribeFrameSaved } from "./torrentThumbnail";
 
 interface Props {
   library: AnimeMedia[];
@@ -59,11 +59,15 @@ export function HomePage({
     for (const entry of inProgress) {
       if (entry.episode == null) continue;
       const key = `${entry.animeId}-${entry.episode}`;
-      cachedTorrentThumbnail(entry.animeId, entry.episode).then((dataUri) => {
-        if (dataUri) setLastFrames((current) => (current[key] === dataUri ? current : { ...current, [key]: dataUri }));
+      cachedTorrentThumbnail(entry.animeId, entry.episode).then((url) => {
+        if (url) setLastFrames((current) => (current[key] === url ? current : { ...current, [key]: url }));
       });
     }
   }, [inProgress]);
+  useEffect(
+    () => subscribeFrameSaved((key, url) => setLastFrames((current) => ({ ...current, [key]: url }))),
+    [],
+  );
 
   return (
     <div class="home-page">

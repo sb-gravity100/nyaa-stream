@@ -3,10 +3,31 @@ import { isTauriAvailable } from "./browserFallback";
 import { parseEpisode } from "./episodeParser";
 import type { AnimeTitle, NyaaResult } from "./types";
 
-// Module-level cache + in-flight dedupe, same pattern as kitsu.ts. `null`
-// means "tried, no thumbnail available" (no matching release found, or the
-// capture itself failed) so a card doesn't retry every re-render.
+// Module-level cache + in-flight dedupe, same pattern as kitsu.ts. Values
+// are image URLs (`thumb://` from the backend's disk cache, or a blob URL
+// for a frame saved this session) - never base64. `null` means "tried, no
+// thumbnail available" (no matching release found, or the capture itself
+// failed) so a card doesn't retry every re-render.
 const cache = new Map<string, string | null>();
+
+type SavedListener = (key: string, url: string) => void;
+const savedListeners = new Set<SavedListener>();
+
+/** Called with `{anilistId}-{episode}` and the new URL whenever the player
+ * saves a last frame - the encode is async, so a view that looked the
+ * thumbnail up as the player closed would otherwise keep the old one. */
+export function subscribeFrameSaved(listener: SavedListener): () => void {
+  savedListeners.add(listener);
+  return () => savedListeners.delete(listener);
+}
+
+/** `cached_torrent_thumbnail`'s reply. */
+interface CachedThumbnail {
+  url: string | null;
+  /** A capture failed recently (backend-side marker) - don't search nyaa
+   * for another attempt yet. */
+  failedRecently: boolean;
+}
 const inFlight = new Map<string, Promise<string | null>>();
 
 function cacheKey(anilistId: number, episode: number): string {
@@ -28,16 +49,25 @@ function pickCandidate(results: NyaaResult[], episode: number): NyaaResult | nul
   return matches.reduce((best, r) => (r.seeders > best.seeders ? r : best));
 }
 
-/** Saves the player's last frame as the episode's thumbnail (disk cache,
- * shared with torrent captures) and makes it the in-memory entry, so the
- * home page shows it as soon as the player closes. */
-export function saveFrameThumbnail(anilistId: number, episode: number, dataUri: string): void {
+/** Saves the player's last frame (a JPEG blob) as the episode's thumbnail
+ * (disk cache, shared with torrent captures) and makes it the in-memory
+ * entry right away, so the home page shows it as soon as the player
+ * closes. The bytes go over IPC raw, not base64. */
+export async function saveFrameThumbnail(anilistId: number, episode: number, jpeg: Blob): Promise<void> {
   const key = cacheKey(anilistId, episode);
-  cache.set(key, dataUri);
+  // Blob URLs are never revoked: cards may still hold this one, and it's
+  // one small frame per closed episode.
+  const objectUrl = URL.createObjectURL(jpeg);
+  cache.set(key, objectUrl);
+  for (const listener of savedListeners) listener(key, objectUrl);
   if (!isTauriAvailable()) return;
-  invoke("save_frame_thumbnail", { cacheKey: key, dataUri }).catch((err) =>
-    console.warn("[save_frame_thumbnail] failed", { anilistId, episode, err: String(err) }),
-  );
+  try {
+    const bytes = new Uint8Array(await jpeg.arrayBuffer());
+    const url = await invoke<string>("save_frame_thumbnail", bytes, { headers: { "x-cache-key": key } });
+    console.debug("[save_frame_thumbnail] saved", { anilistId, episode, bytes: bytes.length, url });
+  } catch (err) {
+    console.warn("[save_frame_thumbnail] failed", { anilistId, episode, err: String(err) });
+  }
 }
 
 /** A previously captured frame from the backend's disk cache, or null -
@@ -49,9 +79,9 @@ export async function cachedTorrentThumbnail(anilistId: number, episode: number)
   const key = cacheKey(anilistId, episode);
   if (cache.get(key)) return cache.get(key)!;
   try {
-    const dataUri = await invoke<string | null>("cached_torrent_thumbnail", { cacheKey: key });
-    if (dataUri) cache.set(key, dataUri);
-    return dataUri;
+    const { url } = await invoke<CachedThumbnail>("cached_torrent_thumbnail", { cacheKey: key });
+    if (url) cache.set(key, url);
+    return url;
   } catch (err) {
     console.debug("[cached_torrent_thumbnail] failed", { anilistId, episode, err });
     return null;
@@ -79,10 +109,14 @@ export async function fetchTorrentThumbnail(
   const promise = (async () => {
     try {
       // A frame captured in any earlier session: no nyaa search needed.
-      const cached = await invoke<string | null>("cached_torrent_thumbnail", { cacheKey: key });
-      if (cached) {
+      const cached = await invoke<CachedThumbnail>("cached_torrent_thumbnail", { cacheKey: key });
+      if (cached.url) {
         console.debug("[capture_torrent_thumbnail] served from disk cache", { anilistId, episode });
-        return cached;
+        return cached.url;
+      }
+      if (cached.failedRecently) {
+        console.debug("[capture_torrent_thumbnail] skipped, failed recently", { anilistId, episode });
+        return null;
       }
       console.debug("[capture_torrent_thumbnail] resolving candidate release", { anilistId, episode });
       const results = await invoke<NyaaResult[]>("search_torrents_for_anime", { title });
@@ -92,13 +126,13 @@ export async function fetchTorrentThumbnail(
         return null;
       }
       console.debug("[capture_torrent_thumbnail] invoked", { anilistId, episode, title: candidate.title });
-      const dataUri = await invoke<string | null>("capture_torrent_thumbnail", {
+      const url = await invoke<string | null>("capture_torrent_thumbnail", {
         magnet: candidate.magnet,
         cacheKey: key,
         durationMinutes,
       });
-      console.info("[capture_torrent_thumbnail] succeeded", { anilistId, episode, found: dataUri !== null });
-      return dataUri;
+      console.info("[capture_torrent_thumbnail] succeeded", { anilistId, episode, found: url !== null });
+      return url;
     } catch (err) {
       // Deferred because something is playing: leave it uncached so the
       // next request (after playback) tries again.
