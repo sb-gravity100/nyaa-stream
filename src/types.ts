@@ -58,11 +58,22 @@ export interface KitsuMetadata {
   episodeThumbnails: Record<number, string>;
 }
 
+export interface PlayFile {
+  index: number;
+  /** Path inside the torrent. */
+  name: string;
+  length: number;
+  isVideo: boolean;
+  /** Base HLS playlist URL - append `?duration=<seconds>` before use. */
+  hlsUrl: string;
+}
+
 export interface PlaySession {
   /** Torrent info-hash (not a numeric session id - see torrent-engine's `TorrentId`). */
   torrentId: string;
-  /** Base HLS playlist URL - append `?duration=<seconds>` before use. */
-  hlsUrl: string;
+  files: PlayFile[];
+  /** Largest video file - fallback when no file matches the episode. */
+  defaultFileIdx: number;
 }
 
 export interface SubtitleTrack {
@@ -98,6 +109,9 @@ export interface StreamStats {
    * tracks raw torrent byte download and can run ahead of or behind
    * this (see torrent-engine's StreamStats doc comment). */
   readySeconds: number;
+  /** Every produced `[start, end)` stretch in seconds - seek restarts
+   * leave several disjoint ones. */
+  readyRanges: [number, number][];
 }
 
 export function displayTitle(title: AnimeTitle): string {

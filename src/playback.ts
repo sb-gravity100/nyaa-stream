@@ -10,20 +10,20 @@ export async function playMagnet(magnet: string, title: string): Promise<PlaySes
   if (!isTauriAvailable()) throw new Error("Playback requires the Tauri app, not the browser preview");
   console.debug("[play_magnet] invoked", { title });
   const session = await invoke<PlaySession>("play_magnet", { magnet, title });
-  console.info("[play_magnet] succeeded", { title, torrentId: session.torrentId });
+  console.info("[play_magnet] succeeded", { title, torrentId: session.torrentId, files: session.files.length });
   return session;
 }
 
-export async function getStreamStats(torrentId: string): Promise<StreamStats> {
-  return invoke<StreamStats>("get_stream_stats", { torrentId });
+export async function getStreamStats(torrentId: string, fileIdx: number): Promise<StreamStats> {
+  return invoke<StreamStats>("get_stream_stats", { torrentId, fileIdx });
 }
 
 // No browser-fallback path (see this file's top comment): a torrent-less
 // dev preview has no subtitle tracks to list either. Rejects while the
 // container header hasn't downloaded yet - callers retry.
-export async function getSubtitleTracks(torrentId: string): Promise<SubtitleInfo> {
+export async function getSubtitleTracks(torrentId: string, fileIdx: number): Promise<SubtitleInfo> {
   if (!isTauriAvailable()) return { tracks: [], fonts: [] };
-  return invoke<SubtitleInfo>("get_subtitle_tracks", { torrentId });
+  return invoke<SubtitleInfo>("get_subtitle_tracks", { torrentId, fileIdx });
 }
 
 export async function stopPlayback(): Promise<void> {

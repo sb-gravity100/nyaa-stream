@@ -1,17 +1,21 @@
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useMemo, useState } from "preact/hooks";
 import { displayTitle, formatSeason, type AnimeMedia, type KitsuMetadata, type NyaaResult } from "./types";
 import type { EpisodeLabel } from "./episodeParser";
 import { PlayerView } from "./PlayerView";
+import { progressForAnime, setWatched, subscribeProgress, type ProgressEntry } from "./watchProgress";
+import { BackIcon, CheckIcon, PlayIcon, PlusIcon } from "./icons";
+
+type SourceGroup = [string, { label: EpisodeLabel; releases: NyaaResult[] }];
 
 interface Props {
   anime: AnimeMedia;
   kitsu: KitsuMetadata | null;
-  groupedSources: [string, { label: EpisodeLabel; releases: NyaaResult[] }][];
+  groupedSources: SourceGroup[];
   sourcesLoading: boolean;
   sourcesCount: number;
-  /** Set when the user clicked a specific episode (the Latest Episodes
-   * row) rather than the anime in general - auto-plays it once sources
-   * finish loading, then reports back via onAutoplayHandled. */
+  /** Set when the user clicked a specific episode (Latest Episodes /
+   * Continue Watching) rather than the anime in general - auto-plays it
+   * once sources finish loading, then reports back via onAutoplayHandled. */
   autoplayEpisode: number | null;
   onAutoplayHandled: () => void;
   error: string | null;
@@ -21,10 +25,9 @@ interface Props {
   onRemoveFromLibrary: () => void;
 }
 
-// AniList's `description(asHtml: false)` mostly already strips markup, but
-// has been observed to still leave stray <br> tags — normalize those to
-// paragraph breaks and drop anything else that looks like a tag rather
-// than trust the API's html-stripping to be complete.
+// AniList's `description(asHtml: false)` has been observed to still leave
+// stray <br> tags - normalize those to paragraph breaks and drop anything
+// else that looks like a tag.
 function descriptionParagraphs(description: string): string[] {
   return description
     .replace(/<br\s*\/?>/gi, "\n")
@@ -34,26 +37,30 @@ function descriptionParagraphs(description: string): string[] {
     .filter(Boolean);
 }
 
-// Mirrors stremio-web's Video/VideoPlaceholder row shape (verified against
-// its source): a thumbnail box + title, one row per episode. Clicking a
-// row does nothing yet — this panel is deliberately just the episode list
-// (stremio-web's VideosList), not the source picker (StreamsList). Actual
-// per-release source selection is meant to live as a dropdown on the video
-// player once one exists, not here.
 function VideoRowSkeleton() {
   return (
-    <div class="video-row">
+    <div class="video-row video-row-skeleton">
       <div class="video-thumbnail video-thumbnail-skeleton" />
       <div class="video-info">
         <div class="skeleton-line skeleton-title" />
+        <div class="skeleton-line skeleton-meta" />
       </div>
     </div>
   );
 }
 
-interface PlayerSession {
-  title: string;
-  releases: NyaaResult[];
+function useAnimeProgress(animeId: number): Record<string, ProgressEntry> {
+  const [progress, setProgress] = useState(() => progressForAnime(animeId));
+  useEffect(() => {
+    setProgress(progressForAnime(animeId));
+    return subscribeProgress(() => setProgress(progressForAnime(animeId)));
+  }, [animeId]);
+  return progress;
+}
+
+function remainingLabel(entry: ProgressEntry): string {
+  const minutes = Math.max(1, Math.round((entry.duration - entry.position) / 60));
+  return `${minutes} min left`;
 }
 
 export function MediaPage({
@@ -71,111 +78,207 @@ export function MediaPage({
   onRemoveFromLibrary,
 }: Props) {
   const seasonLabel = formatSeason(anime.season, anime.seasonYear);
-  const [player, setPlayer] = useState<PlayerSession | null>(null);
+  // Index into groupedSources of the group being played.
+  const [playingKey, setPlayingKey] = useState<string | null>(null);
+  const progress = useAnimeProgress(anime.id);
+  const [expanded, setExpanded] = useState(false);
 
-  function handlePlay(title: string, releases: NyaaResult[]) {
-    setPlayer({ title, releases });
-  }
+  const playingIndex = playingKey == null ? -1 : groupedSources.findIndex(([key]) => key === playingKey);
+  const playing = playingIndex >= 0 ? groupedSources[playingIndex] : null;
 
-  // Latest Episodes row: jump straight into the player for the clicked
-  // episode once its sources have loaded, instead of leaving the user on
-  // the episode list to click play themselves.
+  // Next = the following numbered episode of the same season, if its
+  // releases are listed.
+  const next = useMemo(() => {
+    if (!playing || playing[1].label.kind !== "episode") return null;
+    const { season, number } = playing[1].label;
+    return (
+      groupedSources.find(([, g]) => g.label.kind === "episode" && g.label.season === season && g.label.number === number + 1) ?? null
+    );
+  }, [playing, groupedSources]);
+
+  // The first episode that isn't finished, after the most recently
+  // watched one - what the primary button plays.
+  const continueTarget = useMemo(() => {
+    const episodes = groupedSources.filter(([, g]) => g.label.kind === "episode");
+    if (episodes.length === 0) return groupedSources[0] ?? null;
+    const latest = Object.values(progress).sort((a, b) => b.updatedAt - a.updatedAt)[0];
+    if (!latest) return episodes[0];
+    const latestIndex = episodes.findIndex(([key]) => key === latest.episodeKey);
+    if (latestIndex < 0) return episodes[0];
+    if (!latest.completed) return episodes[latestIndex];
+    return episodes[latestIndex + 1] ?? episodes[latestIndex];
+  }, [groupedSources, progress]);
+
   useEffect(() => {
     if (sourcesLoading || autoplayEpisode == null) return;
-    const match = groupedSources.find(
-      ([, group]) => group.label.kind === "episode" && group.label.number === autoplayEpisode,
-    );
-    if (match) {
-      const [key, group] = match;
-      handlePlay(key, group.releases);
-    }
+    const match = groupedSources.find(([, group]) => group.label.kind === "episode" && group.label.number === autoplayEpisode);
+    if (match) setPlayingKey(match[0]);
+    else console.warn("[media] autoplay episode has no releases", { autoplayEpisode });
     onAutoplayHandled();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sourcesLoading, groupedSources, autoplayEpisode]);
-  // stremio-web has no separate anime "logo" source (Cinemeta/Fanart.tv
-  // supply that for movies/series; AniList and Kitsu, the anime-metadata
-  // sources, don't), so its real detail page falls back to plain text with
-  // no image at all there. We keep our poster instead since AniList gives
-  // us real art and dropping it would be a strict downgrade, not fidelity.
-  //
-  // Backdrop and per-episode thumbnails both come from Kitsu (see
-  // src/kitsu.ts / crates/kitsu-client) rather than AniList: Kitsu's
-  // coverImage is a real 3360x800 wide banner (AniList's is a stretched
-  // poster), and its episode thumbnails had full coverage for a show
-  // AniList had none for at all (verified live, see kitsu-client's doc
-  // comments). Falls back to AniList's poster when Kitsu has no mapping.
+
+  // Backdrop and episode thumbnails come from Kitsu (real wide banner and
+  // better per-episode coverage than AniList - see src/kitsu.ts), falling
+  // back to AniList's poster.
   const backdrop = kitsu?.background ?? anime.coverImage.extraLarge ?? anime.coverImage.large;
   const thumbnails = kitsu?.episodeThumbnails ?? {};
+  const paragraphs = anime.description ? descriptionParagraphs(anime.description) : [];
+  const watchedCount = Object.values(progress).filter((p) => p.completed).length;
+  const continueEntry = continueTarget ? progress[continueTarget[0]] : undefined;
+  const continueLabel = continueTarget
+    ? continueEntry && !continueEntry.completed
+      ? `Resume ${continueTarget[0]}`
+      : `Play ${continueTarget[0]}`
+    : null;
 
   return (
     <div class="media-page">
       {backdrop && (
-        <div class="media-background-layer">
+        <div class="media-background-layer" aria-hidden="true">
           <img class="media-background-image" src={backdrop} alt="" />
         </div>
       )}
 
-      <button class="back-button" onClick={onBack} aria-label="Back to search">
-        ← Back
+      <button class="back-button" onClick={onBack}>
+        <BackIcon size={18} /> Home
       </button>
 
       <div class="media-content">
         <div class="media-info-column">
-          <div class="media-poster">{anime.coverImage.large && <img src={anime.coverImage.large} alt="" />}</div>
+          {anime.coverImage.large && (
+            <div class="media-poster">
+              <img src={anime.coverImage.large} alt="" />
+            </div>
+          )}
           <h1 class="media-title">{displayTitle(anime.title)}</h1>
-          <button class="library-toggle-button" onClick={inLibrary ? onRemoveFromLibrary : onAddToLibrary}>
-            {inLibrary ? "✓ In Library" : "+ Add to Library"}
-          </button>
-          <div class="media-meta">
-            {anime.averageScore != null && `★ ${(anime.averageScore / 10).toFixed(1)} ∙ `}
-            {anime.format && <strong>{anime.format}</strong>}
-            {anime.episodes != null && ` ∙ ${anime.episodes} Eps`}
-            {seasonLabel && ` ∙ ${seasonLabel}`}
+          {anime.title.native && anime.title.native !== displayTitle(anime.title) && (
+            <div class="media-native-title" lang="ja">
+              {anime.title.native}
+            </div>
+          )}
+          <dl class="media-facts">
+            {anime.averageScore != null && (
+              <div>
+                <dt>Score</dt>
+                <dd>{(anime.averageScore / 10).toFixed(1)}</dd>
+              </div>
+            )}
+            {anime.format && (
+              <div>
+                <dt>Format</dt>
+                <dd>{anime.format.replace("_", " ")}</dd>
+              </div>
+            )}
+            {anime.episodes != null && (
+              <div>
+                <dt>Episodes</dt>
+                <dd>
+                  {watchedCount > 0 ? `${watchedCount}/` : ""}
+                  {anime.episodes}
+                </dd>
+              </div>
+            )}
+            {seasonLabel && (
+              <div>
+                <dt>Aired</dt>
+                <dd>{seasonLabel}</dd>
+              </div>
+            )}
+          </dl>
+          <div class="media-actions">
+            {continueTarget && !sourcesLoading && (
+              <button class="button button-primary" onClick={() => setPlayingKey(continueTarget[0])}>
+                <PlayIcon size={16} /> {continueLabel}
+              </button>
+            )}
+            <button class={`button ${inLibrary ? "button-quiet" : "button-secondary"}`} onClick={inLibrary ? onRemoveFromLibrary : onAddToLibrary}>
+              {inLibrary ? <CheckIcon size={16} /> : <PlusIcon size={16} />}
+              {inLibrary ? "In library" : "Add to library"}
+            </button>
           </div>
-          {anime.description && (
-            <div class="media-description">
-              {descriptionParagraphs(anime.description).map((p, i) => (
+          {paragraphs.length > 0 && (
+            <div class={`media-description${expanded ? " expanded" : ""}`}>
+              {paragraphs.map((p, i) => (
                 <p key={i}>{p}</p>
               ))}
             </div>
           )}
+          {paragraphs.join(" ").length > 420 && (
+            <button class="link-button" onClick={() => setExpanded((e) => !e)}>
+              {expanded ? "Show less" : "Read more"}
+            </button>
+          )}
         </div>
 
-        <div class="media-spacing" />
-
-        <div class="videos-list-panel">
+        <section class="videos-list-panel" aria-label="Episodes">
+          <header class="videos-list-header">
+            <h2>Episodes</h2>
+            {!sourcesLoading && sourcesCount > 0 && <span>{sourcesCount} releases on nyaa.si</span>}
+          </header>
           {error && <p class="error-banner">{error}</p>}
-          {!sourcesLoading && sourcesCount === 0 && <p>No releases found on nyaa.si.</p>}
+          {!sourcesLoading && sourcesCount === 0 && !error && (
+            <p class="empty-state">Nobody has uploaded this to nyaa.si yet, or it's listed under a different title.</p>
+          )}
 
-          {sourcesLoading &&
-            Array.from({ length: 6 }, (_, i) => <VideoRowSkeleton key={i} />)}
+          <div class="videos-list">
+            {sourcesLoading && Array.from({ length: 6 }, (_, i) => <VideoRowSkeleton key={i} />)}
 
-          {!sourcesLoading &&
-            groupedSources.map(([key, group]) => {
-              const thumbnail = group.label.kind === "episode" ? thumbnails[group.label.number] : undefined;
-              return (
-                <div class="video-row" key={key}>
-                  <div class="video-thumbnail">{thumbnail && <img src={thumbnail} alt="" />}</div>
-                  <div class="video-info">
-                    <div class="video-title">{key}</div>
+            {!sourcesLoading &&
+              groupedSources.map(([key, group]) => {
+                const episodeNumber = group.label.kind === "episode" ? group.label.number : null;
+                const thumbnail = episodeNumber != null ? thumbnails[episodeNumber] : undefined;
+                const entry = progress[key];
+                const watched = entry?.completed ?? false;
+                const fraction = entry && !watched ? Math.min(1, entry.position / entry.duration) : 0;
+                return (
+                  <div class={`video-row${watched ? " watched" : ""}${key === continueTarget?.[0] ? " current" : ""}`} key={key}>
+                    <button class="video-row-main" onClick={() => setPlayingKey(key)} aria-label={`Play ${key}`}>
+                      <div class="video-thumbnail">
+                        {thumbnail ? <img src={thumbnail} alt="" loading="lazy" /> : <span class="video-thumbnail-number">{episodeNumber ?? "•"}</span>}
+                        <span class="video-thumbnail-play">
+                          <PlayIcon size={22} />
+                        </span>
+                        {fraction > 0 && (
+                          <span class="video-progress">
+                            <span style={{ width: `${fraction * 100}%` }} />
+                          </span>
+                        )}
+                      </div>
+                      <div class="video-info">
+                        <div class="video-title">{key}</div>
+                        <div class="video-meta">
+                          {group.releases.length} {group.releases.length === 1 ? "release" : "releases"}
+                          {entry && !watched && ` · ${remainingLabel(entry)}`}
+                          {group.label.kind === "batch" && " · pick the episode in the player"}
+                        </div>
+                      </div>
+                    </button>
+                    <button
+                      class={`video-watched-toggle${watched ? " on" : ""}`}
+                      onClick={() => setWatched(anime, key, episodeNumber, !watched)}
+                      aria-pressed={watched}
+                      title={watched ? "Mark as unwatched" : "Mark as watched"}
+                    >
+                      <CheckIcon size={16} />
+                    </button>
                   </div>
-                  <button class="video-play-button" onClick={() => handlePlay(key, group.releases)} aria-label={`Play ${key}`}>
-                    ▶
-                  </button>
-                  <div class="video-sources-badge">{group.releases.length}</div>
-                </div>
-              );
-            })}
-        </div>
+                );
+              })}
+          </div>
+        </section>
       </div>
 
-      {player && (
+      {playing && (
         <PlayerView
-          key={player.title}
-          title={player.title}
-          releases={player.releases}
-          estimatedDurationMinutes={anime.duration}
-          onClose={() => setPlayer(null)}
+          key={playing[0]}
+          anime={anime}
+          episodeKey={playing[0]}
+          episode={playing[1].label.kind === "episode" ? playing[1].label.number : null}
+          releases={playing[1].releases}
+          onClose={() => setPlayingKey(null)}
+          onNext={next ? () => setPlayingKey(next[0]) : null}
+          nextLabel={next ? next[0] : null}
         />
       )}
     </div>
