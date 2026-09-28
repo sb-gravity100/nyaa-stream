@@ -2,6 +2,13 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `88a3dc8` · 2026-09-29 · feat: app-wide F fullscreen hotkey, shared window fullscreen state
+- `src/HlsPlayerView.tsx`
+- `src/PlayerView.tsx`
+- `src/SettingsPanel.tsx`
+- `src/fullscreen.ts`
+- `src/main.tsx`
+
 ### `0153220` · 2026-09-29 · feat(player): clicking the video no longer toggles pause
 - `src/HlsPlayerView.tsx`
 - `src/PlayerView.tsx`
