@@ -1,17 +1,15 @@
 import { useEffect, useState } from "preact/hooks";
-import type Hls from "hls.js";
+import type { MpvVideo } from "./mpvVideo";
 import type { StreamStats } from "./types";
 import { cachedTorrentThumbnail } from "./torrentThumbnail";
 
 // Grew out of stremio-web's Player/StatisticsMenu (peers/speed/completed +
-// info hash): now the full picture - torrent swarm, the streaming server's
-// HLS run, what the browser is actually playing, and the episode's
-// thumbnail.
+// info hash): now the full picture - torrent swarm, what mpv is decoding,
+// and the episode's thumbnail.
 interface Props {
   stats: StreamStats;
   infoHash: string | null;
-  video: HTMLVideoElement | null;
-  hls: Hls | null;
+  video: MpvVideo | null;
   animeId: number;
   episode: number | null;
   /** Active subtitle track's label, null when off. */
@@ -26,37 +24,45 @@ function formatBytes(bytes: number): string {
   return `${(bytes / 1024 ** 3).toFixed(2)} GB`;
 }
 
-function formatTime(seconds: number): string {
-  const s = Math.max(0, Math.round(seconds));
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-}
+const EMPTY_SAMPLE = { width: 0, height: 0, dropped: 0, decoderDropped: 0, bufferAhead: 0, cacheSpeed: 0, videoCodec: "", audioCodec: "", hwdec: "" };
 
-/** Browser-side playback figures, sampled every second. */
-function usePlaybackSample(video: HTMLVideoElement | null, hls: Hls | null) {
-  const [sample, setSample] = useState({ width: 0, height: 0, dropped: 0, frames: 0, bufferAhead: 0, bandwidth: 0 });
+/** mpv's own playback figures, sampled every second. */
+function usePlaybackSample(video: MpvVideo | null) {
+  const [sample, setSample] = useState(EMPTY_SAMPLE);
   useEffect(() => {
     if (!video) return;
-    const read = () => {
-      const quality = video.getVideoPlaybackQuality?.();
-      let bufferAhead = 0;
-      for (let i = 0; i < video.buffered.length; i++) {
-        if (video.buffered.start(i) <= video.currentTime && video.currentTime <= video.buffered.end(i)) {
-          bufferAhead = video.buffered.end(i) - video.currentTime;
-        }
-      }
+    let cancelled = false;
+    const get = (name: string) => video.getProperty(name).catch(() => null);
+    const read = async () => {
+      const [dropped, decoderDropped, cache, videoCodec, audioCodec, hwdec] = await Promise.all([
+        get("frame-drop-count"),
+        get("decoder-frame-drop-count"),
+        get("demuxer-cache-state"),
+        get("video-codec"),
+        get("audio-codec-name"),
+        get("hwdec-current"),
+      ]);
+      if (cancelled) return;
+      const cacheState = cache as { "cache-end"?: number; "raw-input-rate"?: number } | null;
       setSample({
         width: video.videoWidth,
         height: video.videoHeight,
-        dropped: quality?.droppedVideoFrames ?? 0,
-        frames: quality?.totalVideoFrames ?? 0,
-        bufferAhead,
-        bandwidth: hls?.bandwidthEstimate ?? 0,
+        dropped: Number(dropped ?? 0),
+        decoderDropped: Number(decoderDropped ?? 0),
+        bufferAhead: Math.max(0, (cacheState?.["cache-end"] ?? 0) - video.currentTime),
+        cacheSpeed: cacheState?.["raw-input-rate"] ?? 0,
+        videoCodec: String(videoCodec ?? ""),
+        audioCodec: String(audioCodec ?? ""),
+        hwdec: String(hwdec ?? ""),
       });
     };
-    read();
+    void read();
     const timer = window.setInterval(read, REFRESH_MS);
-    return () => window.clearInterval(timer);
-  }, [video, hls]);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [video]);
   return sample;
 }
 
@@ -69,9 +75,9 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function StatisticsMenu({ stats, infoHash, video, hls, animeId, episode, subtitleLabel }: Props) {
+export function StatisticsMenu({ stats, infoHash, video, animeId, episode, subtitleLabel }: Props) {
   const [copied, setCopied] = useState(false);
-  const playback = usePlaybackSample(video, hls);
+  const playback = usePlaybackSample(video);
   const [thumbnail, setThumbnail] = useState<string | null>(null);
   useEffect(() => {
     if (episode == null) return;
@@ -89,8 +95,6 @@ export function StatisticsMenu({ stats, infoHash, video, hls, animeId, episode, 
     }
   }
 
-  const readySeconds = stats.readyRanges.reduce((sum, [start, end]) => sum + (end - start), 0);
-  const run = stats.run;
 
   return (
     <div class="statistics-menu">
@@ -121,24 +125,13 @@ export function StatisticsMenu({ stats, infoHash, video, hls, animeId, episode, 
       </div>
 
       <div class="statistics-menu-section">
-        <div class="statistics-menu-heading">Streaming</div>
-        <Row label="Video" value={stats.videoMode ?? "waiting for first segment"} />
-        <Row label="Ready to seek" value={`${formatTime(readySeconds)} in ${stats.readyRanges.length} stretch${stats.readyRanges.length === 1 ? "" : "es"}`} />
-        {run && (
-          <>
-            <Row label="Current run" value={`from ${formatTime(run.startSeconds)} · ${run.segmentsProduced} segments${run.running ? "" : " · finished"}`} />
-            <Row label="Run speed" value={`${run.speedXRealtime.toFixed(1)}× realtime`} />
-            <Row label="Subtitle tracks" value={`${run.subtitleTracks} extracted with video`} />
-          </>
-        )}
-      </div>
-
-      <div class="statistics-menu-section">
         <div class="statistics-menu-heading">Playback</div>
         <Row label="Resolution" value={playback.width ? `${playback.width}×${playback.height}` : "-"} />
+        <Row label="Video" value={playback.videoCodec ? `${playback.videoCodec}${playback.hwdec && playback.hwdec !== "no" ? ` · ${playback.hwdec}` : " · software"}` : "-"} />
+        <Row label="Audio" value={playback.audioCodec || "-"} />
         <Row label="Buffered ahead" value={`${playback.bufferAhead.toFixed(1)} s`} />
-        <Row label="Dropped frames" value={`${playback.dropped} / ${playback.frames}`} />
-        <Row label="Loader bandwidth" value={playback.bandwidth ? `${(playback.bandwidth / 8 / 1024 / 1024).toFixed(1)} MB/s` : "-"} />
+        <Row label="Stream read" value={playback.cacheSpeed ? `${(playback.cacheSpeed / 1024 / 1024).toFixed(1)} MB/s` : "-"} />
+        <Row label="Dropped frames" value={`${playback.dropped} output · ${playback.decoderDropped} decoder`} />
         <Row label="Subtitles" value={subtitleLabel ?? "off"} />
       </div>
 

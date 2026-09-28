@@ -1,18 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks";
-import Hls from "hls.js";
 import { invoke } from "@tauri-apps/api/core";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { MpvVideo } from "./mpvVideo";
 import type { AnimeMedia, NyaaResult, PlayFile, StreamStats, SubtitleTrack } from "./types";
 import { displayTitle } from "./types";
-import { getStreamStats, getSubtitleTracks, playMagnet, reportDecoderSupport, stopPlayback } from "./playback";
+import { getStreamStats, playMagnet, stopPlayback } from "./playback";
 import { saveFrameThumbnail } from "./torrentThumbnail";
 import { loadingProgress } from "./loadingProgress";
-import { bestRelease, codecPlayable, getPreferredGroup, releaseCodec, releaseGroup, releaseResolution, setPreferredGroup, sortReleases } from "./releases";
+import { bestRelease, getPreferredGroup, releaseGroup, releaseResolution, setPreferredGroup, sortReleases } from "./releases";
 import { parseEpisode } from "./episodeParser";
 import { Buffering } from "./Buffering";
 import { StatisticsMenu } from "./StatisticsMenu";
 import { getSettings as getSettingsSnapshot, useSettings } from "./settings";
-import { defaultSubtitleIndex, isStyledTrack, subtitleTrackLabel } from "./subtitles";
-import { useAssRenderer } from "./assRenderer";
+import { applyMpvSubtitleStyle, defaultSubtitleIndex, isStyledTrack, subtitleTrackLabel } from "./subtitles";
 import { resumePosition, saveProgress } from "./watchProgress";
 import { PlayerPlaylist, type PlaylistItem } from "./PlayerPlaylist";
 import {
@@ -49,14 +49,10 @@ const SEEK_STEP_SECONDS = 5;
 const SEEK_STEP_SECONDS_LARGE = 10;
 // Keyboard seeking (arrows/J/L) only actually moves the video once this
 // long has passed since the last key press (stremio-web's useKeyboardSeek
-// does the same): each real hls.js seek flushes the buffer and fetches a
-// new segment, so committing on every press stutters playback.
+// does the same): each real seek makes mpv drop its demuxer position and
+// may wait on new torrent pieces, so committing on every press stutters.
 const KEYBOARD_SEEK_COMMIT_MS = 300;
 const VOLUME_STEP = 5;
-// The track list needs the container header, which may not have
-// downloaded yet when the player mounts - retried until it has.
-const SUBTITLE_PROBE_RETRY_MS = 3000;
-const SUBTITLE_PROBE_MAX_ATTEMPTS = 40;
 const SUBTITLE_DELAY_STEP = 0.1;
 const PROGRESS_SAVE_MS = 5000;
 // Countdown shown before auto-starting the next episode.
@@ -67,43 +63,24 @@ const REMAINING_STORAGE_KEY = "nyaa-stream:show-remaining";
 /** Thumbnail width for the last-frame capture (16:9 cards). */
 const LAST_FRAME_WIDTH = 640;
 
-/** Copies the frame on screen as the player closes and saves it as the
- * episode's thumbnail (see `saveFrameThumbnail`). The draw must run before
- * playback stops, while the <video> still holds the frame; JPEG encoding
- * then happens off the unmount path via toBlob. MSE media fetched with
- * CORS doesn't taint the canvas; any failure just skips the thumbnail. */
-function captureLastFrame({ video, animeId, episode, hasPlayed }: { video: HTMLVideoElement | null; animeId: number; episode: number | null; hasPlayed: boolean }) {
-   if (!video || episode == null || !hasPlayed || video.readyState < 2 || !video.videoWidth) {
-      console.debug("[player] last-frame capture skipped", {
-         animeId,
-         episode,
-         hasVideo: video != null,
-         hasPlayed,
-         readyState: video?.readyState,
-         videoWidth: video?.videoWidth,
-      });
-      return;
+/** Saves the frame on screen as the episode's thumbnail as the player
+ * closes (see `saveFrameThumbnail`), then unloads mpv - the grab has to
+ * happen while mpv still holds the frame. Any failure just skips the
+ * thumbnail. */
+async function captureLastFrameAndDetach({ video, animeId, episode, hasPlayed }: { video: MpvVideo | null; animeId: number; episode: number | null; hasPlayed: boolean }) {
+   if (!video) return;
+   if (episode == null || !hasPlayed || video.readyState < 2) {
+      console.debug("[player] last-frame capture skipped", { animeId, episode, hasPlayed, readyState: video.readyState });
+   } else {
+      try {
+         const jpeg = await invoke<ArrayBuffer>("mpv_frame", { width: LAST_FRAME_WIDTH });
+         console.info("[player] captured last frame", { animeId, episode, bytes: jpeg.byteLength });
+         void saveFrameThumbnail(animeId, episode, new Blob([jpeg], { type: "image/jpeg" }));
+      } catch (err) {
+         console.warn("[player] last-frame capture failed", { animeId, episode, err: String(err) });
+      }
    }
-   try {
-      const canvas = document.createElement("canvas");
-      canvas.width = LAST_FRAME_WIDTH;
-      canvas.height = Math.round((LAST_FRAME_WIDTH * video.videoHeight) / video.videoWidth);
-      canvas.getContext("2d")?.drawImage(video, 0, 0, canvas.width, canvas.height);
-      canvas.toBlob(
-         (blob) => {
-            if (!blob) {
-               console.warn("[player] last-frame encode produced nothing", { animeId, episode });
-               return;
-            }
-            console.info("[player] captured last frame", { animeId, episode, bytes: blob.size });
-            void saveFrameThumbnail(animeId, episode, blob);
-         },
-         "image/jpeg",
-         0.82,
-      );
-   } catch (err) {
-      console.warn("[player] last-frame capture failed", { animeId, episode, err: String(err) });
-   }
+   await video.detach();
 }
 
 interface Props {
@@ -200,10 +177,11 @@ function loadVolume(): number {
    }
 }
 
-// Full-viewport HLS player (hls.js against torrent-engine's playlist). The
-// control bar only appears while the pointer is over the bottom strip (or
-// briefly after a keybind), plus PotPlayer/YouTube-style keybinds. See
-// PLAN.md's Known gaps for why this isn't mpv.
+// Full-viewport player: the embedded mpv (see `MpvVideo`/src-tauri's
+// player.rs) draws the video under this transparent overlay, which owns the
+// controls. The control bar only appears while the pointer is over the
+// bottom strip (or briefly after a keybind), plus PotPlayer/YouTube-style
+// keybinds.
 export function PlayerView({
    anime,
    episodeKey,
@@ -216,12 +194,9 @@ export function PlayerView({
    onSelectEpisode,
 }: Props) {
    const settings = useSettings();
-   const videoRef = useRef<HTMLVideoElement | null>(null);
+   const videoRef = useRef<MpvVideo | null>(null);
    const rootRef = useRef<HTMLDivElement>(null);
-   // Media position to resume from when hls.js is re-attached to the same
-   // file (see the attach effect).
-   const reattachRef = useRef<{ url: string; time: number } | null>(null);
-   const [videoEl, setVideoEl] = useState<HTMLVideoElement | null>(null);
+   const [videoEl, setVideoEl] = useState<MpvVideo | null>(null);
    const preferredGroup = settings.rememberFansubGroup
       ? getPreferredGroup(anime.id)
       : null;
@@ -236,21 +211,16 @@ export function PlayerView({
    const [files, setFiles] = useState<PlayFile[]>([]);
    const [selectedFile, setSelectedFile] = useState<PlayFile | null>(null);
    const [stats, setStats] = useState<StreamStats | null>(null);
-   // The attached hls.js instance, for the statistics popup's bandwidth.
-   const [hlsInstance, setHlsInstance] = useState<Hls | null>(null);
    const [error, setError] = useState<string | null>(null);
    const [status, setStatus] = useState("Connecting to peers…");
    const [ready, setReady] = useState(false);
-   // Whether the current file has shown its first frame - the <video>
-   // fades in on it instead of popping over the loading state.
+   // Whether the current file has shown its first frame.
    const [hasPlayed, setHasPlayed] = useState(false);
    const [controlsVisible, setControlsVisible] = useState(false);
    const [cursorHidden, setCursorHidden] = useState(false);
    const [paused, setPaused] = useState(true);
-   const estimatedDurationSeconds =
-      anime.duration != null ? anime.duration * 60 : null;
    const [duration, setDuration] = useState(0);
-   // Media time as the <video> element reports it.
+   // Media time as mpv reports it (real episode time).
    const [position, setPosition] = useState(0);
    const [seekPreview, setSeekPreview] = useState<number | null>(null);
    // Seek-bar hover tooltip, positioned straight on the DOM: routing each
@@ -273,8 +243,7 @@ export function PlayerView({
    );
    const closePlaylist = useCallback(() => setPlaylistOpen(false), []);
    const [fullscreen, setFullscreen] = useState(false);
-   // What the <video> element itself has buffered, in episode time - drawn
-   // on the seek bar above the transcode's ready ranges.
+   // What mpv has demuxed ahead (instantly seekable), in episode time.
    const [bufferedRanges, setBufferedRanges] = useState<[number, number][]>([]);
    const [showRemaining, setShowRemaining] = useState(() => {
       try {
@@ -290,15 +259,10 @@ export function PlayerView({
       id: number;
    } | null>(null);
    const [subtitleTracks, setSubtitleTracks] = useState<SubtitleTrack[]>([]);
-   const [subtitleFonts, setSubtitleFonts] = useState<string[]>([]);
    // null = subtitles off.
    const [activeSubtitleIndex, setActiveSubtitleIndex] = useState<
       number | null
    >(null);
-   // Source-file seconds at media time 0 (hls.js initPTS) - see the
-   // INIT_PTS_FOUND handler. Media time + this = real episode time, which
-   // is what's displayed, saved as progress, and what subtitles use.
-   const [timeOffset, setTimeOffset] = useState(0);
    const [subtitleDelay, setSubtitleDelay] = useState(0);
    const [toast, setToast] = useState<string | null>(null);
    const [nextCountdown, setNextCountdown] = useState<number | null>(null);
@@ -311,8 +275,6 @@ export function PlayerView({
    // For the idle timer, which outlives the render that scheduled it.
    const menuOpenRef = useRef(false);
    menuOpenRef.current = menu != null;
-   const timeOffsetRef = useRef(0);
-   timeOffsetRef.current = timeOffset;
    // Resume target in source time, captured once per episode.
    const resumeAtRef = useRef<number | null>(
       settings.resumePlayback ? resumePosition(anime.id, episodeKey) : null,
@@ -348,11 +310,6 @@ export function PlayerView({
       setStatus("Connecting to peers…");
       (async () => {
          try {
-            await reportDecoderSupport().catch((err) =>
-               console.warn("[player] decoder support report failed", {
-                  err: String(err),
-               }),
-            );
             const session = await playMagnet(
                selectedRelease.magnet,
                `${displayTitle(anime.title)} ${episodeKey}`,
@@ -387,150 +344,83 @@ export function PlayerView({
    useEffect(() => {
       setDuration(0);
       setPosition(0);
-      setTimeOffset(0);
       setHasPlayed(false);
+      setBufferedRanges([]);
       setSubtitleTracks([]);
-      setSubtitleFonts([]);
       setActiveSubtitleIndex(null);
+      subtitlesPickedRef.current = false;
       setSubtitleDelay(0);
       setNextCountdown(null);
-   }, [selectedFile?.hlsUrl]);
+   }, [selectedFile?.streamUrl]);
 
    // Latest values for the unmount capture below.
-   const lastFrameRef = useRef({ video: null as HTMLVideoElement | null, animeId: anime.id, episode, hasPlayed: false });
+   const lastFrameRef = useRef({ video: null as MpvVideo | null, animeId: anime.id, episode, hasPlayed: false });
    lastFrameRef.current = { video: videoEl, animeId: anime.id, episode, hasPlayed };
+   useEffect(() => () => void captureLastFrameAndDetach(lastFrameRef.current), []);
 
-   // Must be declared before the hls.js effect: Preact runs unmount
-   // cleanups in declaration order, and hls.destroy() empties the <video>
-   // (readyState 0), which made every capture silently bail.
-   useEffect(() => () => captureLastFrame(lastFrameRef.current), []);
+   // Only the player overlay may cover mpv while it's mounted (App.css).
+   useEffect(() => {
+      document.documentElement.classList.add("mpv-active");
+      return () => document.documentElement.classList.remove("mpv-active");
+   }, []);
 
-   // Attaches hls.js once a file is chosen. The declared duration is baked
-   // into the playlist request (see torrent-engine's hls_playlist_handler).
+   // One mpv facade per player mount; its events drive the same state the
+   // <video> element's used to.
+   useEffect(() => {
+      const video = new MpvVideo();
+      videoRef.current = video;
+      const on = (type: string, handler: () => void) => video.addEventListener(type, handler);
+      on("durationchange", () => setDuration(video.duration));
+      on("loadedmetadata", () => setDuration(video.duration));
+      on("timeupdate", () => setPosition(video.currentTime));
+      on("progress", updateBuffered);
+      on("seeked", updateBuffered);
+      on("play", () => setPaused(false));
+      on("pause", () => setPaused(true));
+      on("ended", () => handleEndedRef.current());
+      on("volumechange", () => setMuted(video.muted));
+      on("canplay", () => setReady(true));
+      on("waiting", () => setReady(false));
+      on("playing", () => {
+         setReady(true);
+         setHasPlayed(true);
+         rememberGroupOnPlay();
+      });
+      on("tracks", () => setSubtitleTracks(video.subtitleTracks));
+      on("error", () =>
+         setError(
+            `This file can't be played: ${video.error?.message ?? "unknown error"}. Try another source.`,
+         ),
+      );
+      let cancelled = false;
+      video
+         .attach()
+         .then(() => {
+            if (cancelled) return;
+            video.volume = volume / 100;
+            setVideoEl(video);
+         })
+         .catch((err) => {
+            console.error("[player] mpv failed to start", { err: String(err) });
+            setError(`The player couldn't start: ${String(err)}. Is mpv installed and on PATH?`);
+         });
+      return () => {
+         cancelled = true;
+      };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, []);
+
+   // Opens the chosen file in mpv, starting at the resume point.
    useEffect(() => {
       const video = videoEl;
       if (!video || !selectedFile) return;
-      // Re-attaching the same file (only the duration estimate changed -
-      // e.g. anime details arriving after playback began) continues from the
-      // current position. It used to restart from 0, which silently undid a
-      // seek made before the details landed (verified live).
-      const reattach =
-         reattachRef.current?.url === selectedFile.hlsUrl
-            ? reattachRef.current
-            : null;
-      reattachRef.current = null;
-      const startAt = reattach ? reattach.time : resumeAtRef.current;
-      // `start` makes the backend begin its run for the fMP4 init segment at
-      // the resume point rather than at 0 (see hls_playlist_handler).
-      const params = new URLSearchParams();
-      if (estimatedDurationSeconds != null)
-         params.set("duration", String(estimatedDurationSeconds));
-      if (startAt != null && startAt > 0) params.set("start", String(startAt));
-      const query = params.toString();
-      const hlsSrc = query
-         ? `${selectedFile.hlsUrl}?${query}`
-         : selectedFile.hlsUrl;
-      console.info("[player] attaching hls", {
-         file: selectedFile.name,
-         startAt,
-         reattach: reattach != null,
+      const startAt = resumeAtRef.current;
+      console.info("[player] loading file", { file: selectedFile.name, startAt });
+      video.load(selectedFile.streamUrl, startAt).catch((err) => {
+         console.error("[player] loadfile failed", { err: String(err) });
+         setError(`Couldn't open this file: ${String(err)}`);
       });
-
-      if (!Hls.isSupported()) {
-         setError("This browser engine can't play HLS streams.");
-         return undefined;
-      }
-      const hls = new Hls({
-         // A segment can legitimately take tens of seconds to become
-         // available (torrent-engine waits up to 45s server-side on a
-         // not-yet-downloaded region) - hls.js's defaults gave up well before
-         // that and fired fatal fragLoadTimeOut errors.
-         fragLoadingTimeOut: 60_000,
-         fragLoadingMaxRetry: 4,
-         manifestLoadingTimeOut: 20_000,
-         // Buffer ahead generously but stay well under what the backend
-         // would treat as a seek (see torrent-engine's job_will_reach_soon).
-         maxBufferLength: 60,
-         maxMaxBufferLength: 90,
-         backBufferLength: 90,
-         // Nudge over the small gaps a keyframe-aligned seek restart can
-         // leave between transcode runs instead of stalling on them.
-         maxBufferHole: 1,
-         nudgeMaxRetry: 10,
-         // Resume: start loading at the saved point instead of 0. This is
-         // media time; the offset correction below is at most one keyframe
-         // interval, well inside what "resume" needs.
-         startPosition: startAt ?? -1,
-      });
-      setHlsInstance(hls);
-      hls.loadSource(hlsSrc);
-      hls.attachMedia(video);
-      // hls.js anchors media time 0 to whichever fragment it loads first.
-      // With -copyts that's source time 0 for a normal start, but a resume
-      // anchors on a keyframe-aligned fragment - initPTS is exactly that
-      // anchor, and without it subtitles and the time display would be off
-      // by a constant (verified: 2s on a 5s-GOP test file).
-      hls.on(Hls.Events.INIT_PTS_FOUND, (_event, data) => {
-         if (data.id !== "main") return;
-         // Segments were MPEG-TS until the fMP4 switch, where initPTS was a
-         // raw 33-bit timestamp: a first DTS just below zero (B-frames) wrapped
-         // to ~2^33 - verified live: an offset of 95443s made progress save as
-         // "watched" and libass draw subtitles 26 hours ahead. fMP4 timestamps
-         // don't wrap; the unwrap below is kept as a harmless guard.
-         let offset = data.initPTS / data.timescale;
-         const wrap = 2 ** 33 / 90_000;
-         if (offset > wrap / 2) offset -= wrap;
-         console.info("[player] hls initPTS found", { offset });
-         setTimeOffset(offset);
-      });
-      let recoveryAttempts = 0;
-      const MAX_RECOVERY_ATTEMPTS = 8;
-      hls.on(Hls.Events.ERROR, (_event, data) => {
-         if (!data.fatal) return;
-         console.error("[player] hls.js fatal error", {
-            type: data.type,
-            details: data.details,
-            recoveryAttempts,
-         });
-         // hls.js's own recommended recovery: a "fatal" error usually just
-         // means its retry budget ran out on a slow segment.
-         // Unsupported codec (typically HEVC without the system extension):
-         // retrying can never succeed, so say so plainly right away.
-         if (
-            data.details === Hls.ErrorDetails.BUFFER_ADD_CODEC_ERROR ||
-            data.details === Hls.ErrorDetails.BUFFER_INCOMPATIBLE_CODECS_ERROR
-         ) {
-            const codec = releaseCodec(selectedReleaseRef.current);
-            setError(
-               `This system can't decode ${codec ? codec.toUpperCase() : "this source's"} video. Pick an H.264 (x264/AVC) source instead.`,
-            );
-            return;
-         }
-         if (recoveryAttempts < MAX_RECOVERY_ATTEMPTS) {
-            if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-               recoveryAttempts++;
-               hls.startLoad();
-               return;
-            }
-            if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-               recoveryAttempts++;
-               hls.recoverMediaError();
-               return;
-            }
-         }
-         setError(
-            "Playback stopped: this source isn't downloading or can't be decoded. Try another source.",
-         );
-      });
-      const attachedUrl = selectedFile.hlsUrl;
-      return () => {
-         // Remember where playback was in case this is a same-file re-attach.
-         if (video.currentTime > 0)
-            reattachRef.current = { url: attachedUrl, time: video.currentTime };
-         setHlsInstance(null);
-         hls.destroy();
-      };
-   }, [videoEl, selectedFile?.hlsUrl, estimatedDurationSeconds]);
+   }, [videoEl, selectedFile?.streamUrl]);
 
    useEffect(() => {
       if (torrentId == null || !selectedFile) return;
@@ -559,104 +449,38 @@ export function PlayerView({
       };
    }, []);
 
-   // Retried until the backend's probe succeeds: right after play_magnet
-   // the container header usually hasn't downloaded yet.
+   // mpv's track list arrives with the file (and may grow as it loads):
+   // pick the default track once per file, then follow the user's choice.
+   const subtitlesPickedRef = useRef(false);
    useEffect(() => {
-      if (torrentId == null || !selectedFile) return;
-      const fileIdx = selectedFile.index;
-      let cancelled = false;
-      let timer: number | undefined;
-      let attempts = 0;
-      async function attempt() {
-         attempts++;
-         try {
-            const info = await getSubtitleTracks(torrentId as string, fileIdx);
-            if (cancelled) return;
-            console.info("[player] subtitle tracks", {
-               count: info.tracks.length,
-               fonts: info.fonts.length,
-            });
-            setSubtitleTracks(info.tracks);
-            setSubtitleFonts(info.fonts);
-            const current = getSettingsSnapshot();
-            setActiveSubtitleIndex(
-               defaultSubtitleIndex(
-                  info.tracks,
-                  current.subtitleLanguage,
-                  current.subtitlesEnabled,
-               ),
-            );
-         } catch (err) {
-            if (cancelled) return;
-            if (attempts < SUBTITLE_PROBE_MAX_ATTEMPTS) {
-               console.debug("[player] subtitle probe not ready, retrying", {
-                  attempts,
-               });
-               timer = window.setTimeout(attempt, SUBTITLE_PROBE_RETRY_MS);
-            } else {
-               console.warn("[player] giving up on subtitle probe", {
-                  err: String(err),
-               });
-            }
-         }
-      }
-      void attempt();
-      return () => {
-         cancelled = true;
-         window.clearTimeout(timer);
-      };
-   }, [torrentId, selectedFile?.index]);
+      if (subtitlesPickedRef.current || subtitleTracks.length === 0) return;
+      subtitlesPickedRef.current = true;
+      const current = getSettingsSnapshot();
+      const pick = defaultSubtitleIndex(subtitleTracks, current.subtitleLanguage, current.subtitlesEnabled);
+      console.info("[player] subtitle tracks", { count: subtitleTracks.length, pick });
+      setActiveSubtitleIndex(pick);
+   }, [subtitleTracks]);
 
    const activeSubtitle =
       subtitleTracks.find((t) => t.index === activeSubtitleIndex) ?? null;
 
-   // How much of the video's bottom edge the control dock covers while it's
-   // up - handed to the renderer, which lifts only the bottom-aligned lines
-   // that would sit under it. Measured from layout offsets (not bounding
-   // rects) so the dock's own slide-in transform doesn't skew it.
-   const DOCK_CLEARANCE_PX = 14;
-   const [subtitleInset, setSubtitleInset] = useState(0);
    useEffect(() => {
-      if (!(controlsVisible || menu)) {
-         setSubtitleInset(0);
-         return;
-      }
-      const root = rootRef.current;
-      const dock = root?.querySelector<HTMLElement>(".player-controls");
-      const video = videoRef.current;
-      if (!root || !dock || !video || !video.videoWidth) return;
-      // The visible picture inside the <video> box (letterboxing excluded).
-      const box = video.getBoundingClientRect();
-      const scale = Math.min(
-         box.width / video.videoWidth,
-         box.height / video.videoHeight,
-      );
-      const pictureBottom =
-         box.top -
-         root.getBoundingClientRect().top +
-         (box.height + video.videoHeight * scale) / 2;
-      setSubtitleInset(
-         // From the seek bar, not the dock's top edge: the dock starts
-         // with a tall transparent gradient that doesn't cover anything.
-         Math.max(0, pictureBottom - (dock.offsetTop + (dock.querySelector<HTMLElement>(".player-seek-wrap")?.offsetTop ?? 0)) + DOCK_CLEARANCE_PX),
-      );
-   }, [controlsVisible, menu, duration]);
-   useAssRenderer({
-      video: videoEl,
-      url: activeSubtitle?.url ?? null,
-      fonts: subtitleFonts,
-      styled: activeSubtitle ? isStyledTrack(activeSubtitle) : false,
-      style: settings.subtitleStyle,
-      bottomInsetPx: subtitleInset,
-      timeOffset,
-      delay: subtitleDelay,
-   });
+      if (!videoEl || !subtitlesPickedRef.current) return;
+      videoEl.setSubtitle(activeSubtitleIndex);
+   }, [videoEl, activeSubtitleIndex, subtitleTracks.length > 0]);
 
-   // Episode time (source-file seconds) - what the user sees and what's
-   // saved, independent of where hls.js anchored media time 0.
-   const episodeTime = position + timeOffset;
-   // The playlist's declared length is itself an estimate (AniList
-   // runtime), so it's used as the episode length as-is.
+   useEffect(() => {
+      void videoEl?.setProperty("sub-delay", subtitleDelay);
+   }, [videoEl, subtitleDelay]);
+
+   // The user's default style, applied by mpv (see applyMpvSubtitleStyle).
+   useEffect(() => {
+      if (!videoEl) return;
+      void applyMpvSubtitleStyle(videoEl, settings.subtitleStyle, activeSubtitle ? isStyledTrack(activeSubtitle) : false);
+   }, [videoEl, settings.subtitleStyle, activeSubtitle?.index]);
+
+   // mpv reports real file time and the file's own exact duration.
+   const episodeTime = position;
    const episodeDuration = duration;
 
    function persistProgress() {
@@ -668,7 +492,7 @@ export function PlayerView({
          anime,
          episodeKey,
          episode,
-         video.currentTime + timeOffsetRef.current,
+         video.currentTime,
          video.duration,
       );
    }
@@ -717,6 +541,9 @@ export function PlayerView({
       if (onNext && settings.autoplayNext)
          setNextCountdown(AUTOPLAY_NEXT_SECONDS);
    }
+   // For the mpv listener registered once at mount.
+   const handleEndedRef = useRef(handleEnded);
+   handleEndedRef.current = handleEnded;
 
    useEffect(() => {
       const root = rootRef.current;
@@ -780,11 +607,14 @@ export function PlayerView({
          document.removeEventListener("pointerdown", handlePointerDown);
    }, [playlistOpen]);
 
-   useEffect(() => {
-      const onChange = () => setFullscreen(document.fullscreenElement != null);
-      document.addEventListener("fullscreenchange", onChange);
-      return () => document.removeEventListener("fullscreenchange", onChange);
-   }, []);
+   const fullscreenRef = useRef(false);
+   // Leaving the player always leaves fullscreen.
+   useEffect(
+      () => () => {
+         if (fullscreenRef.current) void getCurrentWindow().setFullscreen(false);
+      },
+      [],
+   );
 
    /** Show controls + cursor and restart the idle countdown. Uses only
     * refs and setters, so stale closures (the pointer effect) are safe. */
@@ -824,7 +654,7 @@ export function PlayerView({
       seekToEpisodeTime(
          Math.min(
             Math.max(
-               video.currentTime + timeOffsetRef.current + deltaSeconds,
+               video.currentTime + deltaSeconds,
                0,
             ),
             episodeDuration,
@@ -848,10 +678,7 @@ export function PlayerView({
       if (!video) return;
       const ranges: [number, number][] = [];
       for (let i = 0; i < video.buffered.length; i++) {
-         ranges.push([
-            video.buffered.start(i) + timeOffsetRef.current,
-            video.buffered.end(i) + timeOffsetRef.current,
-         ]);
+         ranges.push([video.buffered.start(i), video.buffered.end(i)]);
       }
       setBufferedRanges(ranges);
    }
@@ -874,13 +701,9 @@ export function PlayerView({
       if (!video) return;
       showFlash(video.paused ? "play" : "pause");
       if (video.paused) {
-         // play() rejects with AbortError if something pauses the video
-         // before it resolves (e.g. closing mid-buffer) - expected.
-         video.play().catch((err) => {
-            if (err instanceof DOMException && err.name === "AbortError")
-               return;
-            setError(String(err));
-         });
+         video.play().catch((err) =>
+            console.warn("[player] play failed", { err: String(err) }),
+         );
       } else {
          video.pause();
       }
@@ -895,7 +718,7 @@ export function PlayerView({
    function seekToEpisodeTime(target: number) {
       const video = videoRef.current;
       if (!video) return;
-      video.currentTime = Math.max(0, target - timeOffsetRef.current);
+      video.currentTime = Math.max(0, target);
    }
 
    function handleSeekInput(e: Event) {
@@ -949,8 +772,7 @@ export function PlayerView({
       const video = videoRef.current;
       if (!video || !episodeDuration) return;
       const base =
-         keyboardSeekTargetRef.current ??
-         video.currentTime + timeOffsetRef.current;
+         keyboardSeekTargetRef.current ?? video.currentTime;
       const target = Math.min(
          Math.max(base + deltaSeconds, 0),
          episodeDuration,
@@ -965,78 +787,31 @@ export function PlayerView({
       }, KEYBOARD_SEEK_COMMIT_MS);
    }
 
+   // The window itself goes fullscreen, not an element inside the
+   // webview: mpv draws into the window, so only that grows the video.
    function toggleFullscreen() {
-      if (document.fullscreenElement) {
-         void document.exitFullscreen();
-      } else {
-         void document.querySelector(".player-view")?.requestFullscreen();
-      }
+      setFullscreenWindow(!fullscreenRef.current);
    }
 
-   /** Copies the current frame (at the video's native resolution, with
-    * the rendered subtitles when the libass canvas can be read) to the
-    * clipboard as PNG - Ctrl+C. */
+   function setFullscreenWindow(on: boolean) {
+      console.debug("[player] fullscreen", { on });
+      fullscreenRef.current = on;
+      setFullscreen(on);
+      getCurrentWindow()
+         .setFullscreen(on)
+         .catch((err) => console.warn("[player] fullscreen failed", { err: String(err) }));
+   }
+
+   /** Copies the current frame, rendered subtitles included, at the
+    * video's native resolution to the clipboard - Ctrl+C. */
    async function copyFrame() {
-      const video = videoRef.current;
-      if (!video || video.videoWidth === 0) return;
-      // Immediate feedback: the readback + native clipboard write (which
-      // also PNG-encodes the frame) takes around a second for 1080p.
+      if (!videoRef.current || videoRef.current.readyState < 2) return;
+      // Immediate feedback: the screenshot + PNG decode + native clipboard
+      // write takes around a second for 1080p.
       showToast("Copying frame…");
-      const canvas = document.createElement("canvas");
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const subtitleCanvas =
-         rootRef.current?.querySelector<HTMLCanvasElement>("canvas.JASSUB");
-      let withSubtitles = false;
-      if (subtitleCanvas && activeSubtitleIndex != null) {
-         try {
-            // The libass canvas is sized to the displayed video box; map it
-            // onto the frame.
-            const videoBox = video.getBoundingClientRect();
-            const subBox = subtitleCanvas.getBoundingClientRect();
-            const scale = canvas.width / videoBox.width;
-            ctx.drawImage(
-               subtitleCanvas,
-               (subBox.left - videoBox.left) * scale,
-               (subBox.top - videoBox.top) * scale,
-               subBox.width * scale,
-               subBox.height * scale,
-            );
-            withSubtitles = true;
-         } catch (err) {
-            console.debug(
-               "[player] subtitle layer not capturable, copying bare frame",
-               { err: String(err) },
-            );
-         }
-      }
       try {
-         // Raw RGBA over binary IPC to the native clipboard (see
-         // copy_frame_to_clipboard for why not navigator.clipboard).
-         const pixels = ctx.getImageData(
-            0,
-            0,
-            canvas.width,
-            canvas.height,
-         ).data;
-         await invoke(
-            "copy_frame_to_clipboard",
-            new Uint8Array(pixels.buffer),
-            {
-               headers: {
-                  "x-width": String(canvas.width),
-                  "x-height": String(canvas.height),
-               },
-            },
-         );
-         console.info("[player] frame copied", {
-            width: canvas.width,
-            height: canvas.height,
-            withSubtitles,
-         });
+         await invoke("mpv_copy_frame");
+         console.info("[player] frame copied");
          showToast("Frame copied");
       } catch (err) {
          console.error("[player] frame copy failed", { err: String(err) });
@@ -1154,9 +929,9 @@ export function PlayerView({
                   setPlaylistOpen(false);
                   return;
                }
-               // Escape's native behavior exits fullscreen first; only close
-               // the player once there's nothing left for the browser to do.
-               if (!document.fullscreenElement) onClose();
+               // Escape leaves fullscreen first, then closes the player.
+               if (fullscreenRef.current) setFullscreenWindow(false);
+               else onClose();
                return;
             default:
                return;
@@ -1204,7 +979,7 @@ export function PlayerView({
          const duration = durationRef.current;
          const time =
             seekPreviewRef.current ??
-            (video ? video.currentTime + timeOffsetRef.current : 0);
+            (video ? video.currentTime : 0);
          const percent =
             duration > 0
                ? Math.min(100, Math.max(0, (time / duration) * 100))
@@ -1247,56 +1022,6 @@ export function PlayerView({
       return () => window.clearTimeout(timer);
    }, [buffering, hasPlayed]);
 
-   // Ambient color: the video's average color, sampled a few times a
-   // second into a 16x9 canvas, tints the control dock and top bar so the
-   // chrome picks up the scene instead of sitting on it as flat grey. The
-   // <video> source is an MSE blob (same-origin), so the canvas isn't
-   // tainted. Eased toward each new sample so scene cuts don't flicker.
-   const AMBIENT_SAMPLE_MS = 400;
-   useEffect(() => {
-      if (!videoEl) return;
-      const canvas = document.createElement("canvas");
-      canvas.width = 16;
-      canvas.height = 9;
-      const ctx = canvas.getContext("2d", { willReadFrequently: true });
-      if (!ctx) return;
-      let current: [number, number, number] | null = null;
-      const timer = window.setInterval(() => {
-         if (videoEl.readyState < 2 || videoEl.videoWidth === 0) return;
-         try {
-            ctx.drawImage(videoEl, 0, 0, 16, 9);
-            const data = ctx.getImageData(0, 0, 16, 9).data;
-            let r = 0;
-            let g = 0;
-            let b = 0;
-            for (let i = 0; i < data.length; i += 4) {
-               r += data[i];
-               g += data[i + 1];
-               b += data[i + 2];
-            }
-            const n = data.length / 4;
-            const target: [number, number, number] = [r / n, g / n, b / n];
-            current = current
-               ? (current.map((c, i) => c + (target[i] - c) * 0.35) as [
-                    number,
-                    number,
-                    number,
-                 ])
-               : target;
-            rootRef.current?.style.setProperty(
-               "--ambient",
-               `${Math.round(current[0])}, ${Math.round(current[1])}, ${Math.round(current[2])}`,
-            );
-         } catch (err) {
-            console.debug("[player] ambient sample failed", {
-               err: String(err),
-            });
-            window.clearInterval(timer);
-         }
-      }, AMBIENT_SAMPLE_MS);
-      return () => window.clearInterval(timer);
-   }, [videoEl]);
-
    // Keeps a closing menu mounted for its exit animation.
    const MENU_EXIT_MS = 180;
    const [renderedMenu, setRenderedMenu] = useState<Menu>(null);
@@ -1311,9 +1036,6 @@ export function PlayerView({
       );
       return () => window.clearTimeout(timer);
    }, [menu]);
-   // Every stretch the transcode has produced (instantly seekable), not raw
-   // torrent download progress - see torrent-engine's StreamStats.
-   const readyRanges = episodeDuration && stats ? stats.readyRanges : [];
    const title = displayTitle(anime.title);
    const group = releaseGroup(selectedRelease);
    const resolution = releaseResolution(selectedRelease);
@@ -1324,56 +1046,13 @@ export function PlayerView({
          class={`player-view${controlsVisible || menu ? " controls-shown" : ""}${playlistOpen ? " playlist-open" : ""}${paused && hasPlayed ? " is-paused" : ""}`}
          style={{ cursor: cursorHidden ? "none" : "auto" }}
       >
-         {selectedFile && (
-            <video
-               ref={(el) => {
-                  if (videoRef.current === el) return;
-                  videoRef.current = el;
-                  if (el) el.volume = volume / 100;
-                  setVideoEl(el);
-               }}
-               class={`player-video${hasPlayed ? " shown" : ""}`}
-               autoPlay
-               onClick={togglePause}
-               onDblClick={toggleFullscreen}
-               onLoadedMetadata={(e) =>
-                  setDuration((e.target as HTMLVideoElement).duration || 0)
-               }
-               onDurationChange={(e) =>
-                  setDuration((e.target as HTMLVideoElement).duration || 0)
-               }
-               onTimeUpdate={(e) =>
-                  setPosition((e.target as HTMLVideoElement).currentTime)
-               }
-               onProgress={updateBuffered}
-               onSeeked={updateBuffered}
-               onPlay={() => setPaused(false)}
-               onPause={() => setPaused(true)}
-               onEnded={handleEnded}
-               onVolumeChange={(e) =>
-                  setMuted((e.target as HTMLVideoElement).muted)
-               }
-               onCanPlay={() => setReady(true)}
-               onWaiting={() => setReady(false)}
-               onPlaying={() => {
-                  setReady(true);
-                  setHasPlayed(true);
-                  rememberGroupOnPlay();
-               }}
-               onError={(e) => {
-                  const video = e.target as HTMLVideoElement;
-                  const mediaError = video.error;
-                  // MediaError.code: 1=ABORTED, 2=NETWORK, 3=DECODE, 4=SRC_NOT_SUPPORTED.
-                  console.error("[player] video error", {
-                     code: mediaError?.code,
-                     message: mediaError?.message,
-                  });
-                  setError(
-                     "This file can't be decoded by the player. Try another source.",
-                  );
-               }}
-            />
-         )}
+         {/* mpv draws under the transparent webview; this layer only
+          catches clicks on the picture. */}
+         <div
+            class="player-video-surface"
+            onClick={togglePause}
+            onDblClick={toggleFullscreen}
+         />
 
          <div class="player-topbar">
             <button
@@ -1390,14 +1069,6 @@ export function PlayerView({
                   {episodeKey}
                   {group && <span class="player-chip">{group}</span>}
                   {resolution && <span class="player-chip">{resolution}p</span>}
-                  {stats?.videoMode && stats.videoMode !== "direct" && (
-                     <span
-                        class="player-chip player-chip-accent"
-                        title={stats.videoMode}
-                     >
-                        Converting to H.264
-                     </span>
-                  )}
                </div>
             </div>
          </div>
@@ -1595,13 +1266,6 @@ export function PlayerView({
                                        {r.seeders} seeders
                                     </span>{" "}
                                     · {r.size}
-                                    {!codecPlayable(releaseCodec(r)) && (
-                                       <span class="codec-note">
-                                          {" "}
-                                          · {releaseCodec(r)?.toUpperCase()},
-                                          converted to H.264
-                                       </span>
-                                    )}
                                     {g && g === preferredGroup
                                        ? " · your usual group"
                                        : ""}
@@ -1617,7 +1281,6 @@ export function PlayerView({
                      stats={stats}
                      infoHash={infoHash}
                      video={videoEl}
-                     hls={hlsInstance}
                      animeId={anime.id}
                      episode={episode}
                      subtitleLabel={activeSubtitle ? subtitleTrackLabel(activeSubtitle, subtitleTracks.indexOf(activeSubtitle)) : null}
@@ -1642,16 +1305,6 @@ export function PlayerView({
                onMouseLeave={hideSeekTooltip}
             >
                <div class="player-seek-track" />
-               {readyRanges.map(([start, end]) => (
-                  <div
-                     key={start}
-                     class="player-seek-ready"
-                     style={{
-                        left: `${Math.min(100, (start / episodeDuration) * 100)}%`,
-                        width: `${Math.max(0, Math.min(100, ((end - start) / episodeDuration) * 100))}%`,
-                     }}
-                  />
-               ))}
                {episodeDuration > 0 &&
                   bufferedRanges.map(([start, end]) => (
                      <div
