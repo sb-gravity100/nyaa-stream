@@ -22,10 +22,8 @@ struct AppState {
     /// `stop_playback` can remove it from the session (stop seeding, drop
     /// partial files) once the user is done, mirroring how the
     /// thumbnail-capture path already cleans up its own scratch torrents.
-    /// Playback itself is an HTML5 `<video>` element in the frontend
-    /// pointed straight at torrent-engine's stream URL - no player process
-    /// to track here (see PLAN.md's Known gaps for why mpv embedding was
-    /// dropped).
+    /// The player process itself (embedded mpv) is tracked separately, in
+    /// `player::PlayerState`.
     current_torrent: Mutex<Option<TorrentId>>,
     thumbnail_cache_dir: PathBuf,
     /// One torrent capture at a time: each adds a scratch torrent and a
@@ -686,11 +684,9 @@ struct PlaySession {
     default_file_idx: usize,
 }
 
-/// Adds `magnet` to the torrent session and returns an HLS playlist URL for
-/// it. Playback itself is an HTML5 `<video>` element driven by `hls.js` in
-/// the frontend - there's no player process to spawn or drive over IPC
-/// here, unlike the mpv-based approach this replaced (see PLAN.md's Known
-/// gaps).
+/// Adds `magnet` to the torrent session and returns every file's raw
+/// stream URL (what the embedded mpv opens - see `player.rs`) plus its HLS
+/// playlist URL (the fallback player's, used when mpv isn't installed).
 #[tauri::command]
 async fn play_magnet(state: State<'_, Arc<AppState>>, magnet: String, title: String) -> Result<PlaySession, String> {
     tracing::debug!(%title, "play_magnet invoked");
@@ -708,9 +704,9 @@ async fn play_magnet(state: State<'_, Arc<AppState>>, magnet: String, title: Str
         }
     };
     *state.current_torrent.lock().await = Some(added.id.clone());
-    // HLS (via ffmpeg-produced segments) rather than the raw stream_url -
-    // see torrent-engine's hls_playlist_handler doc comment for why the raw
-    // container bytes aren't reliably playable in a browser <video> element.
+    // The HLS URL is only for the fallback player: raw container bytes
+    // aren't reliably playable in a browser <video> element (see
+    // torrent-engine's hls_playlist_handler), while mpv reads them fine.
     let files = state.torrent_engine.files(&added.id).await.map_err(|err| {
         tracing::error!(%title, torrent_id = %added.id, %err, "play_magnet failed to get file list");
         err.to_string()
