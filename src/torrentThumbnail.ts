@@ -64,11 +64,18 @@ export async function fetchTorrentThumbnail(
       console.info("[capture_torrent_thumbnail] succeeded", { anilistId, episode, found: dataUri !== null });
       return dataUri;
     } catch (err) {
+      // Deferred because something is playing: leave it uncached so the
+      // next request (after playback) tries again.
+      if (String(err).includes("thumbnail-deferred")) {
+        console.debug("[capture_torrent_thumbnail] deferred during playback", { anilistId, episode });
+        return undefined;
+      }
       console.error("[capture_torrent_thumbnail] failed", { anilistId, episode, err });
       return null;
     }
   })()
     .then((result) => {
+      if (result === undefined) return null;
       cache.set(key, result);
       return result;
     })

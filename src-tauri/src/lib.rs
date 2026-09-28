@@ -191,6 +191,10 @@ const THUMBNAIL_POLL_INTERVAL: Duration = Duration::from_millis(500);
 /// failure in the pipeline (mpv missing, torrent add failed, swarm too
 /// slow, etc) - this is a nice-to-have, not something that should surface
 /// as a user-facing error.
+/// Error string `capture_torrent_thumbnail` returns while a stream is
+/// playing - `torrentThumbnail.ts` treats it as "try again later".
+const THUMBNAIL_DEFERRED: &str = "thumbnail-deferred-playback-active";
+
 #[tauri::command]
 async fn capture_torrent_thumbnail(
     state: State<'_, Arc<AppState>>,
@@ -205,6 +209,14 @@ async fn capture_torrent_thumbnail(
         return Ok(Some(to_data_uri(&bytes)));
     }
 
+    // A capture adds a second torrent and an mpv decode while the user is
+    // watching something - both compete with the stream for bandwidth and
+    // CPU (seen live: captures running mid-playback). Defer instead; the
+    // frontend doesn't cache this error and retries later.
+    if state.current_torrent.lock().await.is_some() {
+        tracing::debug!(cache_key, "capture_torrent_thumbnail deferred, playback active");
+        return Err(THUMBNAIL_DEFERRED.to_string());
+    }
     tracing::info!(cache_key, "capture_torrent_thumbnail cache miss, capturing from torrent");
     match capture_thumbnail_uncached(&state, &magnet, &cache_path, duration_minutes).await {
         Ok(bytes) => Ok(Some(to_data_uri(&bytes))),
