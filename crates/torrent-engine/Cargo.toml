@@ -19,3 +19,9 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+# In-process FFmpeg (replaces spawning the ffmpeg/ffprobe CLI - see
+# src/media.rs). Statically linked against the LGPL FFmpeg 7.1 built from
+# the workspace vcpkg.json (found via VCPKGRS_TRIPLET/VCPKG_INSTALLED_DIR
+# in .cargo/config.toml).
+ez-ffmpeg = { version = "0.19", features = ["static"] }
+ffmpeg-next = { version = "8.1", features = ["static"] }
