@@ -716,7 +716,7 @@ pub fn run() {
         Arc::new(AppState {
             anilist: AniListClient::new(),
             kitsu: KitsuClient::new(),
-            nyaa: NyaaClient::new(),
+            nyaa: NyaaClient::with_cache(dirs::cache_dir().unwrap_or_else(std::env::temp_dir).join("nyaa-stream").join("nyaa_cache")),
             torrent_engine,
             current_torrent: Mutex::new(None),
             thumbnail_cache_dir,
