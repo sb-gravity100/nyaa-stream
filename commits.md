@@ -2,6 +2,25 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `616fff8` · 2026-09-29 · feat(icons): app icons from the brand mark
+- `src-tauri/icons/128x128.png`
+- `src-tauri/icons/128x128@2x.png`
+- `src-tauri/icons/32x32.png`
+- `src-tauri/icons/Square107x107Logo.png`
+- `src-tauri/icons/Square142x142Logo.png`
+- `src-tauri/icons/Square150x150Logo.png`
+- `src-tauri/icons/Square284x284Logo.png`
+- `src-tauri/icons/Square30x30Logo.png`
+- `src-tauri/icons/Square310x310Logo.png`
+- `src-tauri/icons/Square44x44Logo.png`
+- `src-tauri/icons/Square71x71Logo.png`
+- `src-tauri/icons/Square89x89Logo.png`
+- `src-tauri/icons/StoreLogo.png`
+- `src-tauri/icons/icon.icns`
+- `src-tauri/icons/icon.ico`
+- `src-tauri/icons/icon.png`
+- `src-tauri/icons/icon.svg`
+
 ### `f7b1269` · 2026-09-29 · style(media): widen the info column and its description
 - `src/App.css`
 
