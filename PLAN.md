@@ -2,9 +2,10 @@
 
 Anime-focused Stremio-like desktop client. Not a full Stremio addon-ecosystem
 clone — a focused tool that searches nyaa.si for torrents, matches them
-against AniList metadata, and streams them via HLS into an in-app HTML5
-`<video>` element (see "Playback" below - `mpv` is used only for headless
-thumbnail capture now, not real playback).
+against AniList metadata, and plays them with the system `mpv` embedded in
+the app window under a transparent webview that draws the controls (see
+"Embedded mpv playback" below). An HLS `<video>` player remains as the
+fallback when mpv isn't installed.
 
 ## Reference
 
@@ -43,11 +44,12 @@ solid-color skeleton blocks, not a spinner).
 ## Stack
 
 - **Shell:** Tauri 2 (Rust backend + Preact/TypeScript frontend via Vite)
-- **Player:** an in-app HTML5 `<video>` element driven by `hls.js`
-  (`src/PlayerView.tsx`) - not `mpv`; see "Playback" below for why and
-  PLAN.md's Known gaps for the history. System `mpv` (must be on PATH — not
-  bundled) is still used, but only for headless thumbnail capture
-  (`crates/mpv-ipc`)
+- **Player:** system `mpv` (must be on PATH — not bundled) embedded in the
+  app window via `--wid` (`crates/mpv-ipc`'s `EmbeddedMpv`,
+  `src-tauri/src/player.rs`), driven over JSON IPC by the HTML controls in
+  `src/PlayerView.tsx` through `src/mpvVideo.ts`. Fallback without mpv:
+  the HLS `<video>` + `hls.js` player (`src/HlsPlayerView.tsx`). mpv is
+  also used headlessly for thumbnail capture
 - **Torrent engine:** `enginefs`'s libtorrent backend (vendored via git
   dependency from https://github.com/stremio-native/stream-server, pinned
   to a specific commit - see `crates/torrent-engine/Cargo.toml`), replacing
@@ -172,7 +174,7 @@ nyaa_stream/
     nyaa-client/              nyaa.si search client (paginated HTML scrape)
     anilist-client/          AniList GraphQL client
     kitsu-client/            Kitsu API client (backdrop + episode thumbnails)
-    mpv-ipc/                 spawns headless mpv for thumbnail capture only
+    mpv-ipc/                 embedded mpv (playback) + headless mpv (thumbnail capture) over JSON IPC
   src/                       Preact + TypeScript frontend
   reference/stremio-core/    reference-only clone, gitignored
   reference/stremio-web/     reference-only clone, gitignored
@@ -428,15 +430,33 @@ nyaa_stream/
    (and has been seen returning zero bytes for a not-yet-flushed piece) -
    both upstream issues in the vendored crate, worked around here.
 
-   **`mpv`/`mpv-ipc` is no longer the real playback engine** — an earlier
-   attempt embedded mpv into the app window via `--wid` and a transparent
-   webview background, but `transparent: true` turned out to break all
-   click input app-wide on this Tauri/WebView2/Windows combination (a
-   known upstream bug, not something fixable from app code). `mpv-ipc` and
-   its `MpvPlayer` are kept only for headless thumbnail capture
-   (`capture_torrent_thumbnail`), where no window/transparency is involved.
-   CLAUDE.md's "player is the user's system mpv" line is now stale for
-   real playback; still accurate for the thumbnail-capture path.
+   **Embedded mpv playback (the default player).** The approach
+   stremio-shell-ng uses: `mpv_start` spawns the system mpv with
+   `--wid=<app window>` (`--idle --force-window --no-config`, no OSC/input,
+   `--hwdec=auto-safe`), finds the child window mpv creates (by process
+   id) and pushes it to `HWND_BOTTOM` so the webview stays on top, then sets
+   the *webview's* background to alpha 0 (`set_background_color`). The
+   window itself is never `transparent: true` - that is what broke click
+   input app-wide in the first embedding attempt; with only the webview
+   background transparent, clicks work (verified with real OS clicks over
+   both controls and bare video). `html.mpv-active` hides the rest of the
+   app while the player is mounted. mpv opens the file's raw
+   `stream_url` directly - no HLS, no transcoding, no codec checks - and
+   renders embedded ASS/SRT subtitles and font attachments itself through
+   libass (bundled Gandhi Sans is written to a `--sub-fonts-dir`). The
+   user's subtitle style maps to `sub-*` options for plain tracks and, with
+   "apply to styled", to `sub-ass-style-overrides` on the dialogue styles
+   named in `sub-ass-extradata`. `MpvVideo` mirrors mpv properties
+   (`observe_property` → `mpv-event`) behind an `HTMLVideoElement`-shaped
+   facade and interpolates `time-pos` between updates. Thumbnails and
+   Ctrl+C use `screenshot-to-file` (`mpv_frame` downscales to 640px JPEG,
+   `mpv_copy_frame` includes subtitles). Fullscreen is the window's own
+   (`setFullscreen`), since mpv only grows with the window. Measured live:
+   a 1080p SubsPlease MKV resumed 6:26 in ~9s from click. mpv stays idle
+   between episodes (`mpv_stop` unloads the file and restores the opaque
+   background). Not carried over from the `<video>` player: the ambient
+   dock tint (the webview can't read mpv's pixels) and lifting bottom
+   subtitle lines above the visible control dock.
 
    **Torrent downloads now live under AppData/cache** (`dirs::cache_dir()`
    joined with `nyaa-stream/downloads`), not the user's actual Downloads
@@ -445,7 +465,8 @@ nyaa_stream/
 
 ## Known gaps / not yet implemented
 
-- The HLS playlist's declared duration is only as good as the frontend's
+- (HLS fallback player only - mpv reads the file's real duration.) The
+  HLS playlist's declared duration is only as good as the frontend's
   AniList-derived estimate (falls back to a generic 24-minute guess if
   even that's missing) - not the file's real, exact length. Good enough
   for a working seek bar; the last segment may be trimmed slightly short
@@ -468,8 +489,8 @@ nyaa_stream/
   sources need `scale_cuda` for the GPU-side 8-bit conversion, which
   vcpkg's FFmpeg doesn't build (no cuda-llvm), so it would cost a custom
   overlay port for no user-visible gain.
-- mpv is still required on PATH for torrent-captured thumbnails (the only
-  remaining external binary).
+- mpv must be on PATH for playback (else the HLS fallback) and for
+  torrent-captured thumbnails - the only external binary, not bundled.
 - The one-time media probe (`probe_media`, ffmpeg-next) still reads
   `stream_handler` over loopback HTTP; HLS and subtitle runs read the
   torrent directly (`direct_input.rs`).

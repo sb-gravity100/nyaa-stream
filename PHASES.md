@@ -102,12 +102,12 @@
       mid-session via a `<select>` in the control bar (sorted by seeders) —
       `play_magnet`'s existing defensive cleanup on the backend tears down
       the previous torrent automatically
-- [x] ~~Embed mpv into the app window~~ tried and abandoned: `--wid`
-      embedding needed a transparent webview background, and `transparent:
-      true` broke all click input app-wide on this Tauri/WebView2/Windows
-      combination (upstream bug, not fixable from app code — see PLAN.md's
-      Known gaps). Replaced with a plain HTML5 `<video>` element; `mpv`/
-      `mpv-ipc` is kept only for headless thumbnail capture now
+- [x] Embed mpv into the app window: first attempt abandoned (`transparent:
+      true` on the window broke all click input app-wide), then done the
+      stremio-shell-ng way - only the webview background transparent, mpv's
+      child window pushed below it (see PLAN.md's "Embedded mpv playback").
+      Now the default player; the HLS `<video>` player is the fallback
+      without mpv
 - [x] Raw torrent bytes aren't reliably playable in a browser `<video>`
       even with the right codecs/`Content-Type` (verified live - Matroska's
       seek index/duration commonly live near the file's *end*, which an
@@ -253,6 +253,9 @@
       next, sticky fansub group, preferred quality, subtitle default
       on/language, default subtitle style with live preview
 - [ ] Settings still missing: mpv/ffmpeg path override, download directory
+- [ ] mpv player: restore the ambient dock tint and lifting bottom
+      subtitles above the visible dock (both depended on reading/moving
+      the `<video>` picture)
 - [ ] Packaging: Tauri bundler for Windows installer; document the mpv
       system-dependency requirement clearly at install/first-run
 - [x] Player chrome: full-width control strip over a bottom gradient (no
