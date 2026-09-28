@@ -1952,6 +1952,12 @@ html.mpv-active .player-view {
   cursor: default;
 }
 
+/* mpv player's pointer-driven seek bar (no <input>, see PlayerView). */
+.player-seek-wrap.seekable {
+  cursor: pointer;
+  touch-action: none;
+}
+
 .player-controls-row {
   display: flex;
   align-items: center;

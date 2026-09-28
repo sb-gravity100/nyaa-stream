@@ -723,18 +723,50 @@ function MpvPlayerView({
       video.currentTime = Math.max(0, target);
    }
 
-   function handleSeekInput(e: Event) {
-      cancelPendingKeyboardSeek();
-      setSeekPreview(Number((e.target as HTMLInputElement).value));
+   // Pointer-driven seek bar: press previews, drag moves the preview,
+   // release commits exactly once. It replaced a controlled
+   // <input type=range>, whose re-rendered value fed stale positions back
+   // in (a paused seek showed the old time until clicked again), fired
+   // commits in bursts mid-drag, and kept focus (disabling Space). The
+   // preview lives in a ref the rAF loop reads, so dragging doesn't
+   // re-render the player.
+   const seekDragRef = useRef<{ pointerId: number } | null>(null);
+   const dragPreviewRef = useRef<number | null>(null);
+
+   function seekValueAt(e: PointerEvent): number {
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      const fraction = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+      return fraction * episodeDuration;
    }
 
-   function handleSeekCommit(e: Event) {
+   function handleSeekPointerDown(e: PointerEvent) {
+      if (!episodeDuration || e.button !== 0) return;
+      e.preventDefault();
       cancelPendingKeyboardSeek();
-      const value = Number((e.target as HTMLInputElement).value);
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      seekDragRef.current = { pointerId: e.pointerId };
+      dragPreviewRef.current = seekValueAt(e);
+   }
+
+   function handleSeekPointerMove(e: PointerEvent) {
+      handleSeekHover(e);
+      if (seekDragRef.current?.pointerId === e.pointerId) dragPreviewRef.current = seekValueAt(e);
+   }
+
+   function handleSeekPointerUp(e: PointerEvent) {
+      if (seekDragRef.current?.pointerId !== e.pointerId) return;
+      seekDragRef.current = null;
+      const value = seekValueAt(e);
+      dragPreviewRef.current = null;
       console.debug("[player] seek bar commit", { value, from: videoRef.current?.currentTime });
-      setSeekPreview(null);
       setNextCountdown(null);
+      setPosition(value);
       seekToEpisodeTime(value);
+   }
+
+   function handleSeekPointerCancel() {
+      seekDragRef.current = null;
+      dragPreviewRef.current = null;
    }
 
    function handleSeekHover(e: MouseEvent) {
@@ -956,6 +988,7 @@ function MpvPlayerView({
          const video = videoRef.current;
          const duration = durationRef.current;
          const time =
+            dragPreviewRef.current ??
             seekPreviewRef.current ??
             (video ? video.currentTime : 0);
          const percent =
@@ -1295,8 +1328,16 @@ function MpvPlayerView({
             class={`player-controls${controlsVisible || menu ? " visible" : ""}`}
          >
             <div
-               class="player-seek-wrap"
-               onMouseMove={handleSeekHover}
+               class={`player-seek-wrap${episodeDuration ? " seekable" : ""}`}
+               role="slider"
+               aria-label="Seek"
+               aria-valuemin={0}
+               aria-valuemax={Math.round(episodeDuration)}
+               aria-valuenow={Math.round(displayTime)}
+               onPointerDown={handleSeekPointerDown}
+               onPointerMove={handleSeekPointerMove}
+               onPointerUp={handleSeekPointerUp}
+               onPointerCancel={handleSeekPointerCancel}
                onMouseLeave={hideSeekTooltip}
             >
                <div class="player-seek-track" />
@@ -1314,18 +1355,6 @@ function MpvPlayerView({
                <div class="player-seek-played" ref={playedFillRef} />
                <div class="player-seek-thumb" ref={seekThumbRef} />
                <div class="player-seek-tooltip" ref={seekTooltipRef} />
-               <input
-                  class="player-seek"
-                  type="range"
-                  min={0}
-                  max={episodeDuration || 1}
-                  step={0.1}
-                  value={displayTime}
-                  aria-label="Seek"
-                  onInput={handleSeekInput}
-                  onChange={handleSeekCommit}
-                  disabled={!episodeDuration}
-               />
             </div>
             <div class="player-controls-row">
                <button
