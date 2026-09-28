@@ -67,11 +67,10 @@ pub(crate) struct LibtorrentDiskFileStream {
     last_wait_log: Instant,
     last_prioritized_piece: i32,
     consecutive_waits: u32,
-    /// (nyaa-stream) How many times the current piece's disk read came
-    /// back all-zero and was sent to the read_piece broker instead - see
-    /// `poll_read`. Bounded so a piece that genuinely contains zeros can't
-    /// stall a reader if the broker keeps failing.
-    zero_read_retries: (i32, u8),
+    /// (nyaa-stream) Piece whose disk reads are currently coming back
+    /// all-zero, when that started, and whether zeros were finally accepted
+    /// as genuine - see `poll_read`.
+    zero_wait: Option<(i32, Instant, bool)>,
     last_blocked_replan: Instant,
     file: Option<tokio::fs::File>,
     file_cursor: u64,
@@ -133,7 +132,7 @@ impl LibtorrentDiskFileStream {
                 .unwrap_or_else(Instant::now),
             last_prioritized_piece: -1,
             consecutive_waits: 0,
-            zero_read_retries: (-1, 0),
+            zero_wait: None,
             last_blocked_replan: Instant::now(),
             file,
             file_cursor: 0,
@@ -797,41 +796,60 @@ impl tokio::io::AsyncRead for LibtorrentDiskFileStream {
         // piece are capped so a failing broker can't stall a reader on a
         // piece that genuinely is zero-filled.
         const ZERO_CHUNK_MIN_BYTES: usize = 64;
-        // ~200ms per piece at the 25ms retry interval.
-        const MAX_ZERO_READ_RETRIES: u8 = 8;
-        let suspicious_zeros = read >= ZERO_CHUNK_MIN_BYTES && self.scratch[..read].iter().all(|&byte| byte == 0);
-        let first_read_zeros = self.current_pos == 0 && !self.first_read_logged && self.scratch[..read].iter().all(|&byte| byte == 0);
+        // How long a verified piece may keep reading back as zeros before
+        // they're accepted as genuine (padding). An earlier bound of
+        // 200-500ms accepted real, not-yet-flushed video bytes as zeros
+        // constantly - verified live, it produced pixelated/broken frames
+        // that transcoding then baked into the output. Genuine zero runs
+        // in video files are rare, so a long wait costs almost nothing.
+        const ZERO_WAIT_LIMIT: Duration = Duration::from_secs(8);
+        let all_zero = self.scratch[..read].iter().all(|&byte| byte == 0);
+        let suspicious_zeros = read >= ZERO_CHUNK_MIN_BYTES && all_zero;
+        let first_read_zeros = self.current_pos == 0 && !self.first_read_logged && all_zero;
         if suspicious_zeros || first_read_zeros {
-            if self.zero_read_retries.0 != piece {
-                self.zero_read_retries = (piece, 0);
-            }
-            if self.zero_read_retries.1 < MAX_ZERO_READ_RETRIES {
-                self.zero_read_retries.1 += 1;
-                if self.zero_read_retries.1 == 1 {
+            let now = Instant::now();
+            let (since, accepted) = match self.zero_wait {
+                Some((waiting_piece, since, accepted)) if waiting_piece == piece => (since, accepted),
+                _ => {
                     tracing::debug!(
                         info_hash = %self.info_hash,
                         file_idx = self.file_idx,
                         piece,
                         pos = self.current_pos,
                         read,
-                        "all-zero disk read on a verified piece, re-reading via read_piece"
+                        "all-zero disk read on a verified piece, waiting for real bytes"
                     );
+                    self.zero_wait = Some((piece, now, false));
+                    (now, false)
                 }
-                self.request_piece_from_libtorrent(piece);
-                self.schedule_retry(cx, Duration::from_millis(25));
-                return Poll::Pending;
-            }
-            // Once per piece: pieces with long genuine zero runs (padding)
-            // otherwise logged this for every chunk.
-            if self.zero_read_retries.1 == MAX_ZERO_READ_RETRIES {
-                self.zero_read_retries.1 += 1;
-                tracing::debug!(
+            };
+            if !accepted {
+                if now.duration_since(since) < ZERO_WAIT_LIMIT {
+                    // Prefer libtorrent's own copy; re-read disk shortly.
+                    self.request_piece_from_libtorrent(piece);
+                    self.schedule_retry(cx, Duration::from_millis(50));
+                    return Poll::Pending;
+                }
+                tracing::warn!(
                     info_hash = %self.info_hash,
                     file_idx = self.file_idx,
                     piece,
                     pos = self.current_pos,
-                    "accepting all-zero disk reads for this piece after read_piece retries"
+                    waited_ms = now.duration_since(since).as_millis() as u64,
+                    "accepting all-zero disk reads for this piece as genuine"
                 );
+                self.zero_wait = Some((piece, since, true));
+            }
+        } else if let Some((waiting_piece, since, false)) = self.zero_wait {
+            if waiting_piece == piece {
+                tracing::debug!(
+                    info_hash = %self.info_hash,
+                    file_idx = self.file_idx,
+                    piece,
+                    waited_ms = since.elapsed().as_millis() as u64,
+                    "real bytes appeared after all-zero disk reads"
+                );
+                self.zero_wait = None;
             }
         }
         if read == 0 {
