@@ -2,6 +2,13 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `41de78a` · 2026-09-28 · style: dusk-indigo redesign with bundled Zen Kaku Gothic New
+- `index.html`
+- `package-lock.json`
+- `package.json`
+- `src/App.css`
+- `src/main.tsx`
+
 ### `536346c` · 2026-09-28 · feat(ui): resume, next episode, batch file picker, settings panel
 - `src/App.tsx`
 - `src/HomePage.tsx`
