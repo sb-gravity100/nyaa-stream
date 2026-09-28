@@ -2,6 +2,13 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `c2ffe15` · 2026-09-28 · fix(ui): clearer fetch errors, preview scaling, continue-watching tie-break
+- `src/App.tsx`
+- `src/MediaPage.tsx`
+- `src/PlayerView.tsx`
+- `src/SettingsPanel.tsx`
+- `src/watchProgress.ts`
+
 ### `41de78a` · 2026-09-28 · style: dusk-indigo redesign with bundled Zen Kaku Gothic New
 - `index.html`
 - `package-lock.json`
