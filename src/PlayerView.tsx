@@ -213,7 +213,7 @@ export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNe
         setSelectedFile(file);
         setStatus("Preparing stream…");
       } catch (err) {
-        if (!cancelled) setError(`Couldn't start this source: ${String(err)}`);
+        if (!cancelled) setError(`Couldn't start this source: ${err instanceof Error ? err.message : String(err)}`);
       }
     })();
     return () => {

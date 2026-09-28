@@ -53,7 +53,11 @@ function Row({ label, hint, children }: { label: string; hint?: string; children
 /** CSS approximation of the libass output, for immediate feedback while
  * adjusting - the real renderer uses the same values via ASS styles. */
 function SubtitlePreview({ style }: { style: SubtitleStyle }) {
-  const outline = style.background ? 0 : Math.max(0.5, style.outlineWidth * 3);
+  // Percent-of-video-height values -> container-width units (the frame is
+  // 16:9, so 1% of height = 0.5625cqw). Text stroke paints half inside the
+  // glyph, hence doubled to match libass's outside-only outline.
+  const toCqw = (percentOfHeight: number) => `${percentOfHeight * 0.5625}cqw`;
+  const outline = style.background ? 0 : style.outlineWidth * 2;
   const bgAlpha = style.backgroundOpacity / 100;
   const hex = style.backgroundColor.replace("#", "");
   const bg = `rgba(${parseInt(hex.slice(0, 2), 16)}, ${parseInt(hex.slice(2, 4), 16)}, ${parseInt(hex.slice(4, 6), 16)}, ${bgAlpha})`;
@@ -64,13 +68,13 @@ function SubtitlePreview({ style }: { style: SubtitleStyle }) {
         class="subtitle-preview-text"
         style={{
           fontFamily: `"${style.fontFamily}", sans-serif`,
-          fontSize: `${style.sizePercent * 0.034}em`,
+          fontSize: toCqw(style.sizePercent),
           fontWeight: style.bold ? 700 : 400,
           color: style.color,
           bottom: `${style.marginPercent}%`,
           background: style.background ? bg : "transparent",
           padding: style.background ? "0.08em 0.35em" : 0,
-          WebkitTextStroke: outline ? `${outline}px ${style.outlineColor}` : undefined,
+          WebkitTextStroke: outline ? `${toCqw(outline)} ${style.outlineColor}` : undefined,
           paintOrder: "stroke fill",
           textShadow: style.shadow ? `${style.shadow}px ${style.shadow}px 0 rgba(0,0,0,0.6)` : undefined,
         }}
