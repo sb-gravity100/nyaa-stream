@@ -2,6 +2,12 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `d4dbef0` · 2026-09-28 · docs: transcode throughput and GPU-resident pipeline decision
+- `PLAN.md`
+
+### `01bd282` · 2026-09-28 · test(hls): transcode throughput mode for the smoke test
+- `crates/torrent-engine/src/media.rs`
+
 ### `9ed5c55` · 2026-09-28 · docs: direct torrent reads for HLS runs
 - `PLAN.md`
 - `FILE_INDEX.md`
