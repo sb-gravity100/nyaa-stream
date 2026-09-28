@@ -2,6 +2,11 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `6d6e48a` · 2026-09-28 · feat(player): fall back to the HLS player when mpv isn't installed
+- `src/App.css`
+- `src/HlsPlayerView.tsx`
+- `src/PlayerView.tsx`
+
 ### `bc9289d` · 2026-09-28 · feat(player): add mpv_available check
 - `src-tauri/src/lib.rs`
 - `src-tauri/src/player.rs`
