@@ -6,8 +6,20 @@ import { progressForAnime, setWatched, subscribeProgress, type ProgressEntry } f
 import { BackIcon, CheckIcon, PlayIcon, PlusIcon } from "./icons";
 import { Buffering } from "./Buffering";
 import type { WatchTarget } from "./router";
+import { useSettings } from "./settings";
 
 type SourceGroup = [string, { label: EpisodeLabel; releases: NyaaResult[] }];
+
+/** The rows AniList/Kitsu know as real episodes: numbered episodes within
+ * the episode count (AniList's, or Kitsu's when it's the fallback source).
+ * Batch and Unknown rows are never listed; a movie's one group is episode
+ * 1. A show still airing has no count yet - there every numbered episode
+ * stays, since Kitsu's episode list trails new releases by a day or more
+ * and would hide exactly the newest one. */
+function listedSources(groups: SourceGroup[], anime: AnimeMedia): SourceGroup[] {
+  const count = anime.episodes;
+  return groups.filter(([, g]) => g.label.kind === "episode" && (count == null || (g.label.number >= 1 && g.label.number <= count)));
+}
 
 interface Props {
   anime: AnimeMedia;
@@ -86,6 +98,14 @@ export function MediaPage({
 }: Props) {
   const seasonLabel = formatSeason(anime.season, anime.seasonYear);
   const movie = isMovie(anime);
+  const settings = useSettings();
+  // What the page and the player's episode list show; the route still
+  // resolves against every group, so a direct link to a hidden row plays.
+  const visibleSources = useMemo(
+    () => (settings.hideUnlistedSources ? listedSources(groupedSources, anime) : groupedSources),
+    [settings.hideUnlistedSources, groupedSources, anime.episodes],
+  );
+  const hiddenCount = groupedSources.length - visibleSources.length;
   const progress = useAnimeProgress(anime.id);
   const [expanded, setExpanded] = useState(false);
   // The group the route's player target resolves to, once releases load.
@@ -127,22 +147,22 @@ export function MediaPage({
     if (!playing || playing[1].label.kind !== "episode") return null;
     const { season, number } = playing[1].label;
     return (
-      groupedSources.find(([, g]) => g.label.kind === "episode" && g.label.season === season && g.label.number === number + 1) ?? null
+      visibleSources.find(([, g]) => g.label.kind === "episode" && g.label.season === season && g.label.number === number + 1) ?? null
     );
-  }, [playing, groupedSources]);
+  }, [playing, visibleSources]);
 
   // The first episode that isn't finished, after the most recently
   // watched one - what the primary button plays.
   const continueTarget = useMemo(() => {
-    const episodes = groupedSources.filter(([, g]) => g.label.kind === "episode");
-    if (episodes.length === 0) return groupedSources[0] ?? null;
+    const episodes = visibleSources.filter(([, g]) => g.label.kind === "episode");
+    if (episodes.length === 0) return visibleSources[0] ?? null;
     const latest = Object.values(progress).sort((a, b) => b.updatedAt - a.updatedAt)[0];
     if (!latest) return episodes[0];
     const latestIndex = episodes.findIndex(([key]) => key === latest.episodeKey);
     if (latestIndex < 0) return episodes[0];
     if (!latest.completed) return episodes[latestIndex];
     return episodes[latestIndex + 1] ?? episodes[latestIndex];
-  }, [groupedSources, progress]);
+  }, [visibleSources, progress]);
 
   // Backdrop and episode thumbnails come from Kitsu (real wide banner and
   // better per-episode coverage than AniList - see src/kitsu.ts), falling
@@ -162,7 +182,7 @@ export function MediaPage({
   // actually changes, not on every MediaPage render.
   const playlist = useMemo(
     () =>
-      groupedSources.map(([key, group]) => {
+      visibleSources.map(([key, group]) => {
         const number = group.label.kind === "episode" ? group.label.number : null;
         return {
           key,
@@ -172,7 +192,7 @@ export function MediaPage({
           progress: progress[key] ?? null,
         };
       }),
-    [groupedSources, thumbnails, progress],
+    [visibleSources, thumbnails, progress],
   );
 
   // Stable for the memoized player playlist.
@@ -317,7 +337,12 @@ export function MediaPage({
         <section class="videos-list-panel" aria-label={movie ? "Movie" : "Episodes"}>
           <header class="videos-list-header">
             <h2>{movie ? "Movie" : "Episodes"}</h2>
-            {!sourcesLoading && sourcesCount > 0 && <span>{sourcesCount} releases on nyaa.si</span>}
+            {!sourcesLoading && sourcesCount > 0 && (
+              <span>
+                {sourcesCount} releases on nyaa.si
+                {hiddenCount > 0 && ` · ${hiddenCount} unlisted ${hiddenCount === 1 ? "row" : "rows"} hidden`}
+              </span>
+            )}
           </header>
           {error && <p class="error-banner">{error}</p>}
           {watchMissing && (
@@ -326,12 +351,17 @@ export function MediaPage({
           {!sourcesLoading && sourcesCount === 0 && !error && (
             <p class="empty-state">Nobody has uploaded this to nyaa.si yet, or it's listed under a different title.</p>
           )}
+          {!sourcesLoading && visibleSources.length === 0 && hiddenCount > 0 && (
+            <p class="empty-state">
+              Only unlisted releases (batches or unrecognized titles) were found. Turn off “Hide unlisted sources” in Settings to see them.
+            </p>
+          )}
 
           <div class="videos-list">
             {sourcesLoading && Array.from({ length: 6 }, (_, i) => <VideoRowSkeleton key={i} />)}
 
             {!sourcesLoading &&
-              groupedSources.map(([key, group]) => {
+              visibleSources.map(([key, group]) => {
                 const episodeNumber = group.label.kind === "episode" ? group.label.number : null;
                 // A movie's row shows its key art, not a "1".
                 const thumbnail = movie ? (backdrop ?? undefined) : episodeNumber != null ? thumbnails[episodeNumber] : undefined;

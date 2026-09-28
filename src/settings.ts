@@ -45,6 +45,10 @@ export interface Settings {
   autoplayNext: boolean;
   /** Remember the fansub group last played per anime and prefer it. */
   rememberFansubGroup: boolean;
+  /** Only list rows that are real episodes per AniList/Kitsu - hides
+   * off-list episode numbers, Batch and Unknown rows (see
+   * `listedSources` in MediaPage). */
+  hideUnlistedSources: boolean;
 }
 
 /** Crunchyroll's own dialogue style (its English ASS tracks, e.g. a
@@ -79,6 +83,7 @@ export const DEFAULT_SETTINGS: Settings = {
   resumePlayback: true,
   autoplayNext: true,
   rememberFansubGroup: true,
+  hideUnlistedSources: true,
 };
 
 function load(): Settings {
