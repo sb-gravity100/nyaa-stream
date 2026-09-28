@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `a7530bc` · 2026-09-28 · fix(subtitles): stream-copy ASS tracks instead of decoding them
+- `crates/torrent-engine/src/lib.rs`
+- `crates/torrent-engine/src/media.rs`
+
 ### `313ff0a` · 2026-09-28 · docs: in-process FFmpeg, build prerequisites, subtitle lift/AA
 - `CLAUDE.md`
 - `FILE_INDEX.md`
