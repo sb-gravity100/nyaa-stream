@@ -52,7 +52,12 @@
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 
-  font-family: "Zen Kaku Gothic New", "Yu Gothic UI", "Segoe UI", system-ui, sans-serif;
+  /* Outfit carries titles and labels; Zen Kaku reads body copy and every
+     Japanese glyph (Outfit has none, so native titles fall through). */
+  --font-body: "Zen Kaku Gothic New", "Yu Gothic UI", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Outfit Variable", "Zen Kaku Gothic New", "Yu Gothic UI", system-ui, sans-serif;
+
+  font-family: var(--font-body);
   font-size: 16px;
   line-height: 1.5;
   font-weight: 400;
@@ -88,9 +93,40 @@ h1,
 h2,
 h3 {
   margin: 0;
-  font-weight: 700;
-  letter-spacing: -0.01em;
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.015em;
 }
+
+/* Titles and interface labels in the display face. */
+.app-brand,
+.button,
+.back-button,
+.link-button,
+.home-hero-reason,
+.home-section-count,
+.episode-card-title,
+.episode-card-badge,
+.library-title,
+.result-title,
+.result-score,
+.media-facts dd,
+.video-title,
+.video-thumbnail-number,
+.setting-label,
+.shortcut-list dt {
+  font-family: var(--font-display);
+}
+
+.home-section-count,
+.episode-card-meta,
+.video-meta,
+.media-facts dd,
+.result-status,
+.home-hero-meta {
+  font-variant-numeric: tabular-nums;
+}
+
 
 button {
   font: inherit;
@@ -154,9 +190,11 @@ a {
   padding: 0 20px;
   border: 1px solid transparent;
   border-radius: 999px;
-  font-size: 0.9rem;
-  font-weight: 700;
+  font-size: 0.92rem;
+  font-weight: 600;
+  letter-spacing: 0.005em;
   cursor: pointer;
+
   white-space: nowrap;
   transition: background-color 0.15s var(--ease), border-color 0.15s var(--ease), transform 0.1s var(--ease);
 }
@@ -306,9 +344,9 @@ a {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  font-size: 1.15rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  font-size: 1.2rem;
+  font-weight: 600;
+  letter-spacing: -0.03em;
   color: var(--text);
 }
 
@@ -638,9 +676,10 @@ a {
 }
 
 .home-hero-title {
-  font-size: clamp(2.2rem, 4.6vw, 4rem);
-  line-height: 1.02;
-  letter-spacing: -0.035em;
+  font-size: clamp(2.4rem, 5vw, 4.4rem);
+  font-weight: 700;
+  line-height: 0.98;
+  letter-spacing: -0.04em;
   text-wrap: balance;
   text-shadow: 0 4px 30px rgba(4, 5, 12, 0.6);
 }
@@ -1092,9 +1131,10 @@ a {
 }
 
 .media-title {
-  font-size: clamp(2rem, 3vw, 2.9rem);
-  line-height: 1.05;
-  letter-spacing: -0.03em;
+  font-size: clamp(2.1rem, 3.2vw, 3.1rem);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.035em;
   text-wrap: balance;
   text-shadow: 0 4px 30px rgba(4, 5, 12, 0.6);
 }

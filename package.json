@@ -10,6 +10,7 @@
     "tauri": "tauri"
   },
   "dependencies": {
+    "@fontsource-variable/outfit": "^5.3.0",
     "@fontsource/zen-kaku-gothic-new": "^5.3.0",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-opener": "^2",
