@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `32554f3` · 2026-09-29 · docs: note Outfit in FILE_INDEX
+- `FILE_INDEX.md`
+
 ### `e5c1138` · 2026-09-29 · style: Outfit display face for titles and labels
 - `package-lock.json`
 - `package.json`
