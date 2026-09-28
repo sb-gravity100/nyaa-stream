@@ -1332,7 +1332,8 @@ export function HlsPlayerView({
                }}
                class={`player-video${hasPlayed ? " shown" : ""}`}
                autoPlay
-               onClick={togglePause}
+               // No click-to-pause (same as the mpv player): Space/K or
+               // the button.
                onDblClick={toggleFullscreen}
                onLoadedMetadata={(e) =>
                   setDuration((e.target as HTMLVideoElement).duration || 0)

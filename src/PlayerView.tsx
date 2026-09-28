@@ -1049,10 +1049,10 @@ function MpvPlayerView({
          style={{ cursor: cursorHidden ? "none" : "auto" }}
       >
          {/* mpv draws under the transparent webview; this layer only
-          catches clicks on the picture. */}
+          catches double-clicks on the picture (fullscreen). A single click
+          deliberately does nothing - pause is Space/K or the button. */}
          <div
             class="player-video-surface"
-            onClick={togglePause}
             onDblClick={toggleFullscreen}
          />
 
