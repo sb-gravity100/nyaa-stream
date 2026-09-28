@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `6dc5711` · 2026-09-29 · perf(build): optimize image decoding crates in dev builds
+- `Cargo.toml`
+
 ### `03b5131` · 2026-09-29 · fix(player): mpv pause state, seek coalescing, instant close
 - `src/PlayerView.tsx`
 - `src/mpvVideo.ts`
