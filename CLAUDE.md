@@ -115,12 +115,13 @@ full architecture; summary:
   embedding mpv into the app window was tried and abandoned (a
   Tauri/WebView2 transparency bug on Windows broke click input app-wide;
   see PLAN.md's Known gaps)
-- `ffmpeg`/`ffprobe` on PATH are required too: raw torrent bytes aren't
-  reliably playable in a browser `<video>` (Matroska's seek index/duration
-  commonly live near the file's end, which an incrementally-downloading
-  torrent can't provide up front), so `torrent_engine::HlsJobs` runs one
-  continuous `ffmpeg` transcode per torrent file, writing real HLS segment
-  files to disk that `hls_segment_handler` serves - see PLAN.md
+- FFmpeg runs in-process (`crates/torrent-engine/src/media.rs`, ez-ffmpeg +
+  ffmpeg-next), statically linked from the FFmpeg that `vcpkg.json` builds
+  (LGPL - never enable x264/GPL features): raw torrent bytes aren't
+  reliably playable in a browser `<video>`, so `torrent_engine::HlsJobs`
+  runs one continuous HLS run per torrent file, writing real segment files
+  that `hls_segment_handler` serves - see PLAN.md. Building needs vcpkg +
+  LLVM's libclang (see PLAN.md's Build prerequisites)
 - `reference/stremio-core/` is a gitignored, reference-only clone of
   Stremio's core (https://github.com/Stremio/stremio-core) — never a build
   dependency, consult it for architecture ideas only
