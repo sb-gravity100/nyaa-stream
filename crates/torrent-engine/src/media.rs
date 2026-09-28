@@ -455,16 +455,22 @@ mod tests {
             dir: &dir,
             start_segment_index,
             segment_seconds: 6.0,
-            video: VideoCodec::Copy { hvc1 },
+            // NYAA_HLS_TEST_TRANSCODE=1: H.264 transcode with the detected
+            // encoder, for measuring throughput.
+            video: if std::env::var("NYAA_HLS_TEST_TRANSCODE").is_ok() { VideoCodec::Transcode(detect_h264_encoder()) } else { VideoCodec::Copy { hvc1 } },
             subtitle_streams: &[],
         })
         .unwrap();
-        let third = dir.join(format!("{}.{SEGMENT_EXTENSION}", start_segment_index + 2));
-        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(60);
+        let segments: usize = std::env::var("NYAA_HLS_TEST_SEGMENTS").ok().and_then(|s| s.parse().ok()).unwrap_or(3);
+        let third = dir.join(format!("{}.{SEGMENT_EXTENSION}", start_segment_index + segments - 1));
+        let started = std::time::Instant::now();
+        let deadline = started + std::time::Duration::from_secs(300);
         while !third.exists() && !job.is_ended() && std::time::Instant::now() < deadline {
             std::thread::sleep(std::time::Duration::from_millis(100));
         }
+        let elapsed = started.elapsed().as_secs_f64();
         job.abort();
+        println!("{segments} segments in {elapsed:.1}s = {:.1}x realtime", segments as f64 * 6.0 / elapsed);
         assert!(dir.join(INIT_SEGMENT).exists(), "no init segment");
         assert!(third.exists(), "no third segment");
         println!("output in {}", dir.display());
