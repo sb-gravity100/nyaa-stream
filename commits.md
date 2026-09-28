@@ -2,6 +2,15 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `0c735c0` · 2026-09-28 · feat(player): arrow-key skips no longer reveal the controls
+- `src/PlayerView.tsx`
+
+### `67be4db` · 2026-09-28 · perf(player): memoize episode list, drop per-open row cascade
+- `src/PlayerPlaylist.tsx`
+- `src/PlayerView.tsx`
+- `src/MediaPage.tsx`
+- `src/App.css`
+
 ### `dc49fb4` · 2026-09-28 · feat(player): fade controls on mouse idle unless over top/bottom bars
 - `src/PlayerView.tsx`
 - `src/App.css`
