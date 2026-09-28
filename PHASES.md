@@ -256,3 +256,7 @@
 - [ ] Settings still missing: mpv/ffmpeg path override, download directory
 - [ ] Packaging: Tauri bundler for Windows installer; document the mpv
       system-dependency requirement clearly at install/first-run
+- [x] Player chrome: full-width control strip over a bottom gradient (no
+      glass dock), controls also revealed by hovering the top edge;
+      verbose statistics popup (torrent, streaming run, playback,
+      thumbnail)

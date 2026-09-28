@@ -2,6 +2,19 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `eecd13f` · 2026-09-28 · feat(stats): verbose statistics popup
+- `src/App.css`
+- `src/PlayerView.tsx`
+- `src/StatisticsMenu.tsx`
+- `src/types.ts`
+
+### `2a77529` · 2026-09-28 · feat(stats): report swarm, upload and HLS run details in StreamStats
+- `crates/torrent-engine/src/lib.rs`
+
+### `ca42e3e` · 2026-09-28 · feat(player): gradient control strip, reveal controls from the top edge
+- `src/App.css`
+- `src/PlayerView.tsx`
+
 ### `3c70de4` · 2026-09-28 · feat(thumbnails): paint card art on the first frame after launch
 - `src/kitsu.ts`
 - `src/App.tsx`
