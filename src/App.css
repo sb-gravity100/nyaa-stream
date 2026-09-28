@@ -22,6 +22,9 @@
   --radius-m: 10px;
   --radius-l: 16px;
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  /* Expo-out for things that arrive, slight overshoot for things you press. */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 
   font-family: "Zen Kaku Gothic New", "Yu Gothic UI", "Segoe UI", system-ui, sans-serif;
   font-size: 16px;
@@ -1138,6 +1141,12 @@ a {
   width: 100%;
   height: 100%;
   background: #000;
+  opacity: 0;
+  transition: opacity 0.45s var(--ease-out);
+}
+
+.player-video.shown {
+  opacity: 1;
 }
 
 /* JASSUB's libass canvas sits right after the <video>; keep it under the
@@ -1158,12 +1167,14 @@ a {
   padding: 16px 20px 40px;
   background: linear-gradient(rgba(0, 0, 0, 0.7), transparent);
   opacity: 0;
-  transition: opacity 0.2s var(--ease);
+  transform: translateY(-10px);
+  transition: opacity 0.28s var(--ease-out), transform 0.36s var(--ease-out);
   pointer-events: none;
 }
 
 .player-view.controls-shown .player-topbar {
   opacity: 1;
+  transform: none;
   pointer-events: auto;
 }
 
@@ -1205,12 +1216,18 @@ a {
   background: transparent;
   color: rgba(255, 255, 255, 0.88);
   cursor: pointer;
-  transition: background-color 0.15s var(--ease), color 0.15s var(--ease);
+  transition: background-color 0.18s var(--ease), color 0.18s var(--ease), transform 0.22s var(--ease-spring);
 }
 
 .player-icon-button:hover {
   background: rgba(255, 255, 255, 0.12);
   color: #fff;
+  transform: scale(1.08);
+}
+
+.player-icon-button:active {
+  transform: scale(0.9);
+  transition-duration: 0.08s;
 }
 
 .player-icon-button:disabled {
@@ -1253,6 +1270,7 @@ a {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
+  animation: fade-in 0.3s var(--ease-out);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1338,7 +1356,21 @@ a {
   font-size: 0.9rem;
   font-weight: 700;
   pointer-events: none;
-  animation: fade-in 0.12s var(--ease);
+  animation: toast-in 0.26s var(--ease-out);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -8px) scale(0.96);
+  }
+}
+
+@keyframes tooltip-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 4px);
+  }
 }
 
 .player-next-card {
@@ -1352,7 +1384,36 @@ a {
   background: rgba(23, 26, 43, 0.94);
   border: 1px solid var(--line);
   box-shadow: 0 20px 48px rgba(0, 0, 0, 0.5);
-  animation: slide-in 0.2s var(--ease);
+  overflow: hidden;
+  animation: next-in 0.45s var(--ease-out);
+}
+
+@keyframes next-in {
+  from {
+    opacity: 0;
+    transform: translateX(40px);
+  }
+}
+
+/* Drains over the autoplay countdown. */
+.player-next-progress {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 3px;
+  width: 100%;
+  background: var(--accent);
+  transform-origin: left;
+  animation: next-drain linear forwards;
+}
+
+@keyframes next-drain {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
 }
 
 .player-next-label {
@@ -1381,10 +1442,29 @@ a {
   overflow-y: auto;
   padding: 10px;
   border-radius: var(--radius-l);
-  background: rgba(23, 26, 43, 0.96);
+  background: rgba(23, 26, 43, 0.9);
+  backdrop-filter: blur(18px) saturate(1.2);
   border: 1px solid var(--line);
   box-shadow: 0 20px 48px rgba(0, 0, 0, 0.5);
-  animation: fade-in 0.12s var(--ease);
+  transform-origin: bottom right;
+  opacity: 0;
+  transform: translateY(10px) scale(0.96);
+  transition: opacity 0.16s var(--ease), transform 0.18s var(--ease);
+  pointer-events: none;
+}
+
+.player-menu.open {
+  opacity: 1;
+  transform: none;
+  transition: opacity 0.2s var(--ease-out), transform 0.32s var(--ease-out);
+  pointer-events: auto;
+}
+
+@starting-style {
+  .player-menu.open {
+    opacity: 0;
+    transform: translateY(10px) scale(0.96);
+  }
 }
 
 .player-menu-title {
@@ -1569,8 +1649,8 @@ a {
   padding: 36px 18px 12px;
   background: linear-gradient(transparent, rgba(0, 0, 0, 0.82) 55%);
   opacity: 0;
-  transform: translateY(6px);
-  transition: opacity 0.18s var(--ease), transform 0.18s var(--ease);
+  transform: translateY(14px);
+  transition: opacity 0.22s var(--ease-out), transform 0.4s var(--ease-out);
   pointer-events: none;
 }
 
@@ -1578,6 +1658,20 @@ a {
   opacity: 1;
   transform: translateY(0);
   pointer-events: auto;
+}
+
+/* The row settles a beat after the bar, so the reveal reads as one motion
+   rather than a block appearing. */
+.player-controls-row {
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.2s var(--ease-out), transform 0.36s var(--ease-out);
+}
+
+.player-controls.visible .player-controls-row {
+  opacity: 1;
+  transform: none;
+  transition-delay: 0.04s;
 }
 
 /* Layered seek bar: a transparent <input type=range> on top for drag
@@ -1618,9 +1712,15 @@ a {
   background: rgba(255, 255, 255, 0.62);
 }
 
+/* Width is driven per frame from PlayerView's rAF loop as scaleX (no
+   layout work per frame). */
 .player-seek-played {
   left: 0;
+  right: 0;
   background: var(--accent);
+  transform-origin: left center;
+  transform: scaleX(0);
+  will-change: transform;
 }
 
 .player-seek-wrap:hover .player-seek-track,
@@ -1639,8 +1739,9 @@ a {
   margin: -7px 0 0 -7px;
   border-radius: 50%;
   background: var(--accent-strong);
+  box-shadow: 0 0 0 4px rgba(240, 122, 166, 0.25);
   transform: scale(0);
-  transition: transform 0.12s var(--ease);
+  transition: transform 0.22s var(--ease-spring);
   pointer-events: none;
 }
 
@@ -1652,6 +1753,7 @@ a {
   position: absolute;
   bottom: 22px;
   transform: translateX(-50%);
+  animation: tooltip-in 0.14s var(--ease-out);
   padding: 2px 8px;
   border-radius: 4px;
   background: rgba(16, 18, 31, 0.92);
@@ -1851,13 +1953,27 @@ a {
   box-shadow: -24px 0 60px rgba(0, 0, 0, 0.45);
   transform: translateX(100%);
   visibility: hidden;
-  transition: transform 0.26s var(--ease), visibility 0s linear 0.26s;
+  transition: transform 0.3s var(--ease), visibility 0s linear 0.3s;
 }
 
 .player-playlist.open {
   transform: translateX(0);
   visibility: visible;
-  transition: transform 0.26s var(--ease), visibility 0s;
+  transition: transform 0.46s var(--ease-out), visibility 0s;
+}
+
+/* Rows cascade in after the panel, the first ~15 staggered. */
+.player-playlist .player-playlist-item {
+  opacity: 0;
+  transform: translateX(18px);
+  transition: opacity 0.2s var(--ease), transform 0.2s var(--ease), background-color 0.15s var(--ease);
+}
+
+.player-playlist.open .player-playlist-item {
+  opacity: 1;
+  transform: none;
+  transition: opacity 0.35s var(--ease-out), transform 0.45s var(--ease-out), background-color 0.15s var(--ease);
+  transition-delay: calc(0.08s + var(--i, 0) * 22ms), calc(0.08s + var(--i, 0) * 22ms), 0s;
 }
 
 .player-playlist-header {
@@ -2046,4 +2162,134 @@ a {
 .player-chip-accent {
   background: rgba(240, 122, 166, 0.22);
   color: var(--accent-strong);
+}
+
+/* ---------- Player: floating dock + ambient tint ---------- */
+
+.player-view {
+  /* Updated from the video's average color (PlayerView ambient sampler). */
+  --ambient: 43, 48, 80;
+}
+
+/* The control bar floats as an inset glass dock rather than a full-width
+   strip; its glow and tint follow the scene. */
+.player-view .player-controls {
+  left: 18px;
+  right: 18px;
+  bottom: 16px;
+  padding: 10px 14px 8px;
+  border-radius: 20px;
+  background: linear-gradient(rgba(var(--ambient), 0.16), rgba(var(--ambient), 0.08)), rgba(12, 13, 22, 0.62);
+  backdrop-filter: blur(22px) saturate(1.35);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow:
+    0 18px 50px rgba(0, 0, 0, 0.45),
+    0 0 60px rgba(var(--ambient), 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  transition:
+    opacity 0.22s var(--ease-out),
+    transform 0.4s var(--ease-out),
+    background 1.2s linear,
+    box-shadow 1.2s linear;
+}
+
+.player-view .player-controls-hover-zone {
+  height: 120px;
+}
+
+.player-view .player-topbar {
+  background: linear-gradient(rgba(var(--ambient), 0.28), rgba(0, 0, 0, 0.35) 45%, transparent);
+  padding: 20px 24px 56px;
+  transition:
+    opacity 0.28s var(--ease-out),
+    transform 0.36s var(--ease-out),
+    background 1.2s linear;
+}
+
+.player-heading-title {
+  font-size: 1.3rem;
+  letter-spacing: -0.02em;
+  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.5);
+}
+
+.player-view .player-seek-wrap {
+  margin: 0 6px 6px;
+}
+
+.player-view .player-seek-played {
+  background: linear-gradient(90deg, var(--accent), var(--accent-strong));
+  box-shadow: 0 0 12px rgba(240, 122, 166, 0.55);
+}
+
+.player-view .player-menu,
+.player-view .player-next-card {
+  bottom: 118px;
+}
+
+/* Paused: the frame dims slightly and a large glyph breathes in the
+   center until playback resumes. */
+.player-view.is-paused .player-video.shown {
+  filter: brightness(0.78);
+}
+
+.player-video {
+  transition: opacity 0.45s var(--ease-out), filter 0.35s var(--ease-out);
+}
+
+.player-paused-glyph {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 96px;
+  height: 96px;
+  margin: -48px 0 0 -48px;
+  border-radius: 50%;
+  color: #fff;
+  background: rgba(var(--ambient), 0.35);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 0 60px rgba(var(--ambient), 0.5);
+  pointer-events: none;
+  animation:
+    paused-in 0.35s var(--ease-spring),
+    paused-breathe 2.8s ease-in-out 0.35s infinite;
+}
+
+.player-paused-glyph svg {
+  margin-left: 4px;
+}
+
+@keyframes paused-in {
+  from {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+}
+
+@keyframes paused-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+.player-view .player-playlist {
+  top: 12px;
+  right: 12px;
+  bottom: 12px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: linear-gradient(rgba(var(--ambient), 0.14), rgba(var(--ambient), 0.05)), rgba(14, 15, 26, 0.78);
+  backdrop-filter: blur(24px) saturate(1.3);
+  transform: translateX(calc(100% + 24px));
+}
+
+.player-view .player-playlist.open {
+  transform: translateX(0);
 }
