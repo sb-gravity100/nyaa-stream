@@ -229,7 +229,8 @@ export function SettingsPanel({ onClose }: Props) {
               <div><dt>C</dt><dd>Cycle subtitles</dd></div>
               <div><dt>Z / X</dt><dd>Subtitle delay −/+ 0.1s</dd></div>
               <div><dt>N</dt><dd>Next episode</dd></div>
-              <div><dt>F / M</dt><dd>Fullscreen / mute</dd></div>
+              <div><dt>M</dt><dd>Mute</dd></div>
+              <div><dt>F</dt><dd>Fullscreen (anywhere in the app)</dd></div>
               <div><dt>Ctrl + C</dt><dd>Copy the current frame</dd></div>
             </dl>
           </section>

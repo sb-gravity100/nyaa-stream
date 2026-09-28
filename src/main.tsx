@@ -4,6 +4,8 @@ import "@fontsource/zen-kaku-gothic-new/500.css";
 import "@fontsource/zen-kaku-gothic-new/700.css";
 import App from "./App";
 import { installDevLogger } from "./devLogger";
+import { installFullscreenHotkey } from "./fullscreen";
 
 installDevLogger();
+installFullscreenHotkey();
 render(<App />, document.getElementById("root")!);

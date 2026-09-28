@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks";
 import Hls from "hls.js";
 import { invoke } from "@tauri-apps/api/core";
+import { isFullscreen, setFullscreen, toggleFullscreen, useFullscreen } from "./fullscreen";
 import type { AnimeMedia, NyaaResult, PlayFile, StreamStats, SubtitleTrack } from "./types";
 import { displayTitle } from "./types";
 import { getStreamStats, getSubtitleTracks, playMagnet, reportDecoderSupport, stopPlayback } from "./playback";
@@ -272,7 +273,7 @@ export function HlsPlayerView({
       [onSelectEpisode],
    );
    const closePlaylist = useCallback(() => setPlaylistOpen(false), []);
-   const [fullscreen, setFullscreen] = useState(false);
+   const fullscreen = useFullscreen();
    // What the <video> element itself has buffered, in episode time - drawn
    // on the seek bar above the transcode's ready ranges.
    const [bufferedRanges, setBufferedRanges] = useState<[number, number][]>([]);
@@ -778,11 +779,6 @@ export function HlsPlayerView({
          document.removeEventListener("pointerdown", handlePointerDown);
    }, [playlistOpen]);
 
-   useEffect(() => {
-      const onChange = () => setFullscreen(document.fullscreenElement != null);
-      document.addEventListener("fullscreenchange", onChange);
-      return () => document.removeEventListener("fullscreenchange", onChange);
-   }, []);
 
    /** Show controls + cursor and restart the idle countdown. Uses only
     * refs and setters, so stale closures (the pointer effect) are safe. */
@@ -963,13 +959,6 @@ export function HlsPlayerView({
       }, KEYBOARD_SEEK_COMMIT_MS);
    }
 
-   function toggleFullscreen() {
-      if (document.fullscreenElement) {
-         void document.exitFullscreen();
-      } else {
-         void document.querySelector(".player-view")?.requestFullscreen();
-      }
-   }
 
    /** Copies the current frame (at the video's native resolution, with
     * the rendered subtitles when the libass canvas can be read) to the
@@ -1128,9 +1117,6 @@ export function HlsPlayerView({
             case "m":
                toggleMute();
                break;
-            case "f":
-               toggleFullscreen();
-               break;
             case "c":
                cycleSubtitles();
                break;
@@ -1152,9 +1138,9 @@ export function HlsPlayerView({
                   setPlaylistOpen(false);
                   return;
                }
-               // Escape's native behavior exits fullscreen first; only close
-               // the player once there's nothing left for the browser to do.
-               if (!document.fullscreenElement) onClose();
+               // Escape leaves fullscreen first, then closes the player.
+               if (isFullscreen()) setFullscreen(false);
+               else onClose();
                return;
             default:
                return;
@@ -1332,9 +1318,8 @@ export function HlsPlayerView({
                }}
                class={`player-video${hasPlayed ? " shown" : ""}`}
                autoPlay
-               // No click-to-pause (same as the mpv player): Space/K or
-               // the button.
-               onDblClick={toggleFullscreen}
+               // No click-to-pause or double-click fullscreen (same as
+               // the mpv player): Space/K, F, or the buttons.
                onLoadedMetadata={(e) =>
                   setDuration((e.target as HTMLVideoElement).duration || 0)
                }
