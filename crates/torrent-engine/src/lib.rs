@@ -57,9 +57,13 @@ const SEGMENT_POLL_INTERVAL: Duration = Duration::from_millis(100);
 /// job then starts without subtitle outputs rather than stalling playback.
 const PROBE_TIMEOUT: Duration = Duration::from_secs(30);
 
-/// How long a run waits for the media probe to decide copy vs. transcode
-/// before falling back to copy.
-const PLAN_PROBE_WAIT: Duration = Duration::from_secs(12);
+/// How long a run waits for the media probe to decide copy vs. transcode.
+/// Waiting is nearly free: the run itself needs the same container header
+/// before it can produce anything (verified live - the first segment landed
+/// ~1s after a slow probe finished). A shorter 12s wait fell back to copy
+/// and cached it, which would have left an HEVC release undecodable for the
+/// whole session.
+const PLAN_PROBE_WAIT: Duration = Duration::from_secs(45);
 
 /// How long `font_handler` waits for the background attachment dump to
 /// land a requested font on disk.
@@ -319,6 +323,12 @@ impl HlsJobs {
                     tracing::warn!(torrent_id = %torrent_id, file_idx, segment_index, "hls transcode job had exited, restarting");
                     true
                 }
+                // Started under a provisional plan that turned out wrong
+                // (e.g. copying what the probe now says is HEVC).
+                Some(job) if job.video_mode != plan.label() => {
+                    tracing::info!(torrent_id = %torrent_id, file_idx, running = %job.video_mode, planned = %plan.label(), "hls job video plan changed, restarting");
+                    true
+                }
                 Some(job) => {
                     // Only counts files at or after this job's own
                     // start_index - the directory isn't cleared on
@@ -437,11 +447,28 @@ impl HlsJobs {
                 .ok()
                 .and_then(|result| result.ok()),
         };
-        let support = *self.decoder_support.read().unwrap_or_else(|e| e.into_inner());
-        let plan = plan_video(probe.as_ref().and_then(|p| p.video.as_ref()), support).await;
-        let label = plan.label();
         let marker = dir.join("video_mode");
         let previous = tokio::fs::read_to_string(&marker).await.ok();
+        let Some(probe) = probe else {
+            // No probe yet: use a provisional plan - whatever an earlier
+            // session decided for this file (its marker), else copy - and
+            // don't cache it or touch the cache, so the next request
+            // re-plans once the probe lands. A running job whose mode
+            // differs from the real plan is restarted (see
+            // ensure_segment_available).
+            let provisional = match previous.as_deref() {
+                None | Some("direct") => VideoPlan::Copy,
+                Some(label) => VideoPlan::Transcode {
+                    encoder: detect_h264_encoder().await,
+                    reason: label.split(" -> ").next().unwrap_or(label).to_string(),
+                },
+            };
+            tracing::warn!(torrent_id = %torrent_id, file_idx, video = %provisional.label(), "media probe not ready, provisional video plan");
+            return provisional;
+        };
+        let support = *self.decoder_support.read().unwrap_or_else(|e| e.into_inner());
+        let plan = plan_video(probe.video.as_ref(), support).await;
+        let label = plan.label();
         if previous.as_deref() != Some(label.as_str()) {
             let mut removed = 0usize;
             if let Ok(mut entries) = tokio::fs::read_dir(&dir).await {
