@@ -1382,13 +1382,6 @@ a {
   }
 }
 
-@keyframes tooltip-in {
-  from {
-    opacity: 0;
-    transform: translate(-50%, 4px);
-  }
-}
-
 .player-next-card {
   position: absolute;
   right: 24px;
@@ -1808,11 +1801,14 @@ a {
   transform: scale(1);
 }
 
+/* Positioned from PlayerView.tsx's handleSeekHover via transform (set per
+   mousemove, so no transform transition - it would lag the cursor). */
 .player-seek-tooltip {
   position: absolute;
+  left: 0;
   bottom: 22px;
-  transform: translateX(-50%);
-  animation: tooltip-in 0.14s var(--ease-out);
+  opacity: 0;
+  transition: opacity 0.14s var(--ease-out);
   padding: 2px 8px;
   border-radius: 4px;
   background: rgba(16, 18, 31, 0.92);
@@ -1820,6 +1816,10 @@ a {
   font-variant-numeric: tabular-nums;
   pointer-events: none;
   white-space: nowrap;
+}
+
+.player-seek-tooltip.shown {
+  opacity: 1;
 }
 
 .player-seek {
