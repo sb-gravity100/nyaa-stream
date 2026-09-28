@@ -59,7 +59,7 @@
 | `src/torrentThumbnail.ts` | Frontend wrapper around `capture_torrent_thumbnail`, the last-resort thumbnail source when Kitsu and AniList both lack episode art; asks the disk cache (`cached_torrent_thumbnail`) before any nyaa search | frontend |
 | `src/playback.ts` | Frontend wrapper around `play_magnet`/`get_stream_stats`/`get_subtitle_tracks` (both per file index)/`stop_playback`; rejects/no-ops in the dev-only browser preview since torrenting has no meaningful fallback there | frontend |
 | `src/devLogger.ts` | Forwards frontend `console.*`/uncaught errors into the Rust backend's `tracing` log (`log_frontend` command) - the native window has no accessible devtools console during development | frontend, dev-tool |
-| `src/main.tsx` | Frontend entrypoint: loads the bundled Zen Kaku Gothic New weights, installs `devLogger`, renders | frontend |
+| `src/main.tsx` | Frontend entrypoint: loads the bundled Zen Kaku Gothic New weights (body, Japanese) and Outfit (display), installs `devLogger`, renders | frontend |
 | `reference/stremio-core/` | Reference-only clone of Stremio's core (state/data layer), gitignored, not a build dependency | reference |
 | `reference/stremio-web/` | Reference-only clone of Stremio's actual UI (React), gitignored — used to verify real layout/styling/data-flow decisions against source rather than guessing | reference |
 
