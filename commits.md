@@ -2,6 +2,11 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `f991579` · 2026-09-29 · feat: fall back to Kitsu for anime search/details when AniList is unavailable
+- `src-tauri/Cargo.toml`
+- `src-tauri/src/lib.rs`
+- `src-tauri/src/metadata_fallback.rs`
+
 ### `32225ee` · 2026-09-29 · feat(kitsu-client): anime search and by-AniList-id lookup
 - `crates/kitsu-client/examples/fallback_debug.rs`
 - `crates/kitsu-client/src/anime.rs`
