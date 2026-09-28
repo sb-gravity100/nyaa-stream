@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `04a2a24` · 2026-09-29 · chore(player): debug-log seek commits and restarts
+- `src/PlayerView.tsx`
+- `src/mpvVideo.ts`
+
 ### `6194199` · 2026-09-29 · feat(player): loading overlay while seeks wait, with smoother animation
 - `src/App.css`
 - `src/Buffering.tsx`
