@@ -129,6 +129,12 @@ export function SettingsPanel({ onClose }: Props) {
               checked={settings.rememberFansubGroup}
               onChange={(v) => updateSettings({ rememberFansubGroup: v })}
             />
+            <Toggle
+              label="Hide unlisted sources"
+              hint="Only show episodes AniList/Kitsu know about - hides batches, unrecognized titles and extra episode numbers"
+              checked={settings.hideUnlistedSources}
+              onChange={(v) => updateSettings({ hideUnlistedSources: v })}
+            />
             <Row label="Preferred quality" hint="Used when picking a release automatically">
               <select
                 value={settings.preferredResolution}
