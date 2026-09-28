@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `dda8552` · 2026-09-29 · style: always play animations, ignoring the OS reduced-motion setting
+- `src/App.css`
+
 ### `b97d691` · 2026-09-29 · fix(settings): dark native dropdown lists for selects
 - `src/App.css`
 
