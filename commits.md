@@ -2,6 +2,15 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `9ed5c55` · 2026-09-28 · docs: direct torrent reads for HLS runs
+- `PLAN.md`
+- `FILE_INDEX.md`
+
+### `9a2c5ee` · 2026-09-28 · feat(hls): read torrents directly in HLS and subtitle runs
+- `crates/torrent-engine/src/direct_input.rs`
+- `crates/torrent-engine/src/lib.rs`
+- `crates/torrent-engine/src/media.rs`
+
 ### `1ab76ba` · 2026-09-28 · docs: fMP4 HLS segments and aborted-run tail cleanup
 - `PLAN.md`
 - `FILE_INDEX.md`
