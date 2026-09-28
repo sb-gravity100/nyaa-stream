@@ -2,6 +2,7 @@ import { useEffect, useState } from "preact/hooks";
 import { displayTitle, type AiringEntry, type AnimeMedia, type KitsuMetadata } from "./types";
 import { continueWatching, subscribeProgress, type ProgressEntry } from "./watchProgress";
 import { PlayIcon } from "./icons";
+import { cachedTorrentThumbnail } from "./torrentThumbnail";
 
 interface Props {
   library: AnimeMedia[];
@@ -51,6 +52,18 @@ export function HomePage({
   onSelectEpisode,
 }: Props) {
   const inProgress = useContinueWatching();
+  // Last frames saved by the player (or earlier captures) for the
+  // Continue watching cards - where the user actually left off.
+  const [lastFrames, setLastFrames] = useState<Record<string, string>>({});
+  useEffect(() => {
+    for (const entry of inProgress) {
+      if (entry.episode == null) continue;
+      const key = `${entry.animeId}-${entry.episode}`;
+      cachedTorrentThumbnail(entry.animeId, entry.episode).then((dataUri) => {
+        if (dataUri) setLastFrames((current) => (current[key] === dataUri ? current : { ...current, [key]: dataUri }));
+      });
+    }
+  }, [inProgress]);
 
   return (
     <div class="home-page">
@@ -61,6 +74,7 @@ export function HomePage({
             {inProgress.map((entry) => {
               const kitsu = kitsuByMedia[entry.animeId];
               const thumbnail =
+                (entry.episode != null ? lastFrames[`${entry.animeId}-${entry.episode}`] : undefined) ??
                 (entry.episode != null ? kitsu?.episodeThumbnails[entry.episode] : undefined) ??
                 kitsu?.background ??
                 entry.anime.coverImage.extraLarge ??
