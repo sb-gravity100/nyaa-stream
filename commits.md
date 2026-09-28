@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `90de84d` · 2026-09-28 · perf(subtitles): warm libass renderer at track selection, cap render height
+- `src/assRenderer.ts`
+
 ### `4262654` · 2026-09-28 · fix(engine): restart dead transcodes, reconnect on early EOF, background subs pass
 - `crates/torrent-engine/src/lib.rs`
 
