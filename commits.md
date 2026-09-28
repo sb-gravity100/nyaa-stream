@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `2e16012` · 2026-09-28 · fix(hls): serve init.mp4 only once complete, reopen direct reads on seek
+- `crates/torrent-engine/src/lib.rs`
+- `crates/torrent-engine/src/direct_input.rs`
+
 ### `135e92a` · 2026-09-28 · fix(hls): keep absolute decode times in fMP4 fragments
 - `crates/torrent-engine/src/media.rs`
 
