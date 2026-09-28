@@ -29,7 +29,14 @@ pub async fn mpv_start(app: AppHandle, window: WebviewWindow, state: State<'_, P
     if slot.is_none() {
         let wid = window_handle(&window)?;
         let (events_tx, mut events_rx) = mpsc::unbounded_channel::<Value>();
-        let mpv = EmbeddedMpv::spawn(wid, events_tx).await.map_err(|err| err.to_string())?;
+        let extra_args = match install_fonts().await {
+            Ok(dir) => vec![format!("--sub-fonts-dir={}", dir.display())],
+            Err(err) => {
+                tracing::warn!(%err, "couldn't install bundled subtitle fonts for mpv");
+                Vec::new()
+            }
+        };
+        let mpv = EmbeddedMpv::spawn(wid, &extra_args, events_tx).await.map_err(|err| err.to_string())?;
         if let Some(pid) = mpv.pid() {
             tokio::spawn(push_mpv_window_to_bottom(wid, pid));
         }
@@ -81,6 +88,90 @@ pub async fn mpv_stop(window: WebviewWindow, state: State<'_, PlayerState>) -> R
     window.set_background_color(None).map_err(|err| err.to_string())?;
     tracing::info!("mpv_stop completed");
     Ok(())
+}
+
+/// Longest side of the last-frame thumbnail - matches the headless
+/// capture's width (mpv-ipc's `THUMBNAIL_WIDTH`), both feeding 16:9 cards.
+const THUMBNAIL_WIDTH: u32 = 640;
+
+/// The current video frame (no subtitles) as a JPEG `width` pixels wide -
+/// the player's last-frame thumbnail. Raw bytes over binary IPC.
+#[tauri::command]
+pub async fn mpv_frame(state: State<'_, PlayerState>, width: Option<u32>) -> Result<tauri::ipc::Response, String> {
+    let width = width.unwrap_or(THUMBNAIL_WIDTH);
+    tracing::debug!(width, "mpv_frame invoked");
+    let path = screenshot(&state, "jpg", "video").await?;
+    let jpeg = tokio::task::spawn_blocking(move || -> Result<Vec<u8>, String> {
+        let frame = image::open(&path).map_err(|err| err.to_string())?;
+        let _ = std::fs::remove_file(&path);
+        let height = (width as f64 * frame.height() as f64 / frame.width().max(1) as f64).round() as u32;
+        let small = frame.resize_exact(width, height.max(1), image::imageops::FilterType::Triangle).to_rgb8();
+        let mut out = Vec::new();
+        image::codecs::jpeg::JpegEncoder::new_with_quality(&mut out, 82).encode_image(&small).map_err(|err| err.to_string())?;
+        Ok(out)
+    })
+    .await
+    .map_err(|err| err.to_string())??;
+    tracing::info!(bytes = jpeg.len(), "mpv frame captured");
+    Ok(tauri::ipc::Response::new(jpeg))
+}
+
+/// Copies the frame on screen, rendered subtitles included, to the native
+/// clipboard at the video's own resolution (Ctrl+C in the player).
+#[tauri::command]
+pub async fn mpv_copy_frame(state: State<'_, PlayerState>) -> Result<(), String> {
+    tracing::debug!("mpv_copy_frame invoked");
+    let path = screenshot(&state, "png", "subtitles").await?;
+    let (width, height, pixels) = tokio::task::spawn_blocking(move || -> Result<(usize, usize, Vec<u8>), String> {
+        let frame = image::open(&path).map_err(|err| err.to_string())?.to_rgba8();
+        let _ = std::fs::remove_file(&path);
+        Ok((frame.width() as usize, frame.height() as usize, frame.into_raw()))
+    })
+    .await
+    .map_err(|err| err.to_string())??;
+    crate::set_clipboard_image(width, height, pixels).await?;
+    tracing::info!(width, height, "mpv frame copied to clipboard");
+    Ok(())
+}
+
+/// App-owned scratch directory for mpv (screenshots, fonts).
+fn scratch_dir() -> std::path::PathBuf {
+    dirs::cache_dir().unwrap_or_else(std::env::temp_dir).join("nyaa-stream").join("mpv")
+}
+
+/// Writes one screenshot (`flags`: "video" or "subtitles") to a temp file.
+async fn screenshot(state: &PlayerState, extension: &str, flags: &str) -> Result<std::path::PathBuf, String> {
+    let mpv = state.mpv.lock().await.clone().ok_or_else(|| "mpv is not running".to_string())?;
+    let dir = scratch_dir();
+    tokio::fs::create_dir_all(&dir).await.map_err(|err| err.to_string())?;
+    let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis();
+    let path = dir.join(format!("frame-{stamp}.{extension}"));
+    mpv.command(&["screenshot-to-file".into(), path.to_string_lossy().into_owned().into(), flags.into()])
+        .await
+        .map_err(|err| {
+            tracing::warn!(%err, "mpv screenshot failed");
+            err.to_string()
+        })?;
+    Ok(path)
+}
+
+/// The default subtitle style's font (Gandhi Sans) isn't installed on the
+/// system - write the bundled copies where mpv's `--sub-fonts-dir` finds
+/// them.
+async fn install_fonts() -> std::io::Result<std::path::PathBuf> {
+    const FONTS: &[(&str, &[u8])] = &[
+        ("GandhiSans-Bold.otf", include_bytes!("../../src/assets/fonts/GandhiSans-Bold.otf")),
+        ("GandhiSans-BoldItalic.otf", include_bytes!("../../src/assets/fonts/GandhiSans-BoldItalic.otf")),
+    ];
+    let dir = scratch_dir().join("fonts");
+    tokio::fs::create_dir_all(&dir).await?;
+    for (name, bytes) in FONTS {
+        let path = dir.join(name);
+        if tokio::fs::metadata(&path).await.map(|m| m.len() as usize != bytes.len()).unwrap_or(true) {
+            tokio::fs::write(&path, bytes).await?;
+        }
+    }
+    Ok(dir)
 }
 
 #[cfg(windows)]
