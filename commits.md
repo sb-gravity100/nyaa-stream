@@ -2,6 +2,12 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `63d3a65` · 2026-09-28 · docs: document embedded mpv playback and HLS fallback
+- `CLAUDE.md`
+- `FILE_INDEX.md`
+- `PHASES.md`
+- `PLAN.md`
+
 ### `e621dae` · 2026-09-28 · docs(code): update comments for mpv playback
 - `crates/mpv-ipc/src/lib.rs`
 - `src-tauri/src/lib.rs`
