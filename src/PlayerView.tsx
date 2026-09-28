@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks"
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { MpvVideo } from "./mpvVideo";
+import { HlsPlayerView } from "./HlsPlayerView";
 import type { AnimeMedia, NyaaResult, PlayFile, StreamStats, SubtitleTrack } from "./types";
 import { displayTitle } from "./types";
 import { getStreamStats, playMagnet, stopPlayback } from "./playback";
@@ -182,7 +183,7 @@ function loadVolume(): number {
 // controls. The control bar only appears while the pointer is over the
 // bottom strip (or briefly after a keybind), plus PotPlayer/YouTube-style
 // keybinds.
-export function PlayerView({
+function MpvPlayerView({
    anime,
    episodeKey,
    episode,
@@ -1467,4 +1468,25 @@ export function PlayerView({
          </div>
       </div>
    );
+}
+
+// Asked once per app run: mpv is a system install, it doesn't come and go.
+let mpvAvailable: Promise<boolean> | null = null;
+
+/** The player: embedded mpv when it's installed, otherwise the HLS
+ * fallback (`HlsPlayerView`). */
+export function PlayerView(props: Props) {
+   const [useMpv, setUseMpv] = useState<boolean | null>(null);
+   useEffect(() => {
+      mpvAvailable ??= invoke<boolean>("mpv_available").catch((err) => {
+         console.warn("[player] mpv availability check failed", { err: String(err) });
+         return false;
+      });
+      void mpvAvailable.then((available) => {
+         console.info("[player] backend", { mpv: available });
+         setUseMpv(available);
+      });
+   }, []);
+   if (useMpv == null) return <div class="player-view hls-player" />;
+   return useMpv ? <MpvPlayerView {...props} /> : <HlsPlayerView {...props} />;
 }
