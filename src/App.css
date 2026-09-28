@@ -1,3 +1,17 @@
+/* Default subtitle font (Crunchyroll's), bundled - also used by the
+   settings preview. */
+@font-face {
+  font-family: "Gandhi Sans";
+  src: url("./assets/fonts/GandhiSans-Bold.otf") format("opentype");
+  font-weight: 700;
+}
+@font-face {
+  font-family: "Gandhi Sans";
+  src: url("./assets/fonts/GandhiSans-BoldItalic.otf") format("opentype");
+  font-weight: 700;
+  font-style: italic;
+}
+
 /* nyaa-stream - dusk-indigo theme.
    One accent (sakura) for actions and progress; green only as a data
    color (seeders/health). Zen Kaku Gothic New throughout so Japanese

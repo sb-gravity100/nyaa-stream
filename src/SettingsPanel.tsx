@@ -10,7 +10,7 @@ interface Props {
 // Fonts libass can resolve: the bundled default, plus common system fonts
 // found through the Local Font Access API (see assRenderer.ts's
 // `queryFonts: "local"`). Anything unavailable falls back to the default.
-const FONT_CHOICES = ["Liberation Sans", "Arial", "Segoe UI", "Verdana", "Trebuchet MS", "Tahoma", "Georgia", "Yu Gothic"];
+const FONT_CHOICES = ["Gandhi Sans", "Liberation Sans", "Arial", "Segoe UI", "Verdana", "Trebuchet MS", "Tahoma", "Georgia", "Yu Gothic"];
 
 const LANGUAGE_CHOICES: [string, string][] = [
   ["en", "English"],

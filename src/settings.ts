@@ -47,20 +47,29 @@ export interface Settings {
   rememberFansubGroup: boolean;
 }
 
+/** Crunchyroll's own dialogue style (its English ASS tracks, e.g. a
+ * ToonsHub CR WEB-DL: `Style: Default,Gandhi Sans,24,&H00FFFFFF,...,
+ * &H00000000,&HA0404040,-1,...,1,1.2,0.5,2,20,20,20` at PlayResY 360),
+ * converted to height percentages. Gandhi Sans is bundled
+ * (`src/assets/fonts`). */
 export const DEFAULT_SUBTITLE_STYLE: SubtitleStyle = {
-  fontFamily: "Liberation Sans",
-  sizePercent: 5.5,
+  fontFamily: "Gandhi Sans",
+  sizePercent: 6.67,
   bold: true,
   color: "#ffffff",
   outlineColor: "#000000",
-  outlineWidth: 0.45,
-  shadow: 0,
+  outlineWidth: 0.33,
+  shadow: 0.5,
   background: false,
   backgroundColor: "#000000",
   backgroundOpacity: 60,
-  marginPercent: 6,
+  marginPercent: 5.6,
   applyToStyled: false,
 };
+
+/** Bumped when DEFAULT_SUBTITLE_STYLE changes in a way stored settings
+ * should adopt: an older stored style is replaced by the new default. */
+const SUBTITLE_STYLE_VERSION = 2;
 
 export const DEFAULT_SETTINGS: Settings = {
   subtitleStyle: DEFAULT_SUBTITLE_STYLE,
@@ -79,10 +88,13 @@ function load(): Settings {
     const parsed = JSON.parse(raw) as Partial<Settings>;
     // Shallow-merged over defaults so settings added later get sane values
     // for users with an older stored blob.
+    const stored = parsed as Partial<Settings> & { subtitleStyleVersion?: number };
+    const styleCurrent = (stored.subtitleStyleVersion ?? 1) >= SUBTITLE_STYLE_VERSION;
+    if (!styleCurrent) console.info("[settings] adopting new default subtitle style (Crunchyroll)");
     return {
       ...DEFAULT_SETTINGS,
       ...parsed,
-      subtitleStyle: { ...DEFAULT_SUBTITLE_STYLE, ...(parsed.subtitleStyle ?? {}) },
+      subtitleStyle: styleCurrent ? { ...DEFAULT_SUBTITLE_STYLE, ...(parsed.subtitleStyle ?? {}) } : DEFAULT_SUBTITLE_STYLE,
     };
   } catch (err) {
     console.error("[settings] failed to read from localStorage", { err });
@@ -100,7 +112,7 @@ export function getSettings(): Settings {
 export function updateSettings(patch: Partial<Settings>): Settings {
   current = { ...current, ...patch };
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(current));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...current, subtitleStyleVersion: SUBTITLE_STYLE_VERSION }));
   } catch (err) {
     console.error("[settings] failed to write to localStorage", { err });
   }

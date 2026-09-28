@@ -80,7 +80,8 @@ export function applySubtitleStyle(script: string, style: SubtitleStyle, styled:
     fontsize: fontSize,
     primarycolour: assColor(style.color),
     outlinecolour: style.background ? assColor(style.backgroundColor, backAlpha) : assColor(style.outlineColor),
-    backcolour: style.background ? assColor(style.backgroundColor, backAlpha) : assColor("#000000", 128),
+    // Shadow colour: Crunchyroll's translucent grey (&HA0404040).
+    backcolour: style.background ? assColor(style.backgroundColor, backAlpha) : assColor("#404040", 0xa0),
     bold: style.bold ? "-1" : "0",
     borderstyle: style.background ? "3" : "1",
     outline: style.background ? "2" : outline,
