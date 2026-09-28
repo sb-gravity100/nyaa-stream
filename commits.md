@@ -2,6 +2,11 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `2a9c864` · 2026-09-28 · docs: sync planning docs with live-debug fixes and player playlist
+- `FILE_INDEX.md`
+- `PHASES.md`
+- `PLAN.md`
+
 ### `362ea6a` · 2026-09-28 · feat(player): side playlist, control UX, direct episode play, timing fixes
 - `src/App.css`
 - `src/MediaPage.tsx`
