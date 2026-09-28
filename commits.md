@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `6e7aa79` · 2026-09-28 · fix(enginefs): bound zero-read retries to ~200ms per piece, log once
+- `vendor/enginefs/src/backend/libtorrent/disk_stream.rs`
+
 ### `a2dc946` · 2026-09-28 · chore(mpv-ipc): log expected 'property unavailable' replies at debug
 - `crates/mpv-ipc/src/lib.rs`
 
