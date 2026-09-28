@@ -72,7 +72,17 @@ const LAST_FRAME_WIDTH = 640;
  * stops, while the <video> still holds the frame. MSE media fetched with
  * CORS doesn't taint the canvas; any failure just skips the thumbnail. */
 function captureLastFrame({ video, animeId, episode, hasPlayed }: { video: HTMLVideoElement | null; animeId: number; episode: number | null; hasPlayed: boolean }) {
-   if (!video || episode == null || !hasPlayed || video.readyState < 2 || !video.videoWidth) return;
+   if (!video || episode == null || !hasPlayed || video.readyState < 2 || !video.videoWidth) {
+      console.debug("[player] last-frame capture skipped", {
+         animeId,
+         episode,
+         hasVideo: video != null,
+         hasPlayed,
+         readyState: video?.readyState,
+         videoWidth: video?.videoWidth,
+      });
+      return;
+   }
    try {
       const canvas = document.createElement("canvas");
       canvas.width = LAST_FRAME_WIDTH;
@@ -376,6 +386,15 @@ export function PlayerView({
       setNextCountdown(null);
    }, [selectedFile?.hlsUrl]);
 
+   // Latest values for the unmount capture below.
+   const lastFrameRef = useRef({ video: null as HTMLVideoElement | null, animeId: anime.id, episode, hasPlayed: false });
+   lastFrameRef.current = { video: videoEl, animeId: anime.id, episode, hasPlayed };
+
+   // Must be declared before the hls.js effect: Preact runs unmount
+   // cleanups in declaration order, and hls.destroy() empties the <video>
+   // (readyState 0), which made every capture silently bail.
+   useEffect(() => () => captureLastFrame(lastFrameRef.current), []);
+
    // Attaches hls.js once a file is chosen. The declared duration is baked
    // into the playlist request (see torrent-engine's hls_playlist_handler).
    useEffect(() => {
@@ -521,16 +540,11 @@ export function PlayerView({
       return () => window.clearInterval(timer);
    }, [torrentId, selectedFile?.index]);
 
-   // Latest values for the unmount cleanup below.
-   const lastFrameRef = useRef({ video: null as HTMLVideoElement | null, animeId: anime.id, episode, hasPlayed: false });
-   lastFrameRef.current = { video: videoEl, animeId: anime.id, episode, hasPlayed };
-
    useEffect(() => {
       return () => {
          window.clearTimeout(idleTimerRef.current);
          window.clearTimeout(keyboardSeekTimerRef.current);
          window.clearTimeout(toastTimerRef.current);
-         captureLastFrame(lastFrameRef.current);
          stopPlayback();
       };
    }, []);
