@@ -24,6 +24,23 @@ use tokio::sync::Mutex as AsyncMutex;
 /// where it's used.
 pub type TorrentId = String;
 
+/// A `tokio::process::Command` that never opens a console window. The
+/// release build is a Windows GUI-subsystem app, and every console child
+/// (ffmpeg/ffprobe/mpv) it spawned got its own visible cmd window - `tauri
+/// dev` hid this because it runs attached to a terminal. `CREATE_NO_WINDOW`
+/// suppresses it; stdio pipes still work.
+pub fn hidden_command(program: &str) -> tokio::process::Command {
+    #[allow(unused_mut)]
+    let mut command = tokio::process::Command::new(program);
+    #[cfg(windows)]
+    {
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+    command
+}
+
+
 /// HLS segment length. 6s is Apple's low-latency recommendation.
 const SEGMENT_DURATION_SECONDS: f64 = 6.0;
 
@@ -160,7 +177,7 @@ pub async fn detect_h264_encoder() -> H264Encoder {
     *H264_ENCODER
         .get_or_init(|| async {
             for encoder in [H264Encoder::Nvenc, H264Encoder::Qsv, H264Encoder::Amf] {
-                let status = tokio::process::Command::new("ffmpeg")
+                let status = hidden_command("ffmpeg")
                     .args(["-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc2=s=640x360:r=24:d=0.2"])
                     .args(["-pix_fmt", encoder.pix_fmt(), "-c:v", encoder.ffmpeg_name(), "-f", "null", "-"])
                     .stdin(Stdio::null())
@@ -661,7 +678,7 @@ fn spawn_hls_transcode(
     // there; we only want this process's segment files.
     let discarded_playlist_path = dir.join("ffmpeg_internal.m3u8");
 
-    let mut command = tokio::process::Command::new("ffmpeg");
+    let mut command = hidden_command("ffmpeg");
     // `-y`: a replayed torrent's cache already holds this start offset's
     // `sub_*.ass` from an earlier session, and without it ffmpeg stopped
     // at an "Overwrite? [y/N]" prompt and exited (verified live).
@@ -813,7 +830,7 @@ fn spawn_background_subtitle_pass(
     }
     std::fs::create_dir_all(dir)?;
     let input_url = format!("http://{stream_addr}/stream/{torrent_id}/{file_idx}?intent=background");
-    let mut command = tokio::process::Command::new("ffmpeg");
+    let mut command = hidden_command("ffmpeg");
     command.args(["-loglevel", "warning", "-y"]);
     command.args(RECONNECT_ARGS);
     command.args(["-copyts", "-i", &input_url]);
@@ -857,7 +874,7 @@ fn spawn_subtitle_extraction(
 ) -> anyhow::Result<tokio::process::Child> {
     let start_seconds = start_segment_index as f64 * SEGMENT_DURATION_SECONDS;
     let input_url = format!("http://{stream_addr}/stream/{torrent_id}/{file_idx}");
-    let mut command = tokio::process::Command::new("ffmpeg");
+    let mut command = hidden_command("ffmpeg");
     command.args(["-loglevel", "warning", "-y"]);
     command.args(RECONNECT_ARGS);
     if start_seconds > 0.0 {
@@ -960,7 +977,7 @@ fn is_font_attachment(codec: Option<&str>, mimetype: Option<&str>, filename: &st
 async fn probe_media(stream_addr: SocketAddr, torrent_id: &TorrentId, file_idx: usize) -> anyhow::Result<MediaProbe> {
     tracing::debug!(torrent_id = %torrent_id, file_idx, "probing media streams");
     let input_url = format!("http://{stream_addr}/stream/{torrent_id}/{file_idx}");
-    let output = tokio::process::Command::new("ffprobe")
+    let output = hidden_command("ffprobe")
         // Subtitle codecs and attachments come from the container header
         // alone - no need for ffprobe to also read seconds of packets
         // (which on a cold torrent means waiting for them to download).
@@ -1118,7 +1135,7 @@ fn spawn_font_dump(torrent_id: TorrentId, file_idx: usize, fonts: &[FontAttachme
             return;
         }
         let input_url = format!("http://{stream_addr}/stream/{torrent_id}/{file_idx}");
-        let mut command = tokio::process::Command::new("ffmpeg");
+        let mut command = hidden_command("ffmpeg");
         command.args(["-loglevel", "error", "-y"]);
         for index in &indices {
             command.arg(format!("-dump_attachment:{index}"));

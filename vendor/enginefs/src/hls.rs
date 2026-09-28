@@ -223,7 +223,7 @@ impl HlsEngine {
         analyzeduration: u64,
         probesize: u64,
     ) -> Result<ProbeResult> {
-        let mut cmd = Command::new("ffmpeg");
+        let mut cmd = crate::hidden_command("ffmpeg");
         cmd.arg("-analyzeduration").arg(analyzeduration.to_string());
         cmd.arg("-probesize").arg(probesize.to_string());
         cmd.arg("-i").arg(file_path);
@@ -524,7 +524,7 @@ impl HlsEngine {
         duration: f64,
         config: &TranscodeConfig,
     ) -> anyhow::Result<TranscodeProcess> {
-        let mut cmd = tokio::process::Command::new("ffmpeg");
+        let mut cmd = crate::hidden_command("ffmpeg");
         configure_low_impact_ffmpeg(&mut cmd);
 
         // Reduce FFmpeg verbosity
@@ -717,7 +717,7 @@ impl HlsEngine {
         audio_stream_index: usize,
         config: &TranscodeConfig,
     ) -> anyhow::Result<TranscodeProcess> {
-        let mut cmd = tokio::process::Command::new("ffmpeg");
+        let mut cmd = crate::hidden_command("ffmpeg");
         configure_low_impact_ffmpeg(&mut cmd);
 
         cmd.args(["-loglevel", "warning"]);

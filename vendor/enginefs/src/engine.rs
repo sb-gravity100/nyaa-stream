@@ -649,7 +649,7 @@ impl<H: TorrentHandle> Engine<H> {
 
         // Use ffmpeg to extract and convert to VTT
         // ffmpeg -i input.mkv -map 0:s:INDEX -c:s webvtt -f webvtt -
-        let mut cmd = tokio::process::Command::new("ffmpeg");
+        let mut cmd = crate::hidden_command("ffmpeg");
 
         // Add hardware acceleration flags if available (might speed up decoding even for subs)
         cmd.arg("-y"); // Overwrite output (though we output to stdout)
@@ -686,7 +686,7 @@ async fn probe_embedded_subtitles(
     path: &str,
 ) -> anyhow::Result<Vec<(usize, Option<String>, Option<String>)>> {
     tracing::info!("[SUBTITLES] Executing ffprobe on: {}", path);
-    let output = tokio::process::Command::new("ffprobe")
+    let output = crate::hidden_command("ffprobe")
         .args([
             "-v",
             "quiet",
