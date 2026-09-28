@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `2852e24` · 2026-09-29 · docs: document movie handling
+- `PLAN.md`
+
 ### `d4484ac` · 2026-09-29 · feat: handle movies as one "Movie" group instead of Unknown/Batch rows
 - `src/App.tsx`
 - `src/HlsPlayerView.tsx`
