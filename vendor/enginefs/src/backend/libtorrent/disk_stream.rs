@@ -67,6 +67,11 @@ pub(crate) struct LibtorrentDiskFileStream {
     last_wait_log: Instant,
     last_prioritized_piece: i32,
     consecutive_waits: u32,
+    /// (nyaa-stream) How many times the current piece's disk read came
+    /// back all-zero and was sent to the read_piece broker instead - see
+    /// `poll_read`. Bounded so a piece that genuinely contains zeros can't
+    /// stall a reader if the broker keeps failing.
+    zero_read_retries: (i32, u8),
     last_blocked_replan: Instant,
     file: Option<tokio::fs::File>,
     file_cursor: u64,
@@ -128,6 +133,7 @@ impl LibtorrentDiskFileStream {
                 .unwrap_or_else(Instant::now),
             last_prioritized_piece: -1,
             consecutive_waits: 0,
+            zero_read_retries: (-1, 0),
             last_blocked_replan: Instant::now(),
             file,
             file_cursor: 0,
@@ -779,11 +785,50 @@ impl tokio::io::AsyncRead for LibtorrentDiskFileStream {
         };
         self.file_cursor = self.file_cursor.saturating_add(read as u64);
 
-        if read == 0
-            || (self.current_pos == 0
-                && !self.first_read_logged
-                && self.scratch[..read].iter().all(|&byte| byte == 0))
-        {
+        // (nyaa-stream) Upstream only treated an all-zero chunk as "not yet
+        // visible on disk" for the very first read at offset 0. libtorrent
+        // can report a piece as verified before its bytes are readable
+        // through this separate OS file handle anywhere in the file, and
+        // passing those zeros on corrupted demux mid-episode (ffmpeg: "0x00
+        // at pos N invalid as first byte of an EBML number"). Any
+        // substantial all-zero chunk now goes to the read_piece broker,
+        // which returns libtorrent's own copy of the piece - real zeros
+        // (e.g. EBML Void padding) come back from it unchanged. Retries per
+        // piece are capped so a failing broker can't stall a reader on a
+        // piece that genuinely is zero-filled.
+        const ZERO_CHUNK_MIN_BYTES: usize = 64;
+        const MAX_ZERO_READ_RETRIES: u8 = 20;
+        let suspicious_zeros = read >= ZERO_CHUNK_MIN_BYTES && self.scratch[..read].iter().all(|&byte| byte == 0);
+        let first_read_zeros = self.current_pos == 0 && !self.first_read_logged && self.scratch[..read].iter().all(|&byte| byte == 0);
+        if suspicious_zeros || first_read_zeros {
+            if self.zero_read_retries.0 != piece {
+                self.zero_read_retries = (piece, 0);
+            }
+            if self.zero_read_retries.1 < MAX_ZERO_READ_RETRIES {
+                self.zero_read_retries.1 += 1;
+                if self.zero_read_retries.1 == 1 {
+                    tracing::debug!(
+                        info_hash = %self.info_hash,
+                        file_idx = self.file_idx,
+                        piece,
+                        pos = self.current_pos,
+                        read,
+                        "all-zero disk read on a verified piece, re-reading via read_piece"
+                    );
+                }
+                self.request_piece_from_libtorrent(piece);
+                self.schedule_retry(cx, Duration::from_millis(25));
+                return Poll::Pending;
+            }
+            tracing::warn!(
+                info_hash = %self.info_hash,
+                file_idx = self.file_idx,
+                piece,
+                pos = self.current_pos,
+                "accepting all-zero disk read after exhausting read_piece retries"
+            );
+        }
+        if read == 0 {
             self.request_piece_from_libtorrent(piece);
             self.schedule_retry(cx, Duration::from_millis(25));
             return Poll::Pending;
