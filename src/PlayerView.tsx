@@ -147,6 +147,7 @@ function loadVolume(): number {
 export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNext, nextLabel, playlist, onSelectEpisode }: Props) {
   const settings = useSettings();
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
   const [videoEl, setVideoEl] = useState<HTMLVideoElement | null>(null);
   const preferredGroup = settings.rememberFansubGroup ? getPreferredGroup(anime.id) : null;
   const releasePrefs = { preferredGroup, preferredResolution: settings.preferredResolution };
@@ -158,6 +159,9 @@ export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNe
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState("Connecting to peers…");
   const [ready, setReady] = useState(false);
+  // Whether the current file has shown its first frame - the <video>
+  // fades in on it instead of popping over the loading state.
+  const [hasPlayed, setHasPlayed] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(false);
   const [paused, setPaused] = useState(true);
   const estimatedDurationSeconds = anime.duration != null ? anime.duration * 60 : null;
@@ -259,6 +263,7 @@ export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNe
     setDuration(0);
     setPosition(0);
     setTimeOffset(0);
+    setHasPlayed(false);
     setSubtitleTracks([]);
     setSubtitleFonts([]);
     setActiveSubtitleIndex(null);
@@ -780,7 +785,109 @@ export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNe
 
   const displayTime = seekPreview ?? episodeTime;
   const buffering = !error && !ready;
-  const playedPercent = episodeDuration ? Math.min(100, (displayTime / episodeDuration) * 100) : 0;
+
+  // Seek bar fill/thumb and the clock are written straight to the DOM from
+  // a requestAnimationFrame loop instead of from React state: `timeupdate`
+  // only fires ~4x a second, which made the bar visibly step, and each of
+  // those re-rendered the whole player. The loop reads the <video> clock
+  // every frame and touches only three nodes.
+  const seekPreviewRef = useRef<number | null>(null);
+  seekPreviewRef.current = seekPreview;
+  const durationRef = useRef(0);
+  durationRef.current = episodeDuration;
+  const showRemainingRef = useRef(showRemaining);
+  showRemainingRef.current = showRemaining;
+  const playedFillRef = useRef<HTMLDivElement>(null);
+  const seekThumbRef = useRef<HTMLDivElement>(null);
+  const clockRef = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    let frame = 0;
+    let lastText = "";
+    const tick = () => {
+      const video = videoRef.current;
+      const duration = durationRef.current;
+      const time = seekPreviewRef.current ?? (video ? video.currentTime + timeOffsetRef.current : 0);
+      const percent = duration > 0 ? Math.min(100, Math.max(0, (time / duration) * 100)) : 0;
+      playedFillRef.current?.style.setProperty("transform", `scaleX(${percent / 100})`);
+      seekThumbRef.current?.style.setProperty("left", `${percent}%`);
+      const text = showRemainingRef.current ? `-${formatTime(Math.max(0, duration - time))}` : formatTime(time);
+      if (text !== lastText && clockRef.current) {
+        clockRef.current.textContent = text;
+        lastText = text;
+      }
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, []);
+
+  // Short stalls (a segment arriving a beat late) shouldn't flash the
+  // buffering mark - only show it once a wait has lasted a moment.
+  const BUFFERING_SHOW_DELAY_MS = 350;
+  const [showBuffering, setShowBuffering] = useState(true);
+  useEffect(() => {
+    if (!buffering) {
+      setShowBuffering(false);
+      return;
+    }
+    if (!hasPlayed) {
+      setShowBuffering(true);
+      return;
+    }
+    const timer = window.setTimeout(() => setShowBuffering(true), BUFFERING_SHOW_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, [buffering, hasPlayed]);
+
+  // Ambient color: the video's average color, sampled a few times a
+  // second into a 16x9 canvas, tints the control dock and top bar so the
+  // chrome picks up the scene instead of sitting on it as flat grey. The
+  // <video> source is an MSE blob (same-origin), so the canvas isn't
+  // tainted. Eased toward each new sample so scene cuts don't flicker.
+  const AMBIENT_SAMPLE_MS = 400;
+  useEffect(() => {
+    if (!videoEl) return;
+    const canvas = document.createElement("canvas");
+    canvas.width = 16;
+    canvas.height = 9;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return;
+    let current: [number, number, number] | null = null;
+    const timer = window.setInterval(() => {
+      if (videoEl.readyState < 2 || videoEl.videoWidth === 0) return;
+      try {
+        ctx.drawImage(videoEl, 0, 0, 16, 9);
+        const data = ctx.getImageData(0, 0, 16, 9).data;
+        let r = 0;
+        let g = 0;
+        let b = 0;
+        for (let i = 0; i < data.length; i += 4) {
+          r += data[i];
+          g += data[i + 1];
+          b += data[i + 2];
+        }
+        const n = data.length / 4;
+        const target: [number, number, number] = [r / n, g / n, b / n];
+        current = current ? (current.map((c, i) => c + (target[i] - c) * 0.35) as [number, number, number]) : target;
+        rootRef.current?.style.setProperty("--ambient", `${Math.round(current[0])}, ${Math.round(current[1])}, ${Math.round(current[2])}`);
+      } catch (err) {
+        console.debug("[player] ambient sample failed", { err: String(err) });
+        window.clearInterval(timer);
+      }
+    }, AMBIENT_SAMPLE_MS);
+    return () => window.clearInterval(timer);
+  }, [videoEl]);
+
+  // Keeps a closing menu mounted for its exit animation.
+  const MENU_EXIT_MS = 180;
+  const [renderedMenu, setRenderedMenu] = useState<Menu>(null);
+  useEffect(() => {
+    if (menu) {
+      setRenderedMenu(menu);
+      return;
+    }
+    const timer = window.setTimeout(() => setRenderedMenu(null), MENU_EXIT_MS);
+    return () => window.clearTimeout(timer);
+  }, [menu]);
   // Every stretch the transcode has produced (instantly seekable), not raw
   // torrent download progress - see torrent-engine's StreamStats.
   const readyRanges = episodeDuration && stats ? stats.readyRanges : [];
@@ -789,7 +896,10 @@ export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNe
   const resolution = releaseResolution(selectedRelease);
 
   return (
-    <div class={`player-view${controlsVisible || menu ? " controls-shown" : ""}${playlistMode ? " playlist-open" : ""}`}>
+    <div
+      ref={rootRef}
+      class={`player-view${controlsVisible || menu ? " controls-shown" : ""}${playlistMode ? " playlist-open" : ""}${paused && hasPlayed ? " is-paused" : ""}`}
+    >
       {selectedFile && (
         <video
           ref={(el) => {
@@ -798,7 +908,7 @@ export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNe
             if (el) el.volume = volume / 100;
             setVideoEl(el);
           }}
-          class="player-video"
+          class={`player-video${hasPlayed ? " shown" : ""}`}
           autoPlay
           onClick={togglePause}
           onDblClick={toggleFullscreen}
@@ -815,6 +925,7 @@ export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNe
           onWaiting={() => setReady(false)}
           onPlaying={() => {
             setReady(true);
+            setHasPlayed(true);
             rememberGroupOnPlay();
           }}
           onError={(e) => {
@@ -857,7 +968,7 @@ export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNe
         </div>
       )}
 
-      {buffering && !error && (
+      {showBuffering && buffering && !error && (
         <div class="player-loading">
           <Buffering progress={loadingProgress(stats)} />
           <div class="player-loading-status">
@@ -871,7 +982,19 @@ export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNe
         </div>
       )}
 
-      {toast && <div class="player-toast">{toast}</div>}
+      {/* Large paused glyph - a state indicator, not a control (the
+          controls themselves stay bottom-hover only). */}
+      {paused && hasPlayed && !error && (
+        <div class="player-paused-glyph" aria-hidden="true">
+          <PlayIcon size={44} />
+        </div>
+      )}
+
+      {toast && (
+        <div class="player-toast" key={toast}>
+          {toast}
+        </div>
+      )}
 
       {flash && (
         <div class="player-flash" key={flash.id} aria-hidden="true" onAnimationEnd={() => setFlash(null)}>
@@ -906,6 +1029,7 @@ export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNe
 
       {nextCountdown != null && onNext && (
         <div class="player-next-card">
+          <div class="player-next-progress" style={{ animationDuration: `${AUTOPLAY_NEXT_SECONDS}s` }} />
           <div class="player-next-label">Up next</div>
           <div class="player-next-title">{nextLabel}</div>
           <div class="player-next-actions">
@@ -919,9 +1043,9 @@ export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNe
         </div>
       )}
 
-      {menu && (
-        <div class="player-menu" ref={menuRef}>
-          {menu === "subtitles" && (
+      {renderedMenu && (
+        <div class={`player-menu${menu ? " open" : ""}`} ref={menuRef}>
+          {renderedMenu === "subtitles" && (
             <>
               <div class="player-menu-title">Subtitles</div>
               <button class={`player-menu-item${activeSubtitleIndex == null ? " selected" : ""}`} onClick={() => setActiveSubtitleIndex(null)}>
@@ -950,7 +1074,7 @@ export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNe
               </div>
             </>
           )}
-          {menu === "sources" && (
+          {renderedMenu === "sources" && (
             <>
               {videoFiles.length > 1 && (
                 <>
@@ -997,7 +1121,7 @@ export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNe
               </div>
             </>
           )}
-          {menu === "stats" && stats && (
+          {renderedMenu === "stats" && stats && (
             <StatisticsMenu
               peers={stats.connectedPeers}
               speedMbps={stats.downloadSpeedMbps}
@@ -1041,8 +1165,8 @@ export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNe
                 }}
               />
             ))}
-          <div class="player-seek-played" style={{ width: `${playedPercent}%` }} />
-          <div class="player-seek-thumb" style={{ left: `${playedPercent}%` }} />
+          <div class="player-seek-played" ref={playedFillRef} />
+          <div class="player-seek-thumb" ref={seekThumbRef} />
           {hoverTime && (
             <div class="player-seek-tooltip" style={{ left: `${hoverTime.x}px` }}>
               {formatTime(hoverTime.time)}
@@ -1096,7 +1220,7 @@ export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNe
             />
           </div>
           <button class="player-time" onClick={toggleRemaining} title="Show remaining time" aria-label="Toggle remaining time">
-            {showRemaining ? `-${formatTime(Math.max(0, episodeDuration - displayTime))}` : formatTime(displayTime)} <span>/ {formatTime(episodeDuration)}</span>
+            <span class="player-clock" ref={clockRef} /> <span>/ {formatTime(episodeDuration)}</span>
           </button>
           <div class="player-spacer" />
           <button

@@ -58,7 +58,7 @@ export function PlayerPlaylist({ title, items, currentKey, open, pinned, onSelec
         )}
       </header>
       <div class="player-playlist-items">
-        {items.map((item) => {
+        {items.map((item, index) => {
           const current = item.key === currentKey;
           const watched = item.progress?.completed ?? false;
           const fraction = item.progress && !watched ? Math.min(1, item.progress.position / item.progress.duration) : 0;
@@ -67,6 +67,7 @@ export function PlayerPlaylist({ title, items, currentKey, open, pinned, onSelec
               key={item.key}
               ref={current ? currentRef : undefined}
               class={`player-playlist-item${current ? " current" : ""}${watched ? " watched" : ""}`}
+              style={{ "--i": Math.min(index, 14) }}
               onClick={() => !current && onSelect(item.key)}
               aria-current={current ? "true" : undefined}
               tabIndex={open ? 0 : -1}
