@@ -797,7 +797,8 @@ impl tokio::io::AsyncRead for LibtorrentDiskFileStream {
         // piece are capped so a failing broker can't stall a reader on a
         // piece that genuinely is zero-filled.
         const ZERO_CHUNK_MIN_BYTES: usize = 64;
-        const MAX_ZERO_READ_RETRIES: u8 = 20;
+        // ~200ms per piece at the 25ms retry interval.
+        const MAX_ZERO_READ_RETRIES: u8 = 8;
         let suspicious_zeros = read >= ZERO_CHUNK_MIN_BYTES && self.scratch[..read].iter().all(|&byte| byte == 0);
         let first_read_zeros = self.current_pos == 0 && !self.first_read_logged && self.scratch[..read].iter().all(|&byte| byte == 0);
         if suspicious_zeros || first_read_zeros {
@@ -820,13 +821,18 @@ impl tokio::io::AsyncRead for LibtorrentDiskFileStream {
                 self.schedule_retry(cx, Duration::from_millis(25));
                 return Poll::Pending;
             }
-            tracing::warn!(
-                info_hash = %self.info_hash,
-                file_idx = self.file_idx,
-                piece,
-                pos = self.current_pos,
-                "accepting all-zero disk read after exhausting read_piece retries"
-            );
+            // Once per piece: pieces with long genuine zero runs (padding)
+            // otherwise logged this for every chunk.
+            if self.zero_read_retries.1 == MAX_ZERO_READ_RETRIES {
+                self.zero_read_retries.1 += 1;
+                tracing::debug!(
+                    info_hash = %self.info_hash,
+                    file_idx = self.file_idx,
+                    piece,
+                    pos = self.current_pos,
+                    "accepting all-zero disk reads for this piece after read_piece retries"
+                );
+            }
         }
         if read == 0 {
             self.request_piece_from_libtorrent(piece);
