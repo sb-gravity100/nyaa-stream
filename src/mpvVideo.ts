@@ -45,8 +45,9 @@ const FILE_PROPERTIES: Observed[] = ["time-pos", "duration", "eof-reached", "dem
 // reads `currentTime` for smoothness. Re-rendering the player on every
 // mpv frame made the controls sluggish and fought seek bar drags.
 const TIMEUPDATE_INTERVAL_MS = 250;
-// A seek that never reports back (no playback-restart) stops blocking the
-// next one after this long.
+// A seek still waiting on torrent data after this long lets a newer
+// requested seek go out (the position stays masked until mpv restarts
+// playback, however long the data takes).
 const SEEK_RELEASE_MS = 2000;
 
 function command(args: unknown[]): Promise<unknown> {
@@ -160,7 +161,13 @@ export class MpvVideo extends EventTarget {
          this.releaseSeek();
       });
       window.clearTimeout(this.seekReleaseTimer);
-      this.seekReleaseTimer = window.setTimeout(() => this.releaseSeek(), SEEK_RELEASE_MS);
+      this.seekReleaseTimer = window.setTimeout(() => {
+         // Only to unblock a newer request - with none queued, the target
+         // stays shown until playback-restart. Releasing it here made the
+         // seek bar snap back to the old position while mpv was still
+         // waiting on the new position's pieces (seen on a 20:31 click).
+         if (this.pendingSeek != null) this.releaseSeek();
+      }, SEEK_RELEASE_MS);
    }
 
    private releaseSeek() {
@@ -309,6 +316,10 @@ export class MpvVideo extends EventTarget {
             this.emit("seeked");
             return;
          case "end-file":
+            // No playback-restart is coming for a seek into a closed file.
+            window.clearTimeout(this.seekReleaseTimer);
+            this.seekTarget = null;
+            this.pendingSeek = null;
             if (e.reason === "error") this.fail(e.file_error ?? "unknown error");
             return;
          default:
