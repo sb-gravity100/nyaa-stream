@@ -2,6 +2,12 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `d22c325` · 2026-09-29 · fix(player): hotkeys stay live after clicking sliders or buttons
+- `src/HlsPlayerView.tsx`
+- `src/PlayerView.tsx`
+- `src/fullscreen.ts`
+- `src/keyboard.ts`
+
 ### `04a2a24` · 2026-09-29 · chore(player): debug-log seek commits and restarts
 - `src/PlayerView.tsx`
 - `src/mpvVideo.ts`
