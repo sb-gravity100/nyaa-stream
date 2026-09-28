@@ -173,7 +173,11 @@ impl MpvPlayer {
                 continue;
             };
             if resp.error != "success" {
-                tracing::warn!(error = resp.error, "mpv command failed");
+                // Debug, not warn: the thumbnail path polls properties
+                // like time-pos that are "unavailable" until the file
+                // loads - expected, and it was flooding the log every
+                // 500ms. Callers log real failures from the bail below.
+                tracing::debug!(error = resp.error, "mpv command failed");
                 anyhow::bail!("mpv command failed: {}", resp.error);
             }
             return Ok(resp.data);
