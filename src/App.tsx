@@ -21,6 +21,8 @@ import { MediaPage } from "./MediaPage";
 import { HomePage } from "./HomePage";
 import { SettingsPanel } from "./SettingsPanel";
 import { SearchIcon, SettingsIcon } from "./icons";
+import { Buffering } from "./Buffering";
+import { goBack, navigate, useRoute, type WatchTarget } from "./router";
 import {
   displayTitle,
   formatSeason,
@@ -56,12 +58,15 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [animeResults, setAnimeResults] = useState<AnimeMedia[]>([]);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  // Which page is showing comes from the URL (see router.ts); this is the
+  // anime that page is about, once loaded.
+  const route = useRoute();
   const [selectedAnime, setSelectedAnime] = useState<AnimeMedia | null>(null);
-  // Set when the user clicks a specific episode (the Latest Episodes row)
-  // rather than an anime in general (Library grid, search) - MediaPage
-  // auto-plays this episode once its sources finish loading, then reports
-  // back via onAutoplayHandled so it only fires once per selection.
-  const [autoplayEpisode, setAutoplayEpisode] = useState<number | null>(null);
+  // Anime objects the user navigated from (search, library, cards), so
+  // opening their route doesn't need an AniList round trip. A reload or a
+  // pasted route falls back to get_anime_details.
+  const knownAnime = useRef(new Map<number, AnimeMedia>());
+  const [routeError, setRouteError] = useState<string | null>(null);
   const [sources, setSources] = useState<NyaaResult[]>([]);
   const [sourcesLoading, setSourcesLoading] = useState(false);
   const [details, setDetails] = useState<Record<string, TorrentDetails>>({});
@@ -75,7 +80,9 @@ function App() {
   // from scratch every single time.
   const [sourcesByMedia, setSourcesByMedia] = useState<Record<number, NyaaResult[]>>({});
   const [detailsByMedia, setDetailsByMedia] = useState<Record<number, Record<string, TorrentDetails>>>({});
-  const [library, setLibrary] = useState<AnimeMedia[]>([]);
+  // Read synchronously: the route effect below looks anime up in it on the
+  // very first render (a reload on an anime route).
+  const [library, setLibrary] = useState<AnimeMedia[]>(getLibrary);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [latestEpisodes, setLatestEpisodes] = useState<AiringEntry[]>([]);
   const [latestEpisodesLoading, setLatestEpisodesLoading] = useState(false);
@@ -99,10 +106,6 @@ function App() {
 
   const skipNextSearch = useRef(false);
   const blurTimeout = useRef<number | undefined>(undefined);
-
-  useEffect(() => {
-    setLibrary(getLibrary());
-  }, []);
 
   useEffect(() => {
     loadLatestEpisodes();
@@ -145,13 +148,58 @@ function App() {
     }
   }
 
-  async function pickAnime(anime: AnimeMedia) {
+  function pickAnime(anime: AnimeMedia) {
+    knownAnime.current.set(anime.id, anime);
+    setDropdownOpen(false);
+    navigate({ name: "anime", id: anime.id, watch: null });
+  }
+
+  // Latest Episodes / Continue watching: straight to that episode's player.
+  function selectEpisode(anime: AnimeMedia, episode: number) {
+    knownAnime.current.set(anime.id, anime);
+    navigate({ name: "anime", id: anime.id, watch: { episode } });
+  }
+
+  // Loads whichever anime the route names - from what the user clicked
+  // when possible, else from AniList (reload, back/forward into an anime
+  // this session hasn't seen yet).
+  const routeAnimeId = route.name === "anime" ? route.id : null;
+  useEffect(() => {
+    setRouteError(null);
+    if (routeAnimeId == null) {
+      if (selectedAnime) backToSearch();
+      return;
+    }
+    if (selectedAnime?.id === routeAnimeId) return;
+    const known = knownAnime.current.get(routeAnimeId) ?? library.find((a) => a.id === routeAnimeId);
+    if (known) {
+      void openAnime(known);
+      return;
+    }
+    let cancelled = false;
+    console.debug("[router] loading anime for route", { id: routeAnimeId });
+    (isTauriAvailable() ? invoke<AnimeMedia>("get_anime_details", { id: routeAnimeId }) : fallbackGetAnimeDetails(routeAnimeId))
+      .then((anime) => {
+        if (cancelled) return;
+        knownAnime.current.set(anime.id, anime);
+        void openAnime(anime);
+      })
+      .catch((err) => {
+        console.error("[router] couldn't load anime for route", { id: routeAnimeId, err });
+        if (!cancelled) setRouteError(`Couldn't load this anime from AniList (${err instanceof Error ? err.message : String(err)}).`);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routeAnimeId]);
+
+  async function openAnime(anime: AnimeMedia) {
     const releaseQuery = displayTitle(anime.title);
     skipNextSearch.current = true;
     setQuery(releaseQuery);
     setDropdownOpen(false);
     setSelectedAnime(anime);
-    setAutoplayEpisode(null);
     setError(null);
 
     const cachedSources = sourcesByMedia[anime.id];
@@ -199,15 +247,6 @@ function App() {
     if (id in episodeOffsetByMedia) return;
     const offset = isTauriAvailable() ? await invoke<number>("get_absolute_episode_offset", { id }).catch(() => 0) : 0;
     setEpisodeOffsetByMedia((current) => (id in current ? current : { ...current, [id]: offset }));
-  }
-
-  // Latest Episodes row: jump straight to that episode's player rather than
-  // just opening the anime's page - pickAnime resets autoplayEpisode to
-  // null as part of its own state reset, so this has to set it *after*
-  // calling pickAnime to win the batched update.
-  function selectEpisode(anime: AnimeMedia, episode: number) {
-    pickAnime(anime);
-    setAutoplayEpisode(episode);
   }
 
   async function loadKitsuMetadata(id: number) {
@@ -472,20 +511,43 @@ function App() {
     </button>
   );
 
-  if (selectedAnime) {
+  if (route.name === "anime" && selectedAnime?.id !== route.id) {
+    // The route's anime is still loading (reload / back-forward into it).
+    return (
+      <div class={route.watch ? "player-view hls-player" : "container route-loading"}>
+        {routeError ? (
+          <div class="player-message player-error" role="alert">
+            <p>{routeError}</p>
+            <button class="button button-quiet" onClick={() => navigate({ name: "home" }, { replace: true })}>
+              Go home
+            </button>
+          </div>
+        ) : (
+          <div class="player-loading">
+            <Buffering progress={0} />
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (route.name === "anime" && selectedAnime) {
+    const animeId = selectedAnime.id;
     return (
       <main class="container">
         <div class="media-settings-anchor">{settingsButton}</div>
         <MediaPage
+          key={animeId}
           anime={selectedAnime}
           kitsu={kitsuByMedia[selectedAnime.id] ?? null}
           groupedSources={groupedSources}
           sourcesLoading={sourcesLoading}
           sourcesCount={sources.length}
-          autoplayEpisode={autoplayEpisode}
-          onAutoplayHandled={() => setAutoplayEpisode(null)}
+          watch={route.watch}
+          onWatch={(watch: WatchTarget, replace?: boolean) => navigate({ name: "anime", id: animeId, watch }, { replace })}
+          onCloseWatch={() => goBack({ name: "anime", id: animeId, watch: null })}
           error={error}
-          onBack={backToSearch}
+          onBack={() => goBack({ name: "home" })}
           inLibrary={isInLibrary(selectedAnime.id, library)}
           onAddToLibrary={() => handleAddToLibrary(selectedAnime)}
           onRemoveFromLibrary={() => handleRemoveFromLibrary(selectedAnime.id)}

@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from "preact/hooks";
+import { useCallback, useEffect, useMemo, useState } from "preact/hooks";
 import { displayTitle, formatSeason, type AnimeMedia, type KitsuMetadata, type NyaaResult } from "./types";
 import type { EpisodeLabel } from "./episodeParser";
 import { PlayerView } from "./PlayerView";
 import { progressForAnime, setWatched, subscribeProgress, type ProgressEntry } from "./watchProgress";
 import { BackIcon, CheckIcon, PlayIcon, PlusIcon } from "./icons";
 import { Buffering } from "./Buffering";
+import type { WatchTarget } from "./router";
 
 type SourceGroup = [string, { label: EpisodeLabel; releases: NyaaResult[] }];
 
@@ -14,11 +15,15 @@ interface Props {
   groupedSources: SourceGroup[];
   sourcesLoading: boolean;
   sourcesCount: number;
-  /** Set when the user clicked a specific episode (Latest Episodes /
-   * Continue Watching) rather than the anime in general - auto-plays it
-   * once sources finish loading, then reports back via onAutoplayHandled. */
-  autoplayEpisode: number | null;
-  onAutoplayHandled: () => void;
+  /** The route's player target (`#/anime/:id/episode/:n` or `/play/:key`),
+   * null on the plain anime page. */
+  watch: WatchTarget | null;
+  /** Opens the player on a group - `replace` for moving between episodes
+   * inside the player, so back leaves the player instead of stepping
+   * through every episode watched. */
+  onWatch: (watch: WatchTarget, replace?: boolean) => void;
+  /** Leaves the player: back to wherever it was opened from. */
+  onCloseWatch: () => void;
   error: string | null;
   onBack: () => void;
   inLibrary: boolean;
@@ -70,8 +75,9 @@ export function MediaPage({
   groupedSources,
   sourcesLoading,
   sourcesCount,
-  autoplayEpisode,
-  onAutoplayHandled,
+  watch,
+  onWatch,
+  onCloseWatch,
   error,
   onBack,
   inLibrary,
@@ -79,26 +85,37 @@ export function MediaPage({
   onRemoveFromLibrary,
 }: Props) {
   const seasonLabel = formatSeason(anime.season, anime.seasonYear);
-  // Index into groupedSources of the group being played.
-  const [playingKey, setPlayingKey] = useState<string | null>(null);
   const progress = useAnimeProgress(anime.id);
   const [expanded, setExpanded] = useState(false);
-  // Entered from an episode card (Continue watching / New episodes): go
-  // straight to the player without ever showing this page, and closing
-  // the player goes back where the user came from rather than here.
-  const [directEpisode] = useState(autoplayEpisode);
-  const [directMissing, setDirectMissing] = useState(false);
-  const direct = directEpisode != null;
+  // The group the route's player target resolves to, once releases load.
+  // Numbered episodes match by number (season-agnostic, like the cards
+  // that link to them).
+  const playingKey = useMemo(() => {
+    if (!watch) return null;
+    if ("key" in watch) return groupedSources.some(([key]) => key === watch.key) ? watch.key : null;
+    return groupedSources.find(([, g]) => g.label.kind === "episode" && g.label.number === watch.episode)?.[0] ?? null;
+  }, [watch, groupedSources]);
+  const watchLabel = watch ? ("key" in watch ? watch.key : `Episode ${watch.episode}`) : null;
+  // A player route whose group has no releases: show this page with a note.
+  const watchMissing = watch != null && playingKey == null && !sourcesLoading;
+  useEffect(() => {
+    if (watchMissing) console.warn("[media] player route has no releases", { watch });
+  }, [watchMissing]);
+
+  function play(key: string, replace = false) {
+    const group = groupedSources.find(([k]) => k === key)?.[1];
+    onWatch(group?.label.kind === "episode" ? { episode: group.label.number } : { key }, replace);
+  }
 
   // Esc leaves the loading shell the same way it closes the player.
   useEffect(() => {
-    if (!direct || playingKey != null || directMissing) return;
+    if (!watch || playingKey != null || watchMissing) return;
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onBack();
+      if (e.key === "Escape") onCloseWatch();
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [direct, playingKey, directMissing, onBack]);
+  }, [watch, playingKey, watchMissing, onCloseWatch]);
 
   const playingIndex = playingKey == null ? -1 : groupedSources.findIndex(([key]) => key === playingKey);
   const playing = playingIndex >= 0 ? groupedSources[playingIndex] : null;
@@ -125,18 +142,6 @@ export function MediaPage({
     if (!latest.completed) return episodes[latestIndex];
     return episodes[latestIndex + 1] ?? episodes[latestIndex];
   }, [groupedSources, progress]);
-
-  useEffect(() => {
-    if (sourcesLoading || autoplayEpisode == null) return;
-    const match = groupedSources.find(([, group]) => group.label.kind === "episode" && group.label.number === autoplayEpisode);
-    if (match) setPlayingKey(match[0]);
-    else {
-      console.warn("[media] autoplay episode has no releases", { autoplayEpisode });
-      if (direct) setDirectMissing(true);
-    }
-    onAutoplayHandled();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sourcesLoading, groupedSources, autoplayEpisode]);
 
   // Backdrop and episode thumbnails come from Kitsu (real wide banner and
   // better per-episode coverage than AniList - see src/kitsu.ts), falling
@@ -169,40 +174,46 @@ export function MediaPage({
     [groupedSources, thumbnails, progress],
   );
 
+  // Stable for the memoized player playlist.
+  const selectFromPlayer = useCallback((key: string) => play(key, true), [groupedSources, onWatch]);
+
   const player = playing && (
     <PlayerView
-      key={playing[0]}
+      // The route target, not the group key: a group can be relabeled as
+      // release details arrive (batch detection, absolute numbering), which
+      // remounted the player and restarted the torrent.
+      key={watchLabel ?? playing[0]}
       anime={anime}
       episodeKey={playing[0]}
       episode={playing[1].label.kind === "episode" ? playing[1].label.number : null}
       releases={playing[1].releases}
-      onClose={() => (direct ? onBack() : setPlayingKey(null))}
-      onNext={next ? () => setPlayingKey(next[0]) : null}
+      onClose={onCloseWatch}
+      onNext={next ? () => play(next[0], true) : null}
       nextLabel={next ? next[0] : null}
       playlist={playlist}
-      onSelectEpisode={setPlayingKey}
+      onSelectEpisode={selectFromPlayer}
     />
   );
 
-  if (direct && !directMissing) {
+  if (watch && !watchMissing) {
     // Player shell while nyaa.si releases load - same full-viewport frame
     // the player uses, so the hand-off to PlayerView doesn't flash.
     return (
       player || (
         <div class="player-view controls-shown">
           <div class="player-topbar">
-            <button class="player-icon-button" onClick={onBack} aria-label="Back" title="Back (Esc)">
+            <button class="player-icon-button" onClick={onCloseWatch} aria-label="Back" title="Back (Esc)">
               <BackIcon size={22} />
             </button>
             <div class="player-heading">
               <div class="player-heading-title">{displayTitle(anime.title)}</div>
-              <div class="player-heading-sub">Episode {directEpisode}</div>
+              <div class="player-heading-sub">{watchLabel}</div>
             </div>
           </div>
           {error ? (
             <div class="player-message player-error" role="alert">
               <p>{error}</p>
-              <button class="button button-quiet" onClick={onBack}>
+              <button class="button button-quiet" onClick={onCloseWatch}>
                 Go back
               </button>
             </div>
@@ -273,7 +284,7 @@ export function MediaPage({
           </dl>
           <div class="media-actions">
             {continueTarget && !sourcesLoading && (
-              <button class="button button-primary" onClick={() => setPlayingKey(continueTarget[0])}>
+              <button class="button button-primary" onClick={() => play(continueTarget[0])}>
                 <PlayIcon size={16} /> {continueLabel}
               </button>
             )}
@@ -302,8 +313,8 @@ export function MediaPage({
             {!sourcesLoading && sourcesCount > 0 && <span>{sourcesCount} releases on nyaa.si</span>}
           </header>
           {error && <p class="error-banner">{error}</p>}
-          {directMissing && (
-            <p class="error-banner">No release of Episode {directEpisode} was found. Pick another episode below.</p>
+          {watchMissing && (
+            <p class="error-banner">No release of {watchLabel} was found. Pick another episode below.</p>
           )}
           {!sourcesLoading && sourcesCount === 0 && !error && (
             <p class="empty-state">Nobody has uploaded this to nyaa.si yet, or it's listed under a different title.</p>
@@ -321,7 +332,7 @@ export function MediaPage({
                 const fraction = entry && !watched ? Math.min(1, entry.position / entry.duration) : 0;
                 return (
                   <div class={`video-row${watched ? " watched" : ""}${key === continueTarget?.[0] ? " current" : ""}`} key={key}>
-                    <button class="video-row-main" onClick={() => setPlayingKey(key)} aria-label={`Play ${key}`}>
+                    <button class="video-row-main" onClick={() => play(key)} aria-label={`Play ${key}`}>
                       <div class="video-thumbnail">
                         {thumbnail ? <img src={thumbnail} alt="" loading="lazy" /> : <span class="video-thumbnail-number">{episodeNumber ?? "All"}</span>}
                         <span class="video-thumbnail-play">

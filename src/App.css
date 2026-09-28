@@ -2411,3 +2411,9 @@ html.mpv-active .player-view {
 .player-view .player-playlist.open {
   transform: translateX(0);
 }
+
+/* Anime page loading from its route (reload, back/forward into it). */
+.route-loading {
+  position: relative;
+  height: 100%;
+}
