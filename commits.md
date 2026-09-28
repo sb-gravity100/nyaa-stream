@@ -2,6 +2,11 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `32225ee` · 2026-09-29 · feat(kitsu-client): anime search and by-AniList-id lookup
+- `crates/kitsu-client/examples/fallback_debug.rs`
+- `crates/kitsu-client/src/anime.rs`
+- `crates/kitsu-client/src/lib.rs`
+
 ### `609864c` · 2026-09-29 · docs: index router, fullscreen and keyboard modules
 - `FILE_INDEX.md`
 
