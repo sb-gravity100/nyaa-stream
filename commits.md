@@ -2,6 +2,12 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `313ff0a` · 2026-09-28 · docs: in-process FFmpeg, build prerequisites, subtitle lift/AA
+- `CLAUDE.md`
+- `FILE_INDEX.md`
+- `PHASES.md`
+- `PLAN.md`
+
 ### `bd893da` · 2026-09-28 · feat(subtitles): lift only dock-covered lines, 2x supersampled rendering
 - `src/App.css`
 - `src/PlayerView.tsx`
