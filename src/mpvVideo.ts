@@ -38,6 +38,17 @@ const OBSERVED = [
 ] as const;
 type Observed = (typeof OBSERVED)[number];
 
+/** Properties that belong to the loaded file (reset on `load`). */
+const FILE_PROPERTIES: Observed[] = ["time-pos", "duration", "eof-reached", "demuxer-cache-state", "video-params", "track-list", "seeking"];
+
+// `<video>` fires timeupdate ~4x a second; the seek bar's own rAF loop
+// reads `currentTime` for smoothness. Re-rendering the player on every
+// mpv frame made the controls sluggish and fought seek bar drags.
+const TIMEUPDATE_INTERVAL_MS = 250;
+// A seek that never reports back (no playback-restart) stops blocking the
+// next one after this long.
+const SEEK_RELEASE_MS = 2000;
+
 function command(args: unknown[]): Promise<unknown> {
    return invoke("mpv_command", { args });
 }
@@ -57,6 +68,11 @@ export class MpvVideo extends EventTarget {
    private started = false;
    private unlisten: UnlistenFn[] = [];
    private disposed = false;
+   private lastTimeUpdate = 0;
+   /** Target of the seek mpv is working on - newer ones wait for it. */
+   private seekTarget: number | null = null;
+   private pendingSeek: number | null = null;
+   private seekReleaseTimer: number | undefined;
    error: { message: string } | null = null;
 
    /** Starts mpv (idempotent), subscribes to its events and observes the
@@ -81,10 +97,25 @@ export class MpvVideo extends EventTarget {
       this.loaded = false;
       this.started = false;
       this.error = null;
-      this.props = {};
+      // Only per-file state: mpv reports a property again only when it
+      // changes, so wiping `pause`/`volume`/`mute` here left them unknown
+      // for the whole file (every click then read as "paused" -> play).
+      for (const name of FILE_PROPERTIES) delete this.props[name];
+      this.seekTarget = null;
+      this.pendingSeek = null;
       await command(["set_property", "start", start != null && start > 0 ? String(start) : "none"]);
       await command(["set_property", "pause", false]);
+      // The previous close froze (muted) mpv - see `freeze`.
+      await command(["set_property", "mute", false]);
       await command(["loadfile", url, "replace"]);
+   }
+
+   /** Silences playback at once - the player's close path calls this
+    * before its last-frame grab, so closing doesn't keep playing. */
+   async freeze(): Promise<void> {
+      await Promise.all([command(["set_property", "pause", true]), command(["set_property", "mute", true])]).catch((err) =>
+         console.warn("[mpv] freeze failed", { err: String(err) }),
+      );
    }
 
    /** Unloads the file and makes the window opaque again. */
@@ -108,13 +139,34 @@ export class MpvVideo extends EventTarget {
       return Math.min(base + Math.min(elapsed, 0.25), this.duration || Infinity);
    }
 
+   /** Seeks are coalesced: while one is in flight only the latest
+    * request is kept, so a drag or held arrow key can't queue dozens of
+    * seeks that each wait on torrent pieces. */
    set currentTime(seconds: number) {
-      console.debug("[mpv] seek", { seconds });
       this.props["time-pos"] = seconds;
       this.timeStamp = performance.now();
-      void command(["seek", seconds, "absolute"]).catch((err) =>
-         console.warn("[mpv] seek failed", { seconds, err: String(err) }),
-      );
+      this.pendingSeek = seconds;
+      this.flushSeek();
+   }
+
+   private flushSeek() {
+      if (this.seekTarget != null || this.pendingSeek == null) return;
+      const seconds = this.pendingSeek;
+      this.pendingSeek = null;
+      this.seekTarget = seconds;
+      console.debug("[mpv] seek", { seconds });
+      void command(["seek", seconds, "absolute"]).catch((err) => {
+         console.warn("[mpv] seek failed", { seconds, err: String(err) });
+         this.releaseSeek();
+      });
+      window.clearTimeout(this.seekReleaseTimer);
+      this.seekReleaseTimer = window.setTimeout(() => this.releaseSeek(), SEEK_RELEASE_MS);
+   }
+
+   private releaseSeek() {
+      window.clearTimeout(this.seekReleaseTimer);
+      this.seekTarget = null;
+      this.flushSeek();
    }
 
    get duration(): number {
@@ -250,6 +302,7 @@ export class MpvVideo extends EventTarget {
             // First frame after a load or a seek.
             if (!this.started) console.info("[mpv] first frame");
             this.started = true;
+            this.releaseSeek();
             this.timeStamp = performance.now();
             this.emit("canplay");
             this.emit("playing");
@@ -265,12 +318,20 @@ export class MpvVideo extends EventTarget {
 
    private handleProperty(name: Observed, data: unknown) {
       const previous = this.props[name];
+      // Positions from before an in-flight seek would snap the seek bar
+      // back to where playback was.
+      if (name === "time-pos" && (this.seekTarget != null || this.pendingSeek != null)) return;
       this.props[name] = data;
       switch (name) {
-         case "time-pos":
-            this.timeStamp = performance.now();
-            this.emit("timeupdate");
+         case "time-pos": {
+            const now = performance.now();
+            this.timeStamp = now;
+            if (now - this.lastTimeUpdate >= TIMEUPDATE_INTERVAL_MS) {
+               this.lastTimeUpdate = now;
+               this.emit("timeupdate");
+            }
             return;
+         }
          case "duration":
             this.emit("durationchange");
             return;

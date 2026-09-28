@@ -70,6 +70,7 @@ const LAST_FRAME_WIDTH = 640;
  * thumbnail. */
 async function captureLastFrameAndDetach({ video, animeId, episode, hasPlayed }: { video: MpvVideo | null; animeId: number; episode: number | null; hasPlayed: boolean }) {
    if (!video) return;
+   await video.freeze();
    if (episode == null || !hasPlayed || video.readyState < 2) {
       console.debug("[player] last-frame capture skipped", { animeId, episode, hasPlayed, readyState: video.readyState });
    } else {
