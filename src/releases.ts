@@ -47,6 +47,39 @@ export function releaseResolution(release: NyaaResult): string | null {
   return match[1] ?? "2160";
 }
 
+// Video codec from the release title. Only the ones WebView2 may not be
+// able to decode matter - everything else is assumed H.264.
+const HEVC_PATTERN = /\b(hevc|x265|h\.?265)\b/i;
+const AV1_PATTERN = /\bav1\b/i;
+
+export type RiskyCodec = "hevc" | "av1";
+
+export function releaseCodec(release: NyaaResult): RiskyCodec | null {
+  if (HEVC_PATTERN.test(release.title)) return "hevc";
+  if (AV1_PATTERN.test(release.title)) return "av1";
+  return null;
+}
+
+const CODEC_PROBES: Record<RiskyCodec, string> = {
+  hevc: 'video/mp4; codecs="hvc1.1.6.L120.90"',
+  av1: 'video/mp4; codecs="av01.0.08M.08"',
+};
+const codecSupportCache = new Map<RiskyCodec, boolean>();
+
+/** Whether this machine's WebView can decode `codec` through MSE (HEVC
+ * needs the OS extension/hardware on Windows - verified live: an HEVC
+ * release failed with hls.js bufferAddCodecError). */
+export function codecPlayable(codec: RiskyCodec | null): boolean {
+  if (codec == null) return true;
+  let supported = codecSupportCache.get(codec);
+  if (supported === undefined) {
+    supported = typeof MediaSource !== "undefined" && MediaSource.isTypeSupported(CODEC_PROBES[codec]);
+    codecSupportCache.set(codec, supported);
+    console.info("[releases] codec support", { codec, supported });
+  }
+  return supported;
+}
+
 export interface ReleasePreferences {
   preferredGroup?: string | null;
   preferredResolution?: PreferredResolution;
@@ -58,6 +91,8 @@ const MIN_PREFERRED_SEEDERS = 3;
 
 function score(release: NyaaResult, prefs: ReleasePreferences): number {
   let value = Math.log10(release.seeders + 1) * 10;
+  // Undecodable here - never auto-pick it over anything playable.
+  if (!codecPlayable(releaseCodec(release))) value -= 1000;
   if (release.seeders < MIN_PREFERRED_SEEDERS) return value;
   const group = releaseGroup(release);
   if (prefs.preferredGroup && group && group.toLowerCase() === prefs.preferredGroup.toLowerCase()) value += 100;
