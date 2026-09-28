@@ -53,6 +53,10 @@ const SEGMENT_POLL_INTERVAL: Duration = Duration::from_millis(100);
 /// job then starts without subtitle outputs rather than stalling playback.
 const PROBE_TIMEOUT: Duration = Duration::from_secs(30);
 
+/// How long a run waits for the media probe to decide copy vs. transcode
+/// before falling back to copy.
+const PLAN_PROBE_WAIT: Duration = Duration::from_secs(12);
+
 /// How long `font_handler` waits for the background attachment dump to
 /// land a requested font on disk.
 const FONT_WAIT_TIMEOUT: Duration = Duration::from_secs(30);
@@ -96,6 +100,129 @@ pub struct TorrentEngine {
     probes: MediaProbes,
 }
 
+/// What the frontend's WebView can decode natively through MSE, reported
+/// by `set_decoder_support`. Conservative defaults (nothing beyond 8-bit
+/// H.264) until the frontend says otherwise.
+#[derive(Debug, Clone, Copy, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DecoderSupport {
+    pub hevc: bool,
+}
+
+/// The H.264 encoder a transcode uses - the first of NVENC / QuickSync /
+/// AMF that actually opens on this machine, else libx264 (see
+/// `detect_h264_encoder`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum H264Encoder {
+    Nvenc,
+    Qsv,
+    Amf,
+    X264,
+}
+
+impl H264Encoder {
+    fn ffmpeg_name(self) -> &'static str {
+        match self {
+            Self::Nvenc => "h264_nvenc",
+            Self::Qsv => "h264_qsv",
+            Self::Amf => "h264_amf",
+            Self::X264 => "libx264",
+        }
+    }
+
+    fn pix_fmt(self) -> &'static str {
+        match self {
+            Self::Qsv | Self::Amf => "nv12",
+            Self::Nvenc | Self::X264 => "yuv420p",
+        }
+    }
+
+    /// Quality-targeted VBR tuned for anime (flat areas, sharp lines) with
+    /// a ceiling so a torrent-fed stream never spikes past what the
+    /// browser buffer comfortably absorbs.
+    fn quality_args(self) -> &'static [&'static str] {
+        match self {
+            Self::Nvenc => &["-preset", "p4", "-tune", "hq", "-rc", "vbr", "-cq", "21", "-b:v", "0", "-maxrate", "12M", "-bufsize", "24M"],
+            Self::Qsv => &["-preset", "medium", "-global_quality", "22", "-maxrate", "12M", "-bufsize", "24M"],
+            Self::Amf => &["-quality", "balanced", "-rc", "qvbr", "-qvbr_quality_level", "22", "-maxrate", "12M", "-bufsize", "24M"],
+            Self::X264 => &["-preset", "veryfast", "-tune", "animation", "-crf", "21", "-maxrate", "12M", "-bufsize", "24M"],
+        }
+    }
+}
+
+static H264_ENCODER: tokio::sync::OnceCell<H264Encoder> = tokio::sync::OnceCell::const_new();
+
+/// Probes hardware encoders once per process with a tiny synthetic
+/// encode (an encoder listed by `ffmpeg -encoders` can still fail to open
+/// without the matching GPU/driver - verified here: QSV and AMF are built
+/// in but fail on an NVIDIA-only machine) and caches the first that works.
+pub async fn detect_h264_encoder() -> H264Encoder {
+    *H264_ENCODER
+        .get_or_init(|| async {
+            for encoder in [H264Encoder::Nvenc, H264Encoder::Qsv, H264Encoder::Amf] {
+                let status = tokio::process::Command::new("ffmpeg")
+                    .args(["-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc2=s=640x360:r=24:d=0.2"])
+                    .args(["-pix_fmt", encoder.pix_fmt(), "-c:v", encoder.ffmpeg_name(), "-f", "null", "-"])
+                    .stdin(Stdio::null())
+                    .stdout(Stdio::null())
+                    .stderr(Stdio::null())
+                    .kill_on_drop(true)
+                    .status()
+                    .await;
+                let works = status.is_ok_and(|s| s.success());
+                tracing::debug!(encoder = encoder.ffmpeg_name(), works, "probed hardware h264 encoder");
+                if works {
+                    tracing::info!(encoder = encoder.ffmpeg_name(), "using hardware h264 encoder for transcodes");
+                    return encoder;
+                }
+            }
+            tracing::info!("no hardware h264 encoder available, transcodes use libx264");
+            H264Encoder::X264
+        })
+        .await
+}
+
+/// How a run handles the video stream.
+#[derive(Debug, Clone)]
+enum VideoPlan {
+    /// Stream-copy: the source is something the WebView decodes natively.
+    Copy,
+    /// Re-encode to 8-bit H.264 High. `reason` is for logs/UI.
+    Transcode { encoder: H264Encoder, reason: String },
+}
+
+impl VideoPlan {
+    fn label(&self) -> String {
+        match self {
+            Self::Copy => "direct".to_string(),
+            Self::Transcode { encoder, reason } => format!("{reason} -> H.264 ({})", encoder.ffmpeg_name()),
+        }
+    }
+}
+
+/// Decides copy vs. transcode from the probed video stream. Browsers (and
+/// hls.js's MPEG-TS demuxer) only reliably handle 8-bit 4:2:0 H.264;
+/// 10-bit "Hi10P" H.264 - still common in anime fansub releases - fails to
+/// decode even though the codec name matches, and AV1/VP9/MPEG-4 can't be
+/// carried in MPEG-TS for hls.js at all. HEVC is copied only when the
+/// frontend reported native HEVC decode.
+async fn plan_video(video: Option<&VideoStreamInfo>, support: DecoderSupport) -> VideoPlan {
+    let Some(video) = video else {
+        // Unknown (probe failed): copying is what always worked before.
+        return VideoPlan::Copy;
+    };
+    let eight_bit_420 = matches!(video.pix_fmt.as_deref(), None | Some("yuv420p" | "yuvj420p"));
+    let reason = match video.codec.as_str() {
+        "h264" if eight_bit_420 => return VideoPlan::Copy,
+        "h264" => format!("H.264 {}", video.pix_fmt.as_deref().unwrap_or("high bit depth")),
+        "hevc" if support.hevc && eight_bit_420 => return VideoPlan::Copy,
+        "hevc" => "HEVC".to_string(),
+        "av1" => "AV1".to_string(),
+        other => other.to_uppercase(),
+    };
+    VideoPlan::Transcode { encoder: detect_h264_encoder().await, reason }
+}
+
 /// One in-progress `ffmpeg` HLS transcode for a specific torrent file -
 /// see `HlsJobs` for why there's at most one of these per file and how
 /// requests decide whether to reuse or restart it.
@@ -113,6 +240,8 @@ struct HlsJob {
     /// subtitle-only process for the same start offset.
     has_subtitles: bool,
     subtitle_child: Option<tokio::process::Child>,
+    /// `VideoPlan::label` of this run, reported in `StreamStats`.
+    video_mode: String,
 }
 
 impl HlsJob {
@@ -144,11 +273,14 @@ impl HlsJob {
 struct HlsJobs {
     jobs: Arc<AsyncMutex<HashMap<(TorrentId, usize), Arc<AsyncMutex<Option<HlsJob>>>>>>,
     cache_root: PathBuf,
+    decoder_support: Arc<std::sync::RwLock<DecoderSupport>>,
+    /// Video plan decided once per file per process (see `plan_for`).
+    plans: Arc<AsyncMutex<HashMap<(TorrentId, usize), VideoPlan>>>,
 }
 
 impl HlsJobs {
     fn new(cache_root: PathBuf) -> Self {
-        Self { jobs: Arc::new(AsyncMutex::new(HashMap::new())), cache_root }
+        Self { jobs: Arc::new(AsyncMutex::new(HashMap::new())), cache_root, decoder_support: Arc::new(std::sync::RwLock::new(DecoderSupport::default())), plans: Arc::new(AsyncMutex::new(HashMap::new())) }
     }
 
     fn job_dir(&self, torrent_id: &TorrentId, file_idx: usize) -> PathBuf {
@@ -222,6 +354,9 @@ impl HlsJobs {
         stream_addr: SocketAddr,
         probes: &MediaProbes,
     ) -> anyhow::Result<PathBuf> {
+        // Decided (and the on-disk cache validated against it) before any
+        // cached segment is served - see plan_for.
+        let plan = self.plan_for(torrent_id, file_idx, stream_addr, probes).await;
         let path = self.segment_path(torrent_id, file_idx, segment_index);
         if tokio::fs::try_exists(&path).await.unwrap_or(false) {
             return Ok(path);
@@ -272,19 +407,18 @@ impl HlsJobs {
                 }
                 let dir = self.job_dir(torrent_id, file_idx);
                 tokio::fs::create_dir_all(&dir).await?;
-                // Subtitle tracks ride along in this same ffmpeg process
-                // (see spawn_hls_transcode) so they're extracted at the
-                // playhead, not from byte 0 - but only if the probe has
-                // already finished. Video never waits on it: an earlier
-                // version awaited the probe here and a slow header read
-                // delayed the first frame by ~55s (two 30s probe attempts,
-                // verified live). If it isn't ready, the probe finishes in
-                // the background and attach_subtitles adds a
-                // subtitle-only process for this run.
-                let cached = probes.peek(torrent_id, file_idx).await;
-                let has_subtitles = cached.is_some();
-                let subtitles = cached.map(|probe| probe.subtitles).unwrap_or_default();
-                let child = spawn_hls_transcode(torrent_id, file_idx, segment_index, stream_addr, &dir, &subtitles)?;
+                // The probe decides copy vs. transcode, so the first run
+                // waits for it - bounded by PLAN_PROBE_WAIT, since ffmpeg
+                // needs the same container header anyway. If it isn't back
+                // in time the run copies video (what always worked before)
+                // and, once the probe lands, attach_subtitles adds the
+                // subtitle outputs. An earlier version waited up to 2x30s
+                // here and delayed the first frame by ~55s (verified live).
+                let probe = probes.peek(torrent_id, file_idx).await;
+                let has_subtitles = probe.is_some();
+                let subtitles = probe.map(|probe| probe.subtitles).unwrap_or_default();
+                tracing::info!(torrent_id = %torrent_id, file_idx, segment_index, video = %plan.label(), "hls run video plan");
+                let child = spawn_hls_transcode(torrent_id, file_idx, segment_index, stream_addr, &dir, &subtitles, &plan)?;
                 *job_slot = Some(HlsJob {
                     child,
                     dir: dir.clone(),
@@ -292,6 +426,7 @@ impl HlsJobs {
                     started_at: tokio::time::Instant::now(),
                     has_subtitles,
                     subtitle_child: None,
+                    video_mode: plan.label(),
                 });
                 if !has_subtitles {
                     let (jobs, probes, torrent_id) = (self.clone(), probes.clone(), torrent_id.clone());
@@ -340,6 +475,57 @@ impl HlsJobs {
         anyhow::bail!("timed out waiting for hls segment {segment_index} to be generated")
     }
 
+    /// The video plan for `(torrent_id, file_idx)`, decided on first use in
+    /// this process: waits (bounded by PLAN_PROBE_WAIT) for the media
+    /// probe, then compares the result with the `video_mode` marker in the
+    /// file's cache directory. Segments cached by a different mode (e.g.
+    /// HEVC stream-copied before transcoding existed, or before the
+    /// frontend reported decoder support) would be undecodable, so they're
+    /// deleted before anything is served from that directory.
+    async fn plan_for(&self, torrent_id: &TorrentId, file_idx: usize, stream_addr: SocketAddr, probes: &MediaProbes) -> VideoPlan {
+        let key = (torrent_id.clone(), file_idx);
+        let mut plans = self.plans.lock().await;
+        if let Some(plan) = plans.get(&key) {
+            return plan.clone();
+        }
+        let dir = self.job_dir(torrent_id, file_idx);
+        let probe = match probes.peek(torrent_id, file_idx).await {
+            Some(probe) => Some(probe),
+            None => tokio::time::timeout(PLAN_PROBE_WAIT, probes.get(torrent_id, file_idx, stream_addr, dir.clone()))
+                .await
+                .ok()
+                .and_then(|result| result.ok()),
+        };
+        let support = *self.decoder_support.read().unwrap_or_else(|e| e.into_inner());
+        let plan = plan_video(probe.as_ref().and_then(|p| p.video.as_ref()), support).await;
+        let label = plan.label();
+        let marker = dir.join("video_mode");
+        let previous = tokio::fs::read_to_string(&marker).await.ok();
+        if previous.as_deref() != Some(label.as_str()) {
+            let mut removed = 0usize;
+            if let Ok(mut entries) = tokio::fs::read_dir(&dir).await {
+                while let Ok(Some(entry)) = entries.next_entry().await {
+                    if entry.file_name().to_string_lossy().ends_with(".ts") && tokio::fs::remove_file(entry.path()).await.is_ok() {
+                        removed += 1;
+                    }
+                }
+            }
+            if let Err(err) = tokio::fs::create_dir_all(&dir).await.and(tokio::fs::write(&marker, &label).await) {
+                tracing::warn!(torrent_id = %torrent_id, file_idx, %err, "failed to write video mode marker");
+            }
+            tracing::info!(torrent_id = %torrent_id, file_idx, previous = ?previous, current = %label, removed, "hls cache video mode changed, dropped stale segments");
+        }
+        tracing::info!(torrent_id = %torrent_id, file_idx, video = %label, "hls video plan decided");
+        plans.insert(key, plan.clone());
+        plan
+    }
+
+    async fn video_mode(&self, torrent_id: &TorrentId, file_idx: usize) -> Option<String> {
+        let job_lock = self.key_lock(torrent_id, file_idx).await;
+        let slot = job_lock.lock().await;
+        slot.as_ref().map(|job| job.video_mode.clone())
+    }
+
     /// Adds a subtitle-only extraction process to the current run of
     /// `(torrent_id, file_idx)` if that run started without subtitle
     /// outputs (probe not ready yet). Same start offset and `-copyts`
@@ -371,6 +557,7 @@ impl HlsJobs {
     /// itself is removed so nothing keeps writing into a now-orphaned
     /// cache directory.
     async fn remove_torrent(&self, torrent_id: &TorrentId) {
+        self.plans.lock().await.retain(|(id, _), _| id != torrent_id);
         let mut jobs = self.jobs.lock().await;
         let keys: Vec<_> = jobs.keys().filter(|(id, _)| id == torrent_id).cloned().collect();
         for key in keys {
@@ -382,6 +569,24 @@ impl HlsJobs {
                 }
             }
         }
+    }
+}
+
+/// Routes one ffmpeg stderr line to the right log level. Some lines are
+/// expected noise for this pipeline and were flooding the warn log: font
+/// attachments have no "codec parameters", and every enginefs early EOF
+/// produces a "Stream ends prematurely"/"Will reconnect" pair that ffmpeg
+/// then recovers from on its own.
+fn log_ffmpeg_line(torrent_id: &TorrentId, file_idx: usize, process: &str, line: &str) {
+    let benign = line.contains("(Attachment: none)")
+        || line.contains("Consider increasing the value for the 'analyzeduration'")
+        || line.contains("Stream ends prematurely")
+        || line.contains("Will reconnect at")
+        || line.contains("Last message repeated");
+    if benign {
+        tracing::debug!(torrent_id = %torrent_id, file_idx, process, ffmpeg_stderr = %line, "ffmpeg stderr");
+    } else {
+        tracing::warn!(torrent_id = %torrent_id, file_idx, process, ffmpeg_stderr = %line, "ffmpeg stderr");
     }
 }
 
@@ -445,17 +650,22 @@ fn spawn_hls_transcode(
     stream_addr: SocketAddr,
     dir: &FsPath,
     subtitles: &[SubtitleTrack],
+    plan: &VideoPlan,
 ) -> anyhow::Result<tokio::process::Child> {
     let start_seconds = start_segment_index as f64 * SEGMENT_DURATION_SECONDS;
     let input_url = format!("http://{stream_addr}/stream/{torrent_id}/{file_idx}");
     let segment_filename = dir.join("%d.ts");
+    let transcoding = matches!(plan, VideoPlan::Transcode { .. });
     // ffmpeg's own playlist output is discarded - hls_playlist_handler
     // still serves the frontend-duration-derived playlist described
     // there; we only want this process's segment files.
     let discarded_playlist_path = dir.join("ffmpeg_internal.m3u8");
 
     let mut command = tokio::process::Command::new("ffmpeg");
-    command.args(["-loglevel", "warning"]);
+    // `-y`: a replayed torrent's cache already holds this start offset's
+    // `sub_*.ass` from an earlier session, and without it ffmpeg stopped
+    // at an "Overwrite? [y/N]" prompt and exited (verified live).
+    command.args(["-loglevel", "warning", "-y"]);
     // Sequential playback from the start (the overwhelmingly common case)
     // deliberately omits `-ss` entirely rather than passing `-ss 0`: with
     // no Matroska Cues index available on a still-downloading torrent, any
@@ -477,6 +687,11 @@ fn spawn_hls_transcode(
     // means the first segment isn't gated on downloading that much extra.
     command.args(RECONNECT_ARGS);
     command.args(["-probesize", "2000000", "-analyzeduration", "2000000"]);
+    if transcoding {
+        // GPU decode when available (HEVC/AV1 10-bit decode is the other
+        // half of the cost); ffmpeg falls back to software on its own.
+        command.args(["-hwaccel", "auto"]);
+    }
     command.args(["-copyts", "-i", &input_url]);
     command.args([
         // Real releases commonly carry an embedded subtitle track (e.g.
@@ -493,8 +708,25 @@ fn spawn_hls_transcode(
         "-map",
         "0:a:0",
         "-sn",
-        "-c:v",
-        "copy",
+    ]);
+    match plan {
+        VideoPlan::Copy => {
+            command.args(["-c:v", "copy"]);
+        }
+        VideoPlan::Transcode { encoder, .. } => {
+            command.args(["-c:v", encoder.ffmpeg_name(), "-pix_fmt", encoder.pix_fmt(), "-profile:v", "high"]);
+            command.args(encoder.quality_args());
+            // Keyframe exactly every SEGMENT_DURATION_SECONDS from the
+            // run's first frame, as IDR frames, so every segment starts
+            // on the playlist's 6s grid and decodes independently - a
+            // stream copy can only cut at the source's own keyframes.
+            command.args(["-force_key_frames", &format!("expr:if(isnan(prev_forced_t),1,gte(t,prev_forced_t+{SEGMENT_DURATION_SECONDS}))")]);
+            if matches!(encoder, H264Encoder::Nvenc | H264Encoder::X264) {
+                command.args(["-forced-idr", "1"]);
+            }
+        }
+    }
+    command.args([
         // Audio is always transcoded to AAC rather than copied: several
         // codecs real releases use (e.g. E-AC-3) aren't reliably muxable
         // into MPEG-TS/played back by browsers, and AAC is universally
@@ -552,7 +784,7 @@ fn spawn_hls_transcode(
             use tokio::io::{AsyncBufReadExt, BufReader};
             let mut lines = BufReader::new(stderr).lines();
             while let Ok(Some(line)) = lines.next_line().await {
-                tracing::warn!(torrent_id = %torrent_id, file_idx, ffmpeg_stderr = %line, "ffmpeg hls transcode stderr");
+                log_ffmpeg_line(&torrent_id, file_idx, "hls transcode", &line);
             }
         });
     }
@@ -602,7 +834,7 @@ fn spawn_background_subtitle_pass(
             use tokio::io::{AsyncBufReadExt, BufReader};
             let mut lines = BufReader::new(stderr).lines();
             while let Ok(Some(line)) = lines.next_line().await {
-                tracing::warn!(torrent_id = %torrent_id, file_idx, ffmpeg_stderr = %line, "ffmpeg background subtitle pass stderr");
+                log_ffmpeg_line(&torrent_id, file_idx, "background subtitle pass", &line);
             }
         });
     }
@@ -649,7 +881,7 @@ fn spawn_subtitle_extraction(
             use tokio::io::{AsyncBufReadExt, BufReader};
             let mut lines = BufReader::new(stderr).lines();
             while let Ok(Some(line)) = lines.next_line().await {
-                tracing::warn!(torrent_id = %torrent_id, file_idx, ffmpeg_stderr = %line, "ffmpeg subtitle extraction stderr");
+                log_ffmpeg_line(&torrent_id, file_idx, "subtitle extraction", &line);
             }
         });
     }
@@ -702,6 +934,15 @@ pub struct FontAttachment {
 pub struct MediaProbe {
     pub subtitles: Vec<SubtitleTrack>,
     pub fonts: Vec<FontAttachment>,
+    pub video: Option<VideoStreamInfo>,
+}
+
+/// The main video stream's codec/pixel format - what `plan_video` decides
+/// copy vs. transcode from.
+#[derive(Debug, Clone)]
+pub struct VideoStreamInfo {
+    pub codec: String,
+    pub pix_fmt: Option<String>,
 }
 
 fn is_font_attachment(codec: Option<&str>, mimetype: Option<&str>, filename: &str) -> bool {
@@ -745,6 +986,7 @@ async fn probe_media(stream_addr: SocketAddr, torrent_id: &TorrentId, file_idx: 
         index: usize,
         codec_type: Option<String>,
         codec_name: Option<String>,
+        pix_fmt: Option<String>,
         tags: Option<HashMap<String, String>>,
         disposition: Option<FfprobeDisposition>,
     }
@@ -773,6 +1015,11 @@ async fn probe_media(stream_addr: SocketAddr, torrent_id: &TorrentId, file_idx: 
                     codec,
                     default: stream.disposition.is_some_and(|d| d.default == 1),
                 });
+            }
+            // First real video stream - cover art attachments also show up
+            // as video (mjpeg/png with the attached_pic disposition).
+            Some("video") if probe.video.is_none() && !matches!(stream.codec_name.as_deref(), Some("mjpeg" | "png" | "bmp")) => {
+                probe.video = Some(VideoStreamInfo { codec: stream.codec_name.clone().unwrap_or_default(), pix_fmt: stream.pix_fmt.clone() });
             }
             Some("attachment") => {
                 let filename = tags.remove("filename").unwrap_or_default();
@@ -990,6 +1237,9 @@ pub struct StreamStats {
     /// seek bar draws these; `ready_seconds` is the end of the stretch
     /// starting at 0, kept for callers that only want one number.
     pub ready_ranges: Vec<(f64, f64)>,
+    /// How the current run handles video: "direct" (stream copy) or e.g.
+    /// "HEVC -> H.264 (h264_nvenc)". None before the first segment request.
+    pub video_mode: Option<String>,
 }
 
 impl TorrentEngine {
@@ -1010,6 +1260,8 @@ impl TorrentEngine {
             .map(|parent| parent.join("hls_cache"))
             .unwrap_or_else(|| download_dir.join("hls_cache"));
         let hls_jobs = HlsJobs::new(hls_cache_root);
+        // Warm the encoder probe so the first transcode doesn't pay for it.
+        tokio::spawn(detect_h264_encoder());
         let probes = MediaProbes::new();
         let cache_dir = download_dir
             .parent()
@@ -1149,6 +1401,13 @@ impl TorrentEngine {
         self.probes.get(torrent_id, file_idx, self.stream_addr, self.hls_jobs.job_dir(torrent_id, file_idx)).await
     }
 
+    /// Records what the frontend's WebView decodes natively (see
+    /// `DecoderSupport`), used by every later transcode-run decision.
+    pub fn set_decoder_support(&self, support: DecoderSupport) {
+        tracing::info!(?support, "decoder support reported");
+        *self.hls_jobs.decoder_support.write().unwrap_or_else(|e| e.into_inner()) = support;
+    }
+
     /// URL a font attachment (see `FontAttachment`) is served from.
     pub fn font_url(&self, torrent_id: &TorrentId, file_idx: usize, stream_index: usize) -> String {
         format!("http://{}/fonts/{}/{}/{}", self.stream_addr, torrent_id, file_idx, stream_index)
@@ -1200,6 +1459,7 @@ impl TorrentEngine {
             total_bytes,
             ready_seconds: ready_ranges.first().filter(|(start, _)| *start == 0.0).map_or(0.0, |(_, end)| *end),
             ready_ranges,
+            video_mode: self.hls_jobs.video_mode(id, file_idx).await,
         })
     }
 }
