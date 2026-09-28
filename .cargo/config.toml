@@ -3,6 +3,14 @@
 # Explicit CI environment values can still override these local defaults.
 VCPKGRS_TRIPLET = "x64-windows-v3-static-md-release"
 VCPKG_INSTALLED_DIR = { value = "vcpkg_installed", relative = true }
+# In-process FFmpeg (crates/torrent-engine/src/media.rs): ffmpeg-sys-next
+# reads the static FFmpeg that vcpkg.json builds straight from our manifest
+# install tree (the `vcpkg` crate it would otherwise use only understands
+# classic-mode installs); torrent-engine's build.rs links FFmpeg's own
+# dependencies. bindgen needs libclang - a dev-machine default, overridden by
+# a real LIBCLANG_PATH environment variable.
+FFMPEG_DIR = { value = "vcpkg_installed/x64-windows-v3-static-md-release", relative = true }
+LIBCLANG_PATH = "C:\\Program Files\\LLVM\\bin"
 
 [target.'cfg(all(windows, target_env = "msvc"))']
 # Keep Rust and C/C++ build-script output on the dynamic MSVC runtime. This

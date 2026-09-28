@@ -6,7 +6,24 @@
             "name": "libtorrent",
             "default-features": false
         },
-        "openssl"
+        "openssl",
+        {
+            "name": "ffmpeg",
+            "default-features": false,
+            "features": [
+                "avcodec",
+                "avformat",
+                "avdevice",
+                "avfilter",
+                "swresample",
+                "swscale",
+                "nvcodec",
+                "openh264",
+                "dav1d",
+                "amf",
+                "qsv"
+            ]
+        }
     ],
     "builtin-baseline": "84bab45d415d22042bd0b9081aea57f362da3f35",
     "overrides": [
