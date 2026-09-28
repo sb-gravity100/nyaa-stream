@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `5ca4ac9` · 2026-09-28 · fix(player): keep mpv when the availability check itself fails
+- `src/PlayerView.tsx`
+
 ### `6d6e48a` · 2026-09-28 · feat(player): fall back to the HLS player when mpv isn't installed
 - `src/App.css`
 - `src/HlsPlayerView.tsx`
