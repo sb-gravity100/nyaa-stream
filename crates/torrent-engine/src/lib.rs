@@ -23,7 +23,9 @@ use tokio::sync::Mutex as AsyncMutex;
 /// where it's used.
 pub type TorrentId = String;
 
+mod direct_input;
 mod media;
+use direct_input::TorrentSources;
 pub use media::H264Encoder;
 
 
@@ -262,14 +264,15 @@ fn drop_aborted_tail_segment(dir: &FsPath) {
 struct HlsJobs {
     jobs: Arc<AsyncMutex<HashMap<(TorrentId, usize), Arc<AsyncMutex<Option<HlsJob>>>>>>,
     cache_root: PathBuf,
+    sources: TorrentSources,
     decoder_support: Arc<std::sync::RwLock<DecoderSupport>>,
     /// Video plan decided once per file per process (see `plan_for`).
     plans: Arc<AsyncMutex<HashMap<(TorrentId, usize), VideoPlan>>>,
 }
 
 impl HlsJobs {
-    fn new(cache_root: PathBuf) -> Self {
-        Self { jobs: Arc::new(AsyncMutex::new(HashMap::new())), cache_root, decoder_support: Arc::new(std::sync::RwLock::new(DecoderSupport::default())), plans: Arc::new(AsyncMutex::new(HashMap::new())) }
+    fn new(cache_root: PathBuf, sources: TorrentSources) -> Self {
+        Self { jobs: Arc::new(AsyncMutex::new(HashMap::new())), cache_root, sources, decoder_support: Arc::new(std::sync::RwLock::new(DecoderSupport::default())), plans: Arc::new(AsyncMutex::new(HashMap::new())) }
     }
 
     fn job_dir(&self, torrent_id: &TorrentId, file_idx: usize) -> PathBuf {
@@ -414,7 +417,7 @@ impl HlsJobs {
                 let has_subtitles = probe.is_some();
                 let subtitles = probe.map(|probe| probe.subtitles).unwrap_or_default();
                 tracing::info!(torrent_id = %torrent_id, file_idx, segment_index, video = %plan.label(), "hls run video plan");
-                let child = spawn_hls_transcode(torrent_id, file_idx, segment_index, stream_addr, &dir, &subtitles, &plan).await?;
+                let child = spawn_hls_transcode(&self.sources, torrent_id, file_idx, segment_index, &dir, &subtitles, &plan).await?;
                 *job_slot = Some(HlsJob {
                     child,
                     dir: dir.clone(),
@@ -428,7 +431,7 @@ impl HlsJobs {
                     let (jobs, probes, torrent_id) = (self.clone(), probes.clone(), torrent_id.clone());
                     tokio::spawn(async move {
                         match probes.get(&torrent_id, file_idx, stream_addr, dir).await {
-                            Ok(probe) => jobs.attach_subtitles(&torrent_id, file_idx, &probe.subtitles, stream_addr).await,
+                            Ok(probe) => jobs.attach_subtitles(&torrent_id, file_idx, &probe.subtitles).await,
                             Err(err) => tracing::warn!(torrent_id = %torrent_id, file_idx, %err, "background media probe failed; no subtitles for this run"),
                         }
                     });
@@ -552,7 +555,7 @@ impl HlsJobs {
     /// `(torrent_id, file_idx)` if that run started without subtitle
     /// outputs (probe not ready yet). Same start offset and `-copyts`
     /// timeline as the run, so its output merges like any other run's.
-    async fn attach_subtitles(&self, torrent_id: &TorrentId, file_idx: usize, tracks: &[SubtitleTrack], stream_addr: SocketAddr) {
+    async fn attach_subtitles(&self, torrent_id: &TorrentId, file_idx: usize, tracks: &[SubtitleTrack]) {
         if tracks.is_empty() {
             return;
         }
@@ -564,7 +567,7 @@ impl HlsJobs {
         if job.has_subtitles {
             return;
         }
-        match spawn_subtitle_extraction(torrent_id, file_idx, job.start_index, stream_addr, &job.dir, tracks).await {
+        match spawn_subtitle_extraction(&self.sources, torrent_id, file_idx, job.start_index, &job.dir, tracks).await {
             Ok(child) => {
                 job.subtitle_child = Some(child);
                 job.has_subtitles = true;
@@ -646,19 +649,19 @@ fn subtitle_streams(tracks: &[SubtitleTrack]) -> Vec<media::SubtitleStream> {
 /// Starts the single continuous in-process HLS run for a torrent file at
 /// `start_segment_index` (0 for normal playback, non-zero only for a seek
 /// restart) - see `media::start_hls_run` for the pipeline itself. Reads
-/// from `stream_handler` over loopback, reusing its Range-aware,
-/// piece-priority-aware reads; segments land as real files (`temp_file`
-/// renames each into place only once complete).
+/// the torrent directly (`direct_input`) with the same piece priority
+/// `stream_handler` gives a foreground read; segments land as real files
+/// (`temp_file` renames each into place only once complete).
 async fn spawn_hls_transcode(
+    sources: &TorrentSources,
     torrent_id: &TorrentId,
     file_idx: usize,
     start_segment_index: usize,
-    stream_addr: SocketAddr,
     dir: &FsPath,
     subtitles: &[SubtitleTrack],
     plan: &VideoPlan,
 ) -> anyhow::Result<media::MediaJob> {
-    let input_url = format!("http://{stream_addr}/stream/{torrent_id}/{file_idx}");
+    let input = media::InputSource::Torrent(sources.reader(torrent_id, file_idx, false));
     let dir = dir.to_path_buf();
     let subtitle_streams = subtitle_streams(subtitles);
     let video = match plan {
@@ -667,8 +670,8 @@ async fn spawn_hls_transcode(
     };
     tracing::debug!(torrent_id = %torrent_id, file_idx, start_segment_index, subtitles = subtitle_streams.len(), "starting in-process hls run");
     tokio::task::spawn_blocking(move || {
-        media::start_hls_run(&media::HlsRun {
-            input_url: &input_url,
+        media::start_hls_run(media::HlsRun {
+            input,
             dir: &dir,
             start_segment_index,
             segment_seconds: SEGMENT_DURATION_SECONDS,
@@ -686,12 +689,12 @@ async fn spawn_hls_transcode(
 /// OP) are usually already there. Subtitle packets are interleaved with
 /// video across every cluster, so this can only complete as the torrent
 /// itself finishes downloading - it reads with the Background intent (see
-/// `StreamQuery`) so it trails the download rather than pulling piece
-/// priority away from the playhead.
+/// `TorrentSources::reader`) so it trails the download rather than pulling
+/// piece priority away from the playhead.
 async fn spawn_background_subtitle_pass(
+    sources: &TorrentSources,
     torrent_id: &TorrentId,
     file_idx: usize,
-    stream_addr: SocketAddr,
     dir: &FsPath,
     tracks: &[SubtitleTrack],
 ) -> anyhow::Result<Option<media::MediaJob>> {
@@ -699,10 +702,10 @@ async fn spawn_background_subtitle_pass(
         return Ok(None);
     }
     tokio::fs::create_dir_all(dir).await?;
-    let input_url = format!("http://{stream_addr}/stream/{torrent_id}/{file_idx}?intent=background");
+    let input = media::InputSource::Torrent(sources.reader(torrent_id, file_idx, true));
     let dir = dir.to_path_buf();
     let streams = subtitle_streams(tracks);
-    let job = tokio::task::spawn_blocking(move || media::start_subtitle_run(&input_url, &dir, 0.0, &streams, "bg"))
+    let job = tokio::task::spawn_blocking(move || media::start_subtitle_run(input, &dir, 0.0, &streams, "bg"))
         .await
         .map_err(|err| anyhow::anyhow!("background subtitle pass start panicked: {err}"))??;
     tracing::info!(torrent_id = %torrent_id, file_idx, tracks = tracks.len(), "started background full-file subtitle pass");
@@ -715,19 +718,19 @@ async fn spawn_background_subtitle_pass(
 /// timeline and `sub_<index>_<start>.ass` naming, so `subtitle_handler`
 /// merges it like any other run.
 async fn spawn_subtitle_extraction(
+    sources: &TorrentSources,
     torrent_id: &TorrentId,
     file_idx: usize,
     start_segment_index: usize,
-    stream_addr: SocketAddr,
     dir: &FsPath,
     tracks: &[SubtitleTrack],
 ) -> anyhow::Result<media::MediaJob> {
-    let input_url = format!("http://{stream_addr}/stream/{torrent_id}/{file_idx}");
+    let input = media::InputSource::Torrent(sources.reader(torrent_id, file_idx, false));
     let start_seconds = start_segment_index as f64 * SEGMENT_DURATION_SECONDS;
     let dir = dir.to_path_buf();
     let streams = subtitle_streams(tracks);
     tracing::debug!(torrent_id = %torrent_id, file_idx, start_segment_index, "starting subtitle catch-up run");
-    tokio::task::spawn_blocking(move || media::start_subtitle_run(&input_url, &dir, start_seconds, &streams, &start_segment_index.to_string()))
+    tokio::task::spawn_blocking(move || media::start_subtitle_run(input, &dir, start_seconds, &streams, &start_segment_index.to_string()))
         .await
         .map_err(|err| anyhow::anyhow!("subtitle run start panicked: {err}"))?
 }
@@ -892,11 +895,12 @@ struct MediaProbes {
     /// One full-file subtitle pass per file (see
     /// `spawn_background_subtitle_pass`), killed with the torrent.
     background_passes: Arc<AsyncMutex<HashMap<(TorrentId, usize), media::MediaJob>>>,
+    sources: TorrentSources,
 }
 
 impl MediaProbes {
-    fn new() -> Self {
-        Self { cells: Arc::new(AsyncMutex::new(HashMap::new())), background_passes: Arc::new(AsyncMutex::new(HashMap::new())) }
+    fn new(sources: TorrentSources) -> Self {
+        Self { cells: Arc::new(AsyncMutex::new(HashMap::new())), background_passes: Arc::new(AsyncMutex::new(HashMap::new())), sources }
     }
 
     async fn get(&self, torrent_id: &TorrentId, file_idx: usize, stream_addr: SocketAddr, job_dir: PathBuf) -> anyhow::Result<MediaProbe> {
@@ -909,7 +913,7 @@ impl MediaProbes {
                 let probe = tokio::time::timeout(PROBE_TIMEOUT, probe_media(stream_addr, torrent_id, file_idx, job_dir.join("fonts")))
                     .await
                     .map_err(|_| anyhow::anyhow!("timed out probing media streams"))??;
-                match spawn_background_subtitle_pass(torrent_id, file_idx, stream_addr, &job_dir, &probe.subtitles).await {
+                match spawn_background_subtitle_pass(&self.sources, torrent_id, file_idx, &job_dir, &probe.subtitles).await {
                     Ok(Some(child)) => {
                         self.background_passes.lock().await.insert((torrent_id.clone(), file_idx), child);
                     }
@@ -1049,10 +1053,8 @@ impl TorrentEngine {
             .parent()
             .map(|parent| parent.join("hls_cache"))
             .unwrap_or_else(|| download_dir.join("hls_cache"));
-        let hls_jobs = HlsJobs::new(hls_cache_root);
         // Warm the encoder probe so the first transcode doesn't pay for it.
         tokio::spawn(detect_h264_encoder());
-        let probes = MediaProbes::new();
         let cache_dir = download_dir
             .parent()
             .map(|parent| parent.join("engine_cache"))
@@ -1061,6 +1063,9 @@ impl TorrentEngine {
         let config = BackendConfig::default();
         let backend = enginefs::backend::libtorrent::LibtorrentBackend::new_disk_backed(download_dir.clone(), config)?;
         let efs: Arc<EngineFS> = Arc::new(EngineFS::new_with_backend(backend, HashMap::new(), cache_dir, download_dir));
+        let sources = TorrentSources::new(efs.clone());
+        let hls_jobs = HlsJobs::new(hls_cache_root, sources.clone());
+        let probes = MediaProbes::new(sources);
 
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
         let stream_addr = listener.local_addr()?;
