@@ -1150,9 +1150,11 @@ a {
 }
 
 /* JASSUB's libass canvas sits right after the <video>; keep it under the
-   UI layers. */
+   UI layers. The slight blur softens libass's native-resolution edges
+   (replaced 2x supersampling, which doubled the render cost). */
 .player-view canvas.JASSUB {
   z-index: 0;
+  filter: blur(0.35px);
 }
 
 .player-topbar {

@@ -34,13 +34,11 @@ const EMPTY_SCRIPT = [
   "",
 ].join("\n");
 
-// libass rasterizes at the canvas's backing resolution. Rendering at
-// exactly the displayed size leaves glyph edges with one pixel of coverage
-// each, which reads as jagged on large text; supersampling renders the
-// layer at N x the displayed size and lets the browser downsample it into
-// the same box (a 2x2 box average at 2x - real SSAA). Capped so 4K
-// fullscreen doesn't ask libass for an 8K canvas.
-const MAX_RENDER_HEIGHT_BY_SUPERSAMPLE: Record<number, number> = { 1: 1440, 2: 2160 };
+// libass renders at the displayed size (capped so 4K fullscreen doesn't ask
+// for a huge canvas); edges are softened with a light CSS blur on the canvas
+// (App.css) instead of the 2x supersampling this used to do, which doubled
+// libass's work on every frame.
+const MAX_RENDER_HEIGHT = 1440;
 
 // Numpad alignments 1-3 are bottom-aligned - identical in libass's internal
 // encoding, so this holds whichever form getStyles returns.
@@ -68,8 +66,6 @@ interface Options {
    * player's control dock (0 when hidden). Bottom-aligned lines whose
    * margin is smaller get pushed up just enough to clear it. */
   bottomInsetPx: number;
-  /** Render-resolution multiplier for anti-aliasing (1 or 2). */
-  supersample: number;
 }
 
 /**
@@ -79,7 +75,7 @@ interface Options {
  * exactly once and so only ever showed what had been extracted at that
  * moment.
  */
-export function useAssRenderer({ video, url, fonts, styled, style, timeOffset, delay, bottomInsetPx, supersample }: Options): void {
+export function useAssRenderer({ video, url, fonts, styled, style, timeOffset, delay, bottomInsetPx }: Options): void {
   const instanceRef = useRef<JASSUB | null>(null);
   const rawRef = useRef<string>("");
   // Styles as the current script defines them (before any dock lift), and
@@ -88,8 +84,6 @@ export function useAssRenderer({ video, url, fonts, styled, style, timeOffset, d
   const appliedLiftRef = useRef(0);
   const insetRef = useRef(bottomInsetPx);
   insetRef.current = bottomInsetPx;
-  const supersampleRef = useRef(supersample);
-  supersampleRef.current = supersample;
   const styleRef = useRef({ style, styled });
   styleRef.current = { style, styled };
   const offsetRef = useRef(timeOffset - delay);
@@ -116,9 +110,9 @@ export function useAssRenderer({ video, url, fonts, styled, style, timeOffset, d
       availableFonts: { "liberation sans": defaultFontUrl },
       queryFonts: "local",
       timeOffset: offsetRef.current,
-      prescaleFactor: supersampleRef.current,
+      prescaleFactor: 1,
       prescaleHeightLimit: 4320,
-      maxRenderHeight: MAX_RENDER_HEIGHT_BY_SUPERSAMPLE[supersampleRef.current] ?? 1440,
+      maxRenderHeight: MAX_RENDER_HEIGHT,
     });
     instanceRef.current = instance;
     const started = performance.now();
@@ -247,16 +241,6 @@ export function useAssRenderer({ video, url, fonts, styled, style, timeOffset, d
     void applyLift(instance, target, LIFT_STEPS).catch((err) => console.debug("[subtitles] lift failed", { err: String(err) }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bottomInsetPx]);
-
-  // Anti-aliasing level change: new backing resolution, same layout.
-  useEffect(() => {
-    const instance = instanceRef.current;
-    if (!instance) return;
-    instance.prescaleFactor = supersample;
-    instance.maxRenderHeight = MAX_RENDER_HEIGHT_BY_SUPERSAMPLE[supersample] ?? 1440;
-    console.info("[subtitles] supersampling", { factor: supersample });
-    void instance.resize(true);
-  }, [supersample]);
 
   // JASSUB draws at mediaTime + timeOffset; a positive user delay shows
   // cues later, i.e. looks up an earlier source time.

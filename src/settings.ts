@@ -45,9 +45,6 @@ export interface Settings {
   autoplayNext: boolean;
   /** Remember the fansub group last played per anime and prefer it. */
   rememberFansubGroup: boolean;
-  /** Subtitle anti-aliasing: libass render resolution multiplier (1 = off,
-   * 2 = 2x supersampled). */
-  subtitleSupersample: 1 | 2;
 }
 
 export const DEFAULT_SUBTITLE_STYLE: SubtitleStyle = {
@@ -73,7 +70,6 @@ export const DEFAULT_SETTINGS: Settings = {
   resumePlayback: true,
   autoplayNext: true,
   rememberFansubGroup: true,
-  subtitleSupersample: 2,
 };
 
 function load(): Settings {
