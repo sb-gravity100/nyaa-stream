@@ -74,6 +74,8 @@ export class MpvVideo extends EventTarget {
    private seekTarget: number | null = null;
    private pendingSeek: number | null = null;
    private seekReleaseTimer: number | undefined;
+   /** Positions dropped during the current seek (debug logging). */
+   private maskedPositions = 0;
    error: { message: string } | null = null;
 
    /** Starts mpv (idempotent), subscribes to its events and observes the
@@ -317,6 +319,9 @@ export class MpvVideo extends EventTarget {
             // First frame after a load or a seek.
             if (!this.started) console.info("[mpv] first frame");
             this.started = true;
+            if (this.seekTarget != null || this.pendingSeek != null)
+               console.debug("[mpv] seek restarted", { target: this.seekTarget, pending: this.pendingSeek, masked: this.maskedPositions });
+            this.maskedPositions = 0;
             this.releaseSeek();
             this.timeStamp = performance.now();
             this.emit("canplay");
@@ -339,7 +344,10 @@ export class MpvVideo extends EventTarget {
       const previous = this.props[name];
       // Positions from before an in-flight seek would snap the seek bar
       // back to where playback was.
-      if (name === "time-pos" && (this.seekTarget != null || this.pendingSeek != null)) return;
+      if (name === "time-pos" && (this.seekTarget != null || this.pendingSeek != null)) {
+         this.maskedPositions++;
+         return;
+      }
       this.props[name] = data;
       switch (name) {
          case "time-pos": {

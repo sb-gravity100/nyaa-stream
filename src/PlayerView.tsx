@@ -730,6 +730,7 @@ function MpvPlayerView({
    function handleSeekCommit(e: Event) {
       cancelPendingKeyboardSeek();
       const value = Number((e.target as HTMLInputElement).value);
+      console.debug("[player] seek bar commit", { value, from: videoRef.current?.currentTime });
       setSeekPreview(null);
       setNextCountdown(null);
       seekToEpisodeTime(value);
