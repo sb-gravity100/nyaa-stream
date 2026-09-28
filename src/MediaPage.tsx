@@ -152,6 +152,23 @@ export function MediaPage({
       : `Play ${continueTarget[0]}`
     : null;
 
+  // Memoized so the player's episode list only re-renders when an entry
+  // actually changes, not on every MediaPage render.
+  const playlist = useMemo(
+    () =>
+      groupedSources.map(([key, group]) => {
+        const number = group.label.kind === "episode" ? group.label.number : null;
+        return {
+          key,
+          episode: number,
+          thumbnail: number != null ? (thumbnails[number] ?? null) : null,
+          releaseCount: group.releases.length,
+          progress: progress[key] ?? null,
+        };
+      }),
+    [groupedSources, thumbnails, progress],
+  );
+
   const player = playing && (
     <PlayerView
       key={playing[0]}
@@ -162,16 +179,7 @@ export function MediaPage({
       onClose={() => (direct ? onBack() : setPlayingKey(null))}
       onNext={next ? () => setPlayingKey(next[0]) : null}
       nextLabel={next ? next[0] : null}
-      playlist={groupedSources.map(([key, group]) => {
-        const number = group.label.kind === "episode" ? group.label.number : null;
-        return {
-          key,
-          episode: number,
-          thumbnail: number != null ? (thumbnails[number] ?? null) : null,
-          releaseCount: group.releases.length,
-          progress: progress[key] ?? null,
-        };
-      })}
+      playlist={playlist}
       onSelectEpisode={setPlayingKey}
     />
   );

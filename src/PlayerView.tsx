@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "preact/hooks";
+import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks";
 import Hls from "hls.js";
 import { invoke } from "@tauri-apps/api/core";
 import type { AnimeMedia, NyaaResult, PlayFile, StreamStats, SubtitleTrack } from "./types";
@@ -241,6 +241,17 @@ export function PlayerView({
    const [muted, setMuted] = useState(false);
    const [menu, setMenu] = useState<Menu>(null);
    const [playlistOpen, setPlaylistOpen] = useState(false);
+   // Stable so the memoized PlayerPlaylist skips the ~4Hz re-renders
+   // that timeupdate drives through this component.
+   const selectFromPlaylist = useCallback(
+      (key: string) => {
+         console.info("[player] episode picked from list", { key });
+         setPlaylistOpen(false);
+         onSelectEpisode(key);
+      },
+      [onSelectEpisode],
+   );
+   const closePlaylist = useCallback(() => setPlaylistOpen(false), []);
    const [fullscreen, setFullscreen] = useState(false);
    // What the <video> element itself has buffered, in episode time - drawn
    // on the seek bar above the transcode's ready ranges.
@@ -1426,11 +1437,8 @@ export function PlayerView({
                items={playlist}
                currentKey={episodeKey}
                open={playlistOpen}
-               onSelect={(key) => {
-                  setPlaylistOpen(false);
-                  onSelectEpisode(key);
-               }}
-               onClose={() => setPlaylistOpen(false)}
+               onSelect={selectFromPlaylist}
+               onClose={closePlaylist}
             />
          )}
 
