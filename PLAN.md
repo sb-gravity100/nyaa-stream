@@ -128,7 +128,10 @@ requires, beyond Rust/Node:
   hint.
 - **Torrent source:** nyaa.si search, scraping its paginated HTML results
   table (its RSS feed was found to silently ignore the `p=` page param and
-  always cap at 75 results — see `crates/nyaa-client`)
+  always cap at 75 results — see `crates/nyaa-client`); responses are
+  cached on disk (`nyaa-client/src/cache.rs`) because nyaa.si rate-limits:
+  searches reused for 30 min and served stale when a refetch fails (a 429
+  is an error, never an empty result), view-page details kept forever
 - **Metadata:** AniList GraphQL API (`https://graphql.anilist.co`), no auth
   required for public queries; Kitsu API (`crates/kitsu-client`) as a
   secondary source for wide backdrop banners and per-episode thumbnails,
