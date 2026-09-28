@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `e7b4964` · 2026-09-29 · style(player): slower, desynced now-playing meter bars
+- `src/App.css`
+
 ### `88a3dc8` · 2026-09-29 · feat: app-wide F fullscreen hotkey, shared window fullscreen state
 - `src/HlsPlayerView.tsx`
 - `src/PlayerView.tsx`
