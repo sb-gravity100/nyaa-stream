@@ -2,6 +2,13 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `b39741b` · 2026-09-28 · feat(player): report decoder support, show when converting to H.264
+- `src/App.css`
+- `src/PlayerView.tsx`
+- `src/playback.ts`
+- `src/releases.ts`
+- `src/types.ts`
+
 ### `67e9797` · 2026-09-28 · feat(engine): transcode formats the WebView can't decode to H.264
 - `crates/torrent-engine/src/lib.rs`
 - `src-tauri/src/lib.rs`
