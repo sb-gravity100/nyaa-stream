@@ -4,6 +4,7 @@ import type { EpisodeLabel } from "./episodeParser";
 import { PlayerView } from "./PlayerView";
 import { progressForAnime, setWatched, subscribeProgress, type ProgressEntry } from "./watchProgress";
 import { BackIcon, CheckIcon, PlayIcon, PlusIcon } from "./icons";
+import { Buffering } from "./Buffering";
 
 type SourceGroup = [string, { label: EpisodeLabel; releases: NyaaResult[] }];
 
@@ -82,6 +83,22 @@ export function MediaPage({
   const [playingKey, setPlayingKey] = useState<string | null>(null);
   const progress = useAnimeProgress(anime.id);
   const [expanded, setExpanded] = useState(false);
+  // Entered from an episode card (Continue watching / New episodes): go
+  // straight to the player without ever showing this page, and closing
+  // the player goes back where the user came from rather than here.
+  const [directEpisode] = useState(autoplayEpisode);
+  const [directMissing, setDirectMissing] = useState(false);
+  const direct = directEpisode != null;
+
+  // Esc leaves the loading shell the same way it closes the player.
+  useEffect(() => {
+    if (!direct || playingKey != null || directMissing) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onBack();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [direct, playingKey, directMissing, onBack]);
 
   const playingIndex = playingKey == null ? -1 : groupedSources.findIndex(([key]) => key === playingKey);
   const playing = playingIndex >= 0 ? groupedSources[playingIndex] : null;
@@ -113,7 +130,10 @@ export function MediaPage({
     if (sourcesLoading || autoplayEpisode == null) return;
     const match = groupedSources.find(([, group]) => group.label.kind === "episode" && group.label.number === autoplayEpisode);
     if (match) setPlayingKey(match[0]);
-    else console.warn("[media] autoplay episode has no releases", { autoplayEpisode });
+    else {
+      console.warn("[media] autoplay episode has no releases", { autoplayEpisode });
+      if (direct) setDirectMissing(true);
+    }
     onAutoplayHandled();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sourcesLoading, groupedSources, autoplayEpisode]);
@@ -131,6 +151,63 @@ export function MediaPage({
       ? `Resume ${continueTarget[0]}`
       : `Play ${continueTarget[0]}`
     : null;
+
+  const player = playing && (
+    <PlayerView
+      key={playing[0]}
+      anime={anime}
+      episodeKey={playing[0]}
+      episode={playing[1].label.kind === "episode" ? playing[1].label.number : null}
+      releases={playing[1].releases}
+      onClose={() => (direct ? onBack() : setPlayingKey(null))}
+      onNext={next ? () => setPlayingKey(next[0]) : null}
+      nextLabel={next ? next[0] : null}
+      playlist={groupedSources.map(([key, group]) => {
+        const number = group.label.kind === "episode" ? group.label.number : null;
+        return {
+          key,
+          episode: number,
+          thumbnail: number != null ? (thumbnails[number] ?? null) : null,
+          releaseCount: group.releases.length,
+          progress: progress[key] ?? null,
+        };
+      })}
+      onSelectEpisode={setPlayingKey}
+    />
+  );
+
+  if (direct && !directMissing) {
+    // Player shell while nyaa.si releases load - same full-viewport frame
+    // the player uses, so the hand-off to PlayerView doesn't flash.
+    return (
+      player || (
+        <div class="player-view controls-shown">
+          <div class="player-topbar">
+            <button class="player-icon-button" onClick={onBack} aria-label="Back" title="Back (Esc)">
+              <BackIcon size={22} />
+            </button>
+            <div class="player-heading">
+              <div class="player-heading-title">{displayTitle(anime.title)}</div>
+              <div class="player-heading-sub">Episode {directEpisode}</div>
+            </div>
+          </div>
+          {error ? (
+            <div class="player-message player-error" role="alert">
+              <p>{error}</p>
+              <button class="button button-quiet" onClick={onBack}>
+                Go back
+              </button>
+            </div>
+          ) : (
+            <div class="player-loading">
+              <Buffering progress={0} />
+              <div class="player-loading-status">Finding releases on nyaa.si…</div>
+            </div>
+          )}
+        </div>
+      )
+    );
+  }
 
   return (
     <div class="media-page">
@@ -217,6 +294,9 @@ export function MediaPage({
             {!sourcesLoading && sourcesCount > 0 && <span>{sourcesCount} releases on nyaa.si</span>}
           </header>
           {error && <p class="error-banner">{error}</p>}
+          {directMissing && (
+            <p class="error-banner">No release of Episode {directEpisode} was found. Pick another episode below.</p>
+          )}
           {!sourcesLoading && sourcesCount === 0 && !error && (
             <p class="empty-state">Nobody has uploaded this to nyaa.si yet, or it's listed under a different title.</p>
           )}
@@ -269,18 +349,7 @@ export function MediaPage({
         </section>
       </div>
 
-      {playing && (
-        <PlayerView
-          key={playing[0]}
-          anime={anime}
-          episodeKey={playing[0]}
-          episode={playing[1].label.kind === "episode" ? playing[1].label.number : null}
-          releases={playing[1].releases}
-          onClose={() => setPlayingKey(null)}
-          onNext={next ? () => setPlayingKey(next[0]) : null}
-          nextLabel={next ? next[0] : null}
-        />
-      )}
+      {player}
     </div>
   );
 }

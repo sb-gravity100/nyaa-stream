@@ -95,3 +95,28 @@ export const SearchIcon = (p: IconProps) => (
     <path d="M20 20l-4.2-4.2" />
   </Svg>
 );
+export const EpisodesIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="3" y="5" width="11" height="14" rx="2" />
+    <path d="M17 7h4M17 12h4M17 17h4" />
+  </Svg>
+);
+export const SkipBackIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M4 12a8 8 0 1 0 2.4-5.7" />
+    <path d="M4 4v4h4" />
+    <text x="12" y="15.5" text-anchor="middle" font-size="7.5" font-weight="700" fill="currentColor" stroke="none">10</text>
+  </Svg>
+);
+export const SkipForwardIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M20 12a8 8 0 1 1-2.4-5.7" />
+    <path d="M20 4v4h-4" />
+    <text x="12" y="15.5" text-anchor="middle" font-size="7.5" font-weight="700" fill="currentColor" stroke="none">10</text>
+  </Svg>
+);
+export const ExitFullscreenIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" />
+  </Svg>
+);
