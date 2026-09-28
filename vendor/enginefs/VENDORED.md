@@ -21,3 +21,9 @@ Copied from https://github.com/stremio-native/stream-server at rev
   per read: a read that is valid bytes followed by an unflushed block is
   served only up to that block (`first_zero_block`), since whole-chunk
   checks let exactly those mixed reads through.
+- `src/backend/libtorrent/disk_stream.rs`: a file read that returned
+  Pending is finished (and its bytes discarded) before the reader seeks
+  its file handle. The broker path can advance the position while a
+  tokio `File` read is still in flight, and tokio then rejects the seek
+  with "other file operation is pending" - surfaced to readers as I/O
+  errors mid-stream, several times per episode (verified live).
