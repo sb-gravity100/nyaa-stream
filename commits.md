@@ -2,6 +2,12 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `b82564b` · 2026-09-28 · feat(player): mpv frame grabs, clipboard copy, bundled sub fonts, raw stream URLs
+- `crates/mpv-ipc/src/embedded.rs`
+- `src-tauri/Cargo.toml`
+- `src-tauri/src/lib.rs`
+- `src-tauri/src/player.rs`
+
 ### `9b3721d` · 2026-09-28 · feat(player): embed mpv under a transparent webview via mpv_start/command/stop
 - `crates/mpv-ipc/src/embedded.rs`
 - `src-tauri/Cargo.toml`
