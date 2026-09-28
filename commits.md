@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `2dfcb94` · 2026-09-28 · fix(releases): rank codecs this WebView can't decode last
+- `src/releases.ts`
+
 ### `90de84d` · 2026-09-28 · perf(subtitles): warm libass renderer at track selection, cap render height
 - `src/assRenderer.ts`
 
