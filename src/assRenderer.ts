@@ -15,6 +15,25 @@ import { applySubtitleStyle } from "./subtitles";
  * `subtitle_handler`), usually well ahead of the playhead. */
 const POLL_MS = 3000;
 
+// Placeholder track the renderer starts with, so the worker, WASM and
+// embedded fonts all initialize the moment a subtitle track is selected
+// instead of on the first successful fetch - by the time the first line
+// is due, libass is warm.
+const EMPTY_SCRIPT = [
+  "[Script Info]",
+  "ScriptType: v4.00+",
+  "PlayResX: 384",
+  "PlayResY: 288",
+  "",
+  "[Events]",
+  "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
+  "",
+].join("\n");
+
+// libass rasterizes at canvas resolution; beyond 1440p (4K fullscreen)
+// the extra cost buys nothing visible for subtitles.
+const MAX_RENDER_HEIGHT = 1440;
+
 interface Options {
   video: HTMLVideoElement | null;
   /** Merged ASS script URL for the active track; null = subtitles off. */
@@ -55,6 +74,24 @@ export function useAssRenderer({ video, url, fonts, styled, style, timeOffset, d
     let lastLength = -1;
     rawRef.current = "";
     console.info("[subtitles] starting renderer", { url, fonts: fonts.length });
+    const instance = new JASSUB({
+      video,
+      subContent: EMPTY_SCRIPT,
+      workerUrl,
+      wasmUrl,
+      modernWasmUrl,
+      fonts,
+      availableFonts: { "liberation sans": defaultFontUrl },
+      queryFonts: "local",
+      timeOffset: offsetRef.current,
+      maxRenderHeight: MAX_RENDER_HEIGHT,
+    });
+    instanceRef.current = instance;
+    const started = performance.now();
+    instance.ready.then(
+      () => console.info("[subtitles] renderer warm", { ms: Math.round(performance.now() - started) }),
+      (err) => console.error("[subtitles] renderer failed to start", { err: String(err) }),
+    );
 
     async function poll() {
       if (cancelled) return;
@@ -73,24 +110,10 @@ export function useAssRenderer({ video, url, fonts, styled, style, timeOffset, d
         lastLength = raw.length;
         rawRef.current = raw;
         const content = applySubtitleStyle(raw, styleRef.current.style, styleRef.current.styled);
-        if (!instanceRef.current) {
-          instanceRef.current = new JASSUB({
-            video: video as HTMLVideoElement,
-            subContent: content,
-            workerUrl,
-            wasmUrl,
-            modernWasmUrl,
-            fonts,
-            availableFonts: { "liberation sans": defaultFontUrl },
-            queryFonts: "local",
-            timeOffset: offsetRef.current,
-          });
-          await instanceRef.current.ready;
-          console.info("[subtitles] renderer ready", { bytes: raw.length });
-        } else {
-          await instanceRef.current.renderer.setTrack(content);
-          console.debug("[subtitles] track updated", { bytes: raw.length });
-        }
+        await instance.ready;
+        if (cancelled) return;
+        await instance.renderer.setTrack(content);
+        console.debug("[subtitles] track updated", { bytes: raw.length });
       } catch (err) {
         console.error("[subtitles] poll/render failed", { err: String(err) });
       }
@@ -101,12 +124,9 @@ export function useAssRenderer({ video, url, fonts, styled, style, timeOffset, d
     return () => {
       cancelled = true;
       window.clearInterval(timer);
-      const instance = instanceRef.current;
       instanceRef.current = null;
-      if (instance) {
-        console.debug("[subtitles] destroying renderer");
-        void instance.destroy();
-      }
+      console.debug("[subtitles] destroying renderer");
+      void instance.destroy();
     };
     // fonts is a fresh array per probe; join keeps this keyed by content.
     // eslint-disable-next-line react-hooks/exhaustive-deps
