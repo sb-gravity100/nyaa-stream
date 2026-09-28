@@ -220,8 +220,8 @@ function App() {
   async function loadTorrentThumbnail(entry: AiringEntry) {
     const key = `${entry.media.id}-${entry.episode}`;
     if (key in torrentThumbnails) return;
-    const dataUri = await fetchTorrentThumbnail(entry.media.id, entry.episode, entry.media.title, entry.media.duration);
-    setTorrentThumbnails((current) => (key in current ? current : { ...current, [key]: dataUri }));
+    const url = await fetchTorrentThumbnail(entry.media.id, entry.episode, entry.media.title, entry.media.duration);
+    setTorrentThumbnails((current) => (key in current ? current : { ...current, [key]: url }));
   }
 
   // Frames captured in earlier sessions show up immediately: the disk cache
@@ -231,8 +231,8 @@ function App() {
     for (const entry of latestEpisodes) {
       const key = `${entry.media.id}-${entry.episode}`;
       if (torrentThumbnails[key]) continue;
-      cachedTorrentThumbnail(entry.media.id, entry.episode).then((dataUri) => {
-        if (dataUri) setTorrentThumbnails((current) => (current[key] ? current : { ...current, [key]: dataUri }));
+      cachedTorrentThumbnail(entry.media.id, entry.episode).then((url) => {
+        if (url) setTorrentThumbnails((current) => (current[key] ? current : { ...current, [key]: url }));
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

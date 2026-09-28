@@ -147,8 +147,13 @@ requires, beyond Rust/Node:
   (they belong to one episode): captured frames on disk, checked first via
   `cached_torrent_thumbnail` before any nyaa search, and Kitsu metadata
   (`thumbnails/kitsu/<anilistId>.json`) reused for a day, stale on failure.
-  Closing the player saves the frame on screen into the same cache
-  (`save_frame_thumbnail`); Continue watching cards prefer it
+  Cached JPEGs reach `<img>` tags by URL through the `thumb` URI scheme
+  (`http://thumb.localhost/<key>.jpg?v=<mtime>` on Windows, served
+  immutable) - never base64 over IPC. Captures run one at a time, and a
+  failed one leaves a `<key>.fail` marker that skips retries (and their
+  nyaa search) for a day. Closing the player saves the frame on screen
+  into the same cache (`save_frame_thumbnail`, raw JPEG body, cache key in
+  an `x-cache-key` header); Continue watching cards prefer it
 - **Persistence:** browser `localStorage` for the saved-anime library, watch progress (`watchProgress.ts`), settings (`settings.ts`) and per-anime preferred fansub group (`releases.ts`)
   (`src/library.ts`) — deliberately not committing to the sqlite-vs-flat-file
   backend store decision below, which is still open

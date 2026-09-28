@@ -68,8 +68,9 @@ const REMAINING_STORAGE_KEY = "nyaa-stream:show-remaining";
 const LAST_FRAME_WIDTH = 640;
 
 /** Copies the frame on screen as the player closes and saves it as the
- * episode's thumbnail (see `saveFrameThumbnail`). Must run before playback
- * stops, while the <video> still holds the frame. MSE media fetched with
+ * episode's thumbnail (see `saveFrameThumbnail`). The draw must run before
+ * playback stops, while the <video> still holds the frame; JPEG encoding
+ * then happens off the unmount path via toBlob. MSE media fetched with
  * CORS doesn't taint the canvas; any failure just skips the thumbnail. */
 function captureLastFrame({ video, animeId, episode, hasPlayed }: { video: HTMLVideoElement | null; animeId: number; episode: number | null; hasPlayed: boolean }) {
    if (!video || episode == null || !hasPlayed || video.readyState < 2 || !video.videoWidth) {
@@ -88,9 +89,18 @@ function captureLastFrame({ video, animeId, episode, hasPlayed }: { video: HTMLV
       canvas.width = LAST_FRAME_WIDTH;
       canvas.height = Math.round((LAST_FRAME_WIDTH * video.videoHeight) / video.videoWidth);
       canvas.getContext("2d")?.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const dataUri = canvas.toDataURL("image/jpeg", 0.82);
-      saveFrameThumbnail(animeId, episode, dataUri);
-      console.info("[player] saved last frame as thumbnail", { animeId, episode, bytes: dataUri.length });
+      canvas.toBlob(
+         (blob) => {
+            if (!blob) {
+               console.warn("[player] last-frame encode produced nothing", { animeId, episode });
+               return;
+            }
+            console.info("[player] captured last frame", { animeId, episode, bytes: blob.size });
+            void saveFrameThumbnail(animeId, episode, blob);
+         },
+         "image/jpeg",
+         0.82,
+      );
    } catch (err) {
       console.warn("[player] last-frame capture failed", { animeId, episode, err: String(err) });
    }

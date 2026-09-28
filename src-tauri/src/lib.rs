@@ -3,7 +3,6 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anilist_client::{AiringEntry, AniListClient, AnimeMedia, AnimeTitle};
-use base64::Engine;
 use kitsu_client::{KitsuClient, KitsuMetadata};
 use mpv_ipc::MpvPlayer;
 use nyaa_client::{Category, NyaaClient, NyaaResult, TorrentDetails};
@@ -27,6 +26,10 @@ struct AppState {
     /// dropped).
     current_torrent: Mutex<Option<TorrentId>>,
     thumbnail_cache_dir: PathBuf,
+    /// One torrent capture at a time: each adds a scratch torrent and a
+    /// headless mpv decode, and a home page full of art-less cards used to
+    /// start them all at once.
+    thumbnail_captures: tokio::sync::Semaphore,
 }
 
 /// Forwards a frontend `console.*`/`window.onerror`/unhandled-rejection
@@ -186,53 +189,144 @@ async fn get_kitsu_metadata(state: State<'_, Arc<AppState>>, anilist_id: i64) ->
 /// How long cached Kitsu metadata is used without refetching.
 const KITSU_CACHE_FRESH_FOR: std::time::Duration = std::time::Duration::from_secs(24 * 3600);
 
-/// Saves the player's last shown frame (a `data:image/jpeg;base64,` URI) as
-/// the episode's thumbnail, in the same cache `capture_torrent_thumbnail`
-/// uses - it's where the user left off, and it costs no torrent capture.
-#[tauri::command]
-async fn save_frame_thumbnail(state: State<'_, Arc<AppState>>, cache_key: String, data_uri: String) -> Result<(), String> {
-    // `{anilistId}-{episode}` only: the key becomes a file name.
-    if cache_key.is_empty() || !cache_key.chars().all(|c| c.is_ascii_digit() || c == '-') {
-        tracing::warn!(cache_key, "save_frame_thumbnail rejected cache key");
-        return Err("invalid cache key".to_string());
-    }
-    let encoded = data_uri.strip_prefix("data:image/jpeg;base64,").ok_or("expected a JPEG data URI")?;
-    let bytes = base64::engine::general_purpose::STANDARD.decode(encoded).map_err(|err| err.to_string())?;
-    let cache_path = state.thumbnail_cache_dir.join(format!("{cache_key}.jpg"));
-    let tmp = cache_path.with_extension("tmp");
-    let write = async {
-        tokio::fs::create_dir_all(&state.thumbnail_cache_dir).await?;
-        tokio::fs::write(&tmp, &bytes).await?;
-        tokio::fs::rename(&tmp, &cache_path).await
+/// URI scheme serving cached thumbnail JPEGs straight to `<img>` tags (see
+/// `thumbnail_protocol`), so no image bytes ever cross IPC as base64.
+const THUMBNAIL_SCHEME: &str = "thumb";
+/// A failed torrent capture isn't retried for this long - each attempt
+/// costs a nyaa search, a scratch torrent and up to
+/// THUMBNAIL_CAPTURE_TIMEOUT of mpv decoding.
+const THUMBNAIL_FAILURE_RETRY_AFTER: Duration = Duration::from_secs(24 * 3600);
+
+/// `{anilistId}-{episode}` only: the key becomes a file name.
+fn valid_thumbnail_key(cache_key: &str) -> bool {
+    !cache_key.is_empty() && cache_key.chars().all(|c| c.is_ascii_digit() || c == '-')
+}
+
+fn thumbnail_path(state: &AppState, cache_key: &str) -> PathBuf {
+    state.thumbnail_cache_dir.join(format!("{cache_key}.jpg"))
+}
+
+fn thumbnail_failure_path(state: &AppState, cache_key: &str) -> PathBuf {
+    state.thumbnail_cache_dir.join(format!("{cache_key}.fail"))
+}
+
+/// The `thumb` URL for a cached thumbnail, or None if there isn't one. The
+/// file's mtime is the version, so a re-saved frame gets a new URL and the
+/// webview can cache every URL forever.
+async fn thumbnail_url(path: &std::path::Path, cache_key: &str) -> Option<String> {
+    let modified = tokio::fs::metadata(path).await.ok()?.modified().ok()?;
+    let version = modified.duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis()).unwrap_or(0);
+    // WebView2 (and Android) only load custom schemes in this form.
+    let base = if cfg!(any(windows, target_os = "android")) {
+        format!("http://{THUMBNAIL_SCHEME}.localhost")
+    } else {
+        format!("{THUMBNAIL_SCHEME}://localhost")
     };
-    match write.await {
-        Ok(()) => {
-            tracing::info!(cache_key, bytes = bytes.len(), "saved last player frame as thumbnail");
-            Ok(())
+    Some(format!("{base}/{cache_key}.jpg?v={version}"))
+}
+
+/// Whether a capture for this key failed within THUMBNAIL_FAILURE_RETRY_AFTER.
+async fn thumbnail_failed_recently(state: &AppState, cache_key: &str) -> bool {
+    let Ok(meta) = tokio::fs::metadata(thumbnail_failure_path(state, cache_key)).await else {
+        return false;
+    };
+    meta.modified()
+        .ok()
+        .and_then(|m| m.elapsed().ok())
+        .is_some_and(|age| age < THUMBNAIL_FAILURE_RETRY_AFTER)
+}
+
+/// Serves `thumb://localhost/{key}.jpg` from the thumbnail cache dir.
+fn thumbnail_protocol(state: &AppState, request: &tauri::http::Request<Vec<u8>>) -> tauri::http::Response<Vec<u8>> {
+    use tauri::http::{header, Response, StatusCode};
+    let file = request.uri().path().trim_start_matches('/');
+    let key = file.strip_suffix(".jpg").unwrap_or("");
+    let not_found = || Response::builder().status(StatusCode::NOT_FOUND).body(Vec::new()).unwrap();
+    if !valid_thumbnail_key(key) {
+        tracing::warn!(path = file, "thumbnail protocol rejected path");
+        return not_found();
+    }
+    match std::fs::read(thumbnail_path(state, key)) {
+        Ok(bytes) => {
+            tracing::debug!(cache_key = key, bytes = bytes.len(), "thumbnail protocol served");
+            Response::builder()
+                .header(header::CONTENT_TYPE, "image/jpeg")
+                // URLs carry the file's mtime (see thumbnail_url).
+                .header(header::CACHE_CONTROL, "public, max-age=31536000, immutable")
+                .body(bytes)
+                .unwrap()
         }
         Err(err) => {
-            tracing::error!(cache_key, %err, "failed to save player frame thumbnail");
-            Err(err.to_string())
+            tracing::debug!(cache_key = key, %err, "thumbnail protocol miss");
+            not_found()
         }
     }
 }
 
-/// A torrent-captured thumbnail from the disk cache only - never captures.
-/// The frontend asks this first so a cached frame comes back without the
-/// nyaa search it needs to pick a release for a real capture.
+/// Saves the player's last shown frame as the episode's thumbnail, in the
+/// same cache `capture_torrent_thumbnail` uses - it's where the user left
+/// off, and it costs no torrent capture. The body is the raw JPEG (no
+/// base64); the cache key comes in the `x-cache-key` header. Returns the
+/// new `thumb` URL.
 #[tauri::command]
-async fn cached_torrent_thumbnail(state: State<'_, Arc<AppState>>, cache_key: String) -> Result<Option<String>, String> {
-    let cache_path = state.thumbnail_cache_dir.join(format!("{cache_key}.jpg"));
-    match tokio::fs::read(&cache_path).await {
-        Ok(bytes) => {
-            tracing::debug!(cache_key, "cached_torrent_thumbnail hit");
-            Ok(Some(to_data_uri(&bytes)))
-        }
-        Err(_) => {
-            tracing::debug!(cache_key, "cached_torrent_thumbnail miss");
-            Ok(None)
-        }
+async fn save_frame_thumbnail(state: State<'_, Arc<AppState>>, request: tauri::ipc::Request<'_>) -> Result<String, String> {
+    let cache_key = request
+        .headers()
+        .get("x-cache-key")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or_default()
+        .to_string();
+    if !valid_thumbnail_key(&cache_key) {
+        tracing::warn!(cache_key, "save_frame_thumbnail rejected cache key");
+        return Err("invalid cache key".to_string());
     }
+    let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
+        tracing::warn!(cache_key, "save_frame_thumbnail expected a raw body");
+        return Err("expected raw JPEG bytes".to_string());
+    };
+    if !bytes.starts_with(&[0xFF, 0xD8]) {
+        tracing::warn!(cache_key, bytes = bytes.len(), "save_frame_thumbnail body is not a JPEG");
+        return Err("expected a JPEG".to_string());
+    }
+    let cache_path = thumbnail_path(&state, &cache_key);
+    let tmp = cache_path.with_extension("tmp");
+    let write = async {
+        tokio::fs::create_dir_all(&state.thumbnail_cache_dir).await?;
+        tokio::fs::write(&tmp, bytes).await?;
+        tokio::fs::rename(&tmp, &cache_path).await
+    };
+    if let Err(err) = write.await {
+        tracing::error!(cache_key, %err, "failed to save player frame thumbnail");
+        return Err(err.to_string());
+    }
+    // A real frame beats any earlier failed capture.
+    let _ = tokio::fs::remove_file(thumbnail_failure_path(&state, &cache_key)).await;
+    tracing::info!(cache_key, bytes = bytes.len(), "saved last player frame as thumbnail");
+    thumbnail_url(&cache_path, &cache_key).await.ok_or_else(|| "saved thumbnail vanished".to_string())
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CachedThumbnail {
+    url: Option<String>,
+    /// A capture failed recently - callers skip the nyaa search a new
+    /// capture would need.
+    failed_recently: bool,
+}
+
+/// A torrent-captured (or saved-frame) thumbnail from the disk cache only -
+/// never captures. The frontend asks this first so a cached frame comes
+/// back without the nyaa search it needs to pick a release for a capture.
+#[tauri::command]
+async fn cached_torrent_thumbnail(state: State<'_, Arc<AppState>>, cache_key: String) -> Result<CachedThumbnail, String> {
+    if !valid_thumbnail_key(&cache_key) {
+        tracing::warn!(cache_key, "cached_torrent_thumbnail rejected cache key");
+        return Err("invalid cache key".to_string());
+    }
+    let url = thumbnail_url(&thumbnail_path(&state, &cache_key), &cache_key).await;
+    let failed_recently = url.is_none() && thumbnail_failed_recently(&state, &cache_key).await;
+    tracing::debug!(cache_key, hit = url.is_some(), failed_recently, "cached_torrent_thumbnail");
+    Ok(CachedThumbnail { url, failed_recently })
 }
 
 /// Fallback seek target when there's no duration estimate to compute a real
@@ -285,11 +379,27 @@ async fn capture_torrent_thumbnail(
     cache_key: String,
     duration_minutes: Option<f64>,
 ) -> Result<Option<String>, String> {
-    let cache_path = state.thumbnail_cache_dir.join(format!("{cache_key}.jpg"));
+    if !valid_thumbnail_key(&cache_key) {
+        tracing::warn!(cache_key, "capture_torrent_thumbnail rejected cache key");
+        return Err("invalid cache key".to_string());
+    }
+    let cache_path = thumbnail_path(&state, &cache_key);
 
-    if let Ok(bytes) = tokio::fs::read(&cache_path).await {
+    if let Some(url) = thumbnail_url(&cache_path, &cache_key).await {
         tracing::debug!(cache_key, "capture_torrent_thumbnail cache hit");
-        return Ok(Some(to_data_uri(&bytes)));
+        return Ok(Some(url));
+    }
+    if thumbnail_failed_recently(&state, &cache_key).await {
+        tracing::debug!(cache_key, "capture_torrent_thumbnail skipped, failed recently");
+        return Ok(None);
+    }
+
+    tracing::debug!(cache_key, "capture_torrent_thumbnail waiting for a capture slot");
+    let _permit = state.thumbnail_captures.acquire().await.map_err(|err| err.to_string())?;
+    // Another request may have produced it while this one waited.
+    if let Some(url) = thumbnail_url(&cache_path, &cache_key).await {
+        tracing::debug!(cache_key, "capture_torrent_thumbnail filled while queued");
+        return Ok(Some(url));
     }
 
     // A capture adds a second torrent and an mpv decode while the user is
@@ -302,19 +412,15 @@ async fn capture_torrent_thumbnail(
     }
     tracing::info!(cache_key, "capture_torrent_thumbnail cache miss, capturing from torrent");
     match capture_thumbnail_uncached(&state, &magnet, &cache_path, duration_minutes).await {
-        Ok(bytes) => Ok(Some(to_data_uri(&bytes))),
+        Ok(()) => Ok(thumbnail_url(&cache_path, &cache_key).await),
         Err(err) => {
             tracing::warn!(cache_key, %err, "capture_torrent_thumbnail failed, falling back to no thumbnail");
+            if let Err(err) = tokio::fs::write(thumbnail_failure_path(&state, &cache_key), b"").await {
+                tracing::warn!(cache_key, %err, "failed to record thumbnail capture failure");
+            }
             Ok(None)
         }
     }
-}
-
-fn to_data_uri(jpeg_bytes: &[u8]) -> String {
-    format!(
-        "data:image/jpeg;base64,{}",
-        base64::engine::general_purpose::STANDARD.encode(jpeg_bytes)
-    )
 }
 
 async fn capture_thumbnail_uncached(
@@ -322,7 +428,7 @@ async fn capture_thumbnail_uncached(
     magnet: &str,
     cache_path: &std::path::Path,
     duration_minutes: Option<f64>,
-) -> anyhow::Result<Vec<u8>> {
+) -> anyhow::Result<()> {
     if let Some(parent) = cache_path.parent() {
         tokio::fs::create_dir_all(parent).await?;
     }
@@ -375,7 +481,7 @@ async fn capture_thumbnail_uncached(
     }
 
     match capture_result {
-        Ok(Ok(())) => Ok(tokio::fs::read(cache_path).await?),
+        Ok(Ok(())) => Ok(()),
         Ok(Err(err)) => Err(err),
         Err(_) => anyhow::bail!("thumbnail capture timed out after {THUMBNAIL_CAPTURE_TIMEOUT:?}"),
     }
@@ -803,12 +909,17 @@ pub fn run() {
             torrent_engine,
             current_torrent: Mutex::new(None),
             thumbnail_cache_dir,
+            thumbnail_captures: tokio::sync::Semaphore::new(1),
         })
     });
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .manage(app_state)
+        .manage(app_state.clone())
+        .register_asynchronous_uri_scheme_protocol(THUMBNAIL_SCHEME, move |_ctx, request, responder| {
+            let state = app_state.clone();
+            tauri::async_runtime::spawn_blocking(move || responder.respond(thumbnail_protocol(&state, &request)));
+        })
         .invoke_handler(tauri::generate_handler![
             log_frontend,
             search_anime,
