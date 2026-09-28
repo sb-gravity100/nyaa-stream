@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `6046daf` · 2026-09-28 · perf(engine): rate-based seek restarts, smaller probe windows, ready ranges
+- `crates/torrent-engine/src/lib.rs`
+
 ### `664586c` · 2026-09-28 · feat(player): render subtitles with libass (JASSUB), styled ASS + fonts
 - `package-lock.json`
 - `package.json`
