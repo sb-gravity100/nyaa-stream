@@ -2,6 +2,12 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `fe500c7` · 2026-09-28 · feat(thumbnails): save the player's last frame as the episode thumbnail
+- `src-tauri/src/lib.rs`
+- `src/torrentThumbnail.ts`
+- `src/PlayerView.tsx`
+- `src/HomePage.tsx`
+
 ### `3f3d8b1` · 2026-09-28 · feat(thumbnails): show cached frames as soon as cards are listed
 - `src/App.tsx`
 - `src/torrentThumbnail.ts`

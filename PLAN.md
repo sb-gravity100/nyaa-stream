@@ -146,7 +146,9 @@ requires, beyond Rust/Node:
   multi-minute midpoint isn't practical within the capture's timeout. Thumbnails are cached for good
   (they belong to one episode): captured frames on disk, checked first via
   `cached_torrent_thumbnail` before any nyaa search, and Kitsu metadata
-  (`thumbnails/kitsu/<anilistId>.json`) reused for a day, stale on failure
+  (`thumbnails/kitsu/<anilistId>.json`) reused for a day, stale on failure.
+  Closing the player saves the frame on screen into the same cache
+  (`save_frame_thumbnail`); Continue watching cards prefer it
 - **Persistence:** browser `localStorage` for the saved-anime library, watch progress (`watchProgress.ts`), settings (`settings.ts`) and per-anime preferred fansub group (`releases.ts`)
   (`src/library.ts`) — deliberately not committing to the sqlite-vs-flat-file
   backend store decision below, which is still open
