@@ -36,6 +36,8 @@ mpv-ipc = { path = "../crates/mpv-ipc" }
 # Native clipboard for the player's Ctrl+C frame copy: the WebView's async
 # clipboard API pops a browser-style permission prompt in WebView2.
 arboard = { version = "3", default-features = false, features = ["image-data"] }
+# Decoding/downscaling mpv screenshots (player.rs: thumbnails, Ctrl+C copy).
+image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
 
 [target.'cfg(windows)'.dependencies]
 # Finding mpv's child window and pushing it below the webview (player.rs).

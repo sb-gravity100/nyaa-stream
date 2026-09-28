@@ -668,6 +668,9 @@ struct PlayFile {
     /// Base HLS playlist URL for this file - the frontend appends
     /// `?duration=<seconds>`.
     hls_url: String,
+    /// Raw Range-capable byte stream of this file - what the embedded mpv
+    /// player opens.
+    stream_url: String,
 }
 
 #[derive(Serialize)]
@@ -715,7 +718,11 @@ async fn play_magnet(state: State<'_, Arc<AppState>>, magnet: String, title: Str
     let default_file_idx = largest_video_file(&files).unwrap_or(0);
     let files: Vec<PlayFile> = files
         .into_iter()
-        .map(|file| PlayFile { hls_url: state.torrent_engine.hls_playlist_url(&added.id, file.index), file })
+        .map(|file| PlayFile {
+            hls_url: state.torrent_engine.hls_playlist_url(&added.id, file.index),
+            stream_url: state.torrent_engine.stream_url(&added.id, file.index),
+            file,
+        })
         .collect();
     tracing::info!(%title, torrent_id = %added.id, file_count = files.len(), default_file_idx, "torrent added, streaming");
 
@@ -827,7 +834,14 @@ async fn copy_frame_to_clipboard(request: tauri::ipc::Request<'_>) -> Result<(),
         return Err(format!("expected {} bytes for {width}x{height}, got {}", width * height * 4, bytes.len()));
     }
     tracing::debug!(width, height, "copy_frame_to_clipboard invoked");
-    let pixels = bytes.clone();
+    set_clipboard_image(width, height, bytes.clone()).await?;
+    tracing::info!(width, height, "frame copied to clipboard");
+    Ok(())
+}
+
+/// Puts an RGBA image on the native clipboard, retrying while another
+/// process holds it.
+pub(crate) async fn set_clipboard_image(width: usize, height: usize, pixels: Vec<u8>) -> Result<(), String> {
     // Windows lets only one process open the clipboard at a time, and other
     // apps (clipboard managers, RDP, the shell) hold it briefly all the
     // time - verified live: "held by another party" on a first attempt
@@ -854,11 +868,9 @@ async fn copy_frame_to_clipboard(request: tauri::ipc::Request<'_>) -> Result<(),
     .await
     .map_err(|err| err.to_string())?
     .map_err(|err| {
-        tracing::error!(%err, "copy_frame_to_clipboard failed");
+        tracing::error!(%err, "clipboard image write failed");
         err
-    })?;
-    tracing::info!(width, height, "frame copied to clipboard");
-    Ok(())
+    })
 }
 
 /// Removes the active torrent (stop seeding, drop partial files) - called
@@ -944,7 +956,9 @@ pub fn run() {
             stop_playback,
             player::mpv_start,
             player::mpv_command,
-            player::mpv_stop
+            player::mpv_stop,
+            player::mpv_frame,
+            player::mpv_copy_frame
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

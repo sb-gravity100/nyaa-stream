@@ -32,10 +32,11 @@ pub struct EmbeddedMpv {
 }
 
 impl EmbeddedMpv {
-    /// Spawns `mpv` idle inside window `wid` (a native window handle).
-    /// Every event line mpv emits is forwarded to `events` as raw JSON;
-    /// the channel closing means mpv exited or its pipe broke.
-    pub async fn spawn(wid: i64, events: mpsc::UnboundedSender<Value>) -> anyhow::Result<Self> {
+    /// Spawns `mpv` idle inside window `wid` (a native window handle), with
+    /// `extra_args` appended to the built-in options. Every event line mpv
+    /// emits is forwarded to `events` as raw JSON; the channel closing
+    /// means mpv exited or its pipe broke.
+    pub async fn spawn(wid: i64, extra_args: &[String], events: mpsc::UnboundedSender<Value>) -> anyhow::Result<Self> {
         let socket_path = ipc_path();
         tracing::debug!(wid, socket_path, "spawning embedded mpv");
 
@@ -64,6 +65,7 @@ impl EmbeddedMpv {
                 // keybindings) into the app's player.
                 "--no-config",
             ])
+            .args(extra_args)
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::null())
