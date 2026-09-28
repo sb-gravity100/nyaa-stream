@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `92413e2` · 2026-09-28 · chore(player): log mpv property polling at trace level
+- `src-tauri/src/player.rs`
+
 ### `43a0e81` · 2026-09-28 · fix(player): round mpv sub-margin-y to an integer
 - `src/subtitles.ts`
 
