@@ -2011,18 +2011,11 @@ a {
   transition: transform 0.46s var(--ease-out), visibility 0s;
 }
 
-/* Rows cascade in after the panel, the first ~15 staggered. */
+/* Rows stay rendered while the panel is closed; off-screen ones skip
+   layout/paint entirely (long shows can have hundreds of rows). */
 .player-playlist .player-playlist-item {
-  opacity: 0;
-  transform: translateX(18px);
-  transition: opacity 0.2s var(--ease), transform 0.2s var(--ease), background-color 0.15s var(--ease);
-}
-
-.player-playlist.open .player-playlist-item {
-  opacity: 1;
-  transform: none;
-  transition: opacity 0.35s var(--ease-out), transform 0.45s var(--ease-out), background-color 0.15s var(--ease);
-  transition-delay: calc(0.08s + var(--i, 0) * 22ms), calc(0.08s + var(--i, 0) * 22ms), 0s;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 80px;
 }
 
 .player-playlist-header {
