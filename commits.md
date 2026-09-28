@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `6cd1bde` · 2026-09-29 · fix(player): keep the seek bar on the target until mpv restarts playback
+- `src/mpvVideo.ts`
+
 ### `0e440f0` · 2026-09-29 · fix(fullscreen): adopt the window's real fullscreen state on load
 - `src-tauri/capabilities/default.json`
 - `src/fullscreen.ts`
