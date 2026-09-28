@@ -141,7 +141,8 @@ export async function applyMpvSubtitleStyle(mpv: MpvSubtitleTarget, style: Subti
     mpv.setProperty("sub-back-color", style.background ? mpvColor(style.backgroundColor, backOpacity) : mpvColor("#404040", 0x5f / 255)),
     mpv.setProperty("sub-border-size", style.background ? 2 : px(style.outlineWidth)),
     mpv.setProperty("sub-shadow-offset", (style.shadow / CONVERTED_PLAY_RES_Y) * MPV_REFERENCE_HEIGHT),
-    mpv.setProperty("sub-margin-y", px(style.marginPercent)),
+    // Integer option - mpv rejects fractional pixels.
+    mpv.setProperty("sub-margin-y", Math.round(px(style.marginPercent))),
   ]);
 
   if (!styled || !style.applyToStyled) {
