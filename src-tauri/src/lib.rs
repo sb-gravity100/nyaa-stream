@@ -637,11 +637,28 @@ async fn copy_frame_to_clipboard(request: tauri::ipc::Request<'_>) -> Result<(),
     }
     tracing::debug!(width, height, "copy_frame_to_clipboard invoked");
     let pixels = bytes.clone();
+    // Windows lets only one process open the clipboard at a time, and other
+    // apps (clipboard managers, RDP, the shell) hold it briefly all the
+    // time - verified live: "held by another party" on a first attempt
+    // with nothing holding it moments later. Retry for about a second.
+    const ATTEMPTS: u32 = 12;
+    const RETRY_DELAY: std::time::Duration = std::time::Duration::from_millis(80);
     tokio::task::spawn_blocking(move || {
-        let mut clipboard = arboard::Clipboard::new().map_err(|err| err.to_string())?;
-        clipboard
-            .set_image(arboard::ImageData { width, height, bytes: std::borrow::Cow::Owned(pixels) })
-            .map_err(|err| err.to_string())
+        let mut last_err = String::new();
+        for attempt in 1..=ATTEMPTS {
+            let result = arboard::Clipboard::new().and_then(|mut clipboard| {
+                clipboard.set_image(arboard::ImageData { width, height, bytes: std::borrow::Cow::Borrowed(&pixels) })
+            });
+            match result {
+                Ok(()) => return Ok(()),
+                Err(err) => {
+                    tracing::debug!(attempt, %err, "clipboard busy, retrying");
+                    last_err = err.to_string();
+                    std::thread::sleep(RETRY_DELAY);
+                }
+            }
+        }
+        Err(last_err)
     })
     .await
     .map_err(|err| err.to_string())?
