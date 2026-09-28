@@ -66,15 +66,23 @@ export interface PlaySession {
 }
 
 export interface SubtitleTrack {
-  /** Absolute demuxer stream index - also the `<track>` element's key and
-   * what identifies this track to the backend (see torrent-engine's
-   * `SubtitleTrack` doc comment). */
+  /** Absolute demuxer stream index - what identifies this track to the
+   * backend (see torrent-engine's `SubtitleTrack` doc comment). */
   index: number;
   language: string | null;
   title: string | null;
-  /** WebVTT content URL for this track - fetched directly by the
-   * browser's own `<track>` element, not via `invoke`. */
+  /** Source codec (`ass`, `subrip`, ...) - served as ASS either way. */
+  codec: string;
+  /** Container's own default-track flag. */
+  default: boolean;
+  /** Merged ASS script URL, polled by `assRenderer.ts` as it grows. */
   url: string;
+}
+
+export interface SubtitleInfo {
+  tracks: SubtitleTrack[];
+  /** Embedded font attachment URLs for the libass renderer. */
+  fonts: string[];
 }
 
 export interface StreamStats {

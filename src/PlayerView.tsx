@@ -2,6 +2,9 @@ import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import Hls from "hls.js";
 import type { NyaaResult, StreamStats, SubtitleTrack } from "./types";
 import { getStreamStats, getSubtitleTracks, playMagnet, stopPlayback } from "./playback";
+import { getSettings as getSettingsSnapshot, useSettings } from "./settings";
+import { defaultSubtitleIndex, isStyledTrack, subtitleTrackLabel } from "./subtitles";
+import { useAssRenderer } from "./assRenderer";
 import { loadingProgress } from "./loadingProgress";
 import { bestRelease } from "./releases";
 import { Buffering } from "./Buffering";
@@ -30,6 +33,11 @@ const SEEK_STEP_SECONDS_LARGE = 10;
 // (seekPreview) in the meantime and only commits once input settles.
 const KEYBOARD_SEEK_COMMIT_MS = 300;
 const VOLUME_STEP = 5;
+// The track list needs the container header, which may not have
+// downloaded yet when the player mounts - retried until it has.
+const SUBTITLE_PROBE_RETRY_MS = 3000;
+const SUBTITLE_PROBE_MAX_ATTEMPTS = 40;
+const SUBTITLE_DELAY_STEP = 0.1;
 
 interface Props {
   title: string;
@@ -66,21 +74,6 @@ function infoHashFromMagnet(magnet: string): string | null {
   return magnet.match(/xt=urn:btih:([a-zA-Z0-9]+)/)?.[1]?.toLowerCase() ?? null;
 }
 
-function subtitleTrackLabel(track: SubtitleTrack, position: number): string {
-  return track.title ?? track.language ?? `Track ${position + 1}`;
-}
-
-// Most fansub releases that carry more than one subtitle track use the
-// extra one(s) for signs/songs commentary rather than a second language -
-// defaulting to the first plain "eng"/"en" track (rather than just the
-// first track outright) avoids landing on one of those by chance. Off
-// (null) otherwise: nothing in the track list says which one - if any -
-// is the "main" dialogue track for a non-English default.
-function defaultSubtitleIndex(tracks: SubtitleTrack[]): number | null {
-  const english = tracks.find((t) => t.language?.toLowerCase().startsWith("en"));
-  return english?.index ?? null;
-}
-
 // An HLS stream (via hls.js) pointed at torrent-engine's playlist endpoint,
 // with a solid-black bottom control bar that only appears while the mouse
 // is actually over it (not on any mouse movement over the video the way
@@ -115,7 +108,14 @@ export function PlayerView({ title, releases, estimatedDurationMinutes, onClose 
   const [volume, setVolumeState] = useState(100);
   const [muted, setMuted] = useState(false);
   const [statsMenuOpen, setStatsMenuOpen] = useState(false);
+  const settings = useSettings();
   const [subtitleTracks, setSubtitleTracks] = useState<SubtitleTrack[]>([]);
+  const [subtitleFonts, setSubtitleFonts] = useState<string[]>([]);
+  // Source-timeline seconds at media time 0 - see the INIT_PTS_FOUND
+  // handler below.
+  const [subtitleTimeOffset, setSubtitleTimeOffset] = useState(0);
+  const [subtitleDelay, setSubtitleDelay] = useState(0);
+  const [videoEl, setVideoEl] = useState<HTMLVideoElement | null>(null);
   // null = subtitles off - also the initial state before tracks have even
   // been fetched, so no <track> is marked "showing" prematurely.
   const [activeSubtitleIndex, setActiveSubtitleIndex] = useState<number | null>(null);
@@ -147,7 +147,10 @@ export function PlayerView({ title, releases, estimatedDurationMinutes, onClose 
     setDuration(0);
     setPosition(0);
     setSubtitleTracks([]);
+    setSubtitleFonts([]);
     setActiveSubtitleIndex(null);
+    setSubtitleTimeOffset(0);
+    setSubtitleDelay(0);
     (async () => {
       try {
         const session = await playMagnet(selectedRelease.magnet, title);
@@ -190,6 +193,28 @@ export function PlayerView({ title, releases, estimatedDurationMinutes, onClose 
         fragLoadingTimeOut: 60_000,
         fragLoadingMaxRetry: 4,
         manifestLoadingTimeOut: 20_000,
+        // Buffer ahead generously (the transcode usually runs well ahead
+        // of playback) but stay under torrent-engine's
+        // RESTART_LOOKAHEAD_SEGMENTS (~120s): prefetching beyond that
+        // looks like a seek to the backend and restarts the job.
+        maxBufferLength: 60,
+        maxMaxBufferLength: 90,
+        backBufferLength: 90,
+        // Nudge over the small gaps a keyframe-aligned seek restart can
+        // leave between runs instead of stalling on them.
+        maxBufferHole: 1,
+        nudgeMaxRetry: 10,
+      });
+      // hls.js anchors media time 0 to whichever fragment it loads first.
+      // With -copyts that's source time 0 for a normal start, but a start
+      // mid-episode (resume) anchors on a keyframe-aligned fragment and
+      // the difference would shift every subtitle cue by a constant -
+      // initPTS is exactly that anchor, so hand it to the renderer.
+      hls.on(Hls.Events.INIT_PTS_FOUND, (_event, data) => {
+        if (data.id !== "main") return;
+        const offset = data.initPTS / data.timescale;
+        console.info("[player] hls initPTS found", { offset });
+        setSubtitleTimeOffset(offset);
       });
       hlsRef.current = hls;
       hls.loadSource(hlsSrc);
@@ -263,40 +288,52 @@ export function PlayerView({ title, releases, estimatedDurationMinutes, onClose 
     };
   }, []);
 
-  // Fetched once the torrent's added rather than only once its container
-  // header has fully downloaded - the backend just returns an empty list
-  // (or a quietly-ignored error, see get_subtitle_tracks's doc comment)
-  // until ffprobe can actually read it, so there's nothing to gate this on
-  // client-side.
+  // Retried until the backend's probe succeeds: right after play_magnet
+  // the container header usually hasn't downloaded yet, and a one-shot
+  // fetch used to leave the player with no subtitles for the whole
+  // session.
   useEffect(() => {
     if (torrentId == null) return;
     let cancelled = false;
-    (async () => {
-      const tracks = await getSubtitleTracks(torrentId).catch(() => [] as SubtitleTrack[]);
-      if (cancelled) return;
-      setSubtitleTracks(tracks);
-      setActiveSubtitleIndex(defaultSubtitleIndex(tracks));
-    })();
+    let timer: number | undefined;
+    let attempts = 0;
+    async function attempt() {
+      attempts++;
+      try {
+        const info = await getSubtitleTracks(torrentId as string);
+        if (cancelled) return;
+        console.info("[player] subtitle tracks", { count: info.tracks.length, fonts: info.fonts.length });
+        setSubtitleTracks(info.tracks);
+        setSubtitleFonts(info.fonts);
+        const current = getSettingsSnapshot();
+        setActiveSubtitleIndex(defaultSubtitleIndex(info.tracks, current.subtitleLanguage, current.subtitlesEnabled));
+      } catch (err) {
+        if (cancelled) return;
+        if (attempts < SUBTITLE_PROBE_MAX_ATTEMPTS) {
+          console.debug("[player] subtitle probe not ready, retrying", { attempts });
+          timer = window.setTimeout(attempt, SUBTITLE_PROBE_RETRY_MS);
+        } else {
+          console.warn("[player] giving up on subtitle probe", { err: String(err) });
+        }
+      }
+    }
+    void attempt();
     return () => {
       cancelled = true;
+      window.clearTimeout(timer);
     };
   }, [torrentId]);
 
-  // <track> elements only apply their `default` attribute once, on load -
-  // switching the active track later has to be done by hand through the
-  // native TextTrackList API instead of re-rendering the `default` prop.
-  // `video.textTracks` order matches the DOM order of the <track> elements
-  // rendered below, which is the same order as `subtitleTracks` itself, so
-  // position (not label - two untitled same-language tracks would collide
-  // on that) is what ties a TextTrack back to its SubtitleTrack.
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-    for (let i = 0; i < video.textTracks.length; i++) {
-      const track = subtitleTracks[i];
-      video.textTracks[i].mode = track && track.index === activeSubtitleIndex ? "showing" : "disabled";
-    }
-  }, [subtitleTracks, activeSubtitleIndex]);
+  const activeSubtitle = subtitleTracks.find((t) => t.index === activeSubtitleIndex) ?? null;
+  useAssRenderer({
+    video: videoEl,
+    url: activeSubtitle?.url ?? null,
+    fonts: subtitleFonts,
+    styled: activeSubtitle ? isStyledTrack(activeSubtitle) : false,
+    style: settings.subtitleStyle,
+    timeOffset: subtitleTimeOffset,
+    delay: subtitleDelay,
+  });
 
   useEffect(() => {
     if (!statsMenuOpen) return;
@@ -470,6 +507,12 @@ export function PlayerView({ title, releases, estimatedDurationMinutes, onClose 
         case "f":
           toggleFullscreen();
           break;
+        case "z":
+          setSubtitleDelay((d) => Math.round((d - SUBTITLE_DELAY_STEP) * 10) / 10);
+          break;
+        case "x":
+          setSubtitleDelay((d) => Math.round((d + SUBTITLE_DELAY_STEP) * 10) / 10);
+          break;
         case "escape":
           // Escape's own browser-native behavior already exits fullscreen
           // first if that's active - only close the player on a second
@@ -507,21 +550,11 @@ export function PlayerView({ title, releases, estimatedDurationMinutes, onClose 
     <div class="player-view">
       {streamUrl && (
         <video
-          ref={videoRef}
+          ref={(el) => {
+            videoRef.current = el;
+            setVideoEl(el);
+          }}
           class="player-video"
-          // Required for the <track> elements below to actually render:
-          // the video/audio itself streams fine cross-origin without this
-          // (hls.js fetches segments manually over XHR/fetch, not as a
-          // native subresource load), but a <track>'s WebVTT fetch is a
-          // native browser subresource load gated by the media element's
-          // own CORS settings attribute - without `crossOrigin` set, a
-          // cross-origin track (our torrent-engine server is a different
-          // origin/port than the app itself) loads as opaque and its cues
-          // are silently never exposed, even though the file downloads
-          // fine and torrent-engine already sends a permissive CORS
-          // header - verified live (extraction/serving both worked, only
-          // rendering didn't).
-          crossOrigin="anonymous"
           autoPlay
           onLoadedMetadata={(e) => setDuration((e.target as HTMLVideoElement).duration || 0)}
           onTimeUpdate={(e) => setPosition((e.target as HTMLVideoElement).currentTime)}
@@ -544,17 +577,7 @@ export function PlayerView({ title, releases, estimatedDurationMinutes, onClose 
             });
             setError("Playback failed - the file format may not be supported by this browser engine.");
           }}
-        >
-          {subtitleTracks.map((track, i) => (
-            <track
-              key={track.index}
-              kind="subtitles"
-              src={track.url}
-              srcLang={track.language ?? undefined}
-              label={subtitleTrackLabel(track, i)}
-            />
-          ))}
-        </video>
+        />
       )}
 
       {error && <div class="player-message player-error">{error}</div>}
