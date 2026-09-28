@@ -10,7 +10,7 @@ use nyaa_client::{Category, NyaaClient, NyaaResult, TorrentDetails};
 use serde::Serialize;
 use tauri::State;
 use tokio::sync::Mutex;
-use torrent_engine::{StreamStats, SubtitleTrack, TorrentEngine, TorrentId};
+use torrent_engine::{largest_video_file, StreamStats, SubtitleTrack, TorrentEngine, TorrentFile, TorrentId};
 
 struct AppState {
     anilist: AniListClient,
@@ -233,7 +233,12 @@ async fn capture_thumbnail_uncached(
     }
 
     let added = state.torrent_engine.add(magnet).await?;
-    let stream_url = state.torrent_engine.stream_url(&added.id, 0);
+    // Largest video file rather than index 0: single-episode torrents
+    // sometimes lead with a sample/NCOP, and index 0 was never a real
+    // choice anyway - just the only one available before file listing.
+    let files = state.torrent_engine.files(&added.id).await?;
+    let file_idx = largest_video_file(&files).unwrap_or(0);
+    let stream_url = state.torrent_engine.stream_url(&added.id, file_idx);
 
     // Some(_) means "seek there via mpv's --start", None means "no
     // estimate, just play from 0" - see spawn_headless/the wait loop below
@@ -454,9 +459,25 @@ async fn get_torrent_details_batch(
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+struct PlayFile {
+    #[serde(flatten)]
+    file: TorrentFile,
+    /// Base HLS playlist URL for this file - the frontend appends
+    /// `?duration=<seconds>`.
+    hls_url: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct PlaySession {
     torrent_id: TorrentId,
-    hls_url: String,
+    /// Every file in the torrent with its own HLS URL - the frontend picks
+    /// which one to play (matching the requested episode inside a batch
+    /// with its own title parser) and can switch between them without
+    /// re-adding the torrent.
+    files: Vec<PlayFile>,
+    /// Largest video file - the frontend's fallback pick.
+    default_file_idx: usize,
 }
 
 /// Adds `magnet` to the torrent session and returns an HLS playlist URL for
@@ -480,14 +501,22 @@ async fn play_magnet(state: State<'_, Arc<AppState>>, magnet: String, title: Str
             return Err(err.to_string());
         }
     };
+    *state.current_torrent.lock().await = Some(added.id.clone());
     // HLS (via ffmpeg-produced segments) rather than the raw stream_url -
     // see torrent-engine's hls_playlist_handler doc comment for why the raw
     // container bytes aren't reliably playable in a browser <video> element.
-    let hls_url = state.torrent_engine.hls_playlist_url(&added.id, 0);
-    *state.current_torrent.lock().await = Some(added.id.clone());
-    tracing::info!(%title, torrent_id = %added.id, %hls_url, "torrent added, streaming");
+    let files = state.torrent_engine.files(&added.id).await.map_err(|err| {
+        tracing::error!(%title, torrent_id = %added.id, %err, "play_magnet failed to get file list");
+        err.to_string()
+    })?;
+    let default_file_idx = largest_video_file(&files).unwrap_or(0);
+    let files: Vec<PlayFile> = files
+        .into_iter()
+        .map(|file| PlayFile { hls_url: state.torrent_engine.hls_playlist_url(&added.id, file.index), file })
+        .collect();
+    tracing::info!(%title, torrent_id = %added.id, file_count = files.len(), default_file_idx, "torrent added, streaming");
 
-    Ok(PlaySession { torrent_id: added.id, hls_url })
+    Ok(PlaySession { torrent_id: added.id, files, default_file_idx })
 }
 
 /// Removes the backing torrent (stop seeding, drop partial files) - used by
@@ -506,8 +535,11 @@ async fn cleanup_playback(state: &AppState) {
 /// Stremio's streaming-server statistics endpoint - see
 /// `torrent_engine::StreamStats` doc comment).
 #[tauri::command]
-async fn get_stream_stats(state: State<'_, Arc<AppState>>, torrent_id: TorrentId) -> Result<StreamStats, String> {
-    state.torrent_engine.stats(&torrent_id).await.map_err(|err| err.to_string())
+async fn get_stream_stats(state: State<'_, Arc<AppState>>, torrent_id: TorrentId, file_idx: usize) -> Result<StreamStats, String> {
+    state.torrent_engine.stats(&torrent_id, file_idx).await.map_err(|err| {
+        tracing::debug!(torrent_id = %torrent_id, file_idx, %err, "get_stream_stats failed");
+        err.to_string()
+    })
 }
 
 #[derive(Serialize)]
@@ -530,15 +562,14 @@ struct SubtitleInfo {
 }
 
 /// Lists `torrent_id`'s embedded text subtitle tracks and font attachments
-/// (file index 0, matching `play_magnet`'s own hardcoded
-/// single-file-per-torrent assumption) - see
+/// for one file of the torrent - see
 /// `TorrentEngine::media_probe`. Errors while the container header hasn't
 /// downloaded yet; the frontend retries until this succeeds, since that
 /// failure is transient and never cached.
 #[tauri::command]
-async fn get_subtitle_tracks(state: State<'_, Arc<AppState>>, torrent_id: TorrentId) -> Result<SubtitleInfo, String> {
-    tracing::debug!(torrent_id = %torrent_id, "get_subtitle_tracks invoked");
-    let probe = state.torrent_engine.media_probe(&torrent_id, 0).await.map_err(|err| {
+async fn get_subtitle_tracks(state: State<'_, Arc<AppState>>, torrent_id: TorrentId, file_idx: usize) -> Result<SubtitleInfo, String> {
+    tracing::debug!(torrent_id = %torrent_id, file_idx, "get_subtitle_tracks invoked");
+    let probe = state.torrent_engine.media_probe(&torrent_id, file_idx).await.map_err(|err| {
         tracing::warn!(torrent_id = %torrent_id, %err, "get_subtitle_tracks failed");
         err.to_string()
     })?;
@@ -547,7 +578,7 @@ async fn get_subtitle_tracks(state: State<'_, Arc<AppState>>, torrent_id: Torren
         .subtitles
         .into_iter()
         .map(|track: SubtitleTrack| SubtitleTrackInfo {
-            url: state.torrent_engine.subtitle_url(&torrent_id, 0, track.index),
+            url: state.torrent_engine.subtitle_url(&torrent_id, file_idx, track.index),
             index: track.index,
             language: track.language,
             title: track.title,
@@ -555,7 +586,7 @@ async fn get_subtitle_tracks(state: State<'_, Arc<AppState>>, torrent_id: Torren
             default: track.default,
         })
         .collect();
-    let fonts = probe.fonts.iter().map(|font| state.torrent_engine.font_url(&torrent_id, 0, font.index)).collect();
+    let fonts = probe.fonts.iter().map(|font| state.torrent_engine.font_url(&torrent_id, file_idx, font.index)).collect();
     Ok(SubtitleInfo { tracks, fonts })
 }
 
