@@ -242,6 +242,10 @@ a {
 .empty-state {
   margin: 0;
   max-width: 52ch;
+  padding: 14px 18px;
+  border-radius: var(--radius-l);
+  border: 1px dashed rgba(236, 234, 246, 0.14);
+  background: rgba(236, 234, 246, 0.03);
   color: var(--muted);
   font-size: 0.92rem;
 }
@@ -261,7 +265,8 @@ a {
 .skeleton-block,
 .video-thumbnail-skeleton,
 .result-thumbnail-skeleton {
-  background: linear-gradient(90deg, rgba(236, 234, 246, 0.05) 0%, rgba(236, 234, 246, 0.1) 50%, rgba(236, 234, 246, 0.05) 100%);
+  background: linear-gradient(100deg, rgba(236, 234, 246, 0.05) 30%, rgba(240, 122, 166, 0.1) 50%, rgba(236, 234, 246, 0.05) 70%);
+
   background-size: 200% 100%;
   animation: shimmer 1.4s linear infinite;
 }
@@ -499,6 +504,17 @@ a {
 }
 
 /* ---------- Home ---------- */
+
+/* Route arrivals: pages fade in rather than snapping. Opacity only on
+   the home page - a transform there would re-anchor its fixed ambient
+   layer mid-animation. */
+.home-page {
+  animation: fade-in 0.5s var(--ease-out);
+}
+
+.media-content {
+  animation: rise-in 0.5s var(--ease-out);
+}
 
 .home-page {
   position: relative;
@@ -1368,8 +1384,9 @@ a {
   z-index: 300;
   display: flex;
   justify-content: flex-end;
-  background: rgba(8, 9, 16, 0.55);
-  animation: fade-in 0.15s var(--ease);
+  background: rgba(8, 9, 16, 0.45);
+  backdrop-filter: blur(4px);
+  animation: fade-in 0.25s var(--ease);
 }
 
 .settings-panel {
@@ -1377,11 +1394,26 @@ a {
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: var(--surface);
-  border-left: 1px solid var(--line);
-  box-shadow: -24px 0 60px rgba(6, 7, 14, 0.5);
-  animation: slide-in 0.2s var(--ease);
+  background: var(--glass-strong);
+  backdrop-filter: var(--glass-blur);
+  border-left: 1px solid var(--glass-rim);
+  box-shadow: -30px 0 80px -20px rgba(4, 5, 12, 0.8), var(--glass-highlight);
+  animation: slide-in 0.45s var(--ease-out);
   outline: none;
+}
+
+.settings-section {
+  animation: rise-in 0.5s var(--ease-out) backwards;
+}
+
+.settings-section:nth-child(2) {
+  animation-delay: 0.06s;
+}
+.settings-section:nth-child(3) {
+  animation-delay: 0.12s;
+}
+.settings-section:nth-child(n + 4) {
+  animation-delay: 0.18s;
 }
 
 @keyframes fade-in {
@@ -1392,7 +1424,7 @@ a {
 
 @keyframes slide-in {
   from {
-    transform: translateX(24px);
+    transform: translateX(60px);
     opacity: 0;
   }
 }
@@ -1433,9 +1465,21 @@ a {
 }
 
 .settings-section h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 0.95rem;
-  color: var(--accent);
+  color: var(--accent-strong);
   margin-bottom: 6px;
+}
+
+.settings-section h3::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--accent);
 }
 
 .setting-row {
@@ -1469,9 +1513,9 @@ a {
 .settings-panel select {
   height: 34px;
   padding: 0 10px;
-  border-radius: var(--radius-s);
-  border: 1px solid var(--line);
-  background: var(--raised);
+  border-radius: var(--radius-m);
+  border: 1px solid var(--glass-rim);
+  background: rgba(236, 234, 246, 0.07);
   color: var(--text);
   font: inherit;
   font-size: 0.85rem;
@@ -1500,10 +1544,10 @@ a {
   height: 22px;
   margin: 0;
   border-radius: 999px;
-  background: var(--raised);
+  background: rgba(236, 234, 246, 0.08);
   border: 1px solid rgba(236, 234, 246, 0.16);
   cursor: pointer;
-  transition: background-color 0.15s var(--ease);
+  transition: background-color 0.25s var(--ease), box-shadow 0.25s var(--ease);
 }
 
 .switch::after {
@@ -1515,12 +1559,13 @@ a {
   height: 16px;
   border-radius: 50%;
   background: var(--muted);
-  transition: transform 0.15s var(--ease), background-color 0.15s var(--ease);
+  transition: transform 0.3s var(--ease-spring), background-color 0.2s var(--ease);
 }
 
 .switch:checked {
   background: var(--accent);
   border-color: var(--accent);
+  box-shadow: 0 0 14px -2px rgba(240, 122, 166, 0.65);
 }
 
 .switch:checked::after {
@@ -1532,8 +1577,9 @@ a {
   position: relative;
   aspect-ratio: 16 / 9;
   margin: 10px 0;
-  border-radius: var(--radius-m);
+  border-radius: var(--radius-l);
   overflow: hidden;
+  box-shadow: 0 14px 30px -14px rgba(4, 5, 12, 0.9), 0 0 0 1px var(--glass-rim);
   font-size: 16px;
   container-type: inline-size;
 }
@@ -1574,9 +1620,21 @@ a {
   font-size: 0.85rem;
 }
 
+.shortcut-list div {
+  align-items: center;
+}
+
 .shortcut-list dt {
+  min-width: 28px;
+  padding: 1px 8px;
+  border-radius: var(--radius-s);
+  background: rgba(236, 234, 246, 0.08);
+  border: 1px solid var(--glass-rim);
+  border-bottom-width: 2px;
   color: var(--text);
+  font-size: 0.78rem;
   font-weight: 700;
+  text-align: center;
 }
 
 .shortcut-list dd {
