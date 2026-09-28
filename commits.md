@@ -2,6 +2,12 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `a400193` · 2026-09-29 · feat: hash routing with back/forward for home, anime pages and the player
+- `src/App.css`
+- `src/App.tsx`
+- `src/MediaPage.tsx`
+- `src/router.ts`
+
 ### `6cd1bde` · 2026-09-29 · fix(player): keep the seek bar on the target until mpv restarts playback
 - `src/mpvVideo.ts`
 
