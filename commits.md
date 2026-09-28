@@ -2,6 +2,11 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `1b1c3d3` · 2026-09-29 · feat(media): glass detail page with drifting key art and staggered reveals
+- `src/App.css`
+- `src/HomePage.tsx`
+- `src/MediaPage.tsx`
+
 ### `0e82b20` · 2026-09-29 · fix(home): fade hero scrim into the page and share one page gutter
 - `src/App.css`
 
