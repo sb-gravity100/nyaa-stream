@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `4856d66` · 2026-09-29 · style(player): fluid buffering ring fill and breathing
+- `src/App.css`
+- `src/Buffering.tsx`
+
 ### `e7b4964` · 2026-09-29 · style(player): slower, desynced now-playing meter bars
 - `src/App.css`
 
