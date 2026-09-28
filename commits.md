@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `17b7275` · 2026-09-28 · fix(enginefs): detect unflushed zeros per 16 KiB block, serve valid prefix
+- `vendor/enginefs/VENDORED.md`
+- `vendor/enginefs/src/backend/libtorrent/disk_stream.rs`
+
 ### `4ef5c5b` · 2026-09-28 · fix(parser): recognize ordinal seasons ('2nd Season')
 - `src/episodeParser.ts`
 
