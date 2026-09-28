@@ -2,6 +2,13 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `362ea6a` · 2026-09-28 · feat(player): side playlist, control UX, direct episode play, timing fixes
+- `src/App.css`
+- `src/MediaPage.tsx`
+- `src/PlayerPlaylist.tsx`
+- `src/PlayerView.tsx`
+- `src/icons.tsx`
+
 ### `2dfcb94` · 2026-09-28 · fix(releases): rank codecs this WebView can't decode last
 - `src/releases.ts`
 
