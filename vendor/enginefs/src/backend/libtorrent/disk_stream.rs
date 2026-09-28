@@ -75,6 +75,10 @@ pub(crate) struct LibtorrentDiskFileStream {
     file: Option<tokio::fs::File>,
     file_cursor: u64,
     seek_pending: bool,
+    /// (nyaa-stream) A `file` read returned Pending and hasn't completed.
+    /// tokio's File refuses `start_seek` until it does, and the broker path
+    /// can move `current_pos` in the meantime - see `drain_pending_read`.
+    file_read_pending: bool,
     open_file: Option<tokio::task::JoinHandle<std::io::Result<tokio::fs::File>>>,
     scratch: Vec<u8>,
     verified_piece: Option<i32>,
@@ -137,6 +141,7 @@ impl LibtorrentDiskFileStream {
             file,
             file_cursor: 0,
             seek_pending: false,
+            file_read_pending: false,
             open_file: None,
             scratch: vec![0; 256 * 1024],
             verified_piece: None,
@@ -643,6 +648,7 @@ impl LibtorrentDiskFileStream {
                 self.file = Some(file);
                 self.file_cursor = 0;
                 self.seek_pending = false;
+                self.file_read_pending = false;
                 self.open_file = None;
                 Poll::Ready(Ok(()))
             }
@@ -777,6 +783,29 @@ impl tokio::io::AsyncRead for LibtorrentDiskFileStream {
         }
 
         if self.file_cursor != self.current_pos {
+            // (nyaa-stream) Finish an abandoned read before seeking: seeking
+            // tokio's File with one in flight fails with "other file
+            // operation is pending", which surfaced to readers as I/O
+            // errors mid-stream (verified live, several per episode).
+            if self.file_read_pending {
+                let this = self.as_mut().get_mut();
+                let (file, scratch) = (&mut this.file, &mut this.scratch);
+                let Some(file) = file.as_mut() else {
+                    return Poll::Pending;
+                };
+                let mut discard = tokio::io::ReadBuf::new(&mut scratch[..]);
+                match Pin::new(file).poll_read(cx, &mut discard) {
+                    Poll::Ready(result) => {
+                        let drained = discard.filled().len() as u64;
+                        this.file_read_pending = false;
+                        match result {
+                            Ok(()) => this.file_cursor = this.file_cursor.saturating_add(drained),
+                            Err(error) => return Poll::Ready(Err(error)),
+                        }
+                    }
+                    Poll::Pending => return Poll::Pending,
+                }
+            }
             if !self.seek_pending {
                 let target = self.current_pos;
                 let Some(file) = self.file.as_mut() else {
@@ -814,7 +843,9 @@ impl tokio::io::AsyncRead for LibtorrentDiskFileStream {
                 return Poll::Pending;
             };
             let mut scratch_buf = tokio::io::ReadBuf::new(&mut scratch[..to_read]);
-            match Pin::new(file).poll_read(cx, &mut scratch_buf) {
+            let polled = Pin::new(file).poll_read(cx, &mut scratch_buf);
+            this.file_read_pending = polled.is_pending();
+            match polled {
                 Poll::Ready(Ok(())) => {
                     let read = scratch_buf.filled().len();
                     Poll::Ready(Ok(read))
