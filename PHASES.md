@@ -232,17 +232,17 @@
 - [x] Player polish: rAF-driven seek bar/clock, animated chrome, ambient
       glass dock, paused glyph, Ctrl+C copies the current frame
 - [x] Thumbnail capture deferred while a stream plays
-- [ ] Bundle ffmpeg/ffprobe/mpv as Tauri sidecars for release installs
-- [ ] Later: replace the ffmpeg/ffprobe CLI processes with in-process
-      `ffmpeg-next` bindings. Wins: verbose, structured debugging (packet
-      /frame-level errors and progress instead of scraped stderr), no
-      process spawning, direct torrent file I/O via custom AVIO instead of
-      the HTTP loopback, subtitle events as data. Costs to plan for: a
-      hand-written demux/decode/encode/mux pipeline (AAC frame FIFO,
-      timestamp rescaling), unsafe AVIO bridging, FFmpeg dev libs + clang
-      in the build (vcpkg), and losing process isolation - a libav crash
-      on a malformed file would take the whole app down, so decoding
-      needs its own guarded thread/process boundary
+- [x] Release build no longer opens console windows (CREATE_NO_WINDOW on
+      every remaining child process)
+- [x] In-process FFmpeg: ez-ffmpeg pipelines + ffmpeg-next probe/fonts,
+      FFmpeg 7.1.2 statically linked from vcpkg (LGPL; OpenH264 CPU
+      fallback instead of x264). No ffmpeg/ffprobe on PATH needed
+- [ ] Read torrent bytes directly (ez-ffmpeg read/seek callbacks over the
+      enginefs file handle) instead of the loopback HTTP stream
+- [ ] Bundle mpv (thumbnail capture) as a sidecar, or capture thumbnails
+      in-process too and drop mpv entirely
+- [x] Subtitles: only dock-covered bottom lines lift while controls show;
+      2x supersampled libass rendering (setting)
 - [x] UI redesign: dusk-indigo token system, bundled Zen Kaku Gothic New,
       app bar, key-art media page, SVG player controls and menus
 - [ ] Local library backed by AniList's own list if the user authenticates

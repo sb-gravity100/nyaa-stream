@@ -78,11 +78,19 @@ solid-color skeleton blocks, not a spinner).
   torrent-engine swap above - it talks to the torrent engine only through
   `enginefs`'s `Engine`/`TorrentHandle` API, not to librqbit or libtorrent
   directly) with two layers: raw Range-capable file bytes (`axum-range`),
-  and an HLS layer on top of that (`ffmpeg`-produced playlist + on-demand
-  segments, one continuous stream-copied (`-c:v copy`) process per file)
-  that real playback actually uses, since raw torrent bytes aren't reliably
-  playable in a browser `<video>` (system `ffmpeg`/`ffprobe`, also not
-  bundled, must be on PATH). Deliberately did **not** adopt `enginefs`'s own
+  and an HLS layer on top of that (FFmpeg-produced segments, one
+  continuous run per file) that real playback actually uses, since raw
+  torrent bytes aren't reliably playable in a browser `<video>`. FFmpeg
+  runs **in-process** (`crates/torrent-engine/src/media.rs`: ez-ffmpeg for
+  the HLS/subtitle pipelines, ffmpeg-next for probing and font
+  extraction), statically linked from FFmpeg 7.1.2 built by our
+  `vcpkg.json` - LGPL features only (avcodec/avformat/avdevice/avfilter/
+  swresample/swscale, nvcodec, qsv, amf, openh264, dav1d; no x264, which
+  would make the app GPL). It replaced spawning the `ffmpeg`/`ffprobe`
+  CLI: no console windows in the GUI-subsystem release build, no PATH
+  dependency, FFmpeg's own log routed into our tracing output, jobs
+  stopped with `abort()`. Accepted tradeoff: a libav crash on a malformed
+  file now takes down the app rather than one child process. Deliberately did **not** adopt `enginefs`'s own
   HLS module (`hls.rs`) - it always re-encodes video (no stream-copy path)
   and spawns one `ffmpeg` process per segment, which is the design this
   project already tried and moved away from (see `torrent-engine/src/lib.rs`'s
@@ -105,6 +113,14 @@ requires, beyond Rust/Node:
 - The first build compiles libtorrent-rasterbar 2.1.1 + OpenSSL from source
   via `vcpkg install` against this project's `vcpkg.json`/`triplets/`
   (took ~10 minutes on the dev machine; cached by vcpkg afterward).
+- The same `vcpkg install` also builds FFmpeg 7.1.2 (LGPL feature set, see
+  the streaming-server section; ~6 minutes, cached afterward).
+  `ffmpeg-sys-next` finds it through `FFMPEG_DIR` (set in
+  `.cargo/config.toml` to `vcpkg_installed/<triplet>` - the `vcpkg` crate
+  it would otherwise use only understands classic-mode installs), and
+  `crates/torrent-engine/build.rs` links FFmpeg's static dependencies.
+  bindgen needs LLVM's libclang (`LIBCLANG_PATH`, default
+  `C:\Program Files\LLVM\bin` in the same config).
 - `.cargo/config.toml` at the project root sets `target-cpu=x86-64-v3`
   (Haswell/2013+ CPUs) for both Rust and the vendored C++ code, matching
   stream-server's own build config - this is a real minimum CPU
@@ -350,9 +366,9 @@ nyaa_stream/
    frontend reported via `set_decoder_support` (MSE `isTypeSupported`):
    8-bit 4:2:0 H.264 (and HEVC where natively supported) is stream-copied;
    everything else - Hi10P H.264, HEVC, AV1, VP9... - is re-encoded to
-   8-bit H.264 High with the first working encoder of NVENC > QSV > AMF >
-   libx264 (`detect_h264_encoder`, a tiny test encode at startup),
-   `-hwaccel auto` decode, and IDR keyframes forced every 6s so segments
+   8-bit H.264 High with the first encoder that opens of NVENC > QSV >
+   AMF > OpenH264 (`media::detect_h264_encoder` opens each on a tiny frame
+   at startup), hwaccel "auto" decode, and IDR keyframes forced every 6s so segments
    sit exactly on the playlist grid (frame-accurate seeks). The cache
    directory's `video_mode` marker drops segments produced under a
    different plan. Verified live: 10-bit HEVC via NVENC at ~16x realtime,
@@ -408,11 +424,14 @@ nyaa_stream/
 - Batches without an explicit episode range in their title (most of them)
   can't be attributed to specific episodes and stay in an undifferentiated
   per-season "Batch" bucket.
-- Transcoding needs a capable machine: NVENC/QSV/AMF are auto-detected
-  (test encode), otherwise libx264 `veryfast` - slower CPUs may not keep
-  real time for 1080p HEVC sources.
-- ffmpeg/ffprobe/mpv are still required on PATH; a release should bundle
-  them as Tauri sidecars (`externalBin`).
+- Transcoding needs a capable machine: NVENC/QSV/AMF are auto-detected,
+  otherwise OpenH264 (CPU, lower quality than x264, kept for LGPL) - slower
+  CPUs may not keep real time for 1080p HEVC sources.
+- mpv is still required on PATH for torrent-captured thumbnails (the only
+  remaining external binary).
+- FFmpeg inputs still read `stream_handler` over loopback HTTP; reading
+  the torrent file handle directly (ez-ffmpeg read/seek callbacks) is the
+  planned next step.
 - enginefs' playback coordinator can end an HTTP body early (permit
   cancellation/lease expiry); handled with ffmpeg `-reconnect`, not fixed
   upstream.
