@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `03b5131` · 2026-09-29 · fix(player): mpv pause state, seek coalescing, instant close
+- `src/PlayerView.tsx`
+- `src/mpvVideo.ts`
+
 ### `63d3a65` · 2026-09-28 · docs: document embedded mpv playback and HLS fallback
 - `CLAUDE.md`
 - `FILE_INDEX.md`
