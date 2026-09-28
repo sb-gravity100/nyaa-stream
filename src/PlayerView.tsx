@@ -61,9 +61,6 @@ const PROGRESS_SAVE_MS = 5000;
 const AUTOPLAY_NEXT_SECONDS = 8;
 const VOLUME_STORAGE_KEY = "nyaa-stream:volume";
 const REMAINING_STORAGE_KEY = "nyaa-stream:show-remaining";
-// Grace period before a hover-opened playlist closes after the pointer
-// leaves it, so brushing past its edge doesn't snap it shut.
-const PLAYLIST_HOVER_CLOSE_MS = 350;
 
 /** Thumbnail width for the last-frame capture (16:9 cards). */
 const LAST_FRAME_WIDTH = 640;
@@ -241,12 +238,7 @@ export function PlayerView({
    const [volume, setVolumeState] = useState(loadVolume);
    const [muted, setMuted] = useState(false);
    const [menu, setMenu] = useState<Menu>(null);
-   // "pinned" = opened with the button (stays until dismissed), "hover" =
-   // opened by the right-edge hover zone (closes when the pointer leaves).
-   const [playlistMode, setPlaylistMode] = useState<"pinned" | "hover" | null>(
-      null,
-   );
-   const playlistCloseTimerRef = useRef<number | undefined>(undefined);
+   const [playlistOpen, setPlaylistOpen] = useState(false);
    const [fullscreen, setFullscreen] = useState(false);
    // What the <video> element itself has buffered, in episode time - drawn
    // on the seek bar above the transcode's ready ranges.
@@ -725,7 +717,7 @@ export function PlayerView({
    }, [menu]);
 
    useEffect(() => {
-      if (playlistMode !== "pinned") return;
+      if (!playlistOpen) return;
       function handlePointerDown(event: PointerEvent) {
          const target = event.target as HTMLElement;
          if (
@@ -733,20 +725,17 @@ export function PlayerView({
             target.closest("[data-playlist-toggle]")
          )
             return;
-         setPlaylistMode(null);
+         setPlaylistOpen(false);
       }
       document.addEventListener("pointerdown", handlePointerDown);
       return () =>
          document.removeEventListener("pointerdown", handlePointerDown);
-   }, [playlistMode]);
+   }, [playlistOpen]);
 
    useEffect(() => {
       const onChange = () => setFullscreen(document.fullscreenElement != null);
       document.addEventListener("fullscreenchange", onChange);
-      return () => {
-         document.removeEventListener("fullscreenchange", onChange);
-         window.clearTimeout(playlistCloseTimerRef.current);
-      };
+      return () => document.removeEventListener("fullscreenchange", onChange);
    }, []);
 
    function resetMouseIdle() {
@@ -773,24 +762,12 @@ export function PlayerView({
       }, HOVER_HIDE_GRACE_MS);
    }
 
-   function openPlaylist(mode: "pinned" | "hover") {
-      window.clearTimeout(playlistCloseTimerRef.current);
+   function togglePlaylist() {
       setMenu(null);
-      // A hover never downgrades a pinned panel.
-      setPlaylistMode((current) => (current === "pinned" ? current : mode));
-   }
-
-   function scheduleHoverPlaylistClose() {
-      window.clearTimeout(playlistCloseTimerRef.current);
-      playlistCloseTimerRef.current = window.setTimeout(() => {
-         setPlaylistMode((current) => (current === "hover" ? null : current));
-      }, PLAYLIST_HOVER_CLOSE_MS);
-   }
-
-   function togglePinnedPlaylist() {
-      window.clearTimeout(playlistCloseTimerRef.current);
-      setMenu(null);
-      setPlaylistMode((current) => (current === "pinned" ? null : "pinned"));
+      setPlaylistOpen((current) => {
+         console.debug("[player] toggle episode list", { open: !current });
+         return !current;
+      });
    }
 
    function skip(deltaSeconds: number) {
@@ -1120,8 +1097,8 @@ export function PlayerView({
                   setMenu(null);
                   return;
                }
-               if (playlistMode) {
-                  setPlaylistMode(null);
+               if (playlistOpen) {
+                  setPlaylistOpen(false);
                   return;
                }
                // Escape's native behavior exits fullscreen first; only close
@@ -1144,7 +1121,7 @@ export function PlayerView({
       onClose,
       onNext,
       menu,
-      playlistMode,
+      playlistOpen,
       subtitleTracks,
       activeSubtitleIndex,
    ]);
@@ -1291,7 +1268,7 @@ export function PlayerView({
    return (
       <div
          ref={rootRef}
-         class={`player-view${controlsVisible || menu ? " controls-shown" : ""}${playlistMode ? " playlist-open" : ""}${paused && hasPlayed ? " is-paused" : ""}`}
+         class={`player-view${controlsVisible || menu ? " controls-shown" : ""}${playlistOpen ? " playlist-open" : ""}${paused && hasPlayed ? " is-paused" : ""}`}
          style={{ cursor: cursorHidden ? "none" : "auto" }}
       >
          {selectedFile && (
@@ -1433,32 +1410,17 @@ export function PlayerView({
             </div>
          )}
 
-         {/* Right-edge strip that slides the playlist in on hover. Stops above
-          the control bar so it never steals the controls' own hover. */}
-         {playlist.length > 1 && !playlistMode && (
-            <div
-               class="player-playlist-edge"
-               onMouseEnter={() => openPlaylist("hover")}
-            />
-         )}
          {playlist.length > 1 && (
             <PlayerPlaylist
                title={title}
                items={playlist}
                currentKey={episodeKey}
-               open={playlistMode != null}
-               pinned={playlistMode === "pinned"}
+               open={playlistOpen}
                onSelect={(key) => {
-                  setPlaylistMode(null);
+                  setPlaylistOpen(false);
                   onSelectEpisode(key);
                }}
-               onClose={() => setPlaylistMode(null)}
-               onMouseEnter={() =>
-                  window.clearTimeout(playlistCloseTimerRef.current)
-               }
-               onMouseLeave={() => {
-                  if (playlistMode === "hover") scheduleHoverPlaylistClose();
-               }}
+               onClose={() => setPlaylistOpen(false)}
             />
          )}
 
@@ -1762,7 +1724,7 @@ export function PlayerView({
                   data-menu-toggle
                   class={`player-icon-button${menu === "subtitles" ? " active" : ""}${activeSubtitleIndex != null ? " on" : ""}`}
                   onClick={() => {
-                     setPlaylistMode(null);
+                     setPlaylistOpen(false);
                      setMenu((m) => (m === "subtitles" ? null : "subtitles"));
                   }}
                   aria-label="Subtitles"
@@ -1774,7 +1736,7 @@ export function PlayerView({
                   data-menu-toggle
                   class={`player-icon-button${menu === "sources" ? " active" : ""}`}
                   onClick={() => {
-                     setPlaylistMode(null);
+                     setPlaylistOpen(false);
                      setMenu((m) => (m === "sources" ? null : "sources"));
                   }}
                   aria-label="Sources"
@@ -1798,10 +1760,10 @@ export function PlayerView({
                {playlist.length > 1 && (
                   <button
                      data-playlist-toggle
-                     class={`player-icon-button${playlistMode === "pinned" ? " active" : ""}`}
-                     onClick={togglePinnedPlaylist}
+                     class={`player-icon-button${playlistOpen ? " active" : ""}`}
+                     onClick={togglePlaylist}
                      aria-label="Episodes"
-                     aria-expanded={playlistMode != null}
+                     aria-expanded={playlistOpen}
                      title="Episodes"
                   >
                      <EpisodesIcon />

@@ -40,7 +40,7 @@
 | `src/SettingsPanel.tsx` | Settings drawer: playback, subtitles (with CSS preview of the default style), shortcut list | frontend |
 | `src/subtitles.ts` | Subtitle helpers: default-track pick (language, skips signs/songs, container default), labels, `applySubtitleStyle` (rewrites ASS `Style:` lines with the user's default style) | frontend |
 | `src/assRenderer.ts` | `useAssRenderer`: JASSUB (libass WASM) renderer over the `<video>`, loads a track once then appends new events from the backend's delta endpoint (`processData`), applies style/time offset/delay | frontend |
-| `src/PlayerPlaylist.tsx` | Slide-in episode list inside the player (pinned via control-bar button or peeked by right-edge hover): thumbnails, progress, watched state, now-playing meter | frontend |
+| `src/PlayerPlaylist.tsx` | Slide-in episode list inside the player (toggled via control-bar button): thumbnails, progress, watched state, now-playing meter | frontend |
 | `src/assets/fonts/GandhiSans-Bold*.otf` | Bundled Gandhi Sans (unmodified, freely redistributable) - font of the default Crunchyroll subtitle style | frontend, subtitles, asset |
 | `src/icons.tsx` | Inline SVG icon set used by the player and pages | frontend |
 | `src/types.ts` | Shared TS interfaces mirroring the Rust structs (`AnimeMedia`, `NyaaResult`, `TorrentDetails`, `AiringEntry`, `PlaySession`/`PlayFile`, `SubtitleInfo`, ...) | frontend |

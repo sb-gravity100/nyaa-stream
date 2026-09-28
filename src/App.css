@@ -1987,16 +1987,6 @@ a {
 
 /* ---------- Player: side playlist ---------- */
 
-/* Invisible right-edge strip; stops above the control bar's hover zone. */
-.player-playlist-edge {
-  position: absolute;
-  top: 80px;
-  right: 0;
-  bottom: 110px;
-  width: 18px;
-  z-index: 4;
-}
-
 .player-playlist {
   position: absolute;
   top: 0;

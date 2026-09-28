@@ -217,7 +217,7 @@
 - [x] Watch progress / continue-watching (`watchProgress.ts`): resume,
       per-episode progress bars and watched toggles, Continue watching row,
       next-episode button + autoplay countdown
-- [x] Player side playlist (button-pinned / right-edge hover), ±10s,
+- [x] Player side playlist (control-bar button), ±10s,
       center action flash, buffered seek layer, remaining-time toggle;
       episode cards open the player directly and closing returns home
 - [x] Live-debug fixes: dead-transcode restart, ffmpeg reconnects, probe
