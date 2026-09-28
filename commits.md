@@ -2,6 +2,12 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `9b3721d` · 2026-09-28 · feat(player): embed mpv under a transparent webview via mpv_start/command/stop
+- `crates/mpv-ipc/src/embedded.rs`
+- `src-tauri/Cargo.toml`
+- `src-tauri/src/lib.rs`
+- `src-tauri/src/player.rs`
+
 ### `7aba654` · 2026-09-28 · feat(mpv-ipc): add EmbeddedMpv for in-window playback over async IPC
 - `crates/mpv-ipc/src/embedded.rs`
 - `crates/mpv-ipc/src/lib.rs`
