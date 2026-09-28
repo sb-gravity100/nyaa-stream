@@ -2,6 +2,12 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `6194199` · 2026-09-29 · feat(player): loading overlay while seeks wait, with smoother animation
+- `src/App.css`
+- `src/Buffering.tsx`
+- `src/PlayerView.tsx`
+- `src/mpvVideo.ts`
+
 ### `a400193` · 2026-09-29 · feat: hash routing with back/forward for home, anime pages and the player
 - `src/App.css`
 - `src/App.tsx`
