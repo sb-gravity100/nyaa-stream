@@ -34,15 +34,17 @@ import {
 
 const STATS_POLL_MS = 1000;
 // How long a keybind-triggered flash of the controls stays up before
-// auto-hiding again - only applies to that flash, not to hovering: while
-// the mouse is actually over the controls (or their hover zone), they stay
-// up indefinitely regardless of this.
+// auto-hiding again.
 const KEYBIND_FLASH_MS = 1200;
-const MOUSE_HIDE_DELAY_MS = 1000;
-// Small grace delay before hiding on mouse-leave, so moving from the
-// invisible hover zone onto the now-visible control bar (or vice versa)
-// can't flicker shut between the two elements' enter/leave events.
-const HOVER_HIDE_GRACE_MS = 150;
+// Mouse idle this long anywhere but the top/bottom control areas fades
+// the controls and hides the cursor. While the pointer rests over those
+// areas the controls stay up indefinitely.
+const CONTROLS_IDLE_MS = 2000;
+// What counts as "over the controls": the bars themselves and the
+// always-present invisible strips under them (the bars have
+// pointer-events:none while hidden, so the strips are hit instead).
+const CONTROLS_AREA_SELECTOR =
+   ".player-controls, .player-topbar, .player-controls-hover-zone";
 const SEEK_STEP_SECONDS = 5;
 const SEEK_STEP_SECONDS_LARGE = 10;
 // Keyboard seeking (arrows/J/L) only actually moves the video once this
@@ -270,12 +272,14 @@ export function PlayerView({
    const [toast, setToast] = useState<string | null>(null);
    const [nextCountdown, setNextCountdown] = useState<number | null>(null);
    const idleTimerRef = useRef<number | undefined>(undefined);
-   const mouseHideTimerRef = useRef<number | undefined>(undefined);
    const toastTimerRef = useRef<number | undefined>(undefined);
    const keyboardSeekTargetRef = useRef<number | null>(null);
    const keyboardSeekTimerRef = useRef<number | undefined>(undefined);
    const hoveringControlsRef = useRef(false);
    const menuRef = useRef<HTMLDivElement>(null);
+   // For the idle timer, which outlives the render that scheduled it.
+   const menuOpenRef = useRef(false);
+   menuOpenRef.current = menu != null;
    const timeOffsetRef = useRef(0);
    timeOffsetRef.current = timeOffset;
    // Resume target in source time, captured once per episode.
@@ -683,15 +687,25 @@ export function PlayerView({
       const root = rootRef.current;
       if (!root) return;
 
+      // Re-checked on every move rather than via enter/leave events, which
+      // miss the pointer when the bars appear or vanish underneath it.
       function handlePointerMove(event: PointerEvent) {
          if (event.pointerType !== "mouse") return;
-         resetMouseIdle();
+         const target = event.target;
+         const over =
+            target instanceof Element &&
+            target.closest(CONTROLS_AREA_SELECTOR) != null;
+         if (over !== hoveringControlsRef.current)
+            console.debug("[player] pointer over controls area", { over });
+         hoveringControlsRef.current = over;
          showControls();
       }
 
       function handlePointerLeave() {
-         window.clearTimeout(mouseHideTimerRef.current);
-         setCursorHidden(true);
+         console.debug("[player] pointer left player");
+         hoveringControlsRef.current = false;
+         window.clearTimeout(idleTimerRef.current);
+         hideControlsIfIdle();
       }
 
       root.addEventListener("pointermove", handlePointerMove);
@@ -699,7 +713,6 @@ export function PlayerView({
       return () => {
          root.removeEventListener("pointermove", handlePointerMove);
          root.removeEventListener("pointerleave", handlePointerLeave);
-         window.clearTimeout(mouseHideTimerRef.current);
       };
    }, []);
 
@@ -738,28 +751,25 @@ export function PlayerView({
       return () => document.removeEventListener("fullscreenchange", onChange);
    }, []);
 
-   function resetMouseIdle() {
+   /** Show controls + cursor and restart the idle countdown. Uses only
+    * refs and setters, so stale closures (the pointer effect) are safe. */
+   function showControls() {
+      setControlsVisible(true);
       setCursorHidden(false);
-      window.clearTimeout(mouseHideTimerRef.current);
-      mouseHideTimerRef.current = window.setTimeout(
-         () => setCursorHidden(true),
-         MOUSE_HIDE_DELAY_MS,
+      window.clearTimeout(idleTimerRef.current);
+      idleTimerRef.current = window.setTimeout(
+         hideControlsIfIdle,
+         CONTROLS_IDLE_MS,
       );
    }
 
-   function showControls() {
-      hoveringControlsRef.current = true;
-      window.clearTimeout(idleTimerRef.current);
-      resetMouseIdle();
-      setControlsVisible(true);
-   }
-
-   function scheduleHideControls() {
-      hoveringControlsRef.current = false;
-      window.clearTimeout(idleTimerRef.current);
-      idleTimerRef.current = window.setTimeout(() => {
-         if (!menu) setControlsVisible(false);
-      }, HOVER_HIDE_GRACE_MS);
+   function hideControlsIfIdle() {
+      // Resting over the top/bottom bars, or with a menu open, keeps them
+      // up; the next pointer move restarts the countdown.
+      if (hoveringControlsRef.current || menuOpenRef.current) return;
+      console.debug("[player] mouse idle, hiding controls");
+      setControlsVisible(false);
+      setCursorHidden(true);
    }
 
    function togglePlaylist() {
@@ -813,11 +823,11 @@ export function PlayerView({
 
    function flashControls() {
       setControlsVisible(true);
-      resetMouseIdle();
       window.clearTimeout(idleTimerRef.current);
-      idleTimerRef.current = window.setTimeout(() => {
-         if (!hoveringControlsRef.current) setControlsVisible(false);
-      }, KEYBIND_FLASH_MS);
+      idleTimerRef.current = window.setTimeout(
+         hideControlsIfIdle,
+         KEYBIND_FLASH_MS,
+      );
    }
 
    function showFlash(kind: "play" | "pause" | "back" | "forward") {
@@ -1322,7 +1332,7 @@ export function PlayerView({
             />
          )}
 
-         <div class="player-topbar" onMouseEnter={showControls} onMouseLeave={scheduleHideControls}>
+         <div class="player-topbar">
             <button
                class="player-icon-button"
                onClick={onClose}
@@ -1576,25 +1586,15 @@ export function PlayerView({
             </div>
          )}
 
-         {/* Always-present, invisible strip with the same footprint as the
-          control bar - the only thing that reveals it, since the bar has
-          pointer-events:none while hidden. */}
-         <div
-            class="player-controls-hover-zone"
-            onMouseEnter={showControls}
-            onMouseLeave={scheduleHideControls}
-         />
-         {/* Same for the top edge: hovering there reveals the controls too. */}
-         <div
-            class="player-controls-hover-zone player-top-hover-zone"
-            onMouseEnter={showControls}
-            onMouseLeave={scheduleHideControls}
-         />
+         {/* Always-present, invisible strips with the control bars'
+          footprint: they're what the pointer hits while the bars are hidden
+          (pointer-events:none), so resting there keeps the controls up -
+          see CONTROLS_AREA_SELECTOR. */}
+         <div class="player-controls-hover-zone" />
+         <div class="player-controls-hover-zone player-top-hover-zone" />
 
          <div
             class={`player-controls${controlsVisible || menu ? " visible" : ""}`}
-            onMouseEnter={showControls}
-            onMouseLeave={scheduleHideControls}
          >
             <div
                class="player-seek-wrap"
