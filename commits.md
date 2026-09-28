@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `bc9289d` · 2026-09-28 · feat(player): add mpv_available check
+- `src-tauri/src/lib.rs`
+- `src-tauri/src/player.rs`
+
 ### `92413e2` · 2026-09-28 · chore(player): log mpv property polling at trace level
 - `src-tauri/src/player.rs`
 
