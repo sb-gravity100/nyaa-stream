@@ -57,6 +57,30 @@ const PROBE_TIMEOUT: Duration = Duration::from_secs(30);
 /// land a requested font on disk.
 const FONT_WAIT_TIMEOUT: Duration = Duration::from_secs(30);
 
+/// How long `TorrentEngine::files` waits for a magnet's metadata (the file
+/// list) to arrive from the swarm.
+const METADATA_TIMEOUT: Duration = Duration::from_secs(90);
+const METADATA_POLL_INTERVAL: Duration = Duration::from_millis(300);
+
+const VIDEO_EXTENSIONS: &[&str] = &["mkv", "mp4", "m4v", "avi", "webm", "mov", "ts", "m2ts", "wmv", "flv"];
+
+/// One file inside a torrent, as listed by its metadata.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TorrentFile {
+    pub index: usize,
+    pub name: String,
+    pub length: u64,
+    pub is_video: bool,
+}
+
+/// Largest video file - the sensible default for a single-episode torrent
+/// that also carries extras (NCOP/NCED, samples, fonts), and the fallback
+/// when a batch's files can't be matched to an episode.
+pub fn largest_video_file(files: &[TorrentFile]) -> Option<usize> {
+    files.iter().filter(|f| f.is_video).max_by_key(|f| f.length).map(|f| f.index)
+}
+
 pub struct TorrentEngine {
     efs: Arc<EngineFS>,
     stream_addr: SocketAddr,
@@ -871,6 +895,34 @@ impl TorrentEngine {
         self.efs.get_backend().remove_torrent(&id).await
     }
 
+    /// Waits (up to `METADATA_TIMEOUT`) for `id`'s metadata and returns its
+    /// file list. A magnet link carries no file list, so nothing about
+    /// which file to stream can be decided before this resolves.
+    pub async fn files(&self, id: &TorrentId) -> anyhow::Result<Vec<TorrentFile>> {
+        let engine = self.efs.get_engine(id).await.ok_or_else(|| anyhow::anyhow!("unknown torrent {id}"))?;
+        let started = tokio::time::Instant::now();
+        loop {
+            let files = engine.handle.get_files().await;
+            if !files.is_empty() {
+                let files: Vec<TorrentFile> = files
+                    .into_iter()
+                    .enumerate()
+                    .map(|(index, file)| {
+                        let extension = file.name.rsplit('.').next().unwrap_or("").to_ascii_lowercase();
+                        TorrentFile { index, is_video: VIDEO_EXTENSIONS.contains(&extension.as_str()), name: file.name, length: file.length }
+                    })
+                    .collect();
+                tracing::info!(torrent_id = %id, count = files.len(), wait_ms = started.elapsed().as_millis() as u64, "torrent metadata available");
+                return Ok(files);
+            }
+            if started.elapsed() >= METADATA_TIMEOUT {
+                tracing::warn!(torrent_id = %id, "timed out waiting for torrent metadata");
+                anyhow::bail!("timed out waiting for torrent metadata (no peers?)");
+            }
+            tokio::time::sleep(METADATA_POLL_INTERVAL).await;
+        }
+    }
+
     /// URL that streams a specific file within an already-added torrent.
     /// The local HTTP server serves it with Range support so playback can
     /// start before the whole torrent has downloaded. Raw container bytes -
@@ -914,19 +966,24 @@ impl TorrentEngine {
     /// Download progress/speed/peer-count snapshot for an in-progress
     /// torrent, polled by the frontend to show buffering feedback while
     /// mpv waits for enough data to start decoding.
-    pub async fn stats(&self, id: &TorrentId) -> anyhow::Result<StreamStats> {
+    pub async fn stats(&self, id: &TorrentId, file_idx: usize) -> anyhow::Result<StreamStats> {
         let engine = self.efs.get_engine(id).await.ok_or_else(|| anyhow::anyhow!("unknown torrent {id}"))?;
         let stats = engine.get_statistics().await;
 
-        let total_bytes: u64 = stats.files.iter().map(|f| f.length).sum();
-        let downloaded_bytes: u64 = stats.files.iter().map(|f| f.downloaded).sum();
+        // The streamed file's own progress, not the whole torrent's - for
+        // a batch those differ by an order of magnitude. Falls back to the
+        // torrent total if the index is somehow out of range.
+        let (total_bytes, downloaded_bytes) = match stats.files.get(file_idx) {
+            Some(file) => (file.length, file.downloaded),
+            None => (stats.files.iter().map(|f| f.length).sum(), stats.files.iter().map(|f| f.downloaded).sum()),
+        };
         let progress_percent = if total_bytes > 0 { downloaded_bytes as f64 / total_bytes as f64 * 100.0 } else { 0.0 };
         // `enginefs::backend::EngineStats::download_speed` is bytes/sec,
         // unlike librqbit's `Speed::mbps` (MiB/s) this field previously
         // mirrored - converted here so `StreamStats`'s documented unit
         // (MiB/s, consumed by the frontend) doesn't silently change.
         let download_speed_mbps = stats.download_speed / (1024.0 * 1024.0);
-        let ready_ranges = self.hls_jobs.ready_ranges(id, 0);
+        let ready_ranges = self.hls_jobs.ready_ranges(id, file_idx);
         let state = if !stats.has_metadata {
             "initializing"
         } else if stats.swarm_paused {
@@ -943,9 +1000,6 @@ impl TorrentEngine {
             finished: stats.is_finished,
             downloaded_bytes,
             total_bytes,
-            // `play_magnet` only ever streams file index 0 today (see
-            // PLAN.md's Known gaps) - matches that assumption rather than
-            // threading a real file index through this call.
             ready_seconds: ready_ranges.first().filter(|(start, _)| *start == 0.0).map_or(0.0, |(_, end)| *end),
             ready_ranges,
         })
