@@ -463,6 +463,15 @@ nyaa_stream/
    folder - this is app-owned scratch data cleaned up via `stop_playback`,
    not something the user is meant to keep or browse to directly.
 
+   **Movies.** AniList `format: MOVIE` pages have one "Movie" group
+   (`MOVIE_KEY`, labelled as episode 1 so `#/anime/:id/episode/1`, resume
+   and Continue watching resolve to it) holding every release that is the
+   film: titles the parser can't number, or that say movie/film/劇場版,
+   minus the franchise's TV episodes and season packs that share its name
+   (`movieSources` in App.tsx). Movies skip the nyaa view-page scrape, the
+   player always plays the torrent's largest video (never an extra), and
+   the page/search show runtime instead of an episode count.
+
    **Kitsu fallback for AniList.** `search_anime` and `get_anime_details`
    divert to Kitsu (`kitsu_client::search_anime`/`anime_by_anilist_id`) when
    AniList answers 429 or 5xx or can't be reached, and skip AniList for 60s
