@@ -2,6 +2,24 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `9ec8b40` · 2026-09-28 · docs: thumbnail and Kitsu metadata caching
+- `PLAN.md`
+- `FILE_INDEX.md`
+
+### `45421b8` · 2026-09-28 · feat(thumbnails): reuse cached thumbnails without refetching
+- `src-tauri/src/lib.rs`
+- `src/torrentThumbnail.ts`
+
+### `ed55599` · 2026-09-28 · docs: nyaa.si response cache
+- `PLAN.md`
+- `FILE_INDEX.md`
+
+### `48fddc2` · 2026-09-28 · feat(nyaa): disk cache for searches and view pages
+- `crates/nyaa-client/src/cache.rs`
+- `crates/nyaa-client/src/lib.rs`
+- `crates/nyaa-client/Cargo.toml`
+- `src-tauri/src/lib.rs`
+
 ### `742ef33` · 2026-09-28 · docs: subtitle event log, ignore_readorder, English-first, CR style
 - `FILE_INDEX.md`
 - `PHASES.md`
