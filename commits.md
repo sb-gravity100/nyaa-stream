@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `f7b1269` · 2026-09-29 · style(media): widen the info column and its description
+- `src/App.css`
+
 ### `dda8552` · 2026-09-29 · style: always play animations, ignoring the OS reduced-motion setting
 - `src/App.css`
 
