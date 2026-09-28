@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "tauri-app",
+  "productName": "nyaa-stream",
   "version": "0.1.0",
   "identifier": "com.nyaastream.app",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "tauri-app",
+        "title": "nyaa-stream",
         "width": 1100,
         "height": 720,
         "maximized": true
