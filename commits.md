@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `7aba654` · 2026-09-28 · feat(mpv-ipc): add EmbeddedMpv for in-window playback over async IPC
+- `crates/mpv-ipc/src/embedded.rs`
+- `crates/mpv-ipc/src/lib.rs`
+
 ### `9f0e360` · 2026-09-28 · perf(mpv-ipc): downscale headless captures, skip audio/sub decode
 - `crates/mpv-ipc/src/lib.rs`
 
