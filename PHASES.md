@@ -76,7 +76,9 @@
       major groups like SubsPlease/Erai-raws/Ironclad) were always missed
       regardless of the page cap - fixed by always searching both titles
       and merging/deduplicating the results instead of falling back
-- [ ] Per-anime preferred fansub group memory — not built
+- [x] Per-anime preferred fansub group memory (`releases.ts`): remembered
+      once a release actually starts playing, preferred by the auto-pick
+      when reasonably seeded, then preferred resolution, then seeders
 
 ## Phase 3 — Playback quality of life
 - [x] Wire a video player to the media page: play button per episode row
@@ -132,8 +134,8 @@
       atomic rename on completion, never serves a partial file); segment
       requests wait for the job's sequential progress to reach them, or
       restart the job at a new offset only for a real forward/backward
-      seek (more than `RESTART_LOOKAHEAD_SEGMENTS` away from current
-      progress), not for ordinary buffering. Also stopped ffmpeg from
+      seek (the job wouldn't reach the target within ~4s at its measured
+      rate - see `job_will_reach_soon`), not for ordinary buffering. Also stopped ffmpeg from
       auto-including embedded subtitle/attachment streams (`-map 0:v:0
       -map 0:a:0 -sn`) - MPEG-TS can't carry them and leaving them in
       produced non-monotonic-DTS spam and was implicated in the dropped
@@ -174,11 +176,19 @@
       an episode, or a thumbnail capture colliding with a real download)
       used to fail outright with "allow_overwrite = false" - fixed via
       `AddTorrentOptions.overwrite`
-- [ ] File selection for multi-file/batch torrents (currently hardcoded to
-      file index 0)
+- [x] File selection for multi-file/batch torrents: `play_magnet` waits
+      for metadata and returns every file with its own HLS URL; the player
+      picks the file whose name parses to the episode (`episodeParser.ts`),
+      else the largest video, and a file menu switches between them
+- [x] Subtitles rework: ASS extraction inside the HLS job at the playhead,
+      merged per-run scripts, libass rendering via JASSUB with embedded
+      fonts, retrying probe, initPTS-corrected timing, Z/X delay
+- [x] Streaming: `-copyts` shared timeline across seek restarts,
+      rate-based restart decision, smaller probe windows, ready ranges on
+      the seek bar
 - [x] Persist a saved-anime library (`src/library.ts`, `localStorage`) —
       resolves the "TBD: sqlite vs. flat file" note for *this* use case;
-      watch-history/continue-watching persistence is still open
+      watch progress is `watchProgress.ts`, also `localStorage`
 - [x] Handle the player closing and clean up the torrent session: closing
       `PlayerView` or navigating away calls `stop_playback`, which removes
       the active torrent; `play_magnet` also defensively runs the same
@@ -204,11 +214,16 @@
       App.css) instead of a poster's 2:3 - unlike the Library grid below,
       these show an actual episode still (that same fallback chain), not
       poster art, so they should be sized for that kind of image
-- [ ] Watch progress / continue-watching (distinct from the library
-      save-list above)
+- [x] Watch progress / continue-watching (`watchProgress.ts`): resume,
+      per-episode progress bars and watched toggles, Continue watching row,
+      next-episode button + autoplay countdown
+- [x] UI redesign: dusk-indigo token system, bundled Zen Kaku Gothic New,
+      app bar, key-art media page, SVG player controls and menus
 - [ ] Local library backed by AniList's own list if the user authenticates
       (optional OAuth — out of scope until asked for)
-- [ ] Settings: mpv path override, download directory, preferred fansub
-      groups, subtitle preferences
+- [x] Settings panel (`SettingsPanel.tsx`/`settings.ts`): resume, autoplay
+      next, sticky fansub group, preferred quality, subtitle default
+      on/language, default subtitle style with live preview
+- [ ] Settings still missing: mpv/ffmpeg path override, download directory
 - [ ] Packaging: Tauri bundler for Windows installer; document the mpv
       system-dependency requirement clearly at install/first-run

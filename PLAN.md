@@ -125,7 +125,7 @@ requires, beyond Rust/Node:
   coverage - falls back to a fixed early point when no duration estimate
   is available, since waiting for real-time playback to reach an actual
   multi-minute midpoint isn't practical within the capture's timeout
-- **Persistence:** browser `localStorage` for the saved-anime library
+- **Persistence:** browser `localStorage` for the saved-anime library, watch progress (`watchProgress.ts`), settings (`settings.ts`) and per-anime preferred fansub group (`releases.ts`)
   (`src/library.ts`) — deliberately not committing to the sqlite-vs-flat-file
   backend store decision below, which is still open
 
@@ -301,8 +301,18 @@ nyaa_stream/
    writing real segment files to disk (`-f hls -hls_flags temp_file` -
    atomic rename on completion, so a request never sees a half-written
    file). A segment request waits for that job's sequential progress to
-   reach it, or restarts the job at a new offset only when the request is
-   a real seek (far from current progress), not ordinary buffering.
+   reach it only if the job's measured production rate says it will get
+   there within ~4s (`job_will_reach_soon`); otherwise it's a seek and the
+   job restarts at the target (a fixed 20-segment lookahead used to make
+   short forward seeks wait for everything in between to download). Every
+   run uses `-copyts` (+ `-muxdelay 0 -muxpreload 0`) so segments keep the
+   source's own timestamps: without it a seek-restarted run re-based PTS to
+   0 and hls.js placed it at the wrong point on the timeline. hls.js still
+   anchors media time 0 to the first fragment it loads, so a mid-file start
+   (resume) is off by up to one keyframe interval - the frontend reads
+   hls.js's `INIT_PTS_FOUND` offset and corrects the time display, saved
+   progress and subtitle timing with it. `StreamStats.readyRanges` reports
+   every produced stretch (seek restarts leave several) for the seek bar.
    Replaced an earlier "one `ffmpeg -ss`/`-t` invocation per segment"
    design: each independent process reinitialized its own AAC encoder and
    timestamp timeline from zero, producing audible artifacts at every
@@ -313,28 +323,27 @@ nyaa_stream/
    line up with librqbit's own sequential piece-priority download
    strategy instead of fighting it with scattered probe reads.
 
-   **Subtitles are extracted to WebVTT sidecars, not muxed into the HLS
-   stream** - MPEG-TS can't carry them (see `-sn` above), and burning them
-   into the video would fix one language/style in at transcode time with no
-   way to toggle or switch it. Instead, `torrent_engine::probe_subtitle_tracks`
-   runs `ffprobe` against the same `stream_handler` input the video job
-   reads (container header only, doesn't wait for the whole file) to list
-   embedded tracks, and `SubtitleJobs` starts one background `ffmpeg`
-   process per file - independent of `HlsJobs`, never restarted on a video
-   seek - with one `-map 0:<index> -c:s webvtt` output per track, all in a
-   single pass over the input. `subtitle_handler` serves whatever's on disk
-   for a track at request time, so a `<track>` element's one-shot fetch
-   gets a valid (if the extraction job hasn't finished, incomplete) prefix
-   rather than nothing. `get_subtitle_tracks` (frontend: `PlayerView.tsx`)
-   lists tracks and kicks off extraction as soon as `play_magnet` resolves;
-   `<video>` gets one `<track kind="subtitles">` per track, and a picker in
-   the control bar flips the active one via the native `TextTrackList` API
-   (`<track default>` only applies once, on load). Known tradeoff: this
-   extraction job reads the same input independently and from byte 0
-   regardless of where the video job's own (seek-restartable) read
-   currently is, contending for piece priority with it - accepted rather
-   than solved, since subtitle text is a tiny fraction of a release's total
-   bytes.
+   **Subtitles are extracted as ASS by the HLS job itself and rendered
+   with libass (JASSUB) in the frontend** - MPEG-TS can't carry them, and
+   burning them in would fix one track/style at transcode time. The
+   per-file media probe (`MediaProbes`, `ffprobe` on the container header,
+   cached on success only) lists text subtitle tracks (bitmap PGS/VobSub
+   are skipped - ffmpeg can't convert them and would fail the whole
+   process) and font attachments. Each HLS transcode run adds one
+   `-map 0:<index> -c:s ass -flush_packets 1` output per track
+   (`sub_<index>_<startSegment>.ass`), so subtitles are extracted at the
+   playhead alongside the video they belong to. This replaced a separate
+   extraction process that read from byte 0 and a one-shot `<track>` WebVTT
+   fetch: subtitles were missing, partial, or late after any forward seek.
+   `subtitle_handler` merges every run's file into one script (header from
+   the earliest run, de-duplicated `Dialogue:` lines - identical across runs
+   thanks to `-copyts`); `assRenderer.ts` polls it every 3s and swaps it into
+   JASSUB. Fonts are dumped once (`-dump_attachment`) and served at
+   `/fonts/...` for libass. Plain (SRT/WebVTT) tracks become ASS with a
+   single `Default` style that the user's default-subtitle-style setting
+   rewrites (`subtitles.ts`'s `applySubtitleStyle`); real ASS tracks keep
+   their styling unless the user opts in, and then only dialogue-looking
+   styles change. Z/X shift subtitle delay by 0.1s.
 
    **`mpv`/`mpv-ipc` is no longer the real playback engine** — an earlier
    attempt embedded mpv into the app window via `--wid` and a transparent
@@ -353,20 +362,20 @@ nyaa_stream/
 
 ## Known gaps / not yet implemented
 
-- `play_magnet` currently always streams file index `0` — needs real file
-  selection when a torrent contains multiple files (e.g. batch releases).
 - The HLS playlist's declared duration is only as good as the frontend's
   AniList-derived estimate (falls back to a generic 24-minute guess if
   even that's missing) - not the file's real, exact length. Good enough
   for a working seek bar; the last segment may be trimmed slightly short
   or read past EOF if the estimate is off by more than a few seconds.
-- No watch history / continue-watching (the library only tracks *which*
-  anime are saved, not watch progress).
+- Watch progress, settings and preferred fansub groups live in
+  `localStorage` (like the library) - no sync across machines.
+- A batch whose episode range covers an episode isn't offered as a
+  source on that episode's row; batches are played from their own "Batch"
+  row, where the player's file menu picks the episode.
 - Batches without an explicit episode range in their title (most of them)
   can't be attributed to specific episodes and stay in an undifferentiated
   per-season "Batch" bucket.
-- Torrent-captured thumbnails only ever use file index `0` — same
-  file-selection gap as playback itself. The seek point targets roughly
+- Torrent-captured thumbnails use the torrent's largest video file. The seek point targets roughly
   the episode's midpoint when a duration estimate is available (a fixed
   early point otherwise), but without a Matroska Cues index on a
   still-downloading torrent that seek is best-effort and can land short
