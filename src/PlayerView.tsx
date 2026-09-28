@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { invoke } from "@tauri-apps/api/core";
-import { getCurrentWindow } from "@tauri-apps/api/window";
+import { isFullscreen, setFullscreen, toggleFullscreen, useFullscreen } from "./fullscreen";
 import { MpvVideo } from "./mpvVideo";
 import { HlsPlayerView } from "./HlsPlayerView";
 import type { AnimeMedia, NyaaResult, PlayFile, StreamStats, SubtitleTrack } from "./types";
@@ -244,7 +244,7 @@ function MpvPlayerView({
       [onSelectEpisode],
    );
    const closePlaylist = useCallback(() => setPlaylistOpen(false), []);
-   const [fullscreen, setFullscreen] = useState(false);
+   const fullscreen = useFullscreen();
    // What mpv has demuxed ahead (instantly seekable), in episode time.
    const [bufferedRanges, setBufferedRanges] = useState<[number, number][]>([]);
    const [showRemaining, setShowRemaining] = useState(() => {
@@ -609,14 +609,7 @@ function MpvPlayerView({
          document.removeEventListener("pointerdown", handlePointerDown);
    }, [playlistOpen]);
 
-   const fullscreenRef = useRef(false);
-   // Leaving the player always leaves fullscreen.
-   useEffect(
-      () => () => {
-         if (fullscreenRef.current) void getCurrentWindow().setFullscreen(false);
-      },
-      [],
-   );
+
 
    /** Show controls + cursor and restart the idle countdown. Uses only
     * refs and setters, so stale closures (the pointer effect) are safe. */
@@ -789,20 +782,7 @@ function MpvPlayerView({
       }, KEYBOARD_SEEK_COMMIT_MS);
    }
 
-   // The window itself goes fullscreen, not an element inside the
-   // webview: mpv draws into the window, so only that grows the video.
-   function toggleFullscreen() {
-      setFullscreenWindow(!fullscreenRef.current);
-   }
 
-   function setFullscreenWindow(on: boolean) {
-      console.debug("[player] fullscreen", { on });
-      fullscreenRef.current = on;
-      setFullscreen(on);
-      getCurrentWindow()
-         .setFullscreen(on)
-         .catch((err) => console.warn("[player] fullscreen failed", { err: String(err) }));
-   }
 
    /** Copies the current frame, rendered subtitles included, at the
     * video's native resolution to the clipboard - Ctrl+C. */
@@ -907,9 +887,6 @@ function MpvPlayerView({
             case "m":
                toggleMute();
                break;
-            case "f":
-               toggleFullscreen();
-               break;
             case "c":
                cycleSubtitles();
                break;
@@ -932,7 +909,7 @@ function MpvPlayerView({
                   return;
                }
                // Escape leaves fullscreen first, then closes the player.
-               if (fullscreenRef.current) setFullscreenWindow(false);
+               if (isFullscreen()) setFullscreen(false);
                else onClose();
                return;
             default:
@@ -1048,13 +1025,11 @@ function MpvPlayerView({
          class={`player-view${controlsVisible || menu ? " controls-shown" : ""}${playlistOpen ? " playlist-open" : ""}${paused && hasPlayed ? " is-paused" : ""}`}
          style={{ cursor: cursorHidden ? "none" : "auto" }}
       >
-         {/* mpv draws under the transparent webview; this layer only
-          catches double-clicks on the picture (fullscreen). A single click
-          deliberately does nothing - pause is Space/K or the button. */}
-         <div
-            class="player-video-surface"
-            onDblClick={toggleFullscreen}
-         />
+         {/* mpv draws under the transparent webview; this layer sits over
+          the picture and deliberately does nothing on click or double-click
+          - pause is Space/K or the button, fullscreen is F (app-wide) or
+          the button. */}
+         <div class="player-video-surface" />
 
          <div class="player-topbar">
             <button
