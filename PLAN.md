@@ -436,6 +436,13 @@ nyaa_stream/
 - Transcoding needs a capable machine: NVENC/QSV/AMF are auto-detected,
   otherwise OpenH264 (CPU, lower quality than x264, kept for LGPL) - slower
   CPUs may not keep real time for 1080p HEVC sources.
+  Measured with NVENC (smoke test, release build): 1080p 10-bit HEVC ->
+  H.264 at 12.9x realtime, 10-bit AV1 at 13.5x - far above download speed.
+  A GPU-resident pipeline (decode -> convert -> encode without the frame
+  round trip through system memory) was evaluated and skipped: 10-bit
+  sources need `scale_cuda` for the GPU-side 8-bit conversion, which
+  vcpkg's FFmpeg doesn't build (no cuda-llvm), so it would cost a custom
+  overlay port for no user-visible gain.
 - mpv is still required on PATH for torrent-captured thumbnails (the only
   remaining external binary).
 - The one-time media probe (`probe_media`, ffmpeg-next) still reads
