@@ -134,7 +134,7 @@ export function continueWatching(limit = 20): ProgressEntry[] {
   const latestPerAnime = new Map<number, ProgressEntry>();
   for (const entry of Object.values(store)) {
     const current = latestPerAnime.get(entry.animeId);
-    if (!current || entry.updatedAt > current.updatedAt) latestPerAnime.set(entry.animeId, entry);
+    if (!current || entry.updatedAt >= current.updatedAt) latestPerAnime.set(entry.animeId, entry);
   }
   return [...latestPerAnime.values()]
     .filter((entry) => !entry.completed && entry.position >= MIN_RESUME_SECONDS)

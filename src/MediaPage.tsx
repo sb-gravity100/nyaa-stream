@@ -235,7 +235,7 @@ export function MediaPage({
                   <div class={`video-row${watched ? " watched" : ""}${key === continueTarget?.[0] ? " current" : ""}`} key={key}>
                     <button class="video-row-main" onClick={() => setPlayingKey(key)} aria-label={`Play ${key}`}>
                       <div class="video-thumbnail">
-                        {thumbnail ? <img src={thumbnail} alt="" loading="lazy" /> : <span class="video-thumbnail-number">{episodeNumber ?? "•"}</span>}
+                        {thumbnail ? <img src={thumbnail} alt="" loading="lazy" /> : <span class="video-thumbnail-number">{episodeNumber ?? "All"}</span>}
                         <span class="video-thumbnail-play">
                           <PlayIcon size={22} />
                         </span>

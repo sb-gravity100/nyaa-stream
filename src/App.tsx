@@ -136,7 +136,7 @@ function App() {
       setAnimeResults(results.slice(0, MAX_DROPDOWN_RESULTS));
     } catch (err) {
       console.error("[search_anime] failed", { query: q, err });
-      setError(String(err));
+      setError(`Search failed: couldn't reach AniList (${err instanceof Error ? err.message : String(err)}).`);
       setAnimeResults([]);
     } finally {
       setLoading(false);
@@ -174,7 +174,7 @@ function App() {
         await loadDetails(anime.id, results);
       } catch (err) {
         console.error("[search_torrents_for_anime] failed", { anime: releaseQuery, err });
-        setError(String(err));
+        setError(`Couldn't load releases from nyaa.si (${err instanceof Error ? err.message : String(err)}). Check your connection and reopen this page.`);
         setSourcesLoading(false);
       }
     }
