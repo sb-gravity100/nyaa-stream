@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `519db39` · 2026-09-28 · fix(hls): drop the truncated segment an aborted run leaves behind
+- `crates/torrent-engine/src/lib.rs`
+
 ### `a7530bc` · 2026-09-28 · fix(subtitles): stream-copy ASS tracks instead of decoding them
 - `crates/torrent-engine/src/lib.rs`
 - `crates/torrent-engine/src/media.rs`
