@@ -205,7 +205,7 @@ export function HomePage({
             Continue watching <span class="home-section-count">{inProgress.length}</span>
           </h2>
           <ul class="card-row">
-            {inProgress.map((entry) => {
+            {inProgress.map((entry, index) => {
               const kitsu = kitsuByMedia[entry.animeId];
               const thumbnail =
                 (entry.episode != null ? lastFrames[`${entry.animeId}-${entry.episode}`] : undefined) ??
@@ -215,7 +215,7 @@ export function HomePage({
                 entry.anime.coverImage.large;
               const fraction = Math.min(1, entry.position / entry.duration);
               return (
-                <li key={`${entry.animeId}-${entry.episodeKey}`} class="episode-card">
+                <li key={`${entry.animeId}-${entry.episodeKey}`} class="episode-card" style={{ "--i": index }}>
                   <button
                     class="card-button"
                     onClick={() => (entry.episode != null ? onSelectEpisode(asAnime(entry), entry.episode) : onSelectAnime(asAnime(entry)))}
@@ -255,7 +255,7 @@ export function HomePage({
           <ul class="card-row">
             {latestEpisodesLoading && Array.from({ length: 6 }, (_, i) => <LatestEpisodeSkeleton key={i} />)}
             {!latestEpisodesLoading &&
-              latestEpisodes.map((entry) => {
+              latestEpisodes.map((entry, index) => {
                 const kitsu = kitsuByMedia[entry.media.id];
                 const episodeThumbnail = kitsu?.episodeThumbnails[entry.episode];
                 // Last-resort torrent-captured frame, only fetched when
@@ -264,7 +264,7 @@ export function HomePage({
                 const torrentThumbnail = torrentThumbnails[`${entry.media.id}-${entry.episode}`];
                 const thumbnail = episodeThumbnail ?? kitsu?.background ?? torrentThumbnail ?? entry.media.coverImage.large;
                 return (
-                  <li key={`${entry.media.id}-${entry.episode}`} class="episode-card">
+                  <li key={`${entry.media.id}-${entry.episode}`} class="episode-card" style={{ "--i": index }}>
                     <button
                       class="card-button"
                       onClick={() => onSelectEpisode(airingAsAnime(entry), entry.episode)}
@@ -293,8 +293,9 @@ export function HomePage({
         {library.length === 0 && <p class="empty-state">Search for a show above, then add it to your library from its page.</p>}
         {library.length > 0 && (
           <ul class="library-grid">
-            {library.map((anime) => (
-              <li key={anime.id} class="library-card">
+            {library.map((anime, index) => (
+              <li key={anime.id} class="library-card" style={{ "--i": index }}>
+
                 <button class="card-button" onClick={() => onSelectAnime(anime)}>
                   <div class="library-thumbnail">{anime.coverImage.large && <img src={anime.coverImage.large} alt="" loading="lazy" />}</div>
                   <div class="library-title">{displayTitle(anime.title)}</div>
