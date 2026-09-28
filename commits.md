@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `6afcf30` · 2026-09-29 · fix(a11y): stop looping animations under reduced motion
+- `src/App.css`
+
 ### `5478cab` · 2026-09-29 · style: glass settings drawer, page transitions and softer empty states
 - `src/App.css`
 
