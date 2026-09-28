@@ -2,6 +2,11 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `5acc88d` · 2026-09-29 · feat(settings): hide unlisted sources (on by default)
+- `src/MediaPage.tsx`
+- `src/SettingsPanel.tsx`
+- `src/settings.ts`
+
 ### `2852e24` · 2026-09-29 · docs: document movie handling
 - `PLAN.md`
 
