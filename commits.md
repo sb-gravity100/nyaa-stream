@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `0e440f0` · 2026-09-29 · fix(fullscreen): adopt the window's real fullscreen state on load
+- `src-tauri/capabilities/default.json`
+- `src/fullscreen.ts`
+
 ### `4856d66` · 2026-09-29 · style(player): fluid buffering ring fill and breathing
 - `src/App.css`
 - `src/Buffering.tsx`
