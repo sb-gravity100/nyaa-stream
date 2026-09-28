@@ -27,19 +27,26 @@ pub type TorrentId = String;
 /// HLS segment length. 6s is Apple's low-latency recommendation.
 const SEGMENT_DURATION_SECONDS: f64 = 6.0;
 
-/// How many segments a request is allowed to sit ahead of a job's current
-/// on-disk progress before that's treated as a real seek (worth killing and
-/// restarting the transcode at the new offset) rather than normal
-/// hls.js/browser prefetch that will be satisfied by the job's own
-/// sequential progress shortly. ~2 minutes at `SEGMENT_DURATION_SECONDS`.
-const RESTART_LOOKAHEAD_SEGMENTS: usize = 20;
+/// A request ahead of a running job's progress waits for that job only if
+/// the job is expected to produce it within this long (at its measured
+/// production rate) - otherwise it's treated as a seek and the job is
+/// restarted at the target. Replaced a fixed 20-segment (~2 min) lookahead:
+/// any forward seek inside that window used to wait for the sequential job
+/// to download and process everything in between, which on a
+/// download-bound torrent meant tens of seconds per short seek.
+const RESTART_WAIT_BUDGET: Duration = Duration::from_secs(4);
+
+/// Before a job has produced anything there's no rate to go on - requests
+/// this close to its start are assumed to be hls.js's own sequential
+/// prefetch, anything further is a seek.
+const RESTART_COLD_LOOKAHEAD_SEGMENTS: usize = 2;
 
 /// How long a segment request waits for the transcode job to produce the
 /// file before giving up - bounded mostly by torrent download speed, not
 /// transcode speed, since `ffmpeg` blocks on `stream_handler` for
 /// not-yet-downloaded bytes.
 const SEGMENT_WAIT_TIMEOUT: Duration = Duration::from_secs(45);
-const SEGMENT_POLL_INTERVAL: Duration = Duration::from_millis(250);
+const SEGMENT_POLL_INTERVAL: Duration = Duration::from_millis(100);
 
 /// How long a stream probe (`ffprobe` over loopback) may block waiting for
 /// the container header to download before the caller gives up - the HLS
@@ -68,6 +75,7 @@ struct HlsJob {
     /// *earlier* job run and, if missing, need a fresh restart to fill the
     /// gap rather than waiting on this job to ever produce them.
     start_index: usize,
+    started_at: tokio::time::Instant,
 }
 
 /// Tracks the single running (or most recently run) `ffmpeg` transcode job
@@ -122,21 +130,38 @@ impl HlsJobs {
     /// deliberately scans for the highest segment file across the whole
     /// directory, unlike the restart-decision logic elsewhere in this
     /// impl, which only looks at the *current* job's own progress.
-    fn ready_seconds(&self, torrent_id: &TorrentId, file_idx: usize) -> f64 {
+    fn ready_ranges(&self, torrent_id: &TorrentId, file_idx: usize) -> Vec<(f64, f64)> {
         let dir = self.job_dir(torrent_id, file_idx);
         let Ok(entries) = std::fs::read_dir(&dir) else {
-            return 0.0;
+            return Vec::new();
         };
-        let highest = entries
+        let mut indices: Vec<usize> = entries
             .flatten()
             .filter_map(|entry| {
                 entry.file_name().to_str().and_then(|name| name.strip_suffix(".ts")).and_then(|stem| stem.parse::<usize>().ok())
             })
-            .max();
-        match highest {
-            Some(index) => (index + 1) as f64 * SEGMENT_DURATION_SECONDS,
-            None => 0.0,
+            .collect();
+        indices.sort_unstable();
+        // Contiguous runs of segment indices -> [start, end) in seconds.
+        // Seek-restarts leave several disjoint runs; reporting them all
+        // (rather than just the highest index, as this used to) keeps the
+        // seek bar from claiming a gap is instantly seekable.
+        let mut ranges: Vec<(f64, f64)> = Vec::new();
+        let mut run: Option<(usize, usize)> = None;
+        for index in indices {
+            run = match run {
+                Some((start, end)) if index == end + 1 => Some((start, index)),
+                Some((start, end)) => {
+                    ranges.push((start as f64 * SEGMENT_DURATION_SECONDS, (end + 1) as f64 * SEGMENT_DURATION_SECONDS));
+                    Some((index, index))
+                }
+                None => Some((index, index)),
+            };
         }
+        if let Some((start, end)) = run {
+            ranges.push((start as f64 * SEGMENT_DURATION_SECONDS, (end + 1) as f64 * SEGMENT_DURATION_SECONDS));
+        }
+        ranges
     }
 
     /// Ensures a background transcode job is producing (or has already
@@ -173,14 +198,13 @@ impl HlsJobs {
                     // same offset - verified live: a single seek restarted
                     // the job 5+ times in a row before it was ever left
                     // alone long enough to produce a single segment.
-                    let highest_existing = highest_existing_segment_from(&job.dir, job.start_index).await.unwrap_or(job.start_index);
+                    let highest_existing = highest_existing_segment_from(&job.dir, job.start_index).await;
                     // Below the current job's start: it belongs to an
                     // earlier, already-superseded run and was never
                     // produced (a backward seek into a gap a forward seek
-                    // left behind). Far enough ahead of current progress
-                    // that it's clearly a real seek, not prefetch the job
-                    // will reach shortly on its own.
-                    segment_index < job.start_index || segment_index > highest_existing + RESTART_LOOKAHEAD_SEGMENTS
+                    // left behind) - always a restart. Ahead of progress:
+                    // restart unless the job will get there shortly.
+                    segment_index < job.start_index || !job_will_reach_soon(job, highest_existing, segment_index)
                 }
             };
 
@@ -204,7 +228,7 @@ impl HlsJobs {
                     }
                 };
                 let child = spawn_hls_transcode(torrent_id, file_idx, segment_index, stream_addr, &dir, &subtitles)?;
-                *job_slot = Some(HlsJob { child, dir, start_index: segment_index });
+                *job_slot = Some(HlsJob { child, dir, start_index: segment_index, started_at: tokio::time::Instant::now() });
                 tracing::info!(torrent_id = %torrent_id, file_idx, segment_index, "started hls transcode job");
             }
         }
@@ -260,6 +284,26 @@ impl HlsJobs {
             }
         }
     }
+}
+
+/// Whether `job` is expected to produce `target` within
+/// `RESTART_WAIT_BUDGET`, from its measured production rate so far.
+fn job_will_reach_soon(job: &HlsJob, highest_existing: Option<usize>, target: usize) -> bool {
+    let Some(highest) = highest_existing else {
+        let soon = target <= job.start_index + RESTART_COLD_LOOKAHEAD_SEGMENTS;
+        tracing::debug!(target, start_index = job.start_index, soon, "hls job has no output yet");
+        return soon;
+    };
+    if target <= highest + 1 {
+        return true;
+    }
+    let produced = (highest + 1 - job.start_index) as f64;
+    let elapsed = job.started_at.elapsed().as_secs_f64().max(0.001);
+    let rate = produced / elapsed;
+    let expected_wait = (target - highest) as f64 / rate;
+    let soon = expected_wait <= RESTART_WAIT_BUDGET.as_secs_f64();
+    tracing::debug!(target, highest, rate_segments_per_sec = rate, expected_wait, soon, "hls restart decision");
+    soon
 }
 
 /// Highest `.ts` segment index present in `dir` at or after `min_index` -
@@ -329,6 +373,10 @@ fn spawn_hls_transcode(
     // it, every run - sequential or restarted - shares one timeline.
     // `-muxdelay 0`/`-muxpreload 0` drop MPEG-TS's default 1.4s offset so
     // that timeline starts where the source does.
+    // Stream-copy only needs codec parameters, which Matroska/MP4 carry in
+    // the header - a smaller probe window than ffmpeg's 5MB/5s default
+    // means the first segment isn't gated on downloading that much extra.
+    command.args(["-probesize", "2000000", "-analyzeduration", "2000000"]);
     command.args(["-copyts", "-i", &input_url]);
     command.args([
         // Real releases commonly carry an embedded subtitle track (e.g.
@@ -476,7 +524,10 @@ async fn probe_media(stream_addr: SocketAddr, torrent_id: &TorrentId, file_idx: 
     tracing::debug!(torrent_id = %torrent_id, file_idx, "probing media streams");
     let input_url = format!("http://{stream_addr}/stream/{torrent_id}/{file_idx}");
     let output = tokio::process::Command::new("ffprobe")
-        .args(["-v", "error", "-print_format", "json", "-show_streams"])
+        // Subtitle codecs and attachments come from the container header
+        // alone - no need for ffprobe to also read seconds of packets
+        // (which on a cold torrent means waiting for them to download).
+        .args(["-v", "error", "-probesize", "1000000", "-analyzeduration", "0", "-print_format", "json", "-show_streams"])
         .arg(&input_url)
         .stdin(Stdio::null())
         .kill_on_drop(true)
@@ -709,10 +760,14 @@ pub struct StreamStats {
     pub total_bytes: u64,
     /// How far into the file (in seconds) HLS segments have actually been
     /// produced and are ready for an instant seek - see
-    /// `HlsJobs::ready_seconds`'s doc comment for why this isn't the same
+    /// `HlsJobs::ready_ranges`' doc comment for why this isn't the same
     /// thing as `progress_percent`. Frontend seek-bar highlight should use
     /// this, not `progress_percent`, for "can I seek here instantly".
     pub ready_seconds: f64,
+    /// Every stretch (`[start, end)` seconds) with produced segments - the
+    /// seek bar draws these; `ready_seconds` is the end of the stretch
+    /// starting at 0, kept for callers that only want one number.
+    pub ready_ranges: Vec<(f64, f64)>,
 }
 
 impl TorrentEngine {
@@ -871,6 +926,7 @@ impl TorrentEngine {
         // mirrored - converted here so `StreamStats`'s documented unit
         // (MiB/s, consumed by the frontend) doesn't silently change.
         let download_speed_mbps = stats.download_speed / (1024.0 * 1024.0);
+        let ready_ranges = self.hls_jobs.ready_ranges(id, 0);
         let state = if !stats.has_metadata {
             "initializing"
         } else if stats.swarm_paused {
@@ -890,7 +946,8 @@ impl TorrentEngine {
             // `play_magnet` only ever streams file index 0 today (see
             // PLAN.md's Known gaps) - matches that assumption rather than
             // threading a real file index through this call.
-            ready_seconds: self.hls_jobs.ready_seconds(id, 0),
+            ready_seconds: ready_ranges.first().filter(|(start, _)| *start == 0.0).map_or(0.0, |(_, end)| *end),
+            ready_ranges,
         })
     }
 }
