@@ -2,6 +2,11 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `d820508` · 2026-09-29 · style: frosted-glass app bar, search and buttons with brand mark
+- `src/App.css`
+- `src/App.tsx`
+- `src/icons.tsx`
+
 ### `6c7400f` · 2026-09-29 · docs: document the hide-unlisted-sources setting
 - `PLAN.md`
 
