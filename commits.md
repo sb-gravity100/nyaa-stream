@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `36cd574` · 2026-09-29 · docs: note home hero and brand mark in FILE_INDEX
+- `FILE_INDEX.md`
+
 ### `6afcf30` · 2026-09-29 · fix(a11y): stop looping animations under reduced motion
 - `src/App.css`
 
