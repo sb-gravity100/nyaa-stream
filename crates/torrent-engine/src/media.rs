@@ -91,14 +91,33 @@ fn http_input(url: &str, start_seconds: f64) -> Input {
     input
 }
 
+/// One subtitle stream to extract.
+#[derive(Debug, Clone, Copy)]
+pub struct SubtitleStream {
+    pub index: usize,
+    /// Source is already ASS/SSA: stream-copy it into the .ass output
+    /// (lossless, no decoder). Everything else (SRT, WebVTT...) is decoded
+    /// and re-encoded as ASS.
+    pub copy: bool,
+}
+
 /// ASS output for one subtitle stream, flushed per event so a growing file
 /// can be served while the job runs.
-fn subtitle_output(dir: &Path, stream_index: usize, name_suffix: &str) -> Output {
-    Output::from(dir.join(format!("sub_{stream_index}_{name_suffix}.ass")).to_string_lossy().to_string())
+///
+/// ASS tracks are stream-copied rather than decoded: in-process, a Kaleido-
+/// subs release failed to decode every packet ("Invalid UTF-8 in decoded
+/// subtitles", "Cannot allocate memory" - verified live), and since FFmpeg
+/// only writes an output's header after the first successfully decoded
+/// frame, no subtitle file was produced at all.
+fn subtitle_output(dir: &Path, stream: SubtitleStream, name_suffix: &str) -> Output {
+    let output = Output::from(dir.join(format!("sub_{}_{name_suffix}.ass", stream.index)).to_string_lossy().to_string())
         .set_format("ass")
-        .add_stream_map(format!("0:{stream_index}"))
-        .set_subtitle_codec("ass")
-        .set_format_opt("flush_packets", "1")
+        .set_format_opt("flush_packets", "1");
+    if stream.copy {
+        output.add_stream_map_with_copy(format!("0:{}", stream.index))
+    } else {
+        output.add_stream_map(format!("0:{}", stream.index)).set_subtitle_codec("ass")
+    }
 }
 
 // ---------------------------------------------------------------- probing
@@ -254,7 +273,7 @@ pub struct HlsRun<'a> {
     pub start_segment_index: usize,
     pub segment_seconds: f64,
     pub video: VideoCodec,
-    pub subtitle_streams: &'a [usize],
+    pub subtitle_streams: &'a [SubtitleStream],
 }
 
 /// Longest run the forced-keyframe list covers (in-process
@@ -313,8 +332,8 @@ pub fn start_hls_run(run: &HlsRun<'_>) -> anyhow::Result<MediaJob> {
     let hls = hls.add_stream_map("0:a:0").set_audio_codec("aac");
 
     let mut builder = FfmpegContext::builder().copyts().input(input).output(hls);
-    for index in run.subtitle_streams {
-        builder = builder.output(subtitle_output(run.dir, *index, &run.start_segment_index.to_string()));
+    for stream in run.subtitle_streams {
+        builder = builder.output(subtitle_output(run.dir, *stream, &run.start_segment_index.to_string()));
     }
     let context = builder.build().map_err(|err| anyhow::anyhow!("hls run: {err}"))?;
     start(context, "hls run")
@@ -324,12 +343,12 @@ pub fn start_hls_run(run: &HlsRun<'_>) -> anyhow::Result<MediaJob> {
 /// `sub_<index>_<name_suffix>.ass` - the catch-up for a run that started
 /// before the probe finished (suffix = its start segment) or the full-file
 /// background pass (suffix `bg`, `start_seconds` 0). Blocking.
-pub fn start_subtitle_run(input_url: &str, dir: &Path, start_seconds: f64, subtitle_streams: &[usize], name_suffix: &str) -> anyhow::Result<MediaJob> {
+pub fn start_subtitle_run(input_url: &str, dir: &Path, start_seconds: f64, subtitle_streams: &[SubtitleStream], name_suffix: &str) -> anyhow::Result<MediaJob> {
     init();
     anyhow::ensure!(!subtitle_streams.is_empty(), "no subtitle streams");
     let mut builder = FfmpegContext::builder().copyts().input(http_input(input_url, start_seconds));
-    for index in subtitle_streams {
-        builder = builder.output(subtitle_output(dir, *index, name_suffix));
+    for stream in subtitle_streams {
+        builder = builder.output(subtitle_output(dir, *stream, name_suffix));
     }
     let context = builder.build().map_err(|err| anyhow::anyhow!("subtitle run: {err}"))?;
     start(context, "subtitle run")

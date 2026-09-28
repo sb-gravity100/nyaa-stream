@@ -583,6 +583,12 @@ async fn highest_existing_segment_from(dir: &FsPath, min_index: usize) -> Option
     highest
 }
 
+/// Media-layer subtitle stream list: ASS/SSA sources are stream-copied,
+/// others converted (see `media::SubtitleStream`).
+fn subtitle_streams(tracks: &[SubtitleTrack]) -> Vec<media::SubtitleStream> {
+    tracks.iter().map(|t| media::SubtitleStream { index: t.index, copy: matches!(t.codec.as_str(), "ass" | "ssa") }).collect()
+}
+
 /// Starts the single continuous in-process HLS run for a torrent file at
 /// `start_segment_index` (0 for normal playback, non-zero only for a seek
 /// restart) - see `media::start_hls_run` for the pipeline itself. Reads
@@ -600,7 +606,7 @@ async fn spawn_hls_transcode(
 ) -> anyhow::Result<media::MediaJob> {
     let input_url = format!("http://{stream_addr}/stream/{torrent_id}/{file_idx}");
     let dir = dir.to_path_buf();
-    let subtitle_streams: Vec<usize> = subtitles.iter().map(|t| t.index).collect();
+    let subtitle_streams = subtitle_streams(subtitles);
     let video = match plan {
         VideoPlan::Copy => media::VideoCodec::Copy,
         VideoPlan::Transcode { encoder, .. } => media::VideoCodec::Transcode(*encoder),
@@ -641,7 +647,7 @@ async fn spawn_background_subtitle_pass(
     tokio::fs::create_dir_all(dir).await?;
     let input_url = format!("http://{stream_addr}/stream/{torrent_id}/{file_idx}?intent=background");
     let dir = dir.to_path_buf();
-    let streams: Vec<usize> = tracks.iter().map(|t| t.index).collect();
+    let streams = subtitle_streams(tracks);
     let job = tokio::task::spawn_blocking(move || media::start_subtitle_run(&input_url, &dir, 0.0, &streams, "bg"))
         .await
         .map_err(|err| anyhow::anyhow!("background subtitle pass start panicked: {err}"))??;
@@ -665,7 +671,7 @@ async fn spawn_subtitle_extraction(
     let input_url = format!("http://{stream_addr}/stream/{torrent_id}/{file_idx}");
     let start_seconds = start_segment_index as f64 * SEGMENT_DURATION_SECONDS;
     let dir = dir.to_path_buf();
-    let streams: Vec<usize> = tracks.iter().map(|t| t.index).collect();
+    let streams = subtitle_streams(tracks);
     tracing::debug!(torrent_id = %torrent_id, file_idx, start_segment_index, "starting subtitle catch-up run");
     tokio::task::spawn_blocking(move || media::start_subtitle_run(&input_url, &dir, start_seconds, &streams, &start_segment_index.to_string()))
         .await
