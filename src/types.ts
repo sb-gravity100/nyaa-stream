@@ -115,6 +115,22 @@ export interface StreamStats {
   /** "direct" (stream copy) or e.g. "HEVC -> H.264 (h264_nvenc)" when the
    * streaming server is transcoding; null before the first segment. */
   videoMode: string | null;
+  torrentName: string;
+  fileName: string;
+  uploadSpeedMbps: number;
+  uploadedBytes: number;
+  unchokedPeers: number;
+  queuedPeers: number;
+  swarmSize: number;
+  sources: number;
+  /** The live HLS run (torrent-engine's HlsRunInfo), null before one starts. */
+  run: {
+    startSeconds: number;
+    segmentsProduced: number;
+    speedXRealtime: number;
+    running: boolean;
+    subtitleTracks: number;
+  } | null;
 }
 
 export function displayTitle(title: AnimeTitle): string {

@@ -1612,6 +1612,49 @@ a {
   font-variant-numeric: tabular-nums;
 }
 
+/* Verbose sections below the headline numbers: label/value rows. */
+.statistics-menu-section {
+  margin-bottom: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(236, 234, 246, 0.08);
+}
+
+.statistics-menu-heading {
+  margin-bottom: 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.statistics-menu-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 2px 0;
+}
+
+.statistics-menu-row .statistics-menu-value {
+  margin-top: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.statistics-menu-thumbnail {
+  display: grid;
+  gap: 6px;
+}
+
+.statistics-menu-thumbnail img {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: var(--radius-s);
+}
+
 .statistics-menu-hash {
   display: flex;
   align-items: center;

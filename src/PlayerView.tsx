@@ -217,6 +217,8 @@ export function PlayerView({
    const [files, setFiles] = useState<PlayFile[]>([]);
    const [selectedFile, setSelectedFile] = useState<PlayFile | null>(null);
    const [stats, setStats] = useState<StreamStats | null>(null);
+   // The attached hls.js instance, for the statistics popup's bandwidth.
+   const [hlsInstance, setHlsInstance] = useState<Hls | null>(null);
    const [error, setError] = useState<string | null>(null);
    const [status, setStatus] = useState("Connecting to peers…");
    const [ready, setReady] = useState(false);
@@ -424,6 +426,7 @@ export function PlayerView({
          // interval, well inside what "resume" needs.
          startPosition: startAt ?? -1,
       });
+      setHlsInstance(hls);
       hls.loadSource(hlsSrc);
       hls.attachMedia(video);
       // hls.js anchors media time 0 to whichever fragment it loads first.
@@ -488,6 +491,7 @@ export function PlayerView({
          // Remember where playback was in case this is a same-file re-attach.
          if (video.currentTime > 0)
             reattachRef.current = { url: attachedUrl, time: video.currentTime };
+         setHlsInstance(null);
          hls.destroy();
       };
    }, [videoEl, selectedFile?.hlsUrl, estimatedDurationSeconds]);
@@ -1598,10 +1602,13 @@ export function PlayerView({
                )}
                {renderedMenu === "stats" && stats && (
                   <StatisticsMenu
-                     peers={stats.connectedPeers}
-                     speedMbps={stats.downloadSpeedMbps}
-                     completedPercent={stats.progressPercent}
+                     stats={stats}
                      infoHash={infoHash}
+                     video={videoEl}
+                     hls={hlsInstance}
+                     animeId={anime.id}
+                     episode={episode}
+                     subtitleLabel={activeSubtitle ? subtitleTrackLabel(activeSubtitle, subtitleTracks.indexOf(activeSubtitle)) : null}
                   />
                )}
             </div>
