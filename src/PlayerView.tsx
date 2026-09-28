@@ -4,7 +4,7 @@ import type { AnimeMedia, NyaaResult, PlayFile, StreamStats, SubtitleTrack } fro
 import { displayTitle } from "./types";
 import { getStreamStats, getSubtitleTracks, playMagnet, stopPlayback } from "./playback";
 import { loadingProgress } from "./loadingProgress";
-import { bestRelease, getPreferredGroup, releaseGroup, releaseResolution, setPreferredGroup, sortReleases } from "./releases";
+import { bestRelease, codecPlayable, getPreferredGroup, releaseCodec, releaseGroup, releaseResolution, setPreferredGroup, sortReleases } from "./releases";
 import { parseEpisode } from "./episodeParser";
 import { Buffering } from "./Buffering";
 import { StatisticsMenu } from "./StatisticsMenu";
@@ -12,9 +12,14 @@ import { getSettings as getSettingsSnapshot, useSettings } from "./settings";
 import { defaultSubtitleIndex, isStyledTrack, subtitleTrackLabel } from "./subtitles";
 import { useAssRenderer } from "./assRenderer";
 import { resumePosition, saveProgress } from "./watchProgress";
+import { PlayerPlaylist, type PlaylistItem } from "./PlayerPlaylist";
 import {
   BackIcon,
+  EpisodesIcon,
+  ExitFullscreenIcon,
   FullscreenIcon,
+  SkipBackIcon,
+  SkipForwardIcon,
   MuteIcon,
   NextIcon,
   PauseIcon,
@@ -52,6 +57,10 @@ const PROGRESS_SAVE_MS = 5000;
 // Countdown shown before auto-starting the next episode.
 const AUTOPLAY_NEXT_SECONDS = 8;
 const VOLUME_STORAGE_KEY = "nyaa-stream:volume";
+const REMAINING_STORAGE_KEY = "nyaa-stream:show-remaining";
+// Grace period before a hover-opened playlist closes after the pointer
+// leaves it, so brushing past its edge doesn't snap it shut.
+const PLAYLIST_HOVER_CLOSE_MS = 350;
 
 interface Props {
   anime: AnimeMedia;
@@ -66,6 +75,9 @@ interface Props {
   /** Present when there's a next episode to go to. */
   onNext: (() => void) | null;
   nextLabel: string | null;
+  /** The anime's episode groups, for the side playlist. */
+  playlist: PlaylistItem[];
+  onSelectEpisode: (key: string) => void;
 }
 
 type Menu = "subtitles" | "sources" | "stats" | null;
@@ -132,7 +144,7 @@ function loadVolume(): number {
 // control bar only appears while the pointer is over the bottom strip (or
 // briefly after a keybind), plus PotPlayer/YouTube-style keybinds. See
 // PLAN.md's Known gaps for why this isn't mpv.
-export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNext, nextLabel }: Props) {
+export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNext, nextLabel, playlist, onSelectEpisode }: Props) {
   const settings = useSettings();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [videoEl, setVideoEl] = useState<HTMLVideoElement | null>(null);
@@ -157,6 +169,24 @@ export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNe
   const [volume, setVolumeState] = useState(loadVolume);
   const [muted, setMuted] = useState(false);
   const [menu, setMenu] = useState<Menu>(null);
+  // "pinned" = opened with the button (stays until dismissed), "hover" =
+  // opened by the right-edge hover zone (closes when the pointer leaves).
+  const [playlistMode, setPlaylistMode] = useState<"pinned" | "hover" | null>(null);
+  const playlistCloseTimerRef = useRef<number | undefined>(undefined);
+  const [fullscreen, setFullscreen] = useState(false);
+  // What the <video> element itself has buffered, in episode time - drawn
+  // on the seek bar above the transcode's ready ranges.
+  const [bufferedRanges, setBufferedRanges] = useState<[number, number][]>([]);
+  const [showRemaining, setShowRemaining] = useState(() => {
+    try {
+      return localStorage.getItem(REMAINING_STORAGE_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  // Brief center-screen icon confirming play/pause/skip - `id` restarts
+  // the animation when the same action repeats.
+  const [flash, setFlash] = useState<{ kind: "play" | "pause" | "back" | "forward"; id: number } | null>(null);
   const [subtitleTracks, setSubtitleTracks] = useState<SubtitleTrack[]>([]);
   const [subtitleFonts, setSubtitleFonts] = useState<string[]>([]);
   // null = subtitles off.
@@ -178,6 +208,8 @@ export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNe
   timeOffsetRef.current = timeOffset;
   // Resume target in source time, captured once per episode.
   const resumeAtRef = useRef<number | null>(settings.resumePlayback ? resumePosition(anime.id, episodeKey) : null);
+  const selectedReleaseRef = useRef(selectedRelease);
+  selectedReleaseRef.current = selectedRelease;
   const infoHash = useMemo(() => infoHashFromMagnet(selectedRelease.magnet), [selectedRelease.magnet]);
   const sortedReleases = useMemo(() => sortReleases(releases, releasePrefs), [releases]);
   const videoFiles = files.filter((f) => f.isVideo);
@@ -278,7 +310,14 @@ export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNe
     // by a constant (verified: 2s on a 5s-GOP test file).
     hls.on(Hls.Events.INIT_PTS_FOUND, (_event, data) => {
       if (data.id !== "main") return;
-      const offset = data.initPTS / data.timescale;
+      // initPTS is a raw 33-bit MPEG-TS timestamp. With -copyts and no mux
+      // delay, a stream whose first DTS sits just below zero (B-frames)
+      // wraps to ~2^33 - verified live: an offset of 95443s made progress
+      // save as "watched" and libass draw subtitles 26 hours ahead (so
+      // none showed). Unwrap anything past the halfway point.
+      let offset = data.initPTS / data.timescale;
+      const wrap = 2 ** 33 / 90_000;
+      if (offset > wrap / 2) offset -= wrap;
       console.info("[player] hls initPTS found", { offset });
       setTimeOffset(offset);
     });
@@ -289,6 +328,15 @@ export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNe
       console.error("[player] hls.js fatal error", { type: data.type, details: data.details, recoveryAttempts });
       // hls.js's own recommended recovery: a "fatal" error usually just
       // means its retry budget ran out on a slow segment.
+      // Unsupported codec (typically HEVC without the system extension):
+      // retrying can never succeed, so say so plainly right away.
+      if (data.details === Hls.ErrorDetails.BUFFER_ADD_CODEC_ERROR || data.details === Hls.ErrorDetails.BUFFER_INCOMPATIBLE_CODECS_ERROR) {
+        const codec = releaseCodec(selectedReleaseRef.current);
+        setError(
+          `This system can't decode ${codec ? codec.toUpperCase() : "this source's"} video. Pick an H.264 (x264/AVC) source instead.`,
+        );
+        return;
+      }
       if (recoveryAttempts < MAX_RECOVERY_ATTEMPTS) {
         if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
           recoveryAttempts++;
@@ -409,13 +457,16 @@ export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNe
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paused, duration]);
 
-  // Remembering the fansub group once it has actually played, not when
-  // merely picked - a source that never starts shouldn't become sticky.
-  useEffect(() => {
-    if (!ready || !settings.rememberFansubGroup) return;
-    const group = releaseGroup(selectedRelease);
+  // Remembers the fansub group once its release actually plays, not when
+  // merely picked. Done from the `playing` event rather than an effect on
+  // `ready`: that effect fired on a source switch while `ready` was still
+  // true from the previous release, saving a group that never played
+  // (verified live).
+  function rememberGroupOnPlay() {
+    if (!getSettingsSnapshot().rememberFansubGroup) return;
+    const group = releaseGroup(selectedReleaseRef.current);
     if (group && group !== getPreferredGroup(anime.id)) setPreferredGroup(anime.id, group);
-  }, [ready, selectedRelease]);
+  }
 
   // Next-episode countdown.
   useEffect(() => {
@@ -445,6 +496,26 @@ export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNe
     return () => document.removeEventListener("pointerdown", handlePointerDown);
   }, [menu]);
 
+  useEffect(() => {
+    if (playlistMode !== "pinned") return;
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target as HTMLElement;
+      if (target.closest(".player-playlist") || target.closest("[data-playlist-toggle]")) return;
+      setPlaylistMode(null);
+    }
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [playlistMode]);
+
+  useEffect(() => {
+    const onChange = () => setFullscreen(document.fullscreenElement != null);
+    document.addEventListener("fullscreenchange", onChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", onChange);
+      window.clearTimeout(playlistCloseTimerRef.current);
+    };
+  }, []);
+
   function showControls() {
     hoveringControlsRef.current = true;
     window.clearTimeout(idleTimerRef.current);
@@ -459,6 +530,56 @@ export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNe
     }, HOVER_HIDE_GRACE_MS);
   }
 
+  function openPlaylist(mode: "pinned" | "hover") {
+    window.clearTimeout(playlistCloseTimerRef.current);
+    setMenu(null);
+    // A hover never downgrades a pinned panel.
+    setPlaylistMode((current) => (current === "pinned" ? current : mode));
+  }
+
+  function scheduleHoverPlaylistClose() {
+    window.clearTimeout(playlistCloseTimerRef.current);
+    playlistCloseTimerRef.current = window.setTimeout(() => {
+      setPlaylistMode((current) => (current === "hover" ? null : current));
+    }, PLAYLIST_HOVER_CLOSE_MS);
+  }
+
+  function togglePinnedPlaylist() {
+    window.clearTimeout(playlistCloseTimerRef.current);
+    setMenu(null);
+    setPlaylistMode((current) => (current === "pinned" ? null : "pinned"));
+  }
+
+  function skip(deltaSeconds: number) {
+    const video = videoRef.current;
+    if (!video || !episodeDuration) return;
+    cancelPendingKeyboardSeek();
+    setNextCountdown(null);
+    showFlash(deltaSeconds < 0 ? "back" : "forward");
+    seekToEpisodeTime(Math.min(Math.max(video.currentTime + timeOffsetRef.current + deltaSeconds, 0), episodeDuration));
+  }
+
+  function toggleRemaining() {
+    setShowRemaining((v) => {
+      try {
+        localStorage.setItem(REMAINING_STORAGE_KEY, v ? "0" : "1");
+      } catch {
+        // Per-viewer convenience only.
+      }
+      return !v;
+    });
+  }
+
+  function updateBuffered() {
+    const video = videoRef.current;
+    if (!video) return;
+    const ranges: [number, number][] = [];
+    for (let i = 0; i < video.buffered.length; i++) {
+      ranges.push([video.buffered.start(i) + timeOffsetRef.current, video.buffered.end(i) + timeOffsetRef.current]);
+    }
+    setBufferedRanges(ranges);
+  }
+
   function flashControls() {
     setControlsVisible(true);
     window.clearTimeout(idleTimerRef.current);
@@ -467,9 +588,14 @@ export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNe
     }, KEYBIND_FLASH_MS);
   }
 
+  function showFlash(kind: "play" | "pause" | "back" | "forward") {
+    setFlash({ kind, id: Date.now() });
+  }
+
   function togglePause() {
     const video = videoRef.current;
     if (!video) return;
+    showFlash(video.paused ? "play" : "pause");
     if (video.paused) {
       // play() rejects with AbortError if something pauses the video
       // before it resolves (e.g. closing mid-buffer) - expected.
@@ -593,9 +719,11 @@ export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNe
           seekBy(SEEK_STEP_SECONDS);
           break;
         case "j":
+          showFlash("back");
           seekBy(-SEEK_STEP_SECONDS_LARGE);
           break;
         case "l":
+          showFlash("forward");
           seekBy(SEEK_STEP_SECONDS_LARGE);
           break;
         case "arrowup":
@@ -629,6 +757,10 @@ export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNe
             setMenu(null);
             return;
           }
+          if (playlistMode) {
+            setPlaylistMode(null);
+            return;
+          }
           // Escape's native behavior exits fullscreen first; only close
           // the player once there's nothing left for the browser to do.
           if (!document.fullscreenElement) onClose();
@@ -643,7 +775,7 @@ export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNe
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [episodeDuration, volume, onClose, onNext, menu, subtitleTracks, activeSubtitleIndex]);
+  }, [episodeDuration, volume, onClose, onNext, menu, playlistMode, subtitleTracks, activeSubtitleIndex]);
 
   const displayTime = seekPreview ?? episodeTime;
   const buffering = !error && !ready;
@@ -656,7 +788,7 @@ export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNe
   const resolution = releaseResolution(selectedRelease);
 
   return (
-    <div class={`player-view${controlsVisible || paused ? " controls-shown" : ""}`}>
+    <div class={`player-view${controlsVisible || menu ? " controls-shown" : ""}${playlistMode ? " playlist-open" : ""}`}>
       {selectedFile && (
         <video
           ref={(el) => {
@@ -672,13 +804,18 @@ export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNe
           onLoadedMetadata={(e) => setDuration((e.target as HTMLVideoElement).duration || 0)}
           onDurationChange={(e) => setDuration((e.target as HTMLVideoElement).duration || 0)}
           onTimeUpdate={(e) => setPosition((e.target as HTMLVideoElement).currentTime)}
+          onProgress={updateBuffered}
+          onSeeked={updateBuffered}
           onPlay={() => setPaused(false)}
           onPause={() => setPaused(true)}
           onEnded={handleEnded}
           onVolumeChange={(e) => setMuted((e.target as HTMLVideoElement).muted)}
           onCanPlay={() => setReady(true)}
           onWaiting={() => setReady(false)}
-          onPlaying={() => setReady(true)}
+          onPlaying={() => {
+            setReady(true);
+            rememberGroupOnPlay();
+          }}
           onError={(e) => {
             const video = e.target as HTMLVideoElement;
             const mediaError = video.error;
@@ -729,6 +866,37 @@ export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNe
       )}
 
       {toast && <div class="player-toast">{toast}</div>}
+
+      {flash && (
+        <div class="player-flash" key={flash.id} aria-hidden="true" onAnimationEnd={() => setFlash(null)}>
+          {flash.kind === "play" && <PlayIcon size={34} />}
+          {flash.kind === "pause" && <PauseIcon size={34} />}
+          {flash.kind === "back" && <SkipBackIcon size={34} />}
+          {flash.kind === "forward" && <SkipForwardIcon size={34} />}
+        </div>
+      )}
+
+      {/* Right-edge strip that slides the playlist in on hover. Stops above
+          the control bar so it never steals the controls' own hover. */}
+      {playlist.length > 1 && !playlistMode && <div class="player-playlist-edge" onMouseEnter={() => openPlaylist("hover")} />}
+      {playlist.length > 1 && (
+        <PlayerPlaylist
+          title={title}
+          items={playlist}
+          currentKey={episodeKey}
+          open={playlistMode != null}
+          pinned={playlistMode === "pinned"}
+          onSelect={(key) => {
+            setPlaylistMode(null);
+            onSelectEpisode(key);
+          }}
+          onClose={() => setPlaylistMode(null)}
+          onMouseEnter={() => window.clearTimeout(playlistCloseTimerRef.current)}
+          onMouseLeave={() => {
+            if (playlistMode === "hover") scheduleHoverPlaylistClose();
+          }}
+        />
+      )}
 
       {nextCountdown != null && onNext && (
         <div class="player-next-card">
@@ -814,6 +982,7 @@ export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNe
                       <span class="player-source-title">{r.title}</span>
                       <span class="player-menu-meta">
                         <span class="seeders">{r.seeders} seeders</span> · {r.size}
+                        {!codecPlayable(releaseCodec(r)) && <span class="codec-warning"> · {releaseCodec(r)?.toUpperCase()} won't play here</span>}
                         {g && g === preferredGroup ? " · your usual group" : ""}
                       </span>
                     </button>
@@ -839,7 +1008,7 @@ export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNe
       <div class="player-controls-hover-zone" onMouseEnter={showControls} onMouseLeave={scheduleHideControls} />
 
       <div
-        class={`player-controls${controlsVisible || paused || menu ? " visible" : ""}`}
+        class={`player-controls${controlsVisible || menu ? " visible" : ""}`}
         onMouseEnter={showControls}
         onMouseLeave={scheduleHideControls}
       >
@@ -855,6 +1024,17 @@ export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNe
               }}
             />
           ))}
+          {episodeDuration > 0 &&
+            bufferedRanges.map(([start, end]) => (
+              <div
+                key={`b${start}`}
+                class="player-seek-buffered"
+                style={{
+                  left: `${Math.max(0, Math.min(100, (start / episodeDuration) * 100))}%`,
+                  width: `${Math.max(0, Math.min(100, ((end - start) / episodeDuration) * 100))}%`,
+                }}
+              />
+            ))}
           <div class="player-seek-played" style={{ width: `${playedPercent}%` }} />
           <div class="player-seek-thumb" style={{ left: `${playedPercent}%` }} />
           {hoverTime && (
@@ -878,6 +1058,12 @@ export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNe
         <div class="player-controls-row">
           <button class="player-icon-button" onClick={togglePause} aria-label={paused ? "Play" : "Pause"} title={`${paused ? "Play" : "Pause"} (Space)`}>
             {paused ? <PlayIcon size={22} /> : <PauseIcon size={22} />}
+          </button>
+          <button class="player-icon-button" onClick={() => skip(-SEEK_STEP_SECONDS_LARGE)} aria-label="Back 10 seconds" title="Back 10s (J)" disabled={!episodeDuration}>
+            <SkipBackIcon />
+          </button>
+          <button class="player-icon-button" onClick={() => skip(SEEK_STEP_SECONDS_LARGE)} aria-label="Forward 10 seconds" title="Forward 10s (L)" disabled={!episodeDuration}>
+            <SkipForwardIcon />
           </button>
           {onNext && (
             <button class="player-icon-button" onClick={onNext} aria-label="Next episode" title={`${nextLabel ?? "Next episode"} (N)`}>
@@ -903,14 +1089,17 @@ export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNe
               aria-label="Volume"
             />
           </div>
-          <div class="player-time">
-            {formatTime(displayTime)} <span>/ {formatTime(episodeDuration)}</span>
-          </div>
+          <button class="player-time" onClick={toggleRemaining} title="Show remaining time" aria-label="Toggle remaining time">
+            {showRemaining ? `-${formatTime(Math.max(0, episodeDuration - displayTime))}` : formatTime(displayTime)} <span>/ {formatTime(episodeDuration)}</span>
+          </button>
           <div class="player-spacer" />
           <button
             data-menu-toggle
             class={`player-icon-button${menu === "subtitles" ? " active" : ""}${activeSubtitleIndex != null ? " on" : ""}`}
-            onClick={() => setMenu((m) => (m === "subtitles" ? null : "subtitles"))}
+            onClick={() => {
+              setPlaylistMode(null);
+              setMenu((m) => (m === "subtitles" ? null : "subtitles"));
+            }}
             aria-label="Subtitles"
             title="Subtitles (C to cycle, Z/X delay)"
           >
@@ -919,7 +1108,10 @@ export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNe
           <button
             data-menu-toggle
             class={`player-icon-button${menu === "sources" ? " active" : ""}`}
-            onClick={() => setMenu((m) => (m === "sources" ? null : "sources"))}
+            onClick={() => {
+              setPlaylistMode(null);
+              setMenu((m) => (m === "sources" ? null : "sources"));
+            }}
             aria-label="Sources"
             title="Sources and files"
           >
@@ -936,8 +1128,20 @@ export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNe
               <StatsIcon />
             </button>
           )}
-          <button class="player-icon-button" onClick={toggleFullscreen} aria-label="Fullscreen" title="Fullscreen (F)">
-            <FullscreenIcon />
+          {playlist.length > 1 && (
+            <button
+              data-playlist-toggle
+              class={`player-icon-button${playlistMode === "pinned" ? " active" : ""}`}
+              onClick={togglePinnedPlaylist}
+              aria-label="Episodes"
+              aria-expanded={playlistMode != null}
+              title="Episodes"
+            >
+              <EpisodesIcon />
+            </button>
+          )}
+          <button class="player-icon-button" onClick={toggleFullscreen} aria-label={fullscreen ? "Exit fullscreen" : "Fullscreen"} title={`${fullscreen ? "Exit fullscreen" : "Fullscreen"} (F)`}>
+            {fullscreen ? <ExitFullscreenIcon /> : <FullscreenIcon />}
           </button>
         </div>
       </div>
