@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `3c70de4` · 2026-09-28 · feat(thumbnails): paint card art on the first frame after launch
+- `src/kitsu.ts`
+- `src/App.tsx`
+
 ### `fe500c7` · 2026-09-28 · feat(thumbnails): save the player's last frame as the episode thumbnail
 - `src-tauri/src/lib.rs`
 - `src/torrentThumbnail.ts`
