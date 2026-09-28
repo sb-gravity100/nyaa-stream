@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `0e82b20` · 2026-09-29 · fix(home): fade hero scrim into the page and share one page gutter
+- `src/App.css`
+
 ### `445c826` · 2026-09-29 · feat(home): featured hero with ambient art wash and lifted cards
 - `src/App.css`
 - `src/HomePage.tsx`
