@@ -13,4 +13,7 @@ Copied from https://github.com/stremio-native/stream-server at rev
   first read at offset 0; in practice libtorrent reports a piece as
   verified before its bytes are visible through a separate OS file
   handle, and ffmpeg received runs of `0x00` mid-file (`0x00 at pos N
-  invalid as first byte of an EBML number`), corrupting demux.
+  invalid as first byte of an EBML number`), corrupting demux. The reader
+  waits up to 8s per piece for real bytes before accepting zeros as
+  genuine padding; a shorter 200-500ms bound was verified to accept real
+  unflushed bytes as zeros and produce pixelated frames.
