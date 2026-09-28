@@ -70,7 +70,13 @@ pub async fn mpv_start(app: AppHandle, window: WebviewWindow, state: State<'_, P
 /// "time-pos"]`...) - the frontend owns playback logic.
 #[tauri::command]
 pub async fn mpv_command(state: State<'_, PlayerState>, args: Vec<Value>) -> Result<Value, String> {
-    tracing::debug!(?args, "mpv_command");
+    // Property reads are the stats menu's once-a-second polling - trace, not
+    // debug, so they don't bury everything else.
+    if args.first().and_then(Value::as_str) == Some("get_property") {
+        tracing::trace!(?args, "mpv_command");
+    } else {
+        tracing::debug!(?args, "mpv_command");
+    }
     let mpv = state.mpv.lock().await.clone().ok_or_else(|| "mpv is not running".to_string())?;
     mpv.command(&args).await.map_err(|err| err.to_string())
 }
