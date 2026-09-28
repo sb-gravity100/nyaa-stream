@@ -19,6 +19,30 @@ pub struct PlayerState {
     mpv: Mutex<Option<Arc<EmbeddedMpv>>>,
 }
 
+/// Whether a system `mpv` is on PATH - the player falls back to HLS
+/// without it. Checked once per run.
+#[tauri::command]
+pub async fn mpv_available() -> bool {
+    static AVAILABLE: tokio::sync::OnceCell<bool> = tokio::sync::OnceCell::const_new();
+    *AVAILABLE
+        .get_or_init(|| async {
+            let mut command = tokio::process::Command::new("mpv");
+            #[cfg(windows)]
+            command.creation_flags(0x0800_0000);
+            let found = command
+                .arg("--version")
+                .stdin(std::process::Stdio::null())
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .status()
+                .await
+                .is_ok_and(|status| status.success());
+            tracing::info!(found, "mpv availability checked");
+            found
+        })
+        .await
+}
+
 /// Starts mpv inside the window if it isn't running yet and makes the
 /// webview transparent over it. Idempotent - the player calls it on every
 /// open.
