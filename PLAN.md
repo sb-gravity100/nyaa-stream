@@ -355,18 +355,29 @@ nyaa_stream/
    cached on success only) lists text subtitle tracks (bitmap PGS/VobSub
    are skipped - ffmpeg can't convert them and would fail the whole
    process) and font attachments. Each HLS transcode run adds one
-   `-map 0:<index> -c:s ass -flush_packets 1` output per track
+   `-map 0:<index>` ASS output per **English** track (`eng`/`en`/`enm`;
+   every track when none is English - other languages come from the
+   full-file background pass), stream-copied for ASS sources, with
+   `flush_packets` and `ignore_readorder` (the ass muxer otherwise holds
+   every event after a ReadOrder gap until the file ends - Kaleido-subs'
+   out-of-order scripts extracted one event during playback)
    (`sub_<index>_<startSegment>.ass`), so subtitles are extracted at the
    playhead alongside the video they belong to. This replaced a separate
    extraction process that read from byte 0 and a one-shot `<track>` WebVTT
    fetch: subtitles were missing, partial, or late after any forward seek.
-   `subtitle_handler` merges every run's file into one script (header from
-   the earliest run, de-duplicated `Dialogue:` lines - identical across runs
-   thanks to `-copyts`); `assRenderer.ts` polls it every 3s and swaps it into
-   JASSUB. Fonts are dumped once (`-dump_attachment`) and served at
+   `subtitle_handler` serves each track from an append-only event log
+   (`subtitle_log.rs`: run files read incrementally, `Dialogue:` lines
+   de-duplicated - identical across runs thanks to `-copyts`); `?from=N`
+   returns only events added since, with the total in `X-Subtitle-Events`.
+   `assRenderer.ts` loads the script once, then every 3s feeds only new
+   lines to libass (`processData`) instead of re-fetching and re-parsing
+   the whole script (a 40 MB, ~77k-event Kaleido-subs track). libass renders
+   at display resolution with a slight CSS blur on its canvas (replaced 2x
+   supersampling). Fonts are dumped once (`-dump_attachment`) and served at
    `/fonts/...` for libass. Plain (SRT/WebVTT) tracks become ASS with a
    single `Default` style that the user's default-subtitle-style setting
-   rewrites (`subtitles.ts`'s `applySubtitleStyle`); real ASS tracks keep
+   rewrites - by default Crunchyroll's own dialogue style (Gandhi Sans bold,
+   bundled in `src/assets/fonts`, taken from a ToonsHub CR WEB-DL's ASS) (`subtitles.ts`'s `applySubtitleStyle`); real ASS tracks keep
    their styling unless the user opts in, and then only dialogue-looking
    styles change. Z/X shift subtitle delay by 0.1s.
 
