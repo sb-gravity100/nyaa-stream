@@ -2187,30 +2187,24 @@ a {
   --ambient: 43, 48, 80;
 }
 
-/* The control bar floats as an inset glass dock rather than a full-width
-   strip; its glow and tint follow the scene. */
+/* The control bar is a full-width strip over a bottom gradient - no
+   panel, border or blur; the gradient's tint follows the scene. */
 .player-view .player-controls {
-  left: 18px;
-  right: 18px;
-  bottom: 16px;
-  padding: 10px 14px 8px;
-  border-radius: 20px;
-  background: linear-gradient(rgba(var(--ambient), 0.16), rgba(var(--ambient), 0.08)), rgba(12, 13, 22, 0.62);
-  backdrop-filter: blur(22px) saturate(1.35);
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  box-shadow:
-    0 18px 50px rgba(0, 0, 0, 0.45),
-    0 0 60px rgba(var(--ambient), 0.28),
-    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  padding: 56px 24px 14px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.45) 45%, rgba(0, 0, 0, 0.78));
   transition:
     opacity 0.22s var(--ease-out),
-    transform 0.4s var(--ease-out),
-    background 1.2s linear,
-    box-shadow 1.2s linear;
+    transform 0.4s var(--ease-out);
 }
 
 .player-view .player-controls-hover-zone {
   height: 120px;
+}
+
+.player-view .player-top-hover-zone {
+  top: 0;
+  bottom: auto;
+  height: 96px;
 }
 
 .player-view .player-topbar {

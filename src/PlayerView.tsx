@@ -601,7 +601,9 @@ export function PlayerView({
          root.getBoundingClientRect().top +
          (box.height + video.videoHeight * scale) / 2;
       setSubtitleInset(
-         Math.max(0, pictureBottom - dock.offsetTop + DOCK_CLEARANCE_PX),
+         // From the seek bar, not the dock's top edge: the dock starts
+         // with a tall transparent gradient that doesn't cover anything.
+         Math.max(0, pictureBottom - (dock.offsetTop + (dock.querySelector<HTMLElement>(".player-seek-wrap")?.offsetTop ?? 0)) + DOCK_CLEARANCE_PX),
       );
    }, [controlsVisible, menu, duration]);
    useAssRenderer({
@@ -1339,7 +1341,7 @@ export function PlayerView({
             />
          )}
 
-         <div class="player-topbar">
+         <div class="player-topbar" onMouseEnter={showControls} onMouseLeave={scheduleHideControls}>
             <button
                class="player-icon-button"
                onClick={onClose}
@@ -1610,6 +1612,12 @@ export function PlayerView({
           pointer-events:none while hidden. */}
          <div
             class="player-controls-hover-zone"
+            onMouseEnter={showControls}
+            onMouseLeave={scheduleHideControls}
+         />
+         {/* Same for the top edge: hovering there reveals the controls too. */}
+         <div
+            class="player-controls-hover-zone player-top-hover-zone"
             onMouseEnter={showControls}
             onMouseLeave={scheduleHideControls}
          />
