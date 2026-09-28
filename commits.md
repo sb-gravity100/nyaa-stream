@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `135e92a` · 2026-09-28 · fix(hls): keep absolute decode times in fMP4 fragments
+- `crates/torrent-engine/src/media.rs`
+
 ### `d4dbef0` · 2026-09-28 · docs: transcode throughput and GPU-resident pipeline decision
 - `PLAN.md`
 
