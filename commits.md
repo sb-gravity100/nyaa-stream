@@ -2,6 +2,11 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `4afa9c8` · 2026-09-28 · feat(player): 60fps seek bar/clock, animated chrome, ambient glass dock
+- `src/App.css`
+- `src/PlayerPlaylist.tsx`
+- `src/PlayerView.tsx`
+
 ### `6e7aa79` · 2026-09-28 · fix(enginefs): bound zero-read retries to ~200ms per piece, log once
 - `vendor/enginefs/src/backend/libtorrent/disk_stream.rs`
 
