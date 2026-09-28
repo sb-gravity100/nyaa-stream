@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `4262654` · 2026-09-28 · fix(engine): restart dead transcodes, reconnect on early EOF, background subs pass
+- `crates/torrent-engine/src/lib.rs`
+
 ### `fbab937` · 2026-09-28 · docs: sync PLAN/PHASES/FILE_INDEX with subtitle, streaming and UI rework
 - `FILE_INDEX.md`
 - `PHASES.md`
