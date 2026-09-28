@@ -145,9 +145,17 @@ const BATCH_PATTERNS: RegExp[] = [/\bseason\s*\d+\b/i, /\bS\d{1,2}\b/, /\bcour\s
 // marker at all is either an explicitly single-season show or (per user
 // input) a long-running, season-less show like One Piece/Naruto/Bleach —
 // both cases are correctly "season 1" for grouping purposes.
+const ORDINAL_SEASON_PATTERN = /\b(\d{1,2})(?:st|nd|rd|th)\s+season\b/i;
+
 export function extractSeasonNumber(title: string): number {
   const seasonWordMatch = title.match(/\bseason\s*(\d+)/i);
   if (seasonWordMatch) return parseInt(seasonWordMatch[1], 10);
+  // "2nd Season" / "3rd Season" (Erai-raws, SubsPlease and others). Without
+  // this they fell through to season 1 and a sequel's episodes were filed
+  // under the first season - verified live: Frieren S1 Episode 5 played
+  // "[Erai-raws] Sousou no Frieren 2nd Season - 05".
+  const ordinalMatch = title.match(ORDINAL_SEASON_PATTERN);
+  if (ordinalMatch) return parseInt(ordinalMatch[1], 10);
   const sMatch = title.match(/\bS(\d{1,2})\b/i);
   if (sMatch) return parseInt(sMatch[1], 10);
   if (FINAL_SEASON_PATTERN.test(title)) return FINAL_SEASON_NUMBER;
