@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `3f3d8b1` · 2026-09-28 · feat(thumbnails): show cached frames as soon as cards are listed
+- `src/App.tsx`
+- `src/torrentThumbnail.ts`
+
 ### `9ec8b40` · 2026-09-28 · docs: thumbnail and Kitsu metadata caching
 - `PLAN.md`
 - `FILE_INDEX.md`
