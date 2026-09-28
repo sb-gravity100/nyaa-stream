@@ -1,3 +1,7 @@
+mod embedded;
+
+pub use embedded::EmbeddedMpv;
+
 use std::process::Stdio;
 
 use serde::{Deserialize, Serialize};
