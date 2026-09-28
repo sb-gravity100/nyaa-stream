@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `d29b0bc` · 2026-09-28 · feat(engine): expose torrent file list and per-file stats/subtitles
+- `crates/torrent-engine/src/lib.rs`
+- `src-tauri/src/lib.rs`
+
 ### `6046daf` · 2026-09-28 · perf(engine): rate-based seek restarts, smaller probe windows, ready ranges
 - `crates/torrent-engine/src/lib.rs`
 
