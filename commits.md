@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `ff42d6e` · 2026-09-28 · fix(thumbnails): defer torrent thumbnail capture while a stream plays
+- `src-tauri/src/lib.rs`
+- `src/torrentThumbnail.ts`
+
 ### `b39741b` · 2026-09-28 · feat(player): report decoder support, show when converting to H.264
 - `src/App.css`
 - `src/PlayerView.tsx`
