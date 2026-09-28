@@ -144,7 +144,14 @@ pub struct SubtitleStream {
 fn subtitle_output(dir: &Path, stream: SubtitleStream, name_suffix: &str) -> Output {
     let output = Output::from(dir.join(format!("sub_{}_{name_suffix}.ass", stream.index)).to_string_lossy().to_string())
         .set_format("ass")
-        .set_format_opt("flush_packets", "1");
+        .set_format_opt("flush_packets", "1")
+        // The ass muxer otherwise writes events strictly in ReadOrder and
+        // holds back everything after a gap until the file ends. Heavily
+        // edited scripts (Kaleido-subs) have ReadOrder out of time order, so
+        // nothing reached disk until the whole episode was processed -
+        // verified: 5 vs 558 events on disk 20s into a real-time run.
+        // libass sorts events itself, so arrival order is fine.
+        .set_format_opt("ignore_readorder", "1");
     if stream.copy {
         output.add_stream_map_with_copy(format!("0:{}", stream.index))
     } else {
