@@ -135,6 +135,16 @@ export interface StreamStats {
   } | null;
 }
 
+/** AniList format MOVIE: one film, not episodes. */
+export function isMovie(anime: { format: string | null }): boolean {
+  return anime.format === "MOVIE";
+}
+
+/** Group key (and watch-progress key) of a movie's single release group.
+ * It's labelled as episode 1, so `#/anime/:id/episode/1`, resume and
+ * Continue watching all resolve to it like any episode. */
+export const MOVIE_KEY = "Movie";
+
 export function displayTitle(title: AnimeTitle): string {
   return title.english ?? title.romaji ?? title.native ?? "Untitled";
 }

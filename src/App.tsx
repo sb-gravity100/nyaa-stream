@@ -26,6 +26,8 @@ import { goBack, navigate, useRoute, type WatchTarget } from "./router";
 import {
   displayTitle,
   formatSeason,
+  isMovie,
+  MOVIE_KEY,
   type AiringEntry,
   type AnimeMedia,
   type KitsuMetadata,
@@ -50,6 +52,27 @@ function currentAndPreviousWeekWindow(): { from: number; to: number } {
     startOfThisWeek.getDate() - 7,
   );
   return { from: Math.floor(startOfLastWeek.getTime() / 1000), to: Math.floor(now.getTime() / 1000) };
+}
+
+// Titles that say they're a film even when they also carry a number.
+const MOVIE_TITLE = /\b(movie|film|gekijou?ban)\b|劇場版/i;
+// Series packs that show up in a movie's nyaa search (same franchise name).
+const SERIES_PACK = /\b(batch|complete|season\s*\d|s\d{1,2})\b|\d{1,3}\s*[-~]\s*\d{1,3}/i;
+
+/** A movie's page: one "Movie" group of every release that is the film -
+ * titles the parser can't number (how movies are named), minus the
+ * franchise's TV episodes and season packs that share its name, e.g.
+ * Jujutsu Kaisen episodes in a "Jujutsu Kaisen 0" search. */
+function movieSources(sources: NyaaResult[]): [string, { label: EpisodeLabel; releases: NyaaResult[] }][] {
+  const releases = sources.filter((source) => {
+    if (MOVIE_TITLE.test(source.title)) return true;
+    const parsed = parseEpisode(source.title);
+    if (parsed.kind === "episode") return false;
+    return !SERIES_PACK.test(source.title);
+  });
+  console.debug("[media] movie releases", { kept: releases.length, dropped: sources.length - releases.length });
+  if (releases.length === 0) return [];
+  return [[MOVIE_KEY, { label: { kind: "episode", season: 1, number: 1 }, releases }]];
 }
 
 function App() {
@@ -221,7 +244,10 @@ function App() {
         setSources(results);
         setSourcesByMedia((current) => ({ ...current, [anime.id]: results }));
         setSourcesLoading(false);
-        await loadDetails(anime.id, results);
+        // A movie's releases all go in one group, so there's no batch
+        // ambiguity worth a view-page scrape per title (which also ran
+        // into nyaa.si's rate limit - every movie title parses "unknown").
+        if (!isMovie(anime)) await loadDetails(anime.id, results);
       } catch (err) {
         console.error("[search_torrents_for_anime] failed", { anime: releaseQuery, err });
         setError(`Couldn't load releases from nyaa.si (${err instanceof Error ? err.message : String(err)}). Check your connection and reopen this page.`);
@@ -414,6 +440,7 @@ function App() {
   const currentEpisodeOffset = selectedAnime ? (episodeOffsetByMedia[selectedAnime.id] ?? 0) : 0;
 
   const groupedSources = useMemo(() => {
+    if (selectedAnime && isMovie(selectedAnime)) return movieSources(sources);
     const groups = new Map<string, { label: EpisodeLabel; releases: NyaaResult[] }>();
     const addToGroup = (label: EpisodeLabel, source: NyaaResult) => {
       const key = episodeLabelText(label);
@@ -502,7 +529,7 @@ function App() {
       }
       return 0;
     });
-  }, [sources, details, currentAnimeSeason, currentEpisodeOffset, selectedAnime?.episodes]);
+  }, [sources, details, currentAnimeSeason, currentEpisodeOffset, selectedAnime?.episodes, selectedAnime?.format]);
 
   const settingsPanel = settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />;
   const settingsButton = (
@@ -606,7 +633,13 @@ function App() {
                     const seasonLabel = formatSeason(anime.season, anime.seasonYear);
                     const facts = [
                       anime.format?.replace("_", " "),
-                      anime.episodes != null ? `${anime.episodes} episodes` : null,
+                      isMovie(anime)
+                        ? anime.duration != null
+                          ? `${anime.duration} min`
+                          : null
+                        : anime.episodes != null
+                          ? `${anime.episodes} episodes`
+                          : null,
                       seasonLabel,
                     ].filter(Boolean);
                     return (
