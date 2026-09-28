@@ -252,9 +252,14 @@ export function MediaPage({
   return (
     <div class="media-page">
       {backdrop && (
-        <div class="media-background-layer" aria-hidden="true">
-          <img class="media-background-image" src={backdrop} alt="" />
-        </div>
+        <>
+          <div class="ambient" aria-hidden="true">
+            <img src={backdrop} alt="" />
+          </div>
+          <div class="media-background-layer" aria-hidden="true">
+            <img class="media-background-image" src={backdrop} alt="" />
+          </div>
+        </>
       )}
 
       <button class="back-button" onClick={onBack}>
@@ -336,7 +341,10 @@ export function MediaPage({
 
         <section class="videos-list-panel" aria-label={movie ? "Movie" : "Episodes"}>
           <header class="videos-list-header">
-            <h2>{movie ? "Movie" : "Episodes"}</h2>
+            <h2>
+              {movie ? "Movie" : "Episodes"}
+              {!sourcesLoading && visibleSources.length > 0 && <span class="home-section-count">{visibleSources.length}</span>}
+            </h2>
             {!sourcesLoading && sourcesCount > 0 && (
               <span>
                 {sourcesCount} releases on nyaa.si
@@ -361,7 +369,7 @@ export function MediaPage({
             {sourcesLoading && Array.from({ length: 6 }, (_, i) => <VideoRowSkeleton key={i} />)}
 
             {!sourcesLoading &&
-              visibleSources.map(([key, group]) => {
+              visibleSources.map(([key, group], index) => {
                 const episodeNumber = group.label.kind === "episode" ? group.label.number : null;
                 // A movie's row shows its key art, not a "1".
                 const thumbnail = movie ? (backdrop ?? undefined) : episodeNumber != null ? thumbnails[episodeNumber] : undefined;
@@ -369,7 +377,12 @@ export function MediaPage({
                 const watched = entry?.completed ?? false;
                 const fraction = entry && !watched ? Math.min(1, entry.position / entry.duration) : 0;
                 return (
-                  <div class={`video-row${watched ? " watched" : ""}${key === continueTarget?.[0] ? " current" : ""}`} key={key}>
+                  <div
+                    class={`video-row${watched ? " watched" : ""}${key === continueTarget?.[0] ? " current" : ""}`}
+                    key={key}
+                    style={{ "--i": index }}
+                  >
+
                     <button class="video-row-main" onClick={() => play(key)} aria-label={`Play ${key}`}>
                       <div class="video-thumbnail">
                         {thumbnail ? <img src={thumbnail} alt="" loading="lazy" /> : <span class="video-thumbnail-number">{episodeNumber ?? "All"}</span>}
