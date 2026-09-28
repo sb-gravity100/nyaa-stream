@@ -1,3 +1,7 @@
+mod anime;
+
+pub use anime::KitsuAnime;
+
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
