@@ -2,6 +2,13 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `84ecda2` · 2026-09-28 · fix(release): spawn ffmpeg/ffprobe/mpv with CREATE_NO_WINDOW
+- `crates/mpv-ipc/src/lib.rs`
+- `crates/torrent-engine/src/lib.rs`
+- `vendor/enginefs/src/engine.rs`
+- `vendor/enginefs/src/hls.rs`
+- `vendor/enginefs/src/lib.rs`
+
 ### `5ae5ea9` · 2026-09-28 · fix(player): retry the native clipboard for ~1s when another app holds it
 - `src-tauri/src/lib.rs`
 
