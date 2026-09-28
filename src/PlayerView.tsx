@@ -1073,12 +1073,18 @@ export function PlayerView({
             case "k":
                togglePause();
                break;
+            // Arrow skips leave the controls as they are - only the centre
+            // flash marks the jump.
             case "arrowleft":
+               e.preventDefault();
+               showFlash("back");
                seekBy(-SEEK_STEP_SECONDS);
-               break;
+               return;
             case "arrowright":
+               e.preventDefault();
+               showFlash("forward");
                seekBy(SEEK_STEP_SECONDS);
-               break;
+               return;
             case "j":
                showFlash("back");
                seekBy(-SEEK_STEP_SECONDS_LARGE);
