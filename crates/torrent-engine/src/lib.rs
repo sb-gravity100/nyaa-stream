@@ -670,6 +670,23 @@ async fn highest_existing_segment_from(dir: &FsPath, min_index: usize) -> Option
     highest
 }
 
+/// The tracks playback runs extract alongside the video: English ones only
+/// (`eng`/`en`, plus `enm`, which fansubbers use for honorifics tracks), or
+/// every track when none is English. Each extracted track is another
+/// output decoding the run's whole span, and multi-sub web releases carry
+/// a dozen; other languages still arrive through the full-file background
+/// pass (`spawn_background_subtitle_pass`), which extracts everything.
+fn playback_subtitle_tracks(tracks: &[SubtitleTrack]) -> Vec<SubtitleTrack> {
+    let english: Vec<SubtitleTrack> =
+        tracks.iter().filter(|t| matches!(t.language.as_deref().map(str::to_ascii_lowercase).as_deref(), Some("eng" | "en" | "enm"))).cloned().collect();
+    if english.is_empty() {
+        tracks.to_vec()
+    } else {
+        tracing::debug!(english = english.len(), total = tracks.len(), "playback run extracts English subtitle tracks only");
+        english
+    }
+}
+
 /// Media-layer subtitle stream list: ASS/SSA sources are stream-copied,
 /// others converted (see `media::SubtitleStream`).
 fn subtitle_streams(tracks: &[SubtitleTrack]) -> Vec<media::SubtitleStream> {
@@ -693,7 +710,7 @@ async fn spawn_hls_transcode(
 ) -> anyhow::Result<media::MediaJob> {
     let input = media::InputSource::Torrent(sources.reader(torrent_id, file_idx, false));
     let dir = dir.to_path_buf();
-    let subtitle_streams = subtitle_streams(subtitles);
+    let subtitle_streams = subtitle_streams(&playback_subtitle_tracks(subtitles));
     let video = match plan {
         VideoPlan::Copy { hvc1 } => media::VideoCodec::Copy { hvc1: *hvc1 },
         VideoPlan::Transcode { encoder, .. } => media::VideoCodec::Transcode(*encoder),
@@ -758,7 +775,7 @@ async fn spawn_subtitle_extraction(
     let input = media::InputSource::Torrent(sources.reader(torrent_id, file_idx, false));
     let start_seconds = start_segment_index as f64 * SEGMENT_DURATION_SECONDS;
     let dir = dir.to_path_buf();
-    let streams = subtitle_streams(tracks);
+    let streams = subtitle_streams(&playback_subtitle_tracks(tracks));
     tracing::debug!(torrent_id = %torrent_id, file_idx, start_segment_index, "starting subtitle catch-up run");
     tokio::task::spawn_blocking(move || media::start_subtitle_run(input, &dir, start_seconds, &streams, &start_segment_index.to_string()))
         .await
