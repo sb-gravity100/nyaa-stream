@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `9f0e360` · 2026-09-28 · perf(mpv-ipc): downscale headless captures, skip audio/sub decode
+- `crates/mpv-ipc/src/lib.rs`
+
 ### `b0ca0b3` · 2026-09-28 · perf(thumbnails): serve by URL, save raw frames, serialize captures
 - `src-tauri/src/lib.rs`
 - `src/torrentThumbnail.ts`
