@@ -16,7 +16,7 @@ import {
 } from "./browserFallback";
 import { addToLibrary, getLibrary, isInLibrary, removeFromLibrary } from "./library";
 import { fetchKitsuMetadata } from "./kitsu";
-import { fetchTorrentThumbnail } from "./torrentThumbnail";
+import { cachedTorrentThumbnail, fetchTorrentThumbnail } from "./torrentThumbnail";
 import { MediaPage } from "./MediaPage";
 import { HomePage } from "./HomePage";
 import { SettingsPanel } from "./SettingsPanel";
@@ -220,6 +220,20 @@ function App() {
     const dataUri = await fetchTorrentThumbnail(entry.media.id, entry.episode, entry.media.title, entry.media.duration);
     setTorrentThumbnails((current) => (key in current ? current : { ...current, [key]: dataUri }));
   }
+
+  // Frames captured in earlier sessions show up immediately: the disk cache
+  // is checked for every card as soon as it's listed, not after the Kitsu
+  // lookup the capture fallback below waits on.
+  useEffect(() => {
+    for (const entry of latestEpisodes) {
+      const key = `${entry.media.id}-${entry.episode}`;
+      if (torrentThumbnails[key]) continue;
+      cachedTorrentThumbnail(entry.media.id, entry.episode).then((dataUri) => {
+        if (dataUri) setTorrentThumbnails((current) => (current[key] ? current : { ...current, [key]: dataUri }));
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [latestEpisodes]);
 
   // Once Kitsu metadata is known for a show, check whether any of its
   // currently-shown latest-episode cards have no thumbnail from either
