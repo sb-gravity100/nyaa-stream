@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `288896f` · 2026-09-28 · fix(player): seek tooltip tracks the cursor without re-rendering
+- `src/PlayerView.tsx`
+- `src/App.css`
+
 ### `0c735c0` · 2026-09-28 · feat(player): arrow-key skips no longer reveal the controls
 - `src/PlayerView.tsx`
 
