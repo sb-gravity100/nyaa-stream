@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `5ae5ea9` · 2026-09-28 · fix(player): retry the native clipboard for ~1s when another app holds it
+- `src-tauri/src/lib.rs`
+
 ### `17b7275` · 2026-09-28 · fix(enginefs): detect unflushed zeros per 16 KiB block, serve valid prefix
 - `vendor/enginefs/VENDORED.md`
 - `vendor/enginefs/src/backend/libtorrent/disk_stream.rs`
