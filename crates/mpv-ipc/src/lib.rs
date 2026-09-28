@@ -28,14 +28,15 @@ struct MpvResponse {
 }
 
 /// Width headless captures are scaled to - matches the player's last-frame
-/// capture (`LAST_FRAME_WIDTH` in PlayerView.tsx), both feeding 16:9 cards.
+/// capture (`LAST_FRAME_WIDTH` in PlayerView.tsx / src-tauri's
+/// `player::THUMBNAIL_WIDTH`), all feeding 16:9 cards.
 const THUMBNAIL_WIDTH: u32 = 640;
 
 /// Spawns a headless `mpv` pointed at a URL (e.g. a torrent-engine stream
 /// URL) with a JSON IPC socket enabled, purely to pull a single frame out of
 /// a torrent's stream as a thumbnail - see `spawn_headless`/
-/// `screenshot_to_file`. Real playback is an HTML5 `<video>` element in the
-/// frontend (see PLAN.md's Known gaps for why mpv isn't the player itself).
+/// `screenshot_to_file`. Real playback is `EmbeddedMpv` (embedded.rs), a
+/// separate instance drawing into the app window.
 pub struct MpvPlayer {
     child: tokio::process::Child,
     #[cfg(windows)]
