@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `5478cab` · 2026-09-29 · style: glass settings drawer, page transitions and softer empty states
+- `src/App.css`
+
 ### `1b1c3d3` · 2026-09-29 · feat(media): glass detail page with drifting key art and staggered reveals
 - `src/App.css`
 - `src/HomePage.tsx`
