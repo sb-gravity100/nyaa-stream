@@ -2,6 +2,14 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `41c4843` · 2026-09-28 · feat(engine): run FFmpeg in-process (ez-ffmpeg/ffmpeg-next) instead of the CLI
+- `.cargo/config.toml`
+- `crates/torrent-engine/Cargo.toml`
+- `crates/torrent-engine/build.rs`
+- `crates/torrent-engine/src/lib.rs`
+- `crates/torrent-engine/src/media.rs`
+- `vcpkg.json`
+
 ### `84ecda2` · 2026-09-28 · fix(release): spawn ffmpeg/ffprobe/mpv with CREATE_NO_WINDOW
 - `crates/mpv-ipc/src/lib.rs`
 - `crates/torrent-engine/src/lib.rs`
