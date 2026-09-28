@@ -954,6 +954,7 @@ pub fn run() {
             set_decoder_support,
             copy_frame_to_clipboard,
             stop_playback,
+            player::mpv_available,
             player::mpv_start,
             player::mpv_command,
             player::mpv_stop,
