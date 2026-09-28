@@ -463,6 +463,15 @@ nyaa_stream/
    folder - this is app-owned scratch data cleaned up via `stop_playback`,
    not something the user is meant to keep or browse to directly.
 
+   **Kitsu fallback for AniList.** `search_anime` and `get_anime_details`
+   divert to Kitsu (`kitsu_client::search_anime`/`anime_by_anilist_id`) when
+   AniList answers 429 or 5xx or can't be reached, and skip AniList for 60s
+   after that (`metadata_fallback::AniListCooldown`) rather than extending a
+   rate limit. Kitsu results carry the AniList id Kitsu maps them to, so
+   routes, library and progress stay keyed by AniList id; entries Kitsu
+   can't map are dropped. Other AniList calls (airing feed, relations
+   offset) still just fail soft.
+
 ## Known gaps / not yet implemented
 
 - (HLS fallback player only - mpv reads the file's real duration.) The
