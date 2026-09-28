@@ -611,6 +611,48 @@ fn set_decoder_support(state: State<'_, Arc<AppState>>, support: DecoderSupport)
     state.torrent_engine.set_decoder_support(support);
 }
 
+/// Puts a video frame on the system clipboard. The body is raw RGBA pixels
+/// (sent as binary IPC - a 1080p frame is ~8MB, too big for JSON), with
+/// the dimensions in `x-width`/`x-height` headers. Native rather than the
+/// WebView's `navigator.clipboard.write`, which in WebView2 raises a
+/// browser-style "See text and images copied to the clipboard" permission
+/// prompt (verified live).
+#[tauri::command]
+async fn copy_frame_to_clipboard(request: tauri::ipc::Request<'_>) -> Result<(), String> {
+    let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
+        return Err("expected a raw RGBA body".to_string());
+    };
+    let header = |name: &str| -> Result<usize, String> {
+        request
+            .headers()
+            .get(name)
+            .and_then(|value| value.to_str().ok())
+            .and_then(|value| value.parse::<usize>().ok())
+            .ok_or_else(|| format!("missing or invalid {name} header"))
+    };
+    let (width, height) = (header("x-width")?, header("x-height")?);
+    if bytes.len() != width * height * 4 {
+        tracing::warn!(width, height, len = bytes.len(), "copy_frame_to_clipboard size mismatch");
+        return Err(format!("expected {} bytes for {width}x{height}, got {}", width * height * 4, bytes.len()));
+    }
+    tracing::debug!(width, height, "copy_frame_to_clipboard invoked");
+    let pixels = bytes.clone();
+    tokio::task::spawn_blocking(move || {
+        let mut clipboard = arboard::Clipboard::new().map_err(|err| err.to_string())?;
+        clipboard
+            .set_image(arboard::ImageData { width, height, bytes: std::borrow::Cow::Owned(pixels) })
+            .map_err(|err| err.to_string())
+    })
+    .await
+    .map_err(|err| err.to_string())?
+    .map_err(|err| {
+        tracing::error!(%err, "copy_frame_to_clipboard failed");
+        err
+    })?;
+    tracing::info!(width, height, "frame copied to clipboard");
+    Ok(())
+}
+
 /// Removes the active torrent (stop seeding, drop partial files) - called
 /// when the user closes the player or navigates away from the media page.
 #[tauri::command]
@@ -682,6 +724,7 @@ pub fn run() {
             get_stream_stats,
             get_subtitle_tracks,
             set_decoder_support,
+            copy_frame_to_clipboard,
             stop_playback
         ])
         .run(tauri::generate_context!())

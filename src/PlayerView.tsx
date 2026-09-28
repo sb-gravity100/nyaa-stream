@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import Hls from "hls.js";
+import { invoke } from "@tauri-apps/api/core";
 import type { AnimeMedia, NyaaResult, PlayFile, StreamStats, SubtitleTrack } from "./types";
 import { displayTitle } from "./types";
 import { getStreamStats, getSubtitleTracks, playMagnet, reportDecoderSupport, stopPlayback } from "./playback";
@@ -722,10 +723,13 @@ export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNe
       }
     }
     try {
-      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
-      if (!blob) throw new Error("frame encode failed");
-      await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
-      console.info("[player] frame copied", { width: canvas.width, height: canvas.height, withSubtitles, bytes: blob.size });
+      // Raw RGBA over binary IPC to the native clipboard (see
+      // copy_frame_to_clipboard for why not navigator.clipboard).
+      const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      await invoke("copy_frame_to_clipboard", new Uint8Array(pixels.buffer), {
+        headers: { "x-width": String(canvas.width), "x-height": String(canvas.height) },
+      });
+      console.info("[player] frame copied", { width: canvas.width, height: canvas.height, withSubtitles });
       showToast("Frame copied");
     } catch (err) {
       console.error("[player] frame copy failed", { err: String(err) });
