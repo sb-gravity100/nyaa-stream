@@ -2,6 +2,15 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `1ab76ba` · 2026-09-28 · docs: fMP4 HLS segments and aborted-run tail cleanup
+- `PLAN.md`
+- `FILE_INDEX.md`
+
+### `2f8d6a1` · 2026-09-28 · feat(hls): serve fMP4 segments instead of MPEG-TS
+- `crates/torrent-engine/src/lib.rs`
+- `crates/torrent-engine/src/media.rs`
+- `src/PlayerView.tsx`
+
 ### `519db39` · 2026-09-28 · fix(hls): drop the truncated segment an aborted run leaves behind
 - `crates/torrent-engine/src/lib.rs`
 
