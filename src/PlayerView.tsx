@@ -710,10 +710,14 @@ export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNe
         const videoBox = video.getBoundingClientRect();
         const subBox = subtitleCanvas.getBoundingClientRect();
         const scale = canvas.width / videoBox.width;
+        // Undo the lift applied while the controls are showing (App.css
+        // `controls-shown canvas.JASSUB`) so the copy has subtitles where
+        // they belong on the frame.
+        const lift = new DOMMatrixReadOnly(getComputedStyle(subtitleCanvas).transform).f;
         ctx.drawImage(
           subtitleCanvas,
           (subBox.left - videoBox.left) * scale,
-          (subBox.top - videoBox.top) * scale,
+          (subBox.top - lift - videoBox.top) * scale,
           subBox.width * scale,
           subBox.height * scale,
         );

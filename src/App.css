@@ -1153,6 +1153,17 @@ a {
    UI layers. */
 .player-view canvas.JASSUB {
   z-index: 0;
+  transition: transform 0.4s var(--ease-out);
+  will-change: transform;
+}
+
+/* Subtitles slide up clear of the control dock while it's showing and
+   settle back when it hides - the dock covers the bottom ~110px, exactly
+   where dialogue lines sit. The whole libass layer moves (it's one canvas),
+   so top-positioned signs shift too, only for as long as the controls are
+   up. JASSUB only sets size/position inline, so the transform is ours. */
+.player-view.controls-shown canvas.JASSUB {
+  transform: translateY(calc(-1 * var(--sub-lift, 96px)));
 }
 
 .player-topbar {
