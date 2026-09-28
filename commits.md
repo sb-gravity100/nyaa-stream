@@ -2,6 +2,40 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `742ef33` · 2026-09-28 · docs: subtitle event log, ignore_readorder, English-first, CR style
+- `FILE_INDEX.md`
+- `PHASES.md`
+- `PLAN.md`
+
+### `31a7d12` · 2026-09-28 · fix(subtitles): write ASS events as they arrive (ignore_readorder)
+- `crates/torrent-engine/src/media.rs`
+
+### `257b296` · 2026-09-28 · feat(subtitles): Crunchyroll style as the default for unstyled tracks
+- `src/App.css`
+- `src/SettingsPanel.tsx`
+- `src/assRenderer.ts`
+- `src/assets/fonts/GandhiSans-Bold.otf`
+- `src/assets/fonts/GandhiSans-BoldItalic.otf`
+- `src/settings.ts`
+- `src/subtitles.ts`
+
+### `cee8223` · 2026-09-28 · perf(subtitles): playback runs extract English tracks only
+- `crates/torrent-engine/src/lib.rs`
+
+### `b14380e` · 2026-09-28 · feat(subtitles): soft CSS blur instead of 2x supersampling
+- `src/App.css`
+- `src/PlayerView.tsx`
+- `src/SettingsPanel.tsx`
+- `src/assRenderer.ts`
+- `src/settings.ts`
+
+### `ef8151e` · 2026-09-28 · fix(subtitles): load a track once, then append new events
+- `src/assRenderer.ts`
+
+### `0317486` · 2026-09-28 · feat(subtitles): append-only event log with delta polling
+- `crates/torrent-engine/src/lib.rs`
+- `crates/torrent-engine/src/subtitle_log.rs`
+
 ### `efca10f` · 2026-09-28 · fix(enginefs): finish an in-flight file read before seeking
 - `vendor/enginefs/src/backend/libtorrent/disk_stream.rs`
 - `vendor/enginefs/VENDORED.md`
