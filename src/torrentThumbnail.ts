@@ -28,6 +28,24 @@ function pickCandidate(results: NyaaResult[], episode: number): NyaaResult | nul
   return matches.reduce((best, r) => (r.seeders > best.seeders ? r : best));
 }
 
+/** A previously captured frame from the backend's disk cache, or null -
+ * never searches nyaa or captures, so it's cheap enough to ask for every
+ * card as soon as it's listed rather than after the Kitsu/AniList
+ * fallback chain has run. A hit also fills this module's cache. */
+export async function cachedTorrentThumbnail(anilistId: number, episode: number): Promise<string | null> {
+  if (!isTauriAvailable()) return null;
+  const key = cacheKey(anilistId, episode);
+  if (cache.get(key)) return cache.get(key)!;
+  try {
+    const dataUri = await invoke<string | null>("cached_torrent_thumbnail", { cacheKey: key });
+    if (dataUri) cache.set(key, dataUri);
+    return dataUri;
+  } catch (err) {
+    console.debug("[cached_torrent_thumbnail] failed", { anilistId, episode, err });
+    return null;
+  }
+}
+
 // Last-resort thumbnail source — see the doc comment on the Rust
 // `capture_torrent_thumbnail` command (src-tauri/src/lib.rs) for the full
 // pipeline (add torrent, let mpv seek/play headlessly to roughly the
