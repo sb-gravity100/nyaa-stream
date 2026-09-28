@@ -2,6 +2,14 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `bd893da` · 2026-09-28 · feat(subtitles): lift only dock-covered lines, 2x supersampled rendering
+- `src/App.css`
+- `src/PlayerView.tsx`
+- `src/SettingsPanel.tsx`
+- `src/assRenderer.ts`
+- `src/settings.ts`
+- `src/subtitles.ts`
+
 ### `628fc53` · 2026-09-28 · feat(player): lift subtitles above the control dock while it's shown
 - `src/App.css`
 - `src/PlayerView.tsx`
