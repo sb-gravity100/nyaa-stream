@@ -68,7 +68,8 @@ const codecSupportCache = new Map<RiskyCodec, boolean>();
 
 /** Whether this machine's WebView can decode `codec` through MSE (HEVC
  * needs the OS extension/hardware on Windows - verified live: an HEVC
- * release failed with hls.js bufferAddCodecError). */
+ * release failed with hls.js bufferAddCodecError). Releases that fail
+ * this are transcoded by the streaming server, not rejected. */
 export function codecPlayable(codec: RiskyCodec | null): boolean {
   if (codec == null) return true;
   let supported = codecSupportCache.get(codec);
@@ -91,8 +92,10 @@ const MIN_PREFERRED_SEEDERS = 3;
 
 function score(release: NyaaResult, prefs: ReleasePreferences): number {
   let value = Math.log10(release.seeders + 1) * 10;
-  // Undecodable here - never auto-pick it over anything playable.
-  if (!codecPlayable(releaseCodec(release))) value -= 1000;
+  // Not natively decodable here: the streaming server transcodes it to
+  // H.264, which works but costs GPU/CPU and startup time - so a native
+  // release of similar health wins, without burying the others.
+  if (!codecPlayable(releaseCodec(release))) value -= 25;
   if (release.seeders < MIN_PREFERRED_SEEDERS) return value;
   const group = releaseGroup(release);
   if (prefs.preferredGroup && group && group.toLowerCase() === prefs.preferredGroup.toLowerCase()) value += 100;

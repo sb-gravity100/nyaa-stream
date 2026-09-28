@@ -2039,6 +2039,11 @@ a {
   color: var(--accent-ink);
 }
 
-.codec-warning {
-  color: var(--danger);
+.codec-note {
+  color: var(--muted);
+}
+
+.player-chip-accent {
+  background: rgba(240, 122, 166, 0.22);
+  color: var(--accent-strong);
 }
