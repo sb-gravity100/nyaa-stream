@@ -663,6 +663,52 @@ impl LibtorrentDiskFileStream {
     }
 }
 
+/// (nyaa-stream) Offset within `chunk` of the first all-zero span that
+/// starts at the chunk start or on a 16 KiB block boundary (libtorrent's
+/// write granularity) and runs to the next boundary or the chunk end -
+/// i.e. a block that plausibly isn't flushed yet. Spans shorter than
+/// `min_len` are ignored (ordinary zero bytes in real data).
+fn first_zero_block(chunk: &[u8], global_start: u64, min_len: usize) -> Option<usize> {
+    const BLOCK: u64 = 16 * 1024;
+    let mut idx = 0usize;
+    while idx < chunk.len() {
+        let global = global_start + idx as u64;
+        let next_boundary = (global / BLOCK + 1) * BLOCK;
+        let end = ((next_boundary - global_start) as usize).min(chunk.len());
+        let span = &chunk[idx..end];
+        if span.len() >= min_len && span.iter().all(|&byte| byte == 0) {
+            return Some(idx);
+        }
+        idx = end;
+    }
+    None
+}
+
+#[cfg(test)]
+mod zero_block_tests {
+    use super::first_zero_block;
+
+    #[test]
+    fn finds_unflushed_block_after_valid_bytes() {
+        let mut chunk = vec![7u8; 40 * 1024];
+        // Block 1 (16..32 KiB) unflushed.
+        chunk[16 * 1024..32 * 1024].fill(0);
+        assert_eq!(first_zero_block(&chunk, 0, 64), Some(16 * 1024));
+    }
+
+    #[test]
+    fn respects_global_alignment_and_ignores_short_runs() {
+        let mut chunk = vec![1u8; 20 * 1024];
+        chunk[100..140].fill(0); // short run inside real data
+        assert_eq!(first_zero_block(&chunk, 0, 64), None);
+        // Chunk starts 4 KiB into a block; the first boundary is 12 KiB in.
+        let mut chunk = vec![1u8; 20 * 1024];
+        chunk[12 * 1024..].fill(0);
+        assert_eq!(first_zero_block(&chunk, 4 * 1024, 64), Some(12 * 1024));
+        assert_eq!(first_zero_block(&vec![0u8; 1024], 0, 64), Some(0));
+    }
+}
+
 impl tokio::io::AsyncRead for LibtorrentDiskFileStream {
     fn poll_read(
         mut self: std::pin::Pin<&mut Self>,
@@ -804,7 +850,20 @@ impl tokio::io::AsyncRead for LibtorrentDiskFileStream {
         // in video files are rare, so a long wait costs almost nothing.
         const ZERO_WAIT_LIMIT: Duration = Duration::from_secs(8);
         let all_zero = self.scratch[..read].iter().all(|&byte| byte == 0);
-        let suspicious_zeros = read >= ZERO_CHUNK_MIN_BYTES && all_zero;
+        // libtorrent flushes in 16 KiB blocks, so a read can be valid bytes
+        // followed by a block that isn't on disk yet - checking only
+        // whole-chunk zeros let exactly those mixed chunks through (16
+        // corrupt-demux hits in one verified session). Find the first
+        // block-aligned all-zero span instead; bytes before it are served,
+        // the span itself is waited on.
+        let accepted_piece = matches!(self.zero_wait, Some((waiting, _, true)) if waiting == piece);
+        let zero_at = if accepted_piece {
+            None
+        } else {
+            first_zero_block(&self.scratch[..read], self.file_offset + self.current_pos, ZERO_CHUNK_MIN_BYTES)
+        };
+        let suspicious_zeros = zero_at == Some(0);
+        let valid_prefix = zero_at.filter(|&at| at > 0);
         let first_read_zeros = self.current_pos == 0 && !self.first_read_logged && all_zero;
         if suspicious_zeros || first_read_zeros {
             let now = Instant::now();
@@ -858,6 +917,10 @@ impl tokio::io::AsyncRead for LibtorrentDiskFileStream {
             return Poll::Pending;
         }
 
+        // Mixed chunk: hand out only the bytes before the unflushed block.
+        // file_cursor already moved past the whole read, so the next poll
+        // seeks back and re-reads from the block.
+        let read = valid_prefix.unwrap_or(read);
         buf.put_slice(&self.scratch[..read]);
         self.current_pos = self.current_pos.saturating_add(read as u64);
         self.consecutive_waits = 0;

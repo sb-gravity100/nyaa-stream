@@ -17,3 +17,7 @@ Copied from https://github.com/stremio-native/stream-server at rev
   waits up to 8s per piece for real bytes before accepting zeros as
   genuine padding; a shorter 200-500ms bound was verified to accept real
   unflushed bytes as zeros and produce pixelated frames.
+  Detection works per 16 KiB block (libtorrent's write granularity), not
+  per read: a read that is valid bytes followed by an unflushed block is
+  served only up to that block (`first_zero_block`), since whole-chunk
+  checks let exactly those mixed reads through.
