@@ -2,6 +2,39 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `20492dc` · 2026-09-28 · build: vendor enginefs (upstream f585ab6, MIT) via [patch]
+- `Cargo.toml`
+- `vendor/enginefs/Cargo.toml`
+- `vendor/enginefs/LICENSE`
+- `vendor/enginefs/VENDORED.md`
+- `vendor/enginefs/build.rs`
+- `vendor/enginefs/src/backend/librqbit.rs`
+- `vendor/enginefs/src/backend/libtorrent/alerts.rs`
+- `vendor/enginefs/src/backend/libtorrent/constants.rs`
+- `vendor/enginefs/src/backend/libtorrent/disk_stream.rs`
+- `vendor/enginefs/src/backend/libtorrent/handle.rs`
+- `vendor/enginefs/src/backend/libtorrent/helpers.rs`
+- `vendor/enginefs/src/backend/libtorrent/mod.rs`
+- `vendor/enginefs/src/backend/libtorrent/playback.rs`
+- `vendor/enginefs/src/backend/libtorrent/stream.rs`
+- `vendor/enginefs/src/backend/metadata.rs`
+- `vendor/enginefs/src/backend/mod.rs`
+- `vendor/enginefs/src/backend/priorities.rs`
+- `vendor/enginefs/src/cache.rs`
+- `vendor/enginefs/src/disk_cache.rs`
+- `vendor/enginefs/src/engine.rs`
+- `vendor/enginefs/src/files.rs`
+- `vendor/enginefs/src/hls.rs`
+- `vendor/enginefs/src/hwaccel.rs`
+- `vendor/enginefs/src/lib.rs`
+- `vendor/enginefs/src/metadata_cache.rs`
+- `vendor/enginefs/src/metadata_pins.rs`
+- `vendor/enginefs/src/piece_cache.rs`
+- `vendor/enginefs/src/piece_waiter.rs`
+- `vendor/enginefs/src/subtitles.rs`
+- `vendor/enginefs/src/tracker_prober.rs`
+- `vendor/enginefs/src/trackers.rs`
+
 ### `2a9c864` · 2026-09-28 · docs: sync planning docs with live-debug fixes and player playlist
 - `FILE_INDEX.md`
 - `PHASES.md`
