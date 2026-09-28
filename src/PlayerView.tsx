@@ -280,8 +280,6 @@ export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNe
   useEffect(() => {
     const video = videoEl;
     if (!video || !selectedFile) return;
-    const hlsSrc =
-      estimatedDurationSeconds != null ? `${selectedFile.hlsUrl}?duration=${estimatedDurationSeconds}` : selectedFile.hlsUrl;
     // Re-attaching the same file (only the duration estimate changed -
     // e.g. anime details arriving after playback began) continues from the
     // current position. It used to restart from 0, which silently undid a
@@ -289,6 +287,13 @@ export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNe
     const reattach = reattachRef.current?.url === selectedFile.hlsUrl ? reattachRef.current : null;
     reattachRef.current = null;
     const startAt = reattach ? reattach.time : resumeAtRef.current;
+    // `start` makes the backend begin its run for the fMP4 init segment at
+    // the resume point rather than at 0 (see hls_playlist_handler).
+    const params = new URLSearchParams();
+    if (estimatedDurationSeconds != null) params.set("duration", String(estimatedDurationSeconds));
+    if (startAt != null && startAt > 0) params.set("start", String(startAt));
+    const query = params.toString();
+    const hlsSrc = query ? `${selectedFile.hlsUrl}?${query}` : selectedFile.hlsUrl;
     console.info("[player] attaching hls", { file: selectedFile.name, startAt, reattach: reattach != null });
 
     if (!Hls.isSupported()) {
@@ -326,11 +331,11 @@ export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNe
     // by a constant (verified: 2s on a 5s-GOP test file).
     hls.on(Hls.Events.INIT_PTS_FOUND, (_event, data) => {
       if (data.id !== "main") return;
-      // initPTS is a raw 33-bit MPEG-TS timestamp. With -copyts and no mux
-      // delay, a stream whose first DTS sits just below zero (B-frames)
-      // wraps to ~2^33 - verified live: an offset of 95443s made progress
-      // save as "watched" and libass draw subtitles 26 hours ahead (so
-      // none showed). Unwrap anything past the halfway point.
+      // Segments were MPEG-TS until the fMP4 switch, where initPTS was a
+      // raw 33-bit timestamp: a first DTS just below zero (B-frames) wrapped
+      // to ~2^33 - verified live: an offset of 95443s made progress save as
+      // "watched" and libass draw subtitles 26 hours ahead. fMP4 timestamps
+      // don't wrap; the unwrap below is kept as a harmless guard.
       let offset = data.initPTS / data.timescale;
       const wrap = 2 ** 33 / 90_000;
       if (offset > wrap / 2) offset -= wrap;

@@ -261,9 +261,19 @@ pub fn detect_h264_encoder() -> H264Encoder {
 
 // ---------------------------------------------------------------- jobs
 
+/// Segment file extension and init segment name of every HLS run. fMP4
+/// rather than MPEG-TS: hls.js appends fMP4 to MSE as-is instead of
+/// transmuxing every TS segment in JavaScript, and it's the container MSE
+/// decodes HEVC from.
+pub const SEGMENT_EXTENSION: &str = "m4s";
+pub const INIT_SEGMENT: &str = "init.mp4";
+
 /// Video handling for one HLS run.
 pub enum VideoCodec {
-    Copy,
+    /// `hvc1`: the source is HEVC - tag it `hvc1` (parameter sets in the
+    /// sample description) rather than the muxer's default `hev1`, which
+    /// MSE implementations reject.
+    Copy { hvc1: bool },
     Transcode(H264Encoder),
 }
 
@@ -276,6 +286,15 @@ pub struct HlsRun<'a> {
     pub subtitle_streams: &'a [SubtitleStream],
 }
 
+/// A path for the HLS muxer, with forward slashes: it places the fMP4 init
+/// segment next to the playlist by cutting the playlist path at its last
+/// `/` only, so a Windows path wrote `init.mp4` into the working directory
+/// (or a parent of the job dir, with mixed separators - verified by the
+/// smoke test below).
+fn muxer_path(path: &Path) -> String {
+    path.to_string_lossy().replace('\\', "/")
+}
+
 /// Longest run the forced-keyframe list covers (in-process
 /// `force_key_frames` takes explicit times, not the CLI's `expr:` form).
 const MAX_RUN_SECONDS: f64 = 4.0 * 3600.0;
@@ -284,9 +303,10 @@ const MAX_RUN_SECONDS: f64 = 4.0 * 3600.0;
 /// H.264 with IDR keyframes exactly every `segment_seconds` so segments sit
 /// on the playlist grid), audio to AAC, plus one ASS output per subtitle
 /// stream. `-copyts` keeps source timestamps so every run - sequential or
-/// seek-restarted - shares one timeline; `max_delay 0` drops MPEG-TS's
-/// default 1.4s offset. Blocking (opens the input) - call from
-/// `spawn_blocking`.
+/// seek-restarted - shares one timeline. Segments are fMP4
+/// (`<index>.m4s`) behind one `init.mp4` per run - identical across runs of
+/// the same file and plan, so the one hls.js loaded stays valid after a seek
+/// restart. Blocking (opens the input) - call from `spawn_blocking`.
 pub fn start_hls_run(run: &HlsRun<'_>) -> anyhow::Result<MediaJob> {
     init();
     let start_seconds = run.start_segment_index as f64 * run.segment_seconds;
@@ -299,17 +319,21 @@ pub fn start_hls_run(run: &HlsRun<'_>) -> anyhow::Result<MediaJob> {
         input = input.set_hwaccel("auto");
     }
 
-    let mut hls = Output::from(run.dir.join("ffmpeg_internal.m3u8").to_string_lossy().to_string())
+    let mut hls = Output::from(muxer_path(&run.dir.join("ffmpeg_internal.m3u8")))
         .set_format("hls")
         .set_format_opt("hls_time", run.segment_seconds.to_string())
         .set_format_opt("hls_list_size", "0")
         .set_format_opt("hls_flags", "temp_file+independent_segments")
+        .set_format_opt("hls_segment_type", "fmp4")
+        .set_format_opt("hls_fmp4_init_filename", INIT_SEGMENT)
         .set_format_opt("start_number", run.start_segment_index.to_string())
-        .set_format_opt("hls_segment_filename", run.dir.join("%d.ts").to_string_lossy().to_string())
-        .set_format_opt("max_delay", "0");
+        .set_format_opt("hls_segment_filename", muxer_path(&run.dir.join(format!("%d.{SEGMENT_EXTENSION}"))));
     match run.video {
-        VideoCodec::Copy => {
+        VideoCodec::Copy { hvc1 } => {
             hls = hls.add_stream_map_with_copy("0:v:0");
+            if hvc1 {
+                hls = hls.set_video_codec_tag("hvc1");
+            }
         }
         VideoCodec::Transcode(encoder) => {
             let keyframes: Vec<String> = (0..)
@@ -328,7 +352,7 @@ pub fn start_hls_run(run: &HlsRun<'_>) -> anyhow::Result<MediaJob> {
         }
     }
     // Audio is always AAC: several codecs real releases use (E-AC-3...)
-    // aren't reliably muxable into MPEG-TS/playable by browsers.
+    // aren't reliably playable by browsers through MSE.
     let hls = hls.add_stream_map("0:a:0").set_audio_codec("aac");
 
     let mut builder = FfmpegContext::builder().copyts().input(input).output(hls);
@@ -352,4 +376,42 @@ pub fn start_subtitle_run(input_url: &str, dir: &Path, start_seconds: f64, subti
     }
     let context = builder.build().map_err(|err| anyhow::anyhow!("subtitle run: {err}"))?;
     start(context, "subtitle run")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Manual smoke test of a real HLS run against a local file:
+    /// `NYAA_HLS_TEST_INPUT=<file> [NYAA_HLS_TEST_HVC1=1] cargo test -p
+    /// torrent-engine hls_run_smoke -- --ignored --nocapture`. Writes to
+    /// `NYAA_HLS_TEST_OUT` (default: a temp dir) for inspection with ffprobe.
+    #[test]
+    #[ignore]
+    fn hls_run_smoke() {
+        let input = std::env::var("NYAA_HLS_TEST_INPUT").expect("NYAA_HLS_TEST_INPUT");
+        let hvc1 = std::env::var("NYAA_HLS_TEST_HVC1").is_ok();
+        let start_segment_index: usize = std::env::var("NYAA_HLS_TEST_START").ok().and_then(|s| s.parse().ok()).unwrap_or(0);
+        let dir = std::env::var("NYAA_HLS_TEST_OUT").map(std::path::PathBuf::from).unwrap_or_else(|_| std::env::temp_dir().join("nyaa_hls_smoke"));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let mut job = start_hls_run(&HlsRun {
+            input_url: &input,
+            dir: &dir,
+            start_segment_index,
+            segment_seconds: 6.0,
+            video: VideoCodec::Copy { hvc1 },
+            subtitle_streams: &[],
+        })
+        .unwrap();
+        let third = dir.join(format!("{}.{SEGMENT_EXTENSION}", start_segment_index + 2));
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(60);
+        while !third.exists() && !job.is_ended() && std::time::Instant::now() < deadline {
+            std::thread::sleep(std::time::Duration::from_millis(100));
+        }
+        job.abort();
+        assert!(dir.join(INIT_SEGMENT).exists(), "no init segment");
+        assert!(third.exists(), "no third segment");
+        println!("output in {}", dir.display());
+    }
 }
