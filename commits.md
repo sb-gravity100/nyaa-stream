@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `93e952d` · 2026-09-28 · fix(engine): don't cache a copy fallback when the probe is slow
+- `crates/torrent-engine/src/lib.rs`
+
 ### `41c4843` · 2026-09-28 · feat(engine): run FFmpeg in-process (ez-ffmpeg/ffmpeg-next) instead of the CLI
 - `.cargo/config.toml`
 - `crates/torrent-engine/Cargo.toml`
