@@ -349,7 +349,7 @@ impl HlsJobs {
             HlsFile::Init { start_hint } => (self.job_dir(torrent_id, file_idx).join(media::INIT_SEGMENT), start_hint),
         };
         let wants_init = matches!(wanted, HlsFile::Init { .. });
-        if tokio::fs::try_exists(&path).await.unwrap_or(false) {
+        if hls_file_ready(&path, wanted).await {
             return Ok(path);
         }
 
@@ -443,7 +443,7 @@ impl HlsJobs {
         let wait_started = tokio::time::Instant::now();
         let deadline = wait_started + SEGMENT_WAIT_TIMEOUT;
         while tokio::time::Instant::now() < deadline {
-            if tokio::fs::try_exists(&path).await.unwrap_or(false) {
+            if hls_file_ready(&path, wanted).await {
                 // Diagnostic for "seeking is slow" reports: distinguishes a
                 // slow torrent download (this job just started, most of
                 // the wait was here) from a slow restart/ffmpeg-startup
@@ -616,6 +616,33 @@ fn job_will_reach_soon(job: &HlsJob, highest_existing: Option<usize>, target: us
     let soon = expected_wait <= RESTART_WAIT_BUDGET.as_secs_f64();
     tracing::debug!(target, highest, rate_segments_per_sec = rate, expected_wait, soon, "hls restart decision");
     soon
+}
+
+/// Whether `wanted` is on disk and complete. Segments are renamed into
+/// place only once written (`temp_file`), so existing means complete. The
+/// init segment isn't: FFmpeg creates `init.mp4` in place and fills it on
+/// close, and every new run rewrites it - serving it on existence alone
+/// handed hls.js an empty/partial init it then cached, failing every
+/// fragment with fragParsingError (verified live).
+async fn hls_file_ready(path: &FsPath, wanted: HlsFile) -> bool {
+    match wanted {
+        HlsFile::Segment(_) => tokio::fs::try_exists(path).await.unwrap_or(false),
+        HlsFile::Init { .. } => tokio::fs::read(path).await.is_ok_and(|bytes| init_segment_complete(&bytes)),
+    }
+}
+
+/// Top-level MP4 boxes cover `bytes` exactly and include a `moov`.
+fn init_segment_complete(bytes: &[u8]) -> bool {
+    let (mut offset, mut has_moov) = (0usize, false);
+    while offset + 8 <= bytes.len() {
+        let size = u32::from_be_bytes([bytes[offset], bytes[offset + 1], bytes[offset + 2], bytes[offset + 3]]) as usize;
+        if size < 8 {
+            return false;
+        }
+        has_moov |= &bytes[offset + 4..offset + 8] == b"moov";
+        offset += size;
+    }
+    has_moov && offset == bytes.len()
 }
 
 /// Segment index of a produced segment file name (`<index>.m4s`).
@@ -1458,6 +1485,12 @@ async fn serve_hls_file(
         tracing::error!(torrent_id = %torrent_id, file_idx, ?wanted, %err, "failed to read generated hls file");
         axum::http::StatusCode::INTERNAL_SERVER_ERROR
     })?;
+    // A new run can start rewriting init.mp4 between the readiness check
+    // and this read; hls.js retries a 503.
+    if matches!(wanted, HlsFile::Init { .. }) && !init_segment_complete(&bytes) {
+        tracing::warn!(torrent_id = %torrent_id, file_idx, bytes = bytes.len(), "hls init segment changed while serving it");
+        return Err(axum::http::StatusCode::SERVICE_UNAVAILABLE);
+    }
     Ok(([(axum::http::header::CONTENT_TYPE, "video/mp4")], bytes))
 }
 

@@ -248,13 +248,14 @@ impl TorrentReader {
         }
         let target_u = target as u64;
         if target_u != self.pos {
-            if let Some(mut stream) = self.stream.take() {
-                match self.block_on(async { stream.seek(SeekFrom::Start(target_u)).await }) {
-                    None => return ffi::AVERROR_EXIT as i64,
-                    Some(Ok(_)) => self.stream = Some(stream),
-                    // Reopened at the new position by the next read.
-                    Some(Err(err)) => tracing::debug!(%err, target, "direct torrent stream seek failed, will reopen"),
-                }
+            // Reopened at the new position by the next read rather than
+            // seeked in place: enginefs's disk stream aborts its in-flight
+            // piece read on seek, which can leave its underlying tokio File
+            // busy, so the next read failed with "other file operation is
+            // pending" (verified live). Each stream only ever reads forward
+            // from where it was opened - what an HTTP Range request does.
+            if self.stream.take().is_some() {
+                tracing::debug!(torrent_id = %self.torrent_id, file_idx = self.file_idx, from = self.pos, to = target, "direct torrent seek, reopening stream");
             }
             self.pos = target_u;
         }
