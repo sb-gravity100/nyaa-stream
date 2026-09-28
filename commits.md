@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `6c7400f` · 2026-09-29 · docs: document the hide-unlisted-sources setting
+- `PLAN.md`
+
 ### `5acc88d` · 2026-09-29 · feat(settings): hide unlisted sources (on by default)
 - `src/MediaPage.tsx`
 - `src/SettingsPanel.tsx`
