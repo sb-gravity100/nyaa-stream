@@ -1522,6 +1522,20 @@ a {
   color: var(--text);
   font: inherit;
   font-size: 0.85rem;
+  /* The translucent fill made the native popup fall back to a light
+     list with light text - pin it dark and give options a solid fill. */
+  color-scheme: dark;
+  cursor: pointer;
+}
+
+.settings-panel select option {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.settings-panel select option:checked {
+  background: var(--raised);
+  color: var(--accent-strong);
 }
 
 .settings-panel input[type="range"] {
