@@ -2,6 +2,17 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `664586c` · 2026-09-28 · feat(player): render subtitles with libass (JASSUB), styled ASS + fonts
+- `package-lock.json`
+- `package.json`
+- `src/PlayerView.tsx`
+- `src/assRenderer.ts`
+- `src/playback.ts`
+- `src/settings.ts`
+- `src/subtitles.ts`
+- `src/types.ts`
+- `vite.config.ts`
+
 ### `fdcdf07` · 2026-09-28 · feat(engine): extract subtitles as ASS inside the HLS job, copyts timeline
 - `crates/torrent-engine/src/lib.rs`
 - `src-tauri/src/lib.rs`
