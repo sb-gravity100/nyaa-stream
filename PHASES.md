@@ -224,7 +224,25 @@
       no longer gates video, 33-bit initPTS unwrap, group memory only on
       real playback, undecodable-codec ranking, background full-file
       subtitle pass, pre-warmed libass renderer
-- [ ] Fork enginefs to fix its premature-EOF / zero-read disk reader
+- [x] Vendor enginefs; its disk reader no longer passes unflushed zero
+      bytes on (was the source of pixelated/broken frames)
+- [x] Transcode anything the WebView can't decode (Hi10P H.264, HEVC,
+      AV1, ...) to H.264 with auto-detected NVENC/QSV/AMF or libx264;
+      forced 6s IDR keyframes for grid-exact segments
+- [x] Player polish: rAF-driven seek bar/clock, animated chrome, ambient
+      glass dock, paused glyph, Ctrl+C copies the current frame
+- [x] Thumbnail capture deferred while a stream plays
+- [ ] Bundle ffmpeg/ffprobe/mpv as Tauri sidecars for release installs
+- [ ] Later: replace the ffmpeg/ffprobe CLI processes with in-process
+      `ffmpeg-next` bindings. Wins: verbose, structured debugging (packet
+      /frame-level errors and progress instead of scraped stderr), no
+      process spawning, direct torrent file I/O via custom AVIO instead of
+      the HTTP loopback, subtitle events as data. Costs to plan for: a
+      hand-written demux/decode/encode/mux pipeline (AAC frame FIFO,
+      timestamp rescaling), unsafe AVIO bridging, FFmpeg dev libs + clang
+      in the build (vcpkg), and losing process isolation - a libav crash
+      on a malformed file would take the whole app down, so decoding
+      needs its own guarded thread/process boundary
 - [x] UI redesign: dusk-indigo token system, bundled Zen Kaku Gothic New,
       app bar, key-art media page, SVG player controls and menus
 - [ ] Local library backed by AniList's own list if the user authenticates

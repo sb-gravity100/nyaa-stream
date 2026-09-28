@@ -343,7 +343,28 @@ nyaa_stream/
    single `Default` style that the user's default-subtitle-style setting
    rewrites (`subtitles.ts`'s `applySubtitleStyle`); real ASS tracks keep
    their styling unless the user opts in, and then only dialogue-looking
-   styles change. Z/X shift subtitle delay by 0.1s. Video never waits on
+   styles change. Z/X shift subtitle delay by 0.1s.
+
+   **Video plan: copy or transcode.** Decided once per file
+   (`HlsJobs::plan_for`) from the probe's video stream and what the
+   frontend reported via `set_decoder_support` (MSE `isTypeSupported`):
+   8-bit 4:2:0 H.264 (and HEVC where natively supported) is stream-copied;
+   everything else - Hi10P H.264, HEVC, AV1, VP9... - is re-encoded to
+   8-bit H.264 High with the first working encoder of NVENC > QSV > AMF >
+   libx264 (`detect_h264_encoder`, a tiny test encode at startup),
+   `-hwaccel auto` decode, and IDR keyframes forced every 6s so segments
+   sit exactly on the playlist grid (frame-accurate seeks). The cache
+   directory's `video_mode` marker drops segments produced under a
+   different plan. Verified live: 10-bit HEVC via NVENC at ~16x realtime,
+   playable in 4.1s, 10-minute seek in 1.2s. `StreamStats.videoMode`
+   drives the player's "Converting to H.264" chip.
+
+   **enginefs is vendored** (`vendor/enginefs`, MIT, `[patch]` in the
+   workspace manifest - see its `VENDORED.md`): its disk reader could hand
+   out zero bytes for pieces libtorrent had verified but not yet made
+   visible on disk, corrupting demux ("0x00 at pos N") and producing
+   pixelated frames. It now waits up to 8s per piece for real bytes,
+   preferring libtorrent's own `read_piece` copy. Video never waits on
    the probe: a run that starts before it finishes gets a subtitle-only
    ffmpeg attached (`HlsJobs::attach_subtitles`). A separate full-file
    subtitle pass (`sub_<index>_bg.ass`) reads `stream_handler` with
@@ -387,12 +408,14 @@ nyaa_stream/
 - Batches without an explicit episode range in their title (most of them)
   can't be attributed to specific episodes and stay in an undifferentiated
   per-season "Batch" bucket.
-- HEVC releases can't play unless the OS provides an HEVC decoder to
-  WebView2 (verified: `MediaSource.isTypeSupported` false here) - they're
-  ranked last and flagged rather than transcoded.
-- enginefs' libtorrent disk reader: premature EOF when a verified piece
-  reports 0 bytes, and occasional zero-filled reads right after a piece
-  verifies. Mitigated with ffmpeg reconnects; a real fix needs a fork.
+- Transcoding needs a capable machine: NVENC/QSV/AMF are auto-detected
+  (test encode), otherwise libx264 `veryfast` - slower CPUs may not keep
+  real time for 1080p HEVC sources.
+- ffmpeg/ffprobe/mpv are still required on PATH; a release should bundle
+  them as Tauri sidecars (`externalBin`).
+- enginefs' playback coordinator can end an HTTP body early (permit
+  cancellation/lease expiry); handled with ffmpeg `-reconnect`, not fixed
+  upstream.
 - Torrent-captured thumbnails use the torrent's largest video file. The seek point targets roughly
   the episode's midpoint when a duration estimate is available (a fixed
   early point otherwise), but without a Matroska Cues index on a
