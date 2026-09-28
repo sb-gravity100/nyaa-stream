@@ -19,6 +19,8 @@ import { fetchKitsuMetadata } from "./kitsu";
 import { fetchTorrentThumbnail } from "./torrentThumbnail";
 import { MediaPage } from "./MediaPage";
 import { HomePage } from "./HomePage";
+import { SettingsPanel } from "./SettingsPanel";
+import { SearchIcon, SettingsIcon } from "./icons";
 import {
   displayTitle,
   formatSeason,
@@ -74,6 +76,7 @@ function App() {
   const [sourcesByMedia, setSourcesByMedia] = useState<Record<number, NyaaResult[]>>({});
   const [detailsByMedia, setDetailsByMedia] = useState<Record<number, Record<string, TorrentDetails>>>({});
   const [library, setLibrary] = useState<AnimeMedia[]>([]);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [latestEpisodes, setLatestEpisodes] = useState<AiringEntry[]>([]);
   const [latestEpisodesLoading, setLatestEpisodesLoading] = useState(false);
   // Shared by MediaPage (selected anime's backdrop + video thumbnails) and
@@ -445,9 +448,17 @@ function App() {
     });
   }, [sources, details, currentAnimeSeason, currentEpisodeOffset, selectedAnime?.episodes]);
 
+  const settingsPanel = settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />;
+  const settingsButton = (
+    <button class="icon-button app-settings-button" onClick={() => setSettingsOpen(true)} aria-label="Settings" title="Settings">
+      <SettingsIcon />
+    </button>
+  );
+
   if (selectedAnime) {
     return (
       <main class="container">
+        <div class="media-settings-anchor">{settingsButton}</div>
         <MediaPage
           anime={selectedAnime}
           kitsu={kitsuByMedia[selectedAnime.id] ?? null}
@@ -462,73 +473,87 @@ function App() {
           onAddToLibrary={() => handleAddToLibrary(selectedAnime)}
           onRemoveFromLibrary={() => handleRemoveFromLibrary(selectedAnime.id)}
         />
+        {settingsPanel}
       </main>
     );
   }
 
   return (
-    <main class="container">
-      <div class="search-bar-wrap">
-        <input
-          id="anime-search-input"
-          class="search-bar"
-          value={query}
-          onInput={(e) => setQuery(e.currentTarget.value)}
-          onFocus={handleInputFocus}
-          onBlur={handleInputBlur}
-          placeholder="Search an anime title..."
-          autocomplete="off"
-        />
+    <main class="container home-container">
+      <header class="app-bar">
+        <div class="app-brand" aria-label="nyaa-stream">
+          nyaa<span>stream</span>
+        </div>
+        <div class="search-bar-wrap">
+          <SearchIcon size={18} class="search-bar-icon" />
+          <input
+            id="anime-search-input"
+            class="search-bar"
+            value={query}
+            onInput={(e) => setQuery(e.currentTarget.value)}
+            onFocus={handleInputFocus}
+            onBlur={handleInputBlur}
+            placeholder="Search anime"
+            autocomplete="off"
+            role="combobox"
+            aria-expanded={dropdownOpen}
+            aria-controls="search-results"
+          />
 
-        {dropdownOpen && (
-          <div class="search-results-wrap">
-            {loading && (
-              <ul class="search-results">
-                {Array.from({ length: 4 }, (_, i) => (
-                  <li key={i}>
-                    <div class="search-result-skeleton-row">
-                      <div class="result-thumbnail result-thumbnail-skeleton" />
-                      <div class="result-metadata">
-                        <div class="skeleton-line skeleton-title" />
-                        <div class="skeleton-line skeleton-meta" />
-                      </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-            {!loading && error && <div class="search-status search-status-error">{error}</div>}
-            {!loading && !error && animeResults.length === 0 && (
-              <div class="search-status">No results</div>
-            )}
-            {!loading && animeResults.length > 0 && (
-              <ul class="search-results">
-                {animeResults.map((anime) => {
-                  const seasonLabel = formatSeason(anime.season, anime.seasonYear);
-                  return (
-                    <li key={anime.id}>
-                      <a onMouseDown={(e) => e.preventDefault()} onClick={() => pickAnime(anime)}>
-                        <div class="result-thumbnail">
-                          {anime.coverImage.large && <img src={anime.coverImage.large} alt="" />}
-                        </div>
+          {dropdownOpen && (
+            <div class="search-results-wrap" id="search-results">
+              {loading && (
+                <ul class="search-results">
+                  {Array.from({ length: 4 }, (_, i) => (
+                    <li key={i}>
+                      <div class="search-result-skeleton-row">
+                        <div class="result-thumbnail result-thumbnail-skeleton" />
                         <div class="result-metadata">
-                          <div class="result-title">{displayTitle(anime.title)}</div>
-                          <div class="result-status">
-                            {anime.averageScore != null && `★ ${(anime.averageScore / 10).toFixed(1)} ∙ `}
-                            {anime.format && <strong>{anime.format}</strong>}
-                            {anime.episodes != null && ` ∙ ${anime.episodes} Eps`}
-                            {seasonLabel && ` ∙ ${seasonLabel}`}
-                          </div>
+                          <div class="skeleton-line skeleton-title" />
+                          <div class="skeleton-line skeleton-meta" />
                         </div>
-                      </a>
+                      </div>
                     </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
-        )}
-      </div>
+                  ))}
+                </ul>
+              )}
+              {!loading && error && <div class="search-status search-status-error">{error}</div>}
+              {!loading && !error && animeResults.length === 0 && (
+                <div class="search-status">No anime matches “{query}”. Try the romaji or English title.</div>
+              )}
+              {!loading && animeResults.length > 0 && (
+                <ul class="search-results" role="listbox">
+                  {animeResults.map((anime) => {
+                    const seasonLabel = formatSeason(anime.season, anime.seasonYear);
+                    const facts = [
+                      anime.format?.replace("_", " "),
+                      anime.episodes != null ? `${anime.episodes} episodes` : null,
+                      seasonLabel,
+                    ].filter(Boolean);
+                    return (
+                      <li key={anime.id} role="option">
+                        <a onMouseDown={(e) => e.preventDefault()} onClick={() => pickAnime(anime)}>
+                          <div class="result-thumbnail">
+                            {anime.coverImage.large && <img src={anime.coverImage.large} alt="" />}
+                          </div>
+                          <div class="result-metadata">
+                            <div class="result-title">{displayTitle(anime.title)}</div>
+                            <div class="result-status">
+                              {anime.averageScore != null && <span class="result-score">{(anime.averageScore / 10).toFixed(1)}</span>}
+                              {facts.join(", ")}
+                            </div>
+                          </div>
+                        </a>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          )}
+        </div>
+        {settingsButton}
+      </header>
 
       <HomePage
         library={library}
@@ -539,6 +564,7 @@ function App() {
         onSelectAnime={pickAnime}
         onSelectEpisode={selectEpisode}
       />
+      {settingsPanel}
     </main>
   );
 }
