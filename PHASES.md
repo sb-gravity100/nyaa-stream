@@ -217,6 +217,14 @@
 - [x] Watch progress / continue-watching (`watchProgress.ts`): resume,
       per-episode progress bars and watched toggles, Continue watching row,
       next-episode button + autoplay countdown
+- [x] Player side playlist (button-pinned / right-edge hover), ±10s,
+      center action flash, buffered seek layer, remaining-time toggle;
+      episode cards open the player directly and closing returns home
+- [x] Live-debug fixes: dead-transcode restart, ffmpeg reconnects, probe
+      no longer gates video, 33-bit initPTS unwrap, group memory only on
+      real playback, undecodable-codec ranking, background full-file
+      subtitle pass, pre-warmed libass renderer
+- [ ] Fork enginefs to fix its premature-EOF / zero-read disk reader
 - [x] UI redesign: dusk-indigo token system, bundled Zen Kaku Gothic New,
       app bar, key-art media page, SVG player controls and menus
 - [ ] Local library backed by AniList's own list if the user authenticates
