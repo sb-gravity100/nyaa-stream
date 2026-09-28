@@ -116,6 +116,12 @@ impl EmbeddedMpv {
         }
     }
 
+    /// The mpv process id - used to find the child window it creates
+    /// inside `wid`.
+    pub fn pid(&self) -> Option<u32> {
+        self.child.id()
+    }
+
     /// Asks mpv to quit, then kills it if it hasn't exited within 2s.
     pub async fn quit(mut self) {
         tracing::debug!("quitting embedded mpv");

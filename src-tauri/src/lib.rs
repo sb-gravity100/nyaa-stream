@@ -1,3 +1,5 @@
+mod player;
+
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
@@ -916,6 +918,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .manage(app_state.clone())
+        .manage(player::PlayerState::default())
         .register_asynchronous_uri_scheme_protocol(THUMBNAIL_SCHEME, move |_ctx, request, responder| {
             let state = app_state.clone();
             tauri::async_runtime::spawn_blocking(move || responder.respond(thumbnail_protocol(&state, &request)));
@@ -938,7 +941,10 @@ pub fn run() {
             get_subtitle_tracks,
             set_decoder_support,
             copy_frame_to_clipboard,
-            stop_playback
+            stop_playback,
+            player::mpv_start,
+            player::mpv_command,
+            player::mpv_stop
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
