@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `b1dae32` · 2026-09-28 · fix(player): capture the last frame before hls.js tears down the video
+- `src/PlayerView.tsx`
+
 ### `288896f` · 2026-09-28 · fix(player): seek tooltip tracks the cursor without re-rendering
 - `src/PlayerView.tsx`
 - `src/App.css`
