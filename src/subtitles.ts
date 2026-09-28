@@ -45,7 +45,7 @@ function assColor(hex: string, alpha = 0): string {
   return `&H${a}${b}${g}${r}`.toUpperCase();
 }
 
-function playResY(script: string): number {
+export function playResY(script: string): number {
   const match = script.match(/^PlayResY:\s*(\d+)/m);
   return match ? Number(match[1]) : 288;
 }

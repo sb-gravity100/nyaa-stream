@@ -149,6 +149,9 @@ export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNe
   const settings = useSettings();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  // Media position to resume from when hls.js is re-attached to the same
+  // file (see the attach effect).
+  const reattachRef = useRef<{ url: string; time: number } | null>(null);
   const [videoEl, setVideoEl] = useState<HTMLVideoElement | null>(null);
   const preferredGroup = settings.rememberFansubGroup ? getPreferredGroup(anime.id) : null;
   const releasePrefs = { preferredGroup, preferredResolution: settings.preferredResolution };
@@ -279,8 +282,14 @@ export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNe
     if (!video || !selectedFile) return;
     const hlsSrc =
       estimatedDurationSeconds != null ? `${selectedFile.hlsUrl}?duration=${estimatedDurationSeconds}` : selectedFile.hlsUrl;
-    const startAt = resumeAtRef.current;
-    console.info("[player] attaching hls", { file: selectedFile.name, startAt });
+    // Re-attaching the same file (only the duration estimate changed -
+    // e.g. anime details arriving after playback began) continues from the
+    // current position. It used to restart from 0, which silently undid a
+    // seek made before the details landed (verified live).
+    const reattach = reattachRef.current?.url === selectedFile.hlsUrl ? reattachRef.current : null;
+    reattachRef.current = null;
+    const startAt = reattach ? reattach.time : resumeAtRef.current;
+    console.info("[player] attaching hls", { file: selectedFile.name, startAt, reattach: reattach != null });
 
     if (!Hls.isSupported()) {
       setError("This browser engine can't play HLS streams.");
@@ -358,7 +367,10 @@ export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNe
       }
       setError("Playback stopped: this source isn't downloading or can't be decoded. Try another source.");
     });
+    const attachedUrl = selectedFile.hlsUrl;
     return () => {
+      // Remember where playback was in case this is a same-file re-attach.
+      if (video.currentTime > 0) reattachRef.current = { url: attachedUrl, time: video.currentTime };
       hls.destroy();
     };
   }, [videoEl, selectedFile?.hlsUrl, estimatedDurationSeconds]);
@@ -426,12 +438,36 @@ export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNe
   }, [torrentId, selectedFile?.index]);
 
   const activeSubtitle = subtitleTracks.find((t) => t.index === activeSubtitleIndex) ?? null;
+
+  // How much of the video's bottom edge the control dock covers while it's
+  // up - handed to the renderer, which lifts only the bottom-aligned lines
+  // that would sit under it. Measured from layout offsets (not bounding
+  // rects) so the dock's own slide-in transform doesn't skew it.
+  const DOCK_CLEARANCE_PX = 14;
+  const [subtitleInset, setSubtitleInset] = useState(0);
+  useEffect(() => {
+    if (!(controlsVisible || menu)) {
+      setSubtitleInset(0);
+      return;
+    }
+    const root = rootRef.current;
+    const dock = root?.querySelector<HTMLElement>(".player-controls");
+    const video = videoRef.current;
+    if (!root || !dock || !video || !video.videoWidth) return;
+    // The visible picture inside the <video> box (letterboxing excluded).
+    const box = video.getBoundingClientRect();
+    const scale = Math.min(box.width / video.videoWidth, box.height / video.videoHeight);
+    const pictureBottom = box.top - root.getBoundingClientRect().top + (box.height + video.videoHeight * scale) / 2;
+    setSubtitleInset(Math.max(0, pictureBottom - dock.offsetTop + DOCK_CLEARANCE_PX));
+  }, [controlsVisible, menu, duration]);
   useAssRenderer({
     video: videoEl,
     url: activeSubtitle?.url ?? null,
     fonts: subtitleFonts,
     styled: activeSubtitle ? isStyledTrack(activeSubtitle) : false,
     style: settings.subtitleStyle,
+    bottomInsetPx: subtitleInset,
+    supersample: settings.subtitleSupersample,
     timeOffset,
     delay: subtitleDelay,
   });
@@ -695,6 +731,9 @@ export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNe
   async function copyFrame() {
     const video = videoRef.current;
     if (!video || video.videoWidth === 0) return;
+    // Immediate feedback: the readback + native clipboard write (which
+    // also PNG-encodes the frame) takes around a second for 1080p.
+    showToast("Copying frame…");
     const canvas = document.createElement("canvas");
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
@@ -710,14 +749,10 @@ export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNe
         const videoBox = video.getBoundingClientRect();
         const subBox = subtitleCanvas.getBoundingClientRect();
         const scale = canvas.width / videoBox.width;
-        // Undo the lift applied while the controls are showing (App.css
-        // `controls-shown canvas.JASSUB`) so the copy has subtitles where
-        // they belong on the frame.
-        const lift = new DOMMatrixReadOnly(getComputedStyle(subtitleCanvas).transform).f;
         ctx.drawImage(
           subtitleCanvas,
           (subBox.left - videoBox.left) * scale,
-          (subBox.top - lift - videoBox.top) * scale,
+          (subBox.top - videoBox.top) * scale,
           subBox.width * scale,
           subBox.height * scale,
         );

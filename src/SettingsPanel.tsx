@@ -156,6 +156,16 @@ export function SettingsPanel({ onClose }: Props) {
               </select>
             </Row>
 
+            <Row label="Smoothing" hint="Renders subtitles at 2x and scales down for clean edges. Use Standard on slow machines.">
+              <select
+                value={String(settings.subtitleSupersample)}
+                onChange={(e) => updateSettings({ subtitleSupersample: Number((e.target as HTMLSelectElement).value) === 2 ? 2 : 1 })}
+              >
+                <option value="2">High (2x anti-aliased)</option>
+                <option value="1">Standard</option>
+              </select>
+            </Row>
+
             <SubtitlePreview style={style} />
 
             <Row label="Font">
