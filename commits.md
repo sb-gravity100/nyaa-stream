@@ -2,6 +2,12 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `5efcbc6` · 2026-09-29 · feat: brand-mark favicon
+- `index.html`
+- `public/favicon.svg`
+- `public/tauri.svg`
+- `public/vite.svg`
+
 ### `32554f3` · 2026-09-29 · docs: note Outfit in FILE_INDEX
 - `FILE_INDEX.md`
 
