@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `77e2bb3` · 2026-09-28 · feat(player): Ctrl+C copies the current frame (with subtitles) as PNG
+- `src/PlayerView.tsx`
+- `src/SettingsPanel.tsx`
+
 ### `314de1d` · 2026-09-28 · fix(enginefs): wait up to 8s for real bytes instead of accepting zeros
 - `vendor/enginefs/VENDORED.md`
 - `vendor/enginefs/src/backend/libtorrent/disk_stream.rs`
