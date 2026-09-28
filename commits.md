@@ -2,6 +2,12 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `e5c1138` · 2026-09-29 · style: Outfit display face for titles and labels
+- `package-lock.json`
+- `package.json`
+- `src/App.css`
+- `src/main.tsx`
+
 ### `616fff8` · 2026-09-29 · feat(icons): app icons from the brand mark
 - `src-tauri/icons/128x128.png`
 - `src-tauri/icons/128x128@2x.png`
