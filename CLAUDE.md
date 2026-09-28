@@ -108,14 +108,16 @@ full architecture; summary:
   streaming HTTP server with Range support
 - `crates/nyaa-client` — nyaa.si search via RSS
 - `crates/anilist-client` — AniList GraphQL metadata client
-- `crates/mpv-ipc` — spawns headless system `mpv` over JSON IPC for
-  torrent-thumbnail frame capture only; requires `mpv` on PATH
-- Real playback is a plain HTML5 `<video>` element driven by `hls.js`
-  (`src/PlayerView.tsx`) against torrent-engine's HLS playlist, not mpv —
-  embedding mpv into the app window was tried and abandoned (a
-  Tauri/WebView2 transparency bug on Windows broke click input app-wide;
-  see PLAN.md's Known gaps)
-- FFmpeg runs in-process (`crates/torrent-engine/src/media.rs`, ez-ffmpeg +
+- `crates/mpv-ipc` — system `mpv` over JSON IPC: `EmbeddedMpv` (playback)
+  and headless `MpvPlayer` (torrent-thumbnail capture); requires `mpv` on
+  PATH
+- Real playback is the system mpv embedded in the app window (`--wid`,
+  `src-tauri/src/player.rs`) under a transparent *webview* background —
+  never `transparent: true` on the window, which broke click input — with
+  the HTML controls in `src/PlayerView.tsx` driving it via
+  `src/mpvVideo.ts`. `src/HlsPlayerView.tsx` (hls.js `<video>` against
+  torrent-engine's HLS playlist) is the fallback when mpv isn't installed
+- FFmpeg runs in-process for the HLS fallback (`crates/torrent-engine/src/media.rs`, ez-ffmpeg +
   ffmpeg-next), statically linked from the FFmpeg that `vcpkg.json` builds
   (LGPL - never enable x264/GPL features): raw torrent bytes aren't
   reliably playable in a browser `<video>`, so `torrent_engine::HlsJobs`
