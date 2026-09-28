@@ -66,6 +66,8 @@ export interface PlayFile {
   isVideo: boolean;
   /** Base HLS playlist URL - append `?duration=<seconds>` before use. */
   hlsUrl: string;
+  /** Raw Range-capable byte stream - what the embedded mpv opens. */
+  streamUrl: string;
 }
 
 export interface PlaySession {

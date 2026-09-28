@@ -100,3 +100,78 @@ export function applySubtitleStyle(script: string, style: SubtitleStyle, styled:
     return `Style: ${values.join(",")}`;
   });
 }
+
+/** What `applyMpvSubtitleStyle` needs from the player (`MpvVideo`). */
+interface MpvSubtitleTarget {
+  setProperty(name: string, value: unknown): Promise<unknown>;
+  getProperty(name: string): Promise<unknown>;
+}
+
+/** `#rrggbb` + opacity 0-1 → mpv's `#AARRGGBB`. */
+function mpvColor(hex: string, opacity = 1): string {
+  const a = Math.round(Math.max(0, Math.min(1, opacity)) * 255).toString(16).padStart(2, "0");
+  return `#${a}${hex.replace("#", "").padEnd(6, "0")}`.toUpperCase();
+}
+
+// mpv's sub-* sizes are pixels at a 720px-tall window; our style is in
+// percent of video height.
+const MPV_REFERENCE_HEIGHT = 720;
+// Plain tracks used to reach libass as ffmpeg-converted ASS, whose
+// PlayResY (288) the stored `shadow` value is relative to.
+const CONVERTED_PLAY_RES_Y = 288;
+
+/**
+ * Applies the user's default subtitle style to mpv. Plain tracks go through
+ * mpv's own `sub-*` options (mpv styles non-ASS subtitles with them). Real
+ * ASS tracks are only touched when `applyToStyled` is on, and then only
+ * their dialogue-looking styles, via `sub-ass-style-overrides` sized
+ * against the track's own `PlayResY` - the same rules `applySubtitleStyle`
+ * applied to scripts.
+ */
+export async function applyMpvSubtitleStyle(mpv: MpvSubtitleTarget, style: SubtitleStyle, styled: boolean): Promise<void> {
+  const px = (percent: number) => (percent / 100) * MPV_REFERENCE_HEIGHT;
+  const backOpacity = style.backgroundOpacity / 100;
+  await Promise.all([
+    mpv.setProperty("sub-font", style.fontFamily),
+    mpv.setProperty("sub-font-size", px(style.sizePercent)),
+    mpv.setProperty("sub-bold", style.bold),
+    mpv.setProperty("sub-color", mpvColor(style.color)),
+    mpv.setProperty("sub-border-style", style.background ? "opaque-box" : "outline-and-shadow"),
+    mpv.setProperty("sub-border-color", style.background ? mpvColor(style.backgroundColor, backOpacity) : mpvColor(style.outlineColor)),
+    mpv.setProperty("sub-back-color", style.background ? mpvColor(style.backgroundColor, backOpacity) : mpvColor("#404040", 0x5f / 255)),
+    mpv.setProperty("sub-border-size", style.background ? 2 : px(style.outlineWidth)),
+    mpv.setProperty("sub-shadow-offset", (style.shadow / CONVERTED_PLAY_RES_Y) * MPV_REFERENCE_HEIGHT),
+    mpv.setProperty("sub-margin-y", px(style.marginPercent)),
+  ]);
+
+  if (!styled || !style.applyToStyled) {
+    await mpv.setProperty("sub-ass-style-overrides", "");
+    return;
+  }
+  // The active track's script header: its PlayResY and style names.
+  let header = "";
+  try {
+    header = String((await mpv.getProperty("sub-ass-extradata")) ?? "");
+  } catch (err) {
+    console.debug("[subtitles] no ASS header for restyle yet", { err: String(err) });
+  }
+  const resY = playResY(header);
+  const names = [...header.matchAll(/^Style:\s*([^,]+),/gm)].map((m) => m[1].trim()).filter((n) => DIALOGUE_STYLE_NAME.test(n));
+  const backAlpha = 255 - backOpacity * 255;
+  const fields: Record<string, string> = {
+    Fontname: style.fontFamily,
+    Fontsize: ((style.sizePercent / 100) * resY).toFixed(1),
+    PrimaryColour: assColor(style.color),
+    OutlineColour: style.background ? assColor(style.backgroundColor, backAlpha) : assColor(style.outlineColor),
+    BackColour: style.background ? assColor(style.backgroundColor, backAlpha) : assColor("#404040", 0xa0),
+    Bold: style.bold ? "-1" : "0",
+    BorderStyle: style.background ? "3" : "1",
+    Outline: style.background ? "2" : ((style.outlineWidth / 100) * resY).toFixed(2),
+    Shadow: String(style.shadow),
+    MarginV: Math.round((style.marginPercent / 100) * resY).toString(),
+  };
+  // Commas separate overrides, so a font name can't contain one.
+  const overrides = names.flatMap((name) => Object.entries(fields).map(([k, v]) => `${name}.${k}=${v.replace(/,/g, "")}`));
+  console.debug("[subtitles] restyling ASS dialogue styles", { names, resY });
+  await mpv.setProperty("sub-ass-style-overrides", overrides.join(","));
+}

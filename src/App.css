@@ -1145,30 +1145,32 @@ a {
   position: fixed;
   inset: 0;
   z-index: 200;
-  background: #000;
+  /* The embedded mpv draws the video under the webview - see PlayerView. */
+  background: transparent;
   overflow: hidden;
 }
 
-.player-video {
+/* While mpv is showing, the webview is transparent (player.rs): hide the
+   rest of the app so only the player overlay sits on the video. */
+html.mpv-active,
+html.mpv-active body {
+  background: transparent;
+}
+
+html.mpv-active body {
+  visibility: hidden;
+}
+
+html.mpv-active .player-view {
+  visibility: visible;
+}
+
+/* Catches clicks on the picture; mpv itself never sees input. */
+.player-video-surface {
   position: absolute;
   inset: 0;
-  width: 100%;
-  height: 100%;
-  background: #000;
-  opacity: 0;
-  transition: opacity 0.45s var(--ease-out);
-}
-
-.player-video.shown {
-  opacity: 1;
-}
-
-/* JASSUB's libass canvas sits right after the <video>; keep it under the
-   UI layers. The slight blur softens libass's native-resolution edges
-   (replaced 2x supersampling, which doubled the render cost). */
-.player-view canvas.JASSUB {
-  z-index: 0;
-  filter: blur(0.35px);
+  background: transparent;
+  transition: background-color 0.35s var(--ease-out);
 }
 
 .player-topbar {
@@ -2209,7 +2211,7 @@ a {
 /* ---------- Player: floating dock + ambient tint ---------- */
 
 .player-view {
-  /* Updated from the video's average color (PlayerView ambient sampler). */
+  /* Tint of the dock and top bar. */
   --ambient: 43, 48, 80;
 }
 
@@ -2264,12 +2266,8 @@ a {
 
 /* Paused: the frame dims slightly and a large glyph breathes in the
    center until playback resumes. */
-.player-view.is-paused .player-video.shown {
-  filter: brightness(0.78);
-}
-
-.player-video {
-  transition: opacity 0.45s var(--ease-out), filter 0.35s var(--ease-out);
+.player-view.is-paused .player-video-surface {
+  background: rgba(0, 0, 0, 0.22);
 }
 
 .player-paused-glyph {
