@@ -23,6 +23,10 @@ struct MpvResponse {
     data: Value,
 }
 
+/// Width headless captures are scaled to - matches the player's last-frame
+/// capture (`LAST_FRAME_WIDTH` in PlayerView.tsx), both feeding 16:9 cards.
+const THUMBNAIL_WIDTH: u32 = 640;
+
 /// Spawns a headless `mpv` pointed at a URL (e.g. a torrent-engine stream
 /// URL) with a JSON IPC socket enabled, purely to pull a single frame out of
 /// a torrent's stream as a thumbnail - see `spawn_headless`/
@@ -63,6 +67,16 @@ impl MpvPlayer {
             // without this flag, even against a normal, fully seekable
             // remote file.
             "--keep-open=yes".to_string(),
+            // Thumbnails only need pictures: skip audio/subtitle decoding
+            // entirely (`--ao=null` alone still decodes audio).
+            "--aid=no".to_string(),
+            "--sid=no".to_string(),
+            // Card-sized frames: a full-res 1080p screenshot was several
+            // times the bytes of what any card ever displays. With
+            // `--vo=null`, the screenshot is the last frame handed to the
+            // VO, i.e. after this filter.
+            format!("--vf=lavfi=[scale={THUMBNAIL_WIDTH}:-2]"),
+            "--screenshot-jpeg-quality=82".to_string(),
         ];
         if let Some(seconds) = start_seconds {
             args.push(format!("--start={seconds}"));
