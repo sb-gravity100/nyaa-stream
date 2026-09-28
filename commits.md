@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `0153220` · 2026-09-29 · feat(player): clicking the video no longer toggles pause
+- `src/HlsPlayerView.tsx`
+- `src/PlayerView.tsx`
+
 ### `6dc5711` · 2026-09-29 · perf(build): optimize image decoding crates in dev builds
 - `Cargo.toml`
 
