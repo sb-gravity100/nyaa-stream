@@ -242,7 +242,10 @@
 - [ ] Bundle mpv (thumbnail capture) as a sidecar, or capture thumbnails
       in-process too and drop mpv entirely
 - [x] Subtitles: only dock-covered bottom lines lift while controls show;
-      2x supersampled libass rendering (setting)
+      native-resolution libass rendering softened with a CSS blur
+- [x] Subtitles: append-only event log + delta polling (`processData`),
+      `ignore_readorder` for out-of-order scripts (Kaleido-subs), English
+      tracks first, Crunchyroll default style (bundled Gandhi Sans)
 - [x] UI redesign: dusk-indigo token system, bundled Zen Kaku Gothic New,
       app bar, key-art media page, SVG player controls and menus
 - [ ] Local library backed by AniList's own list if the user authenticates
