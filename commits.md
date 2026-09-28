@@ -2,6 +2,11 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `fbab937` · 2026-09-28 · docs: sync PLAN/PHASES/FILE_INDEX with subtitle, streaming and UI rework
+- `FILE_INDEX.md`
+- `PHASES.md`
+- `PLAN.md`
+
 ### `c2ffe15` · 2026-09-28 · fix(ui): clearer fetch errors, preview scaling, continue-watching tie-break
 - `src/App.tsx`
 - `src/MediaPage.tsx`
