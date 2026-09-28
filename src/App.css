@@ -1327,6 +1327,31 @@ html.mpv-active .player-view {
   pointer-events: none;
 }
 
+/* The player's own overlay fades and settles in, and fades back out
+   before unmounting (PlayerView keeps it mounted for LOADING_EXIT_MS). A
+   soft vignette keeps the mark legible over bright frames. */
+.player-loading.player-loading-fade {
+  animation: none;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.94);
+  transition:
+    opacity 0.45s cubic-bezier(0.33, 0, 0.2, 1),
+    transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.player-loading.player-loading-fade.shown {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.player-loading.player-loading-fade::before {
+  content: "";
+  position: absolute;
+  inset: -90px -140px;
+  z-index: -1;
+  background: radial-gradient(closest-side, rgba(0, 0, 0, 0.5), transparent);
+}
+
 .player-loading .player-buffering {
   position: relative;
   top: auto;
@@ -1391,6 +1416,44 @@ html.mpv-active .player-view {
 .player-buffering-mark-background {
   color: #fff;
   opacity: 0.15;
+}
+
+/* Indeterminate wait: an arc sweeping around the ring, its length easing
+   in and out as it travels so it never looks like it's stepping. */
+.player-buffering-arc {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  animation: player-buffering-spin 1.6s linear infinite;
+  will-change: transform;
+}
+
+.player-buffering-arc circle {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 6;
+  stroke-linecap: round;
+  stroke-dasharray: 22 78;
+  animation: player-buffering-sweep 1.6s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+
+@keyframes player-buffering-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes player-buffering-sweep {
+  0%,
+  100% {
+    stroke-dasharray: 10 90;
+    stroke-dashoffset: 0;
+  }
+  50% {
+    stroke-dasharray: 40 60;
+    stroke-dashoffset: -15;
+  }
 }
 
 @keyframes player-buffering-breathe {

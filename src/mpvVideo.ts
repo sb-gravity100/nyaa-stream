@@ -156,6 +156,9 @@ export class MpvVideo extends EventTarget {
       this.pendingSeek = null;
       this.seekTarget = seconds;
       console.debug("[mpv] seek", { seconds });
+      // Like <video>: a seek waits (possibly long, on undownloaded pieces)
+      // until playback-restart fires "playing".
+      this.emit("waiting");
       void command(["seek", seconds, "absolute"]).catch((err) => {
          console.warn("[mpv] seek failed", { seconds, err: String(err) });
          this.releaseSeek();
@@ -174,6 +177,11 @@ export class MpvVideo extends EventTarget {
       window.clearTimeout(this.seekReleaseTimer);
       this.seekTarget = null;
       this.flushSeek();
+   }
+
+   /** Where an unfinished seek is headed, else null. */
+   get seekingTo(): number | null {
+      return this.pendingSeek ?? this.seekTarget;
    }
 
    get duration(): number {
