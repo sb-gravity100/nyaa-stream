@@ -37,3 +37,6 @@ mpv-ipc = { path = "../crates/mpv-ipc" }
 # clipboard API pops a browser-style permission prompt in WebView2.
 arboard = { version = "3", default-features = false, features = ["image-data"] }
 
+[target.'cfg(windows)'.dependencies]
+# Finding mpv's child window and pushing it below the webview (player.rs).
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging"] }
