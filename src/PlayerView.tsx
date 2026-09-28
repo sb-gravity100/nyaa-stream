@@ -233,10 +233,10 @@ export function PlayerView({
    // Media time as the <video> element reports it.
    const [position, setPosition] = useState(0);
    const [seekPreview, setSeekPreview] = useState<number | null>(null);
-   const [hoverTime, setHoverTime] = useState<{
-      x: number;
-      time: number;
-   } | null>(null);
+   // Seek-bar hover tooltip, positioned straight on the DOM: routing each
+   // mousemove through React state re-rendered the whole player per event,
+   // so the tooltip trailed behind the cursor.
+   const seekTooltipRef = useRef<HTMLDivElement>(null);
    const [volume, setVolumeState] = useState(loadVolume);
    const [muted, setMuted] = useState(false);
    const [menu, setMenu] = useState<Menu>(null);
@@ -889,15 +889,17 @@ export function PlayerView({
 
    function handleSeekHover(e: MouseEvent) {
       if (!episodeDuration) return;
+      const tooltip = seekTooltipRef.current;
+      if (!tooltip) return;
       const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-      const fraction = Math.min(
-         1,
-         Math.max(0, (e.clientX - rect.left) / rect.width),
-      );
-      setHoverTime({
-         x: e.clientX - rect.left,
-         time: fraction * episodeDuration,
-      });
+      const x = Math.min(rect.width, Math.max(0, e.clientX - rect.left));
+      tooltip.textContent = formatTime((x / rect.width) * episodeDuration);
+      tooltip.style.transform = `translateX(${x}px) translateX(-50%)`;
+      tooltip.classList.add("shown");
+   }
+
+   function hideSeekTooltip() {
+      seekTooltipRef.current?.classList.remove("shown");
    }
 
    function applyVolume(next: number) {
@@ -1613,7 +1615,7 @@ export function PlayerView({
             <div
                class="player-seek-wrap"
                onMouseMove={handleSeekHover}
-               onMouseLeave={() => setHoverTime(null)}
+               onMouseLeave={hideSeekTooltip}
             >
                <div class="player-seek-track" />
                {readyRanges.map(([start, end]) => (
@@ -1639,14 +1641,7 @@ export function PlayerView({
                   ))}
                <div class="player-seek-played" ref={playedFillRef} />
                <div class="player-seek-thumb" ref={seekThumbRef} />
-               {hoverTime && (
-                  <div
-                     class="player-seek-tooltip"
-                     style={{ left: `${hoverTime.x}px` }}
-                  >
-                     {formatTime(hoverTime.time)}
-                  </div>
-               )}
+               <div class="player-seek-tooltip" ref={seekTooltipRef} />
                <input
                   class="player-seek"
                   type="range"
