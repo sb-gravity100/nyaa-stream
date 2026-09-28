@@ -133,18 +133,6 @@ a {
   background-color: rgba(236, 234, 246, 0.3);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    /* Infinite loops (the backdrop drift) would otherwise flicker. */
-    animation-iteration-count: 1 !important;
-    animation-delay: 0s !important;
-    transition-duration: 0.01ms !important;
-  }
-}
-
 .container {
   height: 100%;
 }
