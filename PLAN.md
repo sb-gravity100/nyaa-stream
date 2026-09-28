@@ -463,6 +463,15 @@ nyaa_stream/
    folder - this is app-owned scratch data cleaned up via `stop_playback`,
    not something the user is meant to keep or browse to directly.
 
+   **Hide unlisted sources** (setting, on by default): the anime page's
+   list, the player's episode list, Play/Resume and next-episode only use
+   rows that are real episodes - numbered within the episode count
+   (AniList's, or Kitsu's via the fallback). Batch and Unknown rows are
+   hidden; a show still airing (no count yet) keeps every numbered episode
+   because Kitsu's list trails new releases. The route still resolves
+   against every row, so a direct link to a hidden one plays; the header
+   says how many rows are hidden.
+
    **Movies.** AniList `format: MOVIE` pages have one "Movie" group
    (`MOVIE_KEY`, labelled as episode 1 so `#/anime/:id/episode/1`, resume
    and Continue watching resolve to it) holding every release that is the
