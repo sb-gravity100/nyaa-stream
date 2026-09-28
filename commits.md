@@ -2,6 +2,15 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `b0ca0b3` · 2026-09-28 · perf(thumbnails): serve by URL, save raw frames, serialize captures
+- `src-tauri/src/lib.rs`
+- `src/torrentThumbnail.ts`
+- `src/PlayerView.tsx`
+- `src/HomePage.tsx`
+- `src/App.tsx`
+- `PLAN.md`
+- `FILE_INDEX.md`
+
 ### `b1dae32` · 2026-09-28 · fix(player): capture the last frame before hls.js tears down the video
 - `src/PlayerView.tsx`
 
