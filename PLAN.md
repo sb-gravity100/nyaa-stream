@@ -143,7 +143,10 @@ requires, beyond Rust/Node:
   playlist uses, grabs one frame, caches it to disk) when neither has
   coverage - falls back to a fixed early point when no duration estimate
   is available, since waiting for real-time playback to reach an actual
-  multi-minute midpoint isn't practical within the capture's timeout
+  multi-minute midpoint isn't practical within the capture's timeout. Thumbnails are cached for good
+  (they belong to one episode): captured frames on disk, checked first via
+  `cached_torrent_thumbnail` before any nyaa search, and Kitsu metadata
+  (`thumbnails/kitsu/<anilistId>.json`) reused for a day, stale on failure
 - **Persistence:** browser `localStorage` for the saved-anime library, watch progress (`watchProgress.ts`), settings (`settings.ts`) and per-anime preferred fansub group (`releases.ts`)
   (`src/library.ts`) — deliberately not committing to the sqlite-vs-flat-file
   backend store decision below, which is still open
