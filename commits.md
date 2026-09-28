@@ -2,6 +2,11 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `e81dd4a` · 2026-09-28 · fix(player): copy frames through the native clipboard (arboard)
+- `src-tauri/Cargo.toml`
+- `src-tauri/src/lib.rs`
+- `src/PlayerView.tsx`
+
 ### `16dd815` · 2026-09-28 · docs: transcoding, vendored enginefs, player polish; note ffmpeg-next for later
 - `FILE_INDEX.md`
 - `PHASES.md`
