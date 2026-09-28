@@ -2,6 +2,12 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `dc49fb4` · 2026-09-28 · feat(player): fade controls on mouse idle unless over top/bottom bars
+- `src/PlayerView.tsx`
+- `src/App.css`
+- `PLAN.md`
+- `PHASES.md`
+
 ### `f2f8c33` · 2026-09-28 · feat(player): drop right-edge hover for the episode list
 - `src/PlayerView.tsx`
 - `src/PlayerPlaylist.tsx`
