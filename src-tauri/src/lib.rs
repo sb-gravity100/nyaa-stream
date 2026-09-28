@@ -10,7 +10,7 @@ use nyaa_client::{Category, NyaaClient, NyaaResult, TorrentDetails};
 use serde::Serialize;
 use tauri::State;
 use tokio::sync::Mutex;
-use torrent_engine::{largest_video_file, StreamStats, SubtitleTrack, TorrentEngine, TorrentFile, TorrentId};
+use torrent_engine::{largest_video_file, DecoderSupport, StreamStats, SubtitleTrack, TorrentEngine, TorrentFile, TorrentId};
 
 struct AppState {
     anilist: AniListClient,
@@ -590,6 +590,15 @@ async fn get_subtitle_tracks(state: State<'_, Arc<AppState>>, torrent_id: Torren
     Ok(SubtitleInfo { tracks, fonts })
 }
 
+/// Frontend reports which codecs its WebView decodes natively (MSE
+/// `isTypeSupported`), so the streaming server only transcodes what it has
+/// to - see `torrent_engine::plan_video`.
+#[tauri::command]
+fn set_decoder_support(state: State<'_, Arc<AppState>>, support: DecoderSupport) {
+    tracing::debug!(?support, "set_decoder_support invoked");
+    state.torrent_engine.set_decoder_support(support);
+}
+
 /// Removes the active torrent (stop seeding, drop partial files) - called
 /// when the user closes the player or navigates away from the media page.
 #[tauri::command]
@@ -660,6 +669,7 @@ pub fn run() {
             play_magnet,
             get_stream_stats,
             get_subtitle_tracks,
+            set_decoder_support,
             stop_playback
         ])
         .run(tauri::generate_context!())
