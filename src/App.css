@@ -1687,9 +1687,9 @@ a {
   color: var(--muted);
 }
 
-/* Invisible strip with the same footprint as .player-controls - the only
-   thing that reveals the bar, since the bar has pointer-events:none while
-   hidden (see PlayerView.tsx's showControls). */
+/* Invisible strip with the same footprint as .player-controls - what the
+   pointer hits while the bar is hidden (pointer-events:none), so resting
+   over it keeps the controls up (see PlayerView.tsx's CONTROLS_AREA_SELECTOR). */
 .player-controls-hover-zone {
   position: absolute;
   left: 0;

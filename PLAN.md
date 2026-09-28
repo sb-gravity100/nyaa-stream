@@ -277,10 +277,11 @@ nyaa_stream/
    via `hls.js` in a plain HTML5 `<video>` element — a solid-black bottom
    control bar (play/pause, seek with a download-progress highlight,
    mute, volume, fullscreen, time, a source-picker dropdown over the same
-   release list) that only appears while the mouse is directly over it
-   (a dedicated invisible hover zone the same size as the bar, not "any
-   mouse movement over the video" the way this used to work - see
-   PlayerView.tsx), plus PotPlayer/YouTube-style keybinds (space/K
+   release list) that appears on any mouse movement and fades out (with
+   the cursor) after the mouse sits idle, unless the pointer rests over
+   the top or bottom control areas - re-checked on every pointer move
+   against the bars and their invisible hover zones, see PlayerView.tsx's
+   CONTROLS_AREA_SELECTOR), plus PotPlayer/YouTube-style keybinds (space/K
    play-pause, arrows/J/L seek, up/down volume, M mute, F fullscreen, Esc
    close) that work whether or not the bar is currently shown. Seeking is
    a plain `video.currentTime` set - hls.js fetches whichever segment
