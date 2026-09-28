@@ -11,9 +11,12 @@ import type { SubtitleStyle } from "./settings";
 import type { ASSStyle } from "jassub/dist/worker/util";
 import { applySubtitleStyle, playResY } from "./subtitles";
 
-/** How often the growing merged ASS script is re-fetched - the backend
- * appends events as the HLS transcode advances (see torrent-engine's
- * `subtitle_handler`), usually well ahead of the playhead. */
+/** How often new events are fetched - the backend appends them as the HLS
+ * transcode advances (see torrent-engine's `subtitle_handler`), usually well
+ * ahead of the playhead. Only the delta is fetched and fed to libass
+ * (`processData`): re-fetching and re-parsing the whole growing script each
+ * poll never finished on heavily typeset releases (a 40 MB, ~77k-event
+ * Kaleido-subs script rendered nothing). */
 const POLL_MS = 3000;
 
 // Placeholder track the renderer starts with, so the worker, WASM and
@@ -98,7 +101,9 @@ export function useAssRenderer({ video, url, fonts, styled, style, timeOffset, d
   useEffect(() => {
     if (!video || !url) return;
     let cancelled = false;
-    let lastLength = -1;
+    // Events already loaded (the backend's X-Subtitle-Events cursor).
+    let loadedEvents = 0;
+    let loaded = false;
     rawRef.current = "";
     console.info("[subtitles] starting renderer", { url, fonts: fonts.length });
     const instance = new JASSUB({
@@ -122,10 +127,14 @@ export function useAssRenderer({ video, url, fonts, styled, style, timeOffset, d
       (err) => console.error("[subtitles] renderer failed to start", { err: String(err) }),
     );
 
+    // A large first load can outlast the poll interval; overlapping polls
+    // would append the same events twice.
+    let inFlight = false;
     async function poll() {
-      if (cancelled) return;
+      if (cancelled || inFlight) return;
+      inFlight = true;
       try {
-        const response = await fetch(url as string, { cache: "no-store" });
+        const response = await fetch(`${url}${(url as string).includes("?") ? "&" : "?"}from=${loadedEvents}`, { cache: "no-store" });
         if (response.status === 404) {
           console.debug("[subtitles] track not extracted yet");
           return;
@@ -134,21 +143,32 @@ export function useAssRenderer({ video, url, fonts, styled, style, timeOffset, d
           console.warn("[subtitles] fetch failed", { status: response.status });
           return;
         }
-        const raw = await response.text();
-        if (cancelled || raw.length === lastLength) return;
-        lastLength = raw.length;
-        rawRef.current = raw;
-        const content = applySubtitleStyle(raw, styleRef.current.style, styleRef.current.styled);
+        const total = Number(response.headers.get("x-subtitle-events") ?? "0");
+        const text = await response.text();
+        if (cancelled) return;
         await instance.ready;
         if (cancelled) return;
-        await instance.renderer.setTrack(content);
-        // A new script resets styles: re-read the originals and re-apply
-        // the current dock lift on top of them.
-        await captureBaseStyles(instance);
-        await applyLift(instance, liftTarget(), 1);
-        console.debug("[subtitles] track updated", { bytes: raw.length });
+        if (!loaded) {
+          // First response: the whole script so far, header included.
+          rawRef.current = text;
+          await instance.renderer.setTrack(applySubtitleStyle(text, styleRef.current.style, styleRef.current.styled));
+          // A new script resets styles: re-read the originals and re-apply
+          // the current dock lift on top of them.
+          await captureBaseStyles(instance);
+          await applyLift(instance, liftTarget(), 1);
+          loaded = true;
+          console.info("[subtitles] track loaded", { events: total, bytes: text.length });
+        } else if (text.length > 0) {
+          // Just the new Dialogue lines - appended, no re-parse.
+          rawRef.current += text;
+          await instance.renderer.processData(text);
+          console.debug("[subtitles] events appended", { added: total - loadedEvents, total });
+        }
+        loadedEvents = total;
       } catch (err) {
         console.error("[subtitles] poll/render failed", { err: String(err) });
+      } finally {
+        inFlight = false;
       }
     }
 
