@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks"
 import { invoke } from "@tauri-apps/api/core";
 import { isFullscreen, setFullscreen, toggleFullscreen, useFullscreen } from "./fullscreen";
 import { MpvVideo } from "./mpvVideo";
+import { isTypingTarget } from "./keyboard";
 import { HlsPlayerView } from "./HlsPlayerView";
 import type { AnimeMedia, NyaaResult, PlayFile, StreamStats, SubtitleTrack } from "./types";
 import { displayTitle } from "./types";
@@ -832,19 +833,10 @@ function MpvPlayerView({
       });
    }
 
-   // Player-wide keybinds, ignored while a form control has focus.
+   // Player-wide keybinds, ignored only while typing in a text field.
    useEffect(() => {
-      function isFormControl(target: EventTarget | null): boolean {
-         if (!(target instanceof HTMLElement)) return false;
-         return (
-            target.tagName === "INPUT" ||
-            target.tagName === "SELECT" ||
-            target.tagName === "TEXTAREA"
-         );
-      }
-
       function handleKeyDown(e: KeyboardEvent) {
-         if (isFormControl(e.target)) return;
+         if (isTypingTarget(e.target)) return;
          // Ctrl+C: copy the current frame - unless text is selected, where the
          // user means an ordinary copy.
          if (

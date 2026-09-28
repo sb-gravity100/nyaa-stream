@@ -1,5 +1,6 @@
 import { useEffect, useState } from "preact/hooks";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { isTypingTarget } from "./keyboard";
 
 // App-wide fullscreen: the native window itself, not an element inside the
 // webview - the embedded mpv draws into the window, so only that grows the
@@ -47,17 +48,6 @@ export function useFullscreen(): boolean {
     };
   }, []);
   return on;
-}
-
-const TEXT_INPUT_TYPES = new Set(["", "text", "search", "email", "url", "password", "number", "tel"]);
-
-/** Typing into a field - where F is a letter, not a hotkey. */
-function isTypingTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  if (target.isContentEditable) return true;
-  if (target instanceof HTMLTextAreaElement) return true;
-  if (target instanceof HTMLInputElement) return TEXT_INPUT_TYPES.has(target.type.toLowerCase());
-  return false;
 }
 
 /** F toggles fullscreen anywhere in the app, unless typing. Also adopts
