@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "preact/hooks";
-import { displayTitle, formatSeason, type AnimeMedia, type KitsuMetadata, type NyaaResult } from "./types";
+import { displayTitle, formatSeason, isMovie, type AnimeMedia, type KitsuMetadata, type NyaaResult } from "./types";
 import type { EpisodeLabel } from "./episodeParser";
 import { PlayerView } from "./PlayerView";
 import { progressForAnime, setWatched, subscribeProgress, type ProgressEntry } from "./watchProgress";
@@ -85,6 +85,7 @@ export function MediaPage({
   onRemoveFromLibrary,
 }: Props) {
   const seasonLabel = formatSeason(anime.season, anime.seasonYear);
+  const movie = isMovie(anime);
   const progress = useAnimeProgress(anime.id);
   const [expanded, setExpanded] = useState(false);
   // The group the route's player target resolves to, once releases load.
@@ -266,7 +267,13 @@ export function MediaPage({
                 <dd>{anime.format.replace("_", " ")}</dd>
               </div>
             )}
-            {anime.episodes != null && (
+            {movie && anime.duration != null && (
+              <div>
+                <dt>Runtime</dt>
+                <dd>{anime.duration} min</dd>
+              </div>
+            )}
+            {!movie && anime.episodes != null && (
               <div>
                 <dt>Episodes</dt>
                 <dd>
@@ -307,9 +314,9 @@ export function MediaPage({
           )}
         </div>
 
-        <section class="videos-list-panel" aria-label="Episodes">
+        <section class="videos-list-panel" aria-label={movie ? "Movie" : "Episodes"}>
           <header class="videos-list-header">
-            <h2>Episodes</h2>
+            <h2>{movie ? "Movie" : "Episodes"}</h2>
             {!sourcesLoading && sourcesCount > 0 && <span>{sourcesCount} releases on nyaa.si</span>}
           </header>
           {error && <p class="error-banner">{error}</p>}
@@ -326,7 +333,8 @@ export function MediaPage({
             {!sourcesLoading &&
               groupedSources.map(([key, group]) => {
                 const episodeNumber = group.label.kind === "episode" ? group.label.number : null;
-                const thumbnail = episodeNumber != null ? thumbnails[episodeNumber] : undefined;
+                // A movie's row shows its key art, not a "1".
+                const thumbnail = movie ? (backdrop ?? undefined) : episodeNumber != null ? thumbnails[episodeNumber] : undefined;
                 const entry = progress[key];
                 const watched = entry?.completed ?? false;
                 const fraction = entry && !watched ? Math.min(1, entry.position / entry.duration) : 0;

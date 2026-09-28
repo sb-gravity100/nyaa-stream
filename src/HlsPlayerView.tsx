@@ -4,7 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { isTypingTarget } from "./keyboard";
 import { isFullscreen, setFullscreen, toggleFullscreen, useFullscreen } from "./fullscreen";
 import type { AnimeMedia, NyaaResult, PlayFile, StreamStats, SubtitleTrack } from "./types";
-import { displayTitle } from "./types";
+import { displayTitle, isMovie } from "./types";
 import { getStreamStats, getSubtitleTracks, playMagnet, reportDecoderSupport, stopPlayback } from "./playback";
 import { saveFrameThumbnail } from "./torrentThumbnail";
 import { loadingProgress } from "./loadingProgress";
@@ -360,11 +360,11 @@ export function HlsPlayerView({
                `${displayTitle(anime.title)} ${episodeKey}`,
             );
             if (cancelled) return;
-            const file = pickFile(
-               session.files,
-               session.defaultFileIdx,
-               episode,
-            );
+            // A movie is the torrent's largest video (the backend's
+            // default) - never an extra that happens to parse as "01".
+            const file = isMovie(anime)
+               ? (session.files.find((f) => f.index === session.defaultFileIdx) ?? null)
+               : pickFile(session.files, session.defaultFileIdx, episode);
             if (!file) {
                setError("This torrent has no playable video file.");
                return;
