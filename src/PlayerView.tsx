@@ -1478,9 +1478,11 @@ let mpvAvailable: Promise<boolean> | null = null;
 export function PlayerView(props: Props) {
    const [useMpv, setUseMpv] = useState<boolean | null>(null);
    useEffect(() => {
+      // A failed check (an older backend without the command) isn't
+      // evidence mpv is missing - mpv stays the default.
       mpvAvailable ??= invoke<boolean>("mpv_available").catch((err) => {
-         console.warn("[player] mpv availability check failed", { err: String(err) });
-         return false;
+         console.warn("[player] mpv availability check failed, assuming mpv", { err: String(err) });
+         return true;
       });
       void mpvAvailable.then((available) => {
          console.info("[player] backend", { mpv: available });
