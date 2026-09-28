@@ -13,6 +13,7 @@
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-opener": "^2",
     "hls.js": "^1.7.1",
+    "jassub": "^2.5.16",
     "preact": "^10.25.1"
   },
   "devDependencies": {

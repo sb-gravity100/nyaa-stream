@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { isTauriAvailable } from "./browserFallback";
-import type { PlaySession, StreamStats, SubtitleTrack } from "./types";
+import type { PlaySession, StreamStats, SubtitleInfo } from "./types";
 
 // Torrenting isn't available in the dev-only browser preview (see
 // browserFallback.ts) - there's no meaningful fallback for actual playback,
@@ -19,10 +19,11 @@ export async function getStreamStats(torrentId: string): Promise<StreamStats> {
 }
 
 // No browser-fallback path (see this file's top comment): a torrent-less
-// dev preview has no subtitle tracks to list either.
-export async function getSubtitleTracks(torrentId: string): Promise<SubtitleTrack[]> {
-  if (!isTauriAvailable()) return [];
-  return invoke<SubtitleTrack[]>("get_subtitle_tracks", { torrentId });
+// dev preview has no subtitle tracks to list either. Rejects while the
+// container header hasn't downloaded yet - callers retry.
+export async function getSubtitleTracks(torrentId: string): Promise<SubtitleInfo> {
+  if (!isTauriAvailable()) return { tracks: [], fonts: [] };
+  return invoke<SubtitleInfo>("get_subtitle_tracks", { torrentId });
 }
 
 export async function stopPlayback(): Promise<void> {
