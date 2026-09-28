@@ -9,9 +9,9 @@
 //! linked from the project's vcpkg manifest (LGPL build - no x264; see
 //! `H264Encoder`).
 //!
-//! Inputs still read the torrent through `stream_handler` over loopback
-//! HTTP (with FFmpeg's reconnect options), exactly as the CLI did - swapping
-//! that for direct read callbacks is a separate, later step.
+//! HLS and subtitle runs read the torrent directly through AVIO callbacks
+//! (`direct_input`); only the one-time header probe still reads
+//! `stream_handler` over loopback HTTP (with FFmpeg's reconnect options).
 //!
 //! Tradeoff accepted when choosing in-process: a libav crash on a malformed
 //! file takes the whole app down instead of one child process.
@@ -21,6 +21,9 @@ use std::path::Path;
 
 use ez_ffmpeg::core::scheduler::ffmpeg_scheduler::Running;
 use ez_ffmpeg::{FfmpegContext, FfmpegScheduler, Input, Output};
+use tokio_util::sync::CancellationToken;
+
+use crate::direct_input::TorrentReader;
 
 /// Demuxer/protocol options for every read of `stream_handler`. Its body can
 /// end short of Content-Length when the torrent engine gives up on a piece;
@@ -51,6 +54,8 @@ pub fn init() {
 pub struct MediaJob {
     scheduler: Option<FfmpegScheduler<Running>>,
     label: &'static str,
+    /// Cancels a direct torrent input's reads (see `direct_input`).
+    cancel: Option<CancellationToken>,
 }
 
 impl MediaJob {
@@ -62,6 +67,11 @@ impl MediaJob {
     /// Stops the job without waiting for it to drain (a seek restart
     /// doesn't want the tail of the old run).
     pub fn abort(&mut self) {
+        // First, so a read parked on an undownloaded piece returns and the
+        // scheduler's abort (which waits for its workers) doesn't hang on it.
+        if let Some(cancel) = &self.cancel {
+            cancel.cancel();
+        }
         if let Some(scheduler) = self.scheduler.take() {
             tracing::debug!(job = self.label, "aborting media job");
             scheduler.abort();
@@ -75,20 +85,42 @@ impl Drop for MediaJob {
     }
 }
 
-fn start(context: FfmpegContext, label: &'static str) -> anyhow::Result<MediaJob> {
-    let scheduler = FfmpegScheduler::new(context).start().map_err(|err| anyhow::anyhow!("{label}: failed to start: {err}"))?;
-    Ok(MediaJob { scheduler: Some(scheduler), label })
+fn start(context: FfmpegContext, label: &'static str, cancel: Option<CancellationToken>) -> anyhow::Result<MediaJob> {
+    let scheduler = FfmpegScheduler::new(context).start().map_err(|err| {
+        // Nothing will read from the input any more.
+        if let Some(cancel) = &cancel {
+            cancel.cancel();
+        }
+        anyhow::anyhow!("{label}: failed to start: {err}")
+    })?;
+    Ok(MediaJob { scheduler: Some(scheduler), label, cancel })
 }
 
-fn http_input(url: &str, start_seconds: f64) -> Input {
-    let mut input = Input::from(url).set_format_opts(HTTP_INPUT_OPTS.to_vec());
+/// Where a run reads the media file from.
+pub enum InputSource {
+    /// Direct torrent reads - what the app uses.
+    Torrent(TorrentReader),
+    /// A URL or local path (the smoke test; HTTP gets `HTTP_INPUT_OPTS`).
+    #[cfg_attr(not(test), allow(dead_code))]
+    Url(String),
+}
+
+fn open_input(source: InputSource, start_seconds: f64) -> (Input, Option<CancellationToken>) {
+    let (mut input, cancel) = match source {
+        InputSource::Torrent(reader) => {
+            let (input, cancel) = reader.into_input();
+            (input, Some(cancel))
+        }
+        InputSource::Url(url) if url.starts_with("http") => (Input::from(url).set_format_opts(HTTP_INPUT_OPTS.to_vec()), None),
+        InputSource::Url(url) => (Input::from(url), None),
+    };
     // Sequential playback from the start deliberately passes no start time:
     // without a Matroska Cues index on a still-downloading torrent, any seek
     // can make the demuxer estimate a byte offset instead of reading forward.
     if start_seconds > 0.0 {
         input = input.set_start_time_us((start_seconds * 1_000_000.0) as i64);
     }
-    input
+    (input, cancel)
 }
 
 /// One subtitle stream to extract.
@@ -278,7 +310,7 @@ pub enum VideoCodec {
 }
 
 pub struct HlsRun<'a> {
-    pub input_url: &'a str,
+    pub input: InputSource,
     pub dir: &'a Path,
     pub start_segment_index: usize,
     pub segment_seconds: f64,
@@ -307,11 +339,12 @@ const MAX_RUN_SECONDS: f64 = 4.0 * 3600.0;
 /// (`<index>.m4s`) behind one `init.mp4` per run - identical across runs of
 /// the same file and plan, so the one hls.js loaded stays valid after a seek
 /// restart. Blocking (opens the input) - call from `spawn_blocking`.
-pub fn start_hls_run(run: &HlsRun<'_>) -> anyhow::Result<MediaJob> {
+pub fn start_hls_run(run: HlsRun<'_>) -> anyhow::Result<MediaJob> {
     init();
     let start_seconds = run.start_segment_index as f64 * run.segment_seconds;
     let transcoding = matches!(run.video, VideoCodec::Transcode(_));
-    let mut input = http_input(run.input_url, start_seconds)
+    let (input, cancel) = open_input(run.input, start_seconds);
+    let mut input = input
         .set_format_opt("probesize", "2000000")
         .set_format_opt("analyzeduration", "2000000");
     if transcoding {
@@ -359,23 +392,34 @@ pub fn start_hls_run(run: &HlsRun<'_>) -> anyhow::Result<MediaJob> {
     for stream in run.subtitle_streams {
         builder = builder.output(subtitle_output(run.dir, *stream, &run.start_segment_index.to_string()));
     }
-    let context = builder.build().map_err(|err| anyhow::anyhow!("hls run: {err}"))?;
-    start(context, "hls run")
+    let context = builder.build().map_err(|err| {
+        if let Some(cancel) = &cancel {
+            cancel.cancel();
+        }
+        anyhow::anyhow!("hls run: {err}")
+    })?;
+    start(context, "hls run", cancel)
 }
 
 /// Subtitle-only extraction for `subtitle_streams`, named
 /// `sub_<index>_<name_suffix>.ass` - the catch-up for a run that started
 /// before the probe finished (suffix = its start segment) or the full-file
 /// background pass (suffix `bg`, `start_seconds` 0). Blocking.
-pub fn start_subtitle_run(input_url: &str, dir: &Path, start_seconds: f64, subtitle_streams: &[SubtitleStream], name_suffix: &str) -> anyhow::Result<MediaJob> {
+pub fn start_subtitle_run(source: InputSource, dir: &Path, start_seconds: f64, subtitle_streams: &[SubtitleStream], name_suffix: &str) -> anyhow::Result<MediaJob> {
     init();
     anyhow::ensure!(!subtitle_streams.is_empty(), "no subtitle streams");
-    let mut builder = FfmpegContext::builder().copyts().input(http_input(input_url, start_seconds));
+    let (input, cancel) = open_input(source, start_seconds);
+    let mut builder = FfmpegContext::builder().copyts().input(input);
     for stream in subtitle_streams {
         builder = builder.output(subtitle_output(dir, *stream, name_suffix));
     }
-    let context = builder.build().map_err(|err| anyhow::anyhow!("subtitle run: {err}"))?;
-    start(context, "subtitle run")
+    let context = builder.build().map_err(|err| {
+        if let Some(cancel) = &cancel {
+            cancel.cancel();
+        }
+        anyhow::anyhow!("subtitle run: {err}")
+    })?;
+    start(context, "subtitle run", cancel)
 }
 
 #[cfg(test)]
@@ -383,7 +427,8 @@ mod tests {
     use super::*;
 
     /// Manual smoke test of a real HLS run against a local file:
-    /// `NYAA_HLS_TEST_INPUT=<file> [NYAA_HLS_TEST_HVC1=1] cargo test -p
+    /// `NYAA_HLS_TEST_INPUT=<file> [NYAA_HLS_TEST_HVC1=1]
+    /// [NYAA_HLS_TEST_START=<segment>] [NYAA_HLS_TEST_DIRECT=1] cargo test -p
     /// torrent-engine hls_run_smoke -- --ignored --nocapture`. Writes to
     /// `NYAA_HLS_TEST_OUT` (default: a temp dir) for inspection with ffprobe.
     #[test]
@@ -395,8 +440,18 @@ mod tests {
         let dir = std::env::var("NYAA_HLS_TEST_OUT").map(std::path::PathBuf::from).unwrap_or_else(|_| std::env::temp_dir().join("nyaa_hls_smoke"));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
-        let mut job = start_hls_run(&HlsRun {
-            input_url: &input,
+        // NYAA_HLS_TEST_DIRECT=1: read through direct_input's callbacks
+        // (the app's path) instead of FFmpeg's own file protocol.
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        let _guard = runtime.enter();
+        let source = if std::env::var("NYAA_HLS_TEST_DIRECT").is_ok() {
+            let sources = crate::direct_input::TorrentSources::local_file(input.into());
+            InputSource::Torrent(sources.reader(&"local".to_string(), 0, false))
+        } else {
+            InputSource::Url(input)
+        };
+        let mut job = start_hls_run(HlsRun {
+            input: source,
             dir: &dir,
             start_segment_index,
             segment_seconds: 6.0,
