@@ -26,6 +26,18 @@ export async function getSubtitleTracks(torrentId: string, fileIdx: number): Pro
   return invoke<SubtitleInfo>("get_subtitle_tracks", { torrentId, fileIdx });
 }
 
+// Tells the streaming server what this WebView decodes natively, so it
+// only transcodes what it must (see torrent-engine's plan_video). Probed
+// with MSE, the same path hls.js feeds.
+let decoderSupportSent = false;
+export async function reportDecoderSupport(): Promise<void> {
+  if (!isTauriAvailable() || decoderSupportSent) return;
+  const hevc = typeof MediaSource !== "undefined" && MediaSource.isTypeSupported('video/mp4; codecs="hvc1.1.6.L120.90"');
+  console.info("[set_decoder_support] invoked", { hevc });
+  await invoke("set_decoder_support", { support: { hevc } });
+  decoderSupportSent = true;
+}
+
 export async function stopPlayback(): Promise<void> {
   if (!isTauriAvailable()) return;
   console.debug("[stop_playback] invoked");

@@ -112,6 +112,9 @@ export interface StreamStats {
   /** Every produced `[start, end)` stretch in seconds - seek restarts
    * leave several disjoint ones. */
   readyRanges: [number, number][];
+  /** "direct" (stream copy) or e.g. "HEVC -> H.264 (h264_nvenc)" when the
+   * streaming server is transcoding; null before the first segment. */
+  videoMode: string | null;
 }
 
 export function displayTitle(title: AnimeTitle): string {

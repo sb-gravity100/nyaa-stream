@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import Hls from "hls.js";
 import type { AnimeMedia, NyaaResult, PlayFile, StreamStats, SubtitleTrack } from "./types";
 import { displayTitle } from "./types";
-import { getStreamStats, getSubtitleTracks, playMagnet, stopPlayback } from "./playback";
+import { getStreamStats, getSubtitleTracks, playMagnet, reportDecoderSupport, stopPlayback } from "./playback";
 import { loadingProgress } from "./loadingProgress";
 import { bestRelease, codecPlayable, getPreferredGroup, releaseCodec, releaseGroup, releaseResolution, setPreferredGroup, sortReleases } from "./releases";
 import { parseEpisode } from "./episodeParser";
@@ -233,6 +233,7 @@ export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNe
     setStatus("Connecting to peers…");
     (async () => {
       try {
+        await reportDecoderSupport().catch((err) => console.warn("[player] decoder support report failed", { err: String(err) }));
         const session = await playMagnet(selectedRelease.magnet, `${displayTitle(anime.title)} ${episodeKey}`);
         if (cancelled) return;
         const file = pickFile(session.files, session.defaultFileIdx, episode);
@@ -836,6 +837,11 @@ export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNe
             {episodeKey}
             {group && <span class="player-chip">{group}</span>}
             {resolution && <span class="player-chip">{resolution}p</span>}
+            {stats?.videoMode && stats.videoMode !== "direct" && (
+              <span class="player-chip player-chip-accent" title={stats.videoMode}>
+                Converting to H.264
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -982,7 +988,7 @@ export function PlayerView({ anime, episodeKey, episode, releases, onClose, onNe
                       <span class="player-source-title">{r.title}</span>
                       <span class="player-menu-meta">
                         <span class="seeders">{r.seeders} seeders</span> · {r.size}
-                        {!codecPlayable(releaseCodec(r)) && <span class="codec-warning"> · {releaseCodec(r)?.toUpperCase()} won't play here</span>}
+                        {!codecPlayable(releaseCodec(r)) && <span class="codec-note"> · {releaseCodec(r)?.toUpperCase()}, converted to H.264</span>}
                         {g && g === preferredGroup ? " · your usual group" : ""}
                       </span>
                     </button>
