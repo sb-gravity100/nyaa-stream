@@ -186,6 +186,37 @@ async fn get_kitsu_metadata(state: State<'_, Arc<AppState>>, anilist_id: i64) ->
 /// How long cached Kitsu metadata is used without refetching.
 const KITSU_CACHE_FRESH_FOR: std::time::Duration = std::time::Duration::from_secs(24 * 3600);
 
+/// Saves the player's last shown frame (a `data:image/jpeg;base64,` URI) as
+/// the episode's thumbnail, in the same cache `capture_torrent_thumbnail`
+/// uses - it's where the user left off, and it costs no torrent capture.
+#[tauri::command]
+async fn save_frame_thumbnail(state: State<'_, Arc<AppState>>, cache_key: String, data_uri: String) -> Result<(), String> {
+    // `{anilistId}-{episode}` only: the key becomes a file name.
+    if cache_key.is_empty() || !cache_key.chars().all(|c| c.is_ascii_digit() || c == '-') {
+        tracing::warn!(cache_key, "save_frame_thumbnail rejected cache key");
+        return Err("invalid cache key".to_string());
+    }
+    let encoded = data_uri.strip_prefix("data:image/jpeg;base64,").ok_or("expected a JPEG data URI")?;
+    let bytes = base64::engine::general_purpose::STANDARD.decode(encoded).map_err(|err| err.to_string())?;
+    let cache_path = state.thumbnail_cache_dir.join(format!("{cache_key}.jpg"));
+    let tmp = cache_path.with_extension("tmp");
+    let write = async {
+        tokio::fs::create_dir_all(&state.thumbnail_cache_dir).await?;
+        tokio::fs::write(&tmp, &bytes).await?;
+        tokio::fs::rename(&tmp, &cache_path).await
+    };
+    match write.await {
+        Ok(()) => {
+            tracing::info!(cache_key, bytes = bytes.len(), "saved last player frame as thumbnail");
+            Ok(())
+        }
+        Err(err) => {
+            tracing::error!(cache_key, %err, "failed to save player frame thumbnail");
+            Err(err.to_string())
+        }
+    }
+}
+
 /// A torrent-captured thumbnail from the disk cache only - never captures.
 /// The frontend asks this first so a cached frame comes back without the
 /// nyaa search it needs to pick a release for a real capture.
@@ -787,6 +818,7 @@ pub fn run() {
             get_kitsu_metadata,
             capture_torrent_thumbnail,
             cached_torrent_thumbnail,
+            save_frame_thumbnail,
             search_torrents,
             search_torrents_for_anime,
             get_torrent_details_batch,

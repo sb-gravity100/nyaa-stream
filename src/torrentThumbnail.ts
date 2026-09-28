@@ -28,6 +28,18 @@ function pickCandidate(results: NyaaResult[], episode: number): NyaaResult | nul
   return matches.reduce((best, r) => (r.seeders > best.seeders ? r : best));
 }
 
+/** Saves the player's last frame as the episode's thumbnail (disk cache,
+ * shared with torrent captures) and makes it the in-memory entry, so the
+ * home page shows it as soon as the player closes. */
+export function saveFrameThumbnail(anilistId: number, episode: number, dataUri: string): void {
+  const key = cacheKey(anilistId, episode);
+  cache.set(key, dataUri);
+  if (!isTauriAvailable()) return;
+  invoke("save_frame_thumbnail", { cacheKey: key, dataUri }).catch((err) =>
+    console.warn("[save_frame_thumbnail] failed", { anilistId, episode, err: String(err) }),
+  );
+}
+
 /** A previously captured frame from the backend's disk cache, or null -
  * never searches nyaa or captures, so it's cheap enough to ask for every
  * card as soon as it's listed rather than after the Kitsu/AniList
