@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `772737c` · 2026-09-29 · fix(player): pointer-driven seek bar commits once and never shows stale time
+- `src/App.css`
+- `src/PlayerView.tsx`
+
 ### `d22c325` · 2026-09-29 · fix(player): hotkeys stay live after clicking sliders or buttons
 - `src/HlsPlayerView.tsx`
 - `src/PlayerView.tsx`
