@@ -203,6 +203,8 @@ struct HlsJob {
     /// subtitle-only process for the same start offset.
     has_subtitles: bool,
     subtitle_child: Option<media::MediaJob>,
+    /// Subtitle tracks this run (or its catch-up process) extracts.
+    subtitle_tracks: usize,
     /// `VideoPlan::label` of this run, reported in `StreamStats`.
     video_mode: String,
 }
@@ -428,6 +430,7 @@ impl HlsJobs {
                     started_at: tokio::time::Instant::now(),
                     has_subtitles,
                     subtitle_child: None,
+                    subtitle_tracks: playback_subtitle_tracks(&subtitles).len(),
                     video_mode: plan.label(),
                 });
                 if !has_subtitles {
@@ -548,6 +551,26 @@ impl HlsJobs {
         plan
     }
 
+    async fn run_info(&self, torrent_id: &TorrentId, file_idx: usize) -> Option<HlsRunInfo> {
+        // Plain values only: the job owns FFmpeg state that isn't Sync, so
+        // nothing of it may be held across the directory scan's await.
+        let (dir, start_index, started_at, running, subtitle_tracks) = {
+            let job_lock = self.key_lock(torrent_id, file_idx).await;
+            let slot = job_lock.lock().await;
+            let job = slot.as_ref()?;
+            (job.dir.clone(), job.start_index, job.started_at, !job.child.is_ended(), job.subtitle_tracks)
+        };
+        let produced = highest_existing_segment_from(&dir, start_index).await.map_or(0, |highest| highest + 1 - start_index);
+        let elapsed = started_at.elapsed().as_secs_f64().max(0.001);
+        Some(HlsRunInfo {
+            start_seconds: start_index as f64 * SEGMENT_DURATION_SECONDS,
+            segments_produced: produced,
+            speed_x_realtime: produced as f64 * SEGMENT_DURATION_SECONDS / elapsed,
+            running,
+            subtitle_tracks,
+        })
+    }
+
     async fn video_mode(&self, torrent_id: &TorrentId, file_idx: usize) -> Option<String> {
         let job_lock = self.key_lock(torrent_id, file_idx).await;
         let slot = job_lock.lock().await;
@@ -574,6 +597,7 @@ impl HlsJobs {
             Ok(child) => {
                 job.subtitle_child = Some(child);
                 job.has_subtitles = true;
+                job.subtitle_tracks = playback_subtitle_tracks(tracks).len();
                 tracing::info!(torrent_id = %torrent_id, file_idx, start_index = job.start_index, tracks = tracks.len(), "attached subtitle extraction to running hls job");
             }
             Err(err) => tracing::error!(torrent_id = %torrent_id, file_idx, %err, "failed to start subtitle extraction"),
@@ -1037,6 +1061,34 @@ pub struct StreamStats {
     /// How the current run handles video: "direct" (stream copy) or e.g.
     /// "HEVC -> H.264 (h264_nvenc)". None before the first segment request.
     pub video_mode: Option<String>,
+    // --- Verbose statistics popup ---
+    pub torrent_name: String,
+    pub file_name: String,
+    pub upload_speed_mbps: f64,
+    pub uploaded_bytes: u64,
+    /// Peers sending us data / waiting to connect / the whole known swarm.
+    pub unchoked_peers: u64,
+    pub queued_peers: u64,
+    pub swarm_size: u64,
+    /// Peer sources (trackers, DHT...) queried.
+    pub sources: usize,
+    /// The current HLS run, if any (see `HlsRunInfo`).
+    pub run: Option<HlsRunInfo>,
+}
+
+/// The live HLS run of a file, for the statistics popup.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HlsRunInfo {
+    /// Where the run started (seconds) - 0 unless a seek restarted it.
+    pub start_seconds: f64,
+    /// Segments this run has produced so far.
+    pub segments_produced: usize,
+    /// Media seconds produced per wall-clock second (1.0 = realtime).
+    pub speed_x_realtime: f64,
+    pub running: bool,
+    /// Subtitle tracks extracted alongside the video.
+    pub subtitle_tracks: usize,
 }
 
 impl TorrentEngine {
@@ -1262,6 +1314,15 @@ impl TorrentEngine {
             ready_seconds: ready_ranges.first().filter(|(start, _)| *start == 0.0).map_or(0.0, |(_, end)| *end),
             ready_ranges,
             video_mode: self.hls_jobs.video_mode(id, file_idx).await,
+            torrent_name: stats.name.clone(),
+            file_name: stats.files.get(file_idx).map(|f| f.name.clone()).unwrap_or_default(),
+            upload_speed_mbps: stats.upload_speed / (1024.0 * 1024.0),
+            uploaded_bytes: stats.uploaded,
+            unchoked_peers: stats.unchoked,
+            queued_peers: stats.queued,
+            swarm_size: stats.swarm_size,
+            sources: stats.sources.len(),
+            run: self.hls_jobs.run_info(id, file_idx).await,
         })
     }
 }
