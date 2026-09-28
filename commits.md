@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `67e9797` · 2026-09-28 · feat(engine): transcode formats the WebView can't decode to H.264
+- `crates/torrent-engine/src/lib.rs`
+- `src-tauri/src/lib.rs`
+
 ### `9f111c3` · 2026-09-28 · fix(enginefs): re-read all-zero disk chunks through read_piece
 - `vendor/enginefs/src/backend/libtorrent/disk_stream.rs`
 
