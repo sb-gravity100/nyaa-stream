@@ -2,6 +2,16 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `536346c` · 2026-09-28 · feat(ui): resume, next episode, batch file picker, settings panel
+- `src/App.tsx`
+- `src/HomePage.tsx`
+- `src/MediaPage.tsx`
+- `src/PlayerView.tsx`
+- `src/SettingsPanel.tsx`
+- `src/icons.tsx`
+- `src/playback.ts`
+- `src/types.ts`
+
 ### `9b164a0` · 2026-09-28 · feat(library): watch-progress store and preferred fansub group ranking
 - `src/releases.ts`
 - `src/watchProgress.ts`
