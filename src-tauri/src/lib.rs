@@ -1,3 +1,4 @@
+mod metadata_fallback;
 mod player;
 
 use std::path::PathBuf;
@@ -26,6 +27,8 @@ struct AppState {
     /// `player::PlayerState`.
     current_torrent: Mutex<Option<TorrentId>>,
     thumbnail_cache_dir: PathBuf,
+    /// Set after AniList turns us away - see `metadata_fallback`.
+    anilist_cooldown: metadata_fallback::AniListCooldown,
     /// One torrent capture at a time: each adds a scratch torrent and a
     /// headless mpv decode, and a home page full of art-less cards used to
     /// start them all at once.
@@ -52,14 +55,30 @@ fn log_frontend(level: String, message: String) {
 #[tauri::command]
 async fn search_anime(state: State<'_, Arc<AppState>>, query: String) -> Result<Vec<AnimeMedia>, String> {
     tracing::debug!(%query, "search_anime invoked");
-    match state.anilist.search(&query, 20).await {
+    if !state.anilist_cooldown.active() {
+        match state.anilist.search(&query, 20).await {
+            Ok(results) => {
+                tracing::info!(%query, count = results.len(), "search_anime succeeded");
+                return Ok(results);
+            }
+            Err(err) if metadata_fallback::anilist_unavailable(&err) => {
+                tracing::warn!(%query, %err, "search_anime: AniList unavailable, falling back to Kitsu");
+                state.anilist_cooldown.start();
+            }
+            Err(err) => {
+                tracing::error!(%query, %err, "search_anime failed");
+                return Err(err.to_string());
+            }
+        }
+    }
+    match state.kitsu.search_anime(&query, 20).await {
         Ok(results) => {
-            tracing::info!(%query, count = results.len(), "search_anime succeeded");
-            Ok(results)
+            tracing::info!(%query, count = results.len(), "search_anime succeeded via Kitsu");
+            Ok(results.into_iter().map(metadata_fallback::to_media).collect())
         }
         Err(err) => {
-            tracing::error!(%query, %err, "search_anime failed");
-            Err(err.to_string())
+            tracing::error!(%query, %err, "search_anime failed on Kitsu too");
+            Err(format!("AniList is unavailable and Kitsu failed too: {err}"))
         }
     }
 }
@@ -95,14 +114,34 @@ async fn get_latest_episodes(
 #[tauri::command]
 async fn get_anime_details(state: State<'_, Arc<AppState>>, id: i64) -> Result<AnimeMedia, String> {
     tracing::debug!(id, "get_anime_details invoked");
-    match state.anilist.get_by_id(id).await {
-        Ok(media) => {
-            tracing::info!(id, "get_anime_details succeeded");
-            Ok(media)
+    if !state.anilist_cooldown.active() {
+        match state.anilist.get_by_id(id).await {
+            Ok(media) => {
+                tracing::info!(id, "get_anime_details succeeded");
+                return Ok(media);
+            }
+            Err(err) if metadata_fallback::anilist_unavailable(&err) => {
+                tracing::warn!(id, %err, "get_anime_details: AniList unavailable, falling back to Kitsu");
+                state.anilist_cooldown.start();
+            }
+            Err(err) => {
+                tracing::error!(id, %err, "get_anime_details failed");
+                return Err(err.to_string());
+            }
+        }
+    }
+    match state.kitsu.anime_by_anilist_id(id).await {
+        Ok(Some(anime)) => {
+            tracing::info!(id, "get_anime_details succeeded via Kitsu");
+            Ok(metadata_fallback::to_media(anime))
+        }
+        Ok(None) => {
+            tracing::warn!(id, "get_anime_details: Kitsu has no mapping for this AniList id");
+            Err("AniList is unavailable and Kitsu doesn't know this anime".to_string())
         }
         Err(err) => {
-            tracing::error!(id, %err, "get_anime_details failed");
-            Err(err.to_string())
+            tracing::error!(id, %err, "get_anime_details failed on Kitsu too");
+            Err(format!("AniList is unavailable and Kitsu failed too: {err}"))
         }
     }
 }
@@ -919,6 +958,7 @@ pub fn run() {
             torrent_engine,
             current_torrent: Mutex::new(None),
             thumbnail_cache_dir,
+            anilist_cooldown: Default::default(),
             thumbnail_captures: tokio::sync::Semaphore::new(1),
         })
     });

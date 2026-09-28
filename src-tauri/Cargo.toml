@@ -25,6 +25,8 @@ serde_json = "1"
 tokio = { version = "1", features = ["full"] }
 dirs = "5"
 base64 = { workspace = true }
+# Classifying AniList failures (metadata_fallback.rs).
+reqwest = { workspace = true }
 anyhow = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
