@@ -18,7 +18,7 @@ import { parseEpisode } from "./episodeParser";
 import { Buffering } from "./Buffering";
 import { StatisticsMenu } from "./StatisticsMenu";
 import { getSettings as getSettingsSnapshot, useSettings } from "./settings";
-import { applyMpvSubtitleStyle, defaultSubtitleIndex, isStyledTrack, subtitleTrackLabel } from "./subtitles";
+import { applyMpvSubtitleStyle, mpvSubtitleSettings, defaultSubtitleIndex, isStyledTrack, subtitleTrackLabel } from "./subtitles";
 import { resumePosition, saveProgress } from "./watchProgress";
 import { PlayerPlaylist, type PlaylistItem } from "./PlayerPlaylist";
 import {
@@ -955,8 +955,10 @@ function MpvPlayerView({
       setExporting(true);
       setExportSaved(null);
       setExportError(null);
-      console.info("[player] exporting clip", { start: request.start, end: request.end, folder: request.folder || "(default)" });
+      const burnSubs = request.includeSubs && activeSubtitle != null && videoEl != null;
+      console.info("[player] exporting clip", { start: request.start, end: request.end, folder: request.folder || "(default)", subs: burnSubs });
       try {
+         const subtitleSettings = burnSubs ? await mpvSubtitleSettings(videoEl, settings.subtitleStyle, isStyledTrack(activeSubtitle)) : null;
          const out = await invoke<string>("export_clip", {
             torrentId,
             fileIdx: selectedFile.index,
@@ -965,6 +967,10 @@ function MpvPlayerView({
             audioStream: request.audioPosition,
             name: request.name,
             folder: request.folder || null,
+            includeSubs: burnSubs,
+            audioId: audioTracks[request.audioPosition]?.index ?? null,
+            subtitleId: burnSubs ? activeSubtitle.index : null,
+            subtitleSettings,
          });
          console.info("[player] clip exported", { out });
          setExportSaved(out);
@@ -1462,6 +1468,7 @@ function MpvPlayerView({
                duration={episodeDuration}
                audioTracks={audioTracks}
                activeAudioId={activeAudioId}
+               subtitleLabel={activeSubtitle ? subtitleTrackLabel(activeSubtitle, subtitleTracks.indexOf(activeSubtitle)) : null}
                folder={settings.exportFolder}
                exporting={exporting}
                savedPath={exportSaved}

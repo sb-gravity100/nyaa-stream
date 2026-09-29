@@ -3490,3 +3490,27 @@ html.mpv-active .player-view {
   opacity: 0.55;
   cursor: not-allowed;
 }
+
+.export-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.export-check input {
+  margin-top: 3px;
+  accent-color: var(--accent);
+}
+
+.export-check span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.9rem;
+}
+
+.export-check small {
+  font-size: 0.75rem;
+  color: var(--faint);
+}
