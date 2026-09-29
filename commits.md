@@ -2,6 +2,13 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `2c438a7` · 2026-09-29 · feat: media keys and taskbar progress in the player
+- `src-tauri/Cargo.toml`
+- `src-tauri/capabilities/default.json`
+- `src-tauri/src/lib.rs`
+- `src-tauri/src/media_keys.rs`
+- `src/PlayerView.tsx`
+
 ### `37f4c3e` · 2026-09-29 · feat: settings storage section, mpv path field, new shortcuts listed
 - `src/App.css`
 - `src/PlayerView.tsx`
