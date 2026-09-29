@@ -93,8 +93,8 @@ Copied from https://github.com/stremio-native/stream-server at rev
   (buffering round 2, from a live resume that took 46s to the first frame):
   foreground reads in the file tail are `ContainerMetadata` (our stream
   server opens at 0 and seeks, so upstream's request-offset check never
-  fired) with the whole window at 7; the last 4 MB is requested at 7 with
-  the header (`TAIL_PREFETCH_STREAM_ID`); after the first byte the read-ahead
+  fired) with the whole window at 7; the file tail (1% of the file, 4-16 MB) is
+  requested at 7 with the header (`TAIL_PREFETCH_STREAM_ID`); after the first byte the read-ahead
   covers 30s of playback (cap 64 MB) with priorities graded 7→2 by distance,
   like Elementum; streams report where playback reads ended so a resume
   anchors only past that frontier (`is_resume_point`), and a resume keeps

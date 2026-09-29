@@ -141,9 +141,16 @@ pub fn seek_target_covered(target: i32, anchor: i32, frontier: i32, urgent_piece
 pub const RESUME_ANCHOR_FALLBACK_EXTRA_MS: u64 = 30_000;
 
 /// (nyaa-stream) The file tail requested with the header at playback start:
-/// MKV Cues / MP4 moov usually live there, and the player reads them right
-/// after the header, before it can seek.
-pub const TAIL_PREFETCH_BYTES: u64 = 4 * 1024 * 1024;
+/// MKV Cues / MP4 moov (and some groups' font attachments) live there, and
+/// the player reads them right after the header, before it can seek. 1% of
+/// the file, clamped - a Kaleido-subs 2 GB file's index started 5.6 MB from
+/// its end.
+pub const MIN_TAIL_PREFETCH_BYTES: u64 = 4 * 1024 * 1024;
+pub const MAX_TAIL_PREFETCH_BYTES: u64 = 16 * 1024 * 1024;
+
+pub fn tail_prefetch_bytes(file_size: u64) -> u64 {
+    (file_size / 100).clamp(MIN_TAIL_PREFETCH_BYTES, MAX_TAIL_PREFETCH_BYTES)
+}
 
 /// (nyaa-stream) Seconds of playback the read-ahead window covers after the
 /// first byte, and its byte cap.
@@ -153,7 +160,7 @@ pub const MAX_READ_AHEAD_BYTES: u64 = 64 * 1024 * 1024;
 const ASSUMED_DURATION_SECS: u64 = 24 * 60;
 
 /// (nyaa-stream) Pieces `first..=last` covering the file's last
-/// `TAIL_PREFETCH_BYTES`, or None for a small file (the startup window
+/// `tail_prefetch_bytes`, or None for a small file (the startup window
 /// already reaches its tail). `file_offset` is torrent-absolute.
 pub fn tail_prefetch_pieces(
     last_piece: i32,
@@ -164,7 +171,7 @@ pub fn tail_prefetch_pieces(
     if piece_length == 0 || file_size < SMALL_FILE_BYTES {
         return None;
     }
-    let tail_start = file_offset + file_size.saturating_sub(TAIL_PREFETCH_BYTES);
+    let tail_start = file_offset + file_size.saturating_sub(tail_prefetch_bytes(file_size));
     Some(((tail_start / piece_length) as i32, last_piece))
 }
 
@@ -700,10 +707,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn tail_prefetch_covers_the_last_4_mib_of_a_large_file() {
+    fn tail_prefetch_covers_one_percent_of_the_file_clamped() {
         const MIB: u64 = 1024 * 1024;
-        // 2 GiB file at offset 0, 512 KiB pieces: last piece 4095.
-        assert_eq!(tail_prefetch_pieces(4095, 0, 2048 * MIB, MIB / 2), Some((4088, 4095)));
+        // 2 GiB at 512 KiB pieces: 1% = 20.48 MiB, capped at 16 MiB = 32 pieces.
+        assert_eq!(tail_prefetch_pieces(4095, 0, 2048 * MIB, MIB / 2), Some((4064, 4095)));
+        // 350 MiB: 1% = 3.5 MiB, raised to 4 MiB = 8 pieces.
+        assert_eq!(tail_prefetch_pieces(699, 0, 350 * MIB, MIB / 2), Some((692, 699)));
         assert_eq!(tail_prefetch_pieces(100, 0, 32 * MIB, MIB / 2), None);
     }
 
