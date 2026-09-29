@@ -150,6 +150,18 @@ export class MpvVideo extends EventTarget {
       return this.entryId != null ? id === this.entryId : id > this.staleUpTo;
    }
 
+   /** Drops the current file - and mpv's demuxer/cache buffers - at once,
+    * so nothing of it keeps playing or rendering. A source switch calls
+    * this before `play_magnet` removes the old torrent, which cancels that
+    * torrent's open instead of letting it fail. */
+   async stop(): Promise<void> {
+      console.info("[mpv] stop", { entryId: this.entryId });
+      window.clearTimeout(this.seekReleaseTimer);
+      this.seekTarget = null;
+      this.pendingSeek = null;
+      await command(["stop"]);
+   }
+
    /** Silences playback at once - the player's close path calls this
     * before its last-frame grab, so closing doesn't keep playing. */
    async freeze(): Promise<void> {
