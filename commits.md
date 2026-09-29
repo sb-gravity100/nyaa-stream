@@ -2,6 +2,11 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `fac9a87` · 2026-09-29 · feat: player speed, chapter marks, skip-intro (Shift) and audio menu
+- `src/App.css`
+- `src/PlayerView.tsx`
+- `src/mpvVideo.ts`
+
 ### `5efcbc6` · 2026-09-29 · feat: brand-mark favicon
 - `index.html`
 - `public/favicon.svg`
