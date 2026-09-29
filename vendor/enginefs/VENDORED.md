@@ -27,3 +27,11 @@ Copied from https://github.com/stremio-native/stream-server at rev
   tokio `File` read is still in flight, and tokio then rejects the seek
   with "other file operation is pending" - surfaced to readers as I/O
   errors mid-stream, several times per episode (verified live).
+- `src/backend/libtorrent/playback.rs`, `src/backend/libtorrent/handle.rs`,
+  `src/backend/mod.rs`: `TorrentHandle::set_preload_file` - the coordinator
+  keeps every file but the playing one at priority 0, so nothing else in a
+  batch downloads. A registered preload file (the next episode) now gets
+  libtorrent's lowest priority (1) alongside it, applied on the next
+  activation and immediately if a file is already playing. The playing file's
+  own piece windows keep their higher priorities, so the preload only uses
+  spare bandwidth.
