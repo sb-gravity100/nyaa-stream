@@ -796,9 +796,23 @@ Fixes (vendored enginefs unless noted):
    covers >= 30s of playback (file size / duration from the stream's
    bitrate estimate; 2 GB/24 min ≈ 1.4 MB/s → ~42 MB), capped at 64 MB,
    instead of a fixed ~4 MB.
+   Within the window, priorities are graded by distance like Elementum's
+   (7 for the ~4 MB urgent band, then 6, 5, 4, 3 and 2 further out), so
+   nearer pieces win when bandwidth is short.
 6. **mpv resumes with more buffered** (`embedded.rs`): `--cache-pause-wait=3`
    (default 1s) so after a stall it waits for 3s of data, trading one
    slightly longer pause for fewer stop-start cycles.
+
+**Compared with Elementum** (`elgatito/elementum`, MIT, active; studied
+2026-09-29 - `lt2http` from the same org is unmaintained since 2021 and
+unlicensed): it pre-buffers head + tail (`end_buffer_size`, 1 MB default) at
+priority 7 / deadline 0 before playing, reads ahead a flat 50 MB with graded
+priorities (adopted above), keeps the rest of the chosen file at 1, and
+forces tracker + DHT announces. It also has an optional libtorrent
+pause/resume right after setting buffer priorities, which drops requests
+already queued at peers - the backlog behind "max outstanding piece requests
+reached". Not adopted (it disconnects every peer); the fallback if fixes 1-5
+don't clear the queue delay.
 
 **Later (not in v0.3.2):** prefetch the head (~8 MB, then dropped if unused)
 of the most likely source when an episode page opens - depends on A/B.
