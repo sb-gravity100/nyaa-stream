@@ -264,7 +264,7 @@ function App() {
       setSourcesLoading(true);
       try {
         const results = isTauriAvailable()
-          ? await invoke<NyaaResult[]>("search_torrents_for_anime", { title: anime.title })
+          ? await invoke<NyaaResult[]>("search_torrents_for_anime", { title: anime.title, synonyms: anime.synonyms ?? [] })
           : await fallbackSearchTorrentsForAnime(anime.title);
         console.info("[search_torrents_for_anime] succeeded", { anime: releaseQuery, count: results.length });
         setSources(results);

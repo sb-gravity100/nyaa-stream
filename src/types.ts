@@ -23,6 +23,8 @@ export interface AnimeMedia {
   duration: number | null;
   /** AniList airing status; absent on older saved snapshots. */
   status?: string | null;
+  /** AniList alternative names, extra release-search terms. */
+  synonyms?: string[];
   nextAiringEpisode?: { airingAt: number; episode: number } | null;
 }
 

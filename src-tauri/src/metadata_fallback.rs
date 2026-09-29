@@ -88,6 +88,7 @@ pub fn to_media(anime: KitsuAnime) -> AnimeMedia {
         season_year,
         duration: anime.episode_length,
         status: None,
+        synonyms: Vec::new(),
         next_airing_episode: None,
     }
 }
