@@ -323,8 +323,8 @@ impl LibtorrentDiskFileStream {
         }
 
         let priority_intent = self.priority_intent();
-        let sequential_download = false;
-        self.handle.set_sequential_download(false);
+        // (nyaa-stream) Upstream forced sequential mode off on every window
+        // move; the coordinator owns it now (fix C, `sequential_wanted`).
         let configured_forward_window =
             disk_backed_forward_window_pieces_for(priority_intent, self.piece_length);
         let forward_window = self.active_forward_window(priority_intent, configured_forward_window);
@@ -404,7 +404,7 @@ impl LibtorrentDiskFileStream {
             intent = ?self.playback_intent,
             priority_intent = ?priority_intent,
             piece,
-            sequential_download,
+            sequential_download = status.sequential_download,
             forward_window,
             configured_forward_window,
             urgent_pieces,
