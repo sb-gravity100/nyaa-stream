@@ -273,6 +273,8 @@ function MpvPlayerView({
       }
    });
    const [subtitleTracks, setSubtitleTracks] = useState<SubtitleTrack[]>([]);
+   // Bumped whenever mpv (re)loads the active subtitle track's ASS header.
+   const [subtitleHeaderSeq, setSubtitleHeaderSeq] = useState(0);
    // null = subtitles off.
    const [activeSubtitleIndex, setActiveSubtitleIndex] = useState<
       number | null
@@ -432,6 +434,7 @@ function MpvPlayerView({
          setActiveAudioId(video.activeAudioId);
       });
       on("chapters", () => setChapters(video.chapters));
+      on("subheader", () => setSubtitleHeaderSeq((n) => n + 1));
       on("ratechange", () => setSpeed(video.playbackRate));
       on("error", () =>
          setError(
@@ -524,10 +527,13 @@ function MpvPlayerView({
    }, [videoEl, audioDelay]);
 
    // The user's default style, applied by mpv (see applyMpvSubtitleStyle).
+   // ASS restyling needs the track's header, which only exists once mpv has
+   // loaded the track - on first play that is after this effect first runs,
+   // so it re-runs when the header arrives (`subtitleHeaderSeq`).
    useEffect(() => {
       if (!videoEl) return;
       void applyMpvSubtitleStyle(videoEl, settings.subtitleStyle, activeSubtitle ? isStyledTrack(activeSubtitle) : false);
-   }, [videoEl, settings.subtitleStyle, activeSubtitle?.index]);
+   }, [videoEl, settings.subtitleStyle, activeSubtitle?.index, subtitleHeaderSeq]);
 
    // mpv reports real file time and the file's own exact duration.
    const episodeTime = position;

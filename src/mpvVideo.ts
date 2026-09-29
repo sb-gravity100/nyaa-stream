@@ -43,11 +43,14 @@ const OBSERVED = [
    "seeking",
    "speed",
    "chapter-list",
+   // The active subtitle track's ASS header: unavailable until the track is
+   // actually loaded, which is after `sid` is set - the restyle waits for it.
+   "sub-ass-extradata",
 ] as const;
 type Observed = (typeof OBSERVED)[number];
 
 /** Properties that belong to the loaded file (reset on `load`). */
-const FILE_PROPERTIES: Observed[] = ["time-pos", "duration", "eof-reached", "demuxer-cache-state", "video-params", "track-list", "seeking", "chapter-list"];
+const FILE_PROPERTIES: Observed[] = ["time-pos", "duration", "eof-reached", "demuxer-cache-state", "video-params", "track-list", "seeking", "chapter-list", "sub-ass-extradata"];
 
 // `<video>` fires timeupdate ~4x a second; the seek bar's own rAF loop
 // reads `currentTime` for smoothness. Re-rendering the player on every
@@ -452,6 +455,9 @@ export class MpvVideo extends EventTarget {
             return;
          case "chapter-list":
             this.emit("chapters");
+            return;
+         case "sub-ass-extradata":
+            this.emit("subheader");
             return;
          case "speed":
             this.emit("ratechange");
