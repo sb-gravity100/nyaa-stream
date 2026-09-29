@@ -94,6 +94,15 @@ pub struct TorrentFile {
     pub is_video: bool,
 }
 
+/// See `TorrentEngine::verified_file`.
+#[derive(Debug, Clone)]
+pub struct VerifiedFile {
+    pub path: PathBuf,
+    pub name: String,
+    pub size: u64,
+    pub verified: Vec<(u64, u64)>,
+}
+
 /// Largest video file - the sensible default for a single-episode torrent
 /// that also carries extras (NCOP/NCED, samples, fonts), and the fallback
 /// when a batch's files can't be matched to an episode.
@@ -1247,6 +1256,28 @@ impl TorrentEngine {
     /// File-relative `[start, end)` ranges the player read to open the file.
     pub fn open_read_ranges(&self, id: &TorrentId, file_idx: usize) -> Vec<(u64, u64)> {
         self.open_reads.ranges(id, file_idx)
+    }
+
+    /// What a resume buffer of `file_idx` can copy: the file on disk, its
+    /// size, and its verified `[start, end)` byte runs (whole pieces clipped
+    /// to the file - hash-checked, so safe to serve as-is).
+    pub async fn verified_file(&self, id: &TorrentId, file_idx: usize) -> anyhow::Result<VerifiedFile> {
+        let engine = self.efs.get_engine(id).await.ok_or_else(|| anyhow::anyhow!("unknown torrent {id}"))?;
+        let path = engine.handle.get_file_path(file_idx).await.ok_or_else(|| anyhow::anyhow!("no file on disk for {id}/{file_idx}"))?;
+        let stats = engine.get_statistics().await;
+        let file = stats.files.get(file_idx).ok_or_else(|| anyhow::anyhow!("no file {file_idx} in {id}"))?;
+        Ok(VerifiedFile { path: PathBuf::from(path), name: file.name.clone(), size: file.length, verified: file.downloaded_ranges.clone() })
+    }
+
+    /// Byte offset of the keyframe at or before `seconds` in the file at
+    /// `path` (see `media::keyframe_byte_offset`), bounded by a timeout.
+    pub async fn keyframe_byte_offset(path: PathBuf, seconds: f64) -> anyhow::Result<Option<u64>> {
+        const TIMEOUT: Duration = Duration::from_secs(10);
+        let lookup = tokio::task::spawn_blocking(move || media::keyframe_byte_offset(&path, seconds));
+        match tokio::time::timeout(TIMEOUT, lookup).await {
+            Ok(joined) => joined?,
+            Err(_) => anyhow::bail!("keyframe lookup timed out after {TIMEOUT:?}"),
+        }
     }
 
     /// Waits (up to `METADATA_TIMEOUT`) for `id`'s metadata and returns its

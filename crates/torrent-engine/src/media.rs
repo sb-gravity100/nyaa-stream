@@ -218,6 +218,31 @@ pub fn probe_streams(url: &str) -> anyhow::Result<Vec<ProbedStream>> {
     Ok(streams)
 }
 
+/// Byte offset of the video keyframe at or before `seconds` in the file at
+/// `path`, from the container's own index (MKV Cues / MP4 sample tables) -
+/// where a resume at `seconds` starts reading. `None` when the demuxer
+/// can't say (no index, no position on the packet). Blocking.
+pub fn keyframe_byte_offset(path: &Path, seconds: f64) -> anyhow::Result<Option<u64>> {
+    /// Packets to look through after the seek for the video keyframe.
+    const MAX_PACKETS: usize = 2000;
+    init();
+    let mut context = ffmpeg_next::format::input(&path).map_err(|err| anyhow::anyhow!("opening input: {err}"))?;
+    let Some(video) = context.streams().best(ffmpeg_next::media::Type::Video).map(|s| s.index()) else {
+        return Ok(None);
+    };
+    let target = (seconds.max(0.0) * f64::from(ffmpeg_next::ffi::AV_TIME_BASE)) as i64;
+    // max_ts = target: the keyframe at or before it.
+    context.seek(target, ..target).map_err(|err| anyhow::anyhow!("seeking to {seconds}s: {err}"))?;
+    for (stream, packet) in context.packets().take(MAX_PACKETS) {
+        if stream.index() == video && packet.is_key() {
+            let position = packet.position();
+            tracing::debug!(seconds, position, "keyframe located");
+            return Ok(u64::try_from(position).ok());
+        }
+    }
+    Ok(None)
+}
+
 // ---------------------------------------------------------------- encoders
 
 /// The H.264 encoder a transcode uses. LGPL build: hardware encoders, with
@@ -484,6 +509,22 @@ pub fn export_clip(clip: ClipExport<'_>) -> anyhow::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Manual: `NYAA_KEYFRAME_TEST_INPUT=<file> cargo test -p torrent-engine
+    /// keyframe_offset_smoke -- --ignored --nocapture`.
+    #[test]
+    #[ignore]
+    fn keyframe_offset_smoke() {
+        let input = std::env::var("NYAA_KEYFRAME_TEST_INPUT").expect("NYAA_KEYFRAME_TEST_INPUT");
+        let mut last = 0;
+        for seconds in [0.0, 60.0, 300.0, 600.0] {
+            let offset = keyframe_byte_offset(Path::new(&input), seconds).unwrap();
+            println!("{seconds}s -> {offset:?}");
+            let offset = offset.expect("an offset");
+            assert!(offset >= last, "offsets grow with time");
+            last = offset;
+        }
+    }
 
     /// Manual smoke test of a real HLS run against a local file:
     /// `NYAA_HLS_TEST_INPUT=<file> [NYAA_HLS_TEST_HVC1=1]
