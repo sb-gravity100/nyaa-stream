@@ -302,6 +302,11 @@
             `resume` hint
       - [x] enginefs: file-priority ack timeout no longer leaves the file
             unknown to the stream server (Kaleido-subs case)
+      - [ ] `StreamStats.downloaded_ranges`: verified pieces → byte runs →
+            seconds via the cached container keyframe index (linear
+            fallback), tiny runs merged
+      - [ ] Seek bar: dim downloaded layer under mpv's buffer layer
+      - [ ] mpv `--demuxer-max-back-bytes=150MiB`
       - [ ] Verify live: time from click to first frame, logged before/after
       - [ ] PLAN.md/FILE_INDEX.md sync, `npm run bump -- patch`, tag
             `v0.3.2`, `npm run release -- --notes "..." --dry-run`, then
