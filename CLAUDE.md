@@ -97,9 +97,15 @@ updater only offers builds with a higher version than the installed one.
 - Bump with `npm run bump -- patch|minor|major` (keeps `package.json`,
   `tauri.conf.json`, `src-tauri/Cargo.toml` in lockstep), commit
   `chore: release vX.Y.Z`, tag `vX.Y.Z`.
-- Release builds need `TAURI_SIGNING_PRIVATE_KEY_PATH=~/.tauri/nyaa-stream.key`
-  (never commit it); upload the installer, its `.sig` and `latest.json` to the
-  GitHub release (endpoint in `tauri.conf.json` → `plugins.updater`).
+- Release builds need the key *contents* (the `_PATH` variant is not read):
+  `export TAURI_SIGNING_PRIVATE_KEY="$(cat ~/.tauri/nyaa-stream.key)"` and
+  `TAURI_SIGNING_PRIVATE_KEY_PASSWORD=""` (never commit the key).
+- Publishing: push the tag, `npm run tauri build`, then
+  `gh release create vX.Y.Z --verify-tag` with the NSIS `-setup.exe`, its
+  `.sig`, the MSI + `.sig` and a `latest.json` (`version`, `notes`,
+  `pub_date`, `platforms.windows-x86_64.{signature,url}` using the NSIS `.sig`
+  text). Endpoint: `tauri.conf.json` → `plugins.updater`. The tag-triggered
+  `.github/workflows/release.yml` does this in CI when Actions is available.
 - `.githooks/pre-commit` (`core.hooksPath`, set once per clone with
   `git config core.hooksPath .githooks`) warns when code changed but the
   version still equals the latest tag. Remind the user when it fires.
