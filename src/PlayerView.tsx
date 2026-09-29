@@ -6,7 +6,6 @@ import { isFullscreen, setFullscreen, toggleFullscreen, useFullscreen } from "./
 import { MpvVideo, type Chapter } from "./mpvVideo";
 import { isTypingTarget } from "./keyboard";
 import { ExportDialog, type ExportRequest } from "./ExportDialog";
-import { HlsPlayerView } from "./HlsPlayerView";
 import type { AnimeMedia, NyaaResult, PlayFile, StreamStats, SubtitleTrack } from "./types";
 import { displayTitle, isMovie } from "./types";
 import { getStreamStats, playMagnet, stopPlayback } from "./playback";
@@ -2044,6 +2043,13 @@ export function PlayerView(props: Props) {
          setUseMpv(available);
       });
    }, []);
-   if (useMpv == null) return <div class="player-view hls-player" />;
-   return useMpv ? <MpvPlayerView {...props} /> : <HlsPlayerView {...props} />;
+   // hls.js + JASSUB (~450 kB) only load when mpv is missing.
+   const [Hls, setHls] = useState<typeof import("./HlsPlayerView").HlsPlayerView | null>(null);
+   useEffect(() => {
+      if (useMpv !== false || Hls) return;
+      console.debug("[player] loading HLS fallback chunk");
+      void import("./HlsPlayerView").then((m) => setHls(() => m.HlsPlayerView));
+   }, [useMpv, Hls]);
+   if (useMpv == null || (useMpv === false && !Hls)) return <div class="player-view hls-player" />;
+   return useMpv ? <MpvPlayerView {...props} /> : Hls && <Hls {...props} />;
 }
