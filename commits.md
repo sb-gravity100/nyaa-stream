@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `14f6a12` · 2026-09-29 · docs: plan TMDB episode stills and seek-bar thumbnail preview
+- `PLAN.md`
+- `PHASES.md`
+
 ### `b9e7832` · 2026-09-29 · docs: drop AniDB research from PLAN.md
 - `PLAN.md`
 
