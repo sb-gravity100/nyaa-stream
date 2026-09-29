@@ -558,6 +558,31 @@ only** - never pushed, since a pushed `v*` tag triggers
 (no tags). Only **v0.9.0** is pushed, built and published; installs update
 straight from 0.3.1 to 0.9.0.
 
+**Local release script** (GitHub Actions is unavailable: the account is
+billing-locked, 2026-09-29). `npm run release -- --notes "<text>"`
+(`scripts/release.mjs`) does what `release.yml` did, on this PC:
+
+1. Preflight: clean tree, `HEAD` tagged `v<package.json version>`, versions
+   in lockstep (`package.json`, `tauri.conf.json`, `Cargo.toml`), `gh`
+   logged in, `vcpkg_installed/` present (else `npm run setup`),
+   `src-tauri/lib/libmpv-2.dll` present, release not already published.
+2. Build: `npm run tauri build` with `TAURI_SIGNING_PRIVATE_KEY` set to the
+   *contents* of `~/.tauri/nyaa-stream.key` (the `_PATH` variant isn't read)
+   and an empty password; the key is never printed.
+3. Collect `nyaa-stream_<v>_x64-setup.exe` + `.sig` (NSIS) and
+   `nyaa-stream_<v>_x64_en-US.msi` + `.sig` from `target/release/bundle/`,
+   write `latest.json` (`version`, `notes`, `pub_date`,
+   `platforms.windows-x86_64.{signature, url}` from the NSIS `.sig` and the
+   release download URL) - same shape as v0.3.0's.
+4. Publish: push `main` and the one release tag, then
+   `gh release create v<v> --verify-tag` with the five files; notes = the
+   `--notes` text.
+
+Flags: `--dry-run` (build + stage files, no push/publish), `--skip-build`
+(reuse existing bundle output). `release.yml` keeps only its manual
+`workflow_dispatch` trigger, so a pushed tag can't also start a CI publish if
+the account is unlocked later.
+
 ## Fast playback start (planned, v0.3.2 - patch: fix)
 
 **Problem (measured 2026-09-29, SubsPlease 1080p MKV, 256 KB pieces):**
