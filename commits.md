@@ -2,6 +2,20 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `1e9cd69` · 2026-09-29 · feat(updater): in-app auto-update via GitHub Releases
+- `src/updater.ts`
+- `src/SettingsPanel.tsx`
+- `src-tauri/tauri.conf.json`
+- `src-tauri/Cargo.toml`
+- `src-tauri/src/lib.rs`
+- `src-tauri/capabilities/default.json`
+- `vite.config.ts`
+- `FILE_INDEX.md`
+
+### `2597a05` · 2026-09-29 · chore: remind to bump the version on every change
+- `.githooks/pre-commit`
+- `CLAUDE.md`
+
 ### `ae9e472` · 2026-09-29 · feat(player): picture-in-picture mini always-on-top window (P / button)
 - `src/pip.ts`
 - `src/PlayerView.tsx`
