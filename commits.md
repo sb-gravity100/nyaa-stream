@@ -1,3 +1,8 @@
+### `7e90fe0` · 2026-09-29 · docs: drop Linux/multiplatform, v1.0.0 is the stable Windows release
+- `PLAN.md`
+- `PHASES.md`
+- `CLAUDE.md`
+
 ### `fe2a6d6` · 2026-09-29 · docs: run Linux build testing in cloud sessions
 - `PLAN.md`
 - `PHASES.md`
