@@ -2,6 +2,11 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `d38ff57` · 2026-09-29 · feat(player): , and . step one frame back/forward; subtitle delay moves to - and =
+- `src/mpvVideo.ts`
+- `src/PlayerView.tsx`
+- `src/SettingsPanel.tsx`
+
 ### `4961d54` · 2026-09-29 · feat(player): remove the centre play/pause/skip icon overlays
 - `src/PlayerView.tsx`
 - `src/HlsPlayerView.tsx`
