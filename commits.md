@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `b9e7832` · 2026-09-29 · docs: drop AniDB research from PLAN.md
+- `PLAN.md`
+
 ### `ee97383` · 2026-09-29 · docs: record AniDB API research
 - `PLAN.md`
 
