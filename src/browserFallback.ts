@@ -15,6 +15,7 @@ query ($search: String, $perPage: Int) {
       description(asHtml: false)
       episodes
       coverImage { large extraLarge }
+      bannerImage
       averageScore
       format
       season
@@ -48,6 +49,7 @@ query ($id: Int) {
     description(asHtml: false)
     episodes
     coverImage { large extraLarge }
+    bannerImage
     averageScore
     format
     season

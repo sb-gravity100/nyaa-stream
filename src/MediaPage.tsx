@@ -254,7 +254,7 @@ export function MediaPage({
   // Backdrop and episode thumbnails come from Kitsu (real wide banner and
   // better per-episode coverage than AniList - see src/kitsu.ts), falling
   // back to AniList's poster.
-  const backdrop = kitsu?.background ?? anime.coverImage.extraLarge ?? anime.coverImage.large;
+  const backdrop = kitsu?.background ?? anime.bannerImage ?? anime.coverImage.extraLarge ?? anime.coverImage.large;
   const kitsuThumbnails = kitsu?.episodeThumbnails;
   // Frames already on disk (the player's last frame, or a capture) fill in
   // episodes Kitsu has no picture for, instead of a bare number tile.

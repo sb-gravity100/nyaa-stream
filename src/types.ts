@@ -15,6 +15,8 @@ export interface AnimeMedia {
   description: string | null;
   episodes: number | null;
   coverImage: CoverImage;
+  /** AniList's wide banner; backdrop fallback when Kitsu has no cover. */
+  bannerImage?: string | null;
   averageScore: number | null;
   format: string | null;
   season: string | null;

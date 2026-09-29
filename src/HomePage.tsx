@@ -221,7 +221,7 @@ export function HomePage({
   const candidates = useMemo((): Featured[] => {
     const list: Featured[] = [];
     const seen = new Set<number>();
-    const artFor = (id: number, anime: AnimeMedia) => kitsuByMedia[id]?.background ?? anime.coverImage.extraLarge ?? anime.coverImage.large;
+    const artFor = (id: number, anime: AnimeMedia) => kitsuByMedia[id]?.background ?? anime.bannerImage ?? anime.coverImage.extraLarge ?? anime.coverImage.large;
     for (const resume of inProgress.slice(0, 2)) {
       const anime = asAnime(resume);
       seen.add(anime.id);
@@ -311,6 +311,7 @@ export function HomePage({
                 (entry.episode != null ? lastFrames[`${entry.animeId}-${entry.episode}`] : undefined) ??
                 (entry.episode != null ? kitsu?.episodeThumbnails[entry.episode] : undefined) ??
                 kitsu?.background ??
+                entry.anime.bannerImage ??
                 entry.anime.coverImage.extraLarge ??
                 entry.anime.coverImage.large;
               const fraction = Math.min(1, entry.position / entry.duration);

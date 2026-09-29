@@ -17,6 +17,11 @@ pub struct AnimeMedia {
     pub episodes: Option<i32>,
     #[serde(rename = "coverImage")]
     pub cover_image: CoverImage,
+    /// AniList's wide banner - a better backdrop than the portrait poster
+    /// when Kitsu has no cover. Missing in older snapshots and Kitsu
+    /// fallback data.
+    #[serde(rename = "bannerImage", default)]
+    pub banner_image: Option<String>,
     #[serde(rename = "averageScore")]
     pub average_score: Option<i32>,
     pub format: Option<String>,
@@ -159,6 +164,7 @@ query ($search: String, $perPage: Int) {
       description(asHtml: false)
       episodes
       coverImage { large extraLarge }
+      bannerImage
       averageScore
       format
       season
@@ -180,6 +186,7 @@ query ($id: Int) {
     description(asHtml: false)
     episodes
     coverImage { large extraLarge }
+    bannerImage
     averageScore
     format
     season
