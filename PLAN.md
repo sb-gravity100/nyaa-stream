@@ -597,10 +597,20 @@ first seconds before C's mode is known):**
     file has verified, or immediately when the player seeks back into them.
   - Both: libtorrent ranks piece priority above sequential order, so the
     priority-7 read window and pinned container metadata (MKV Cues / MP4
-    moov) still jump the queue. Sequential mode switches off (back to A/B) on
-    a seek past the downloaded range, and never applies to background /
-    probe / preload reads. A's baseline-0 phase is skipped while sequential
-    mode is on. Upstream turns sequential off everywhere; this is our change.
+    moov) still jump the queue. Sequential mode never applies to
+    background / probe / preload reads. A's baseline-0 phase is skipped
+    while sequential mode is on. Upstream turns sequential off everywhere;
+    this is our change.
+  - **Seek into undownloaded data = continue watch.** A seek (forward or
+    back) whose target piece isn't verified, and that the downloaded run
+    around the old position can't cover, re-anchors continue-watch mode at
+    the target: missing pieces before it drop to 0, sequential order
+    restarts there. A seek landing inside already-downloaded data changes
+    nothing. Debounced - the re-anchor applies once the reader has blocked
+    on the target piece for ~300ms, so scrubbing through the seek bar (the
+    log shows 4 seeks in 1s) doesn't thrash libtorrent's priorities; each
+    re-anchor replaces the previous one, and dropped pieces come back to 1
+    as in continue watch.
   - Trade-off: rarest-first protects swarm health; for one viewer streaming
     in order, order matters more.
 - Log line fix: the "waiting for verified piece" diagnostic reports the window

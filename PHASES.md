@@ -288,8 +288,9 @@
       - [ ] enginefs: continue watch - pieces before the resume point at 0,
             sequential from it, earlier pieces back to 1 when the rest is
             done or on a seek back
-      - [ ] enginefs: sequential off on a seek past the downloaded range and
-            for background/probe/preload reads
+      - [ ] enginefs: a seek into undownloaded data re-anchors
+            continue-watch mode at the target (debounced ~300ms blocked
+            read); never for background/probe/preload reads
       - [ ] enginefs: waiting-piece log reports the effective window
       - [ ] `VENDORED.md` notes for the three enginefs changes
       - [ ] Spawn embedded mpv at app launch instead of first play
