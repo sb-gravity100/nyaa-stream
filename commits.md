@@ -2,6 +2,12 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `2f86de2` · 2026-09-29 · feat: library/progress/settings backup export and import
+- `src-tauri/src/cache.rs`
+- `src-tauri/src/lib.rs`
+- `src/SettingsPanel.tsx`
+- `src/backup.ts`
+
 ### `e84eae8` · 2026-09-29 · feat: home hero cycle, library sort/filter/badges, dismiss continue watching
 - `src/App.css`
 - `src/HomePage.tsx`
