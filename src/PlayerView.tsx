@@ -38,9 +38,6 @@ import {
   VolumeIcon,
 } from "./icons";
 
-const STATS_POLL_MS = 1000;
-// How long a keybind-triggered flash of the controls stays up before
-// auto-hiding again.
 const KEYBIND_FLASH_MS = 1200;
 // Mouse idle this long anywhere but the top/bottom control areas fades
 // the controls and hides the cursor. While the pointer rests over those
@@ -235,6 +232,9 @@ function MpvPlayerView({
    // Whether the current file has shown its first frame.
    const [hasPlayed, setHasPlayed] = useState(false);
    const [controlsVisible, setControlsVisible] = useState(false);
+   // For handlers registered once at mount (window key listeners).
+   const controlsVisibleRef = useRef(false);
+   controlsVisibleRef.current = controlsVisible;
    const [cursorHidden, setCursorHidden] = useState(false);
    const [paused, setPaused] = useState(true);
    // Target of a seek still waiting on data - the loading overlay says so.
@@ -732,12 +732,16 @@ function MpvPlayerView({
       setBufferedRanges(ranges);
    }
 
+   /** Keyboard gestures (seek, skip, subtitles...) never bring the controls
+    * up - their toasts/flashes are the feedback while the mouse is idle. If
+    * the pointer already has the controls open, the gesture just counts as
+    * activity and keeps them up a little longer. */
    function flashControls() {
-      setControlsVisible(true);
+      if (!controlsVisibleRef.current) return;
       window.clearTimeout(idleTimerRef.current);
       idleTimerRef.current = window.setTimeout(
          hideControlsIfIdle,
-         KEYBIND_FLASH_MS,
+         CONTROLS_IDLE_MS,
       );
    }
 
