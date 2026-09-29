@@ -2,6 +2,11 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `4446025` · 2026-09-29 · feat(release): add bump script keeping app version in sync
+- `scripts/bump-version.mjs`
+- `package.json`
+- `FILE_INDEX.md`
+
 ### `574dd5e` · 2026-09-29 · perf(frontend): drop unused Zen Kaku 500 weight (CSS 467kB -> 329kB)
 - `src/main.tsx`
 
