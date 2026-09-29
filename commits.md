@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `2e4f465` · 2026-09-29 · fix: search dropdown had two nested scrollbars
+- `src/App.css`
+
 ### `8e74f35` · 2026-09-29 · docs: describe in-process libmpv playback
 - `CLAUDE.md`
 - `FILE_INDEX.md`
