@@ -1,3 +1,7 @@
+### `f4873a8` · 2026-09-30 · feat: progress entries remember their source; Resume prefers it
+- `src/watchProgress.ts`
+- `src/PlayerView.tsx`
+
 ### `11f90ab` · 2026-09-30 · feat: save a resume buffer when an in-progress episode stops
 - `crates/torrent-engine/src/resume_buffer.rs`
 - `src-tauri/src/resume.rs`
