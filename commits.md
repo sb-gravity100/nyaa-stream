@@ -2,6 +2,11 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `0b76a74` · 2026-09-29 · feat(logging): write a rolling daily log file (release has no console)
+- `src-tauri/src/lib.rs`
+- `src-tauri/Cargo.toml`
+- `FILE_INDEX.md`
+
 ### `305b5cf` · 2026-09-29 · fix(build): pin @tauri-apps/plugin-dialog to 2.7.3 to match the crate
 - `package.json`
 - `package-lock.json`
