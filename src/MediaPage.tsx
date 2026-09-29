@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "preact/hooks";
+import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { invoke } from "@tauri-apps/api/core";
 import { displayTitle, formatSeason, isMovie, type AnimeMedia, type KitsuMetadata, type NyaaResult } from "./types";
 import type { EpisodeLabel } from "./episodeParser";
@@ -8,6 +8,7 @@ import { BackIcon, CheckIcon, PlayIcon, PlusIcon } from "./icons";
 import { Buffering } from "./Buffering";
 import type { WatchTarget } from "./router";
 import { useSettings } from "./settings";
+import { cachedTorrentThumbnail, subscribeFrameSaved } from "./torrentThumbnail";
 
 type SourceGroup = [string, { label: EpisodeLabel; releases: NyaaResult[] }];
 
@@ -125,6 +126,40 @@ function remainingLabel(entry: ProgressEntry): string {
   return `${minutes} min left`;
 }
 
+/** Episode number -> thumbnail already in the local disk cache, for the
+ * `episodes` asked about. Updates when the player saves a new last frame. */
+function useLocalThumbnails(animeId: number, episodes: number[]): Record<number, string> {
+  const [found, setFound] = useState<Record<number, string>>({});
+  const asked = useMemo(() => new Set<number>(), [animeId]);
+  const currentAnime = useRef(animeId);
+  currentAnime.current = animeId;
+  const wanted = episodes.join(",");
+
+  useEffect(() => {
+    setFound({});
+  }, [animeId]);
+
+  useEffect(() => {
+    for (const episode of episodes) {
+      if (asked.has(episode)) continue;
+      asked.add(episode);
+      void cachedTorrentThumbnail(animeId, episode).then((url) => {
+        if (url && currentAnime.current === animeId) setFound((current) => ({ ...current, [episode]: url }));
+      });
+    }
+  }, [animeId, wanted]);
+
+  useEffect(
+    () =>
+      subscribeFrameSaved((key, url) => {
+        const [id, episode] = key.split("-").map(Number);
+        if (id === animeId && Number.isFinite(episode)) setFound((current) => ({ ...current, [episode]: url }));
+      }),
+    [animeId],
+  );
+  return found;
+}
+
 export function MediaPage({
   anime,
   kitsu,
@@ -220,7 +255,14 @@ export function MediaPage({
   // better per-episode coverage than AniList - see src/kitsu.ts), falling
   // back to AniList's poster.
   const backdrop = kitsu?.background ?? anime.coverImage.extraLarge ?? anime.coverImage.large;
-  const thumbnails = kitsu?.episodeThumbnails ?? {};
+  const kitsuThumbnails = kitsu?.episodeThumbnails;
+  // Frames already on disk (the player's last frame, or a capture) fill in
+  // episodes Kitsu has no picture for, instead of a bare number tile.
+  const localThumbnails = useLocalThumbnails(
+    anime.id,
+    visibleSources.flatMap(([, group]) => (group.label.kind === "episode" && !kitsuThumbnails?.[group.label.number] ? [group.label.number] : [])),
+  );
+  const thumbnails = useMemo(() => ({ ...localThumbnails, ...kitsuThumbnails }), [localThumbnails, kitsuThumbnails]);
   const paragraphs = anime.description ? descriptionParagraphs(anime.description) : [];
   const watchedCount = Object.values(progress).filter((p) => p.completed).length;
   const continueEntry = continueTarget ? progress[continueTarget[0]] : undefined;
