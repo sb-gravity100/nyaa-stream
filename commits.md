@@ -2,6 +2,16 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `60b9215` · 2026-09-29 · chore: release v0.3.2
+- `package.json`
+- `src-tauri/Cargo.toml`
+- `src-tauri/tauri.conf.json`
+- `PHASES.md`
+
+### `fe76205` · 2026-09-29 · docs: sync FILE_INDEX.md and PLAN.md for v0.3.2
+- `FILE_INDEX.md`
+- `PLAN.md`
+
 ### `a921784` · 2026-09-29 · fix: grow the home hero to fit long titles
 - `src/App.css`
 - `src/HomePage.tsx`
