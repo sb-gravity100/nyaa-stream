@@ -552,14 +552,16 @@ by an app-styled HTML menu whose items depend on what was right-clicked.
 
 ## Release plan (decided 2026-09-29)
 
-Two published releases: **v0.3.2** (the playback fixes) as soon as it passes a
-live test, then **v0.9.0**. The milestones in between - v0.4.0 (resume
-buffer) → v0.5.0 (context menus) → v0.6.0 (build thumbnails) → v0.7.0 (HD
-banners) → v0.8.0 (seek preview) - are each bumped (`npm run bump`) and
-tagged **locally only**, never pushed. Commits are pushed with plain
-`git push` (no tags); `npm run release` pushes only the tag it publishes.
-Installs update 0.3.1 → 0.3.2 → 0.9.0. (Changed 2026-09-29 from "only
-v0.9.0 is published", so the playback fix doesn't wait on the features.)
+Three published releases: **v0.3.2** (the playback fixes) as soon as it
+passes a live test, **v0.4.0** (splash/title bar, download cache, resume
+buffer, contact and send logs), then **v0.8.0**. The milestones in between -
+v0.5.0 (context menus) → v0.6.0 (build thumbnails) → v0.7.0 (HD banners) -
+are each bumped (`npm run bump`) and tagged **locally only**, never pushed.
+Commits are pushed with plain `git push` (no tags); `npm run release` pushes
+only the tag it publishes. Installs update 0.3.1 → 0.3.2 → 0.4.0 → 0.8.0.
+(Changed 2026-09-29 from "only v0.9.0 is published", so the playback fix
+doesn't wait on the features; contact/logs moved from v0.9.0 to v0.4.0, and
+v0.9.0 dropped, so v0.4.0 is published and v0.8.0 is the last milestone.)
 
 **Local release script** (GitHub Actions is unavailable: the account is
 billing-locked, 2026-09-29). `npm run release -- --notes "<text>"`
@@ -921,7 +923,7 @@ never on a fresh install or a normal launch.
   `relaunch()`.
 - At startup (`src/WhatsNew.tsx`, mounted in `App.tsx`): if the marker's `to`
   equals the running version (`getVersion()`), show every changelog entry
-  newer than `from` up to it (a skipped release, e.g. 0.3.1 → 0.9.0, shows
+  newer than `from` up to it (a skipped release, e.g. 0.3.1 → 0.4.0, shows
   all of them), then clear the marker. A marker whose `to` doesn't match
   (failed install) is cleared silently. Closes with a button or Escape.
 - **Bridge for 0.3.1 and older** (their updater writes no marker): every
@@ -1223,7 +1225,7 @@ it, like YouTube/Stremio.
 - Not a second libmpv instance: live seeks per hover would decode full
   frames and request undownloaded pieces.
 
-## Contact and send logs (planned, v0.9.0 - minor: new feature)
+## Contact and send logs (planned, v0.4.0 - minor: new feature)
 
 Settings gets a **Help** section with two buttons. Nothing is uploaded
 automatically - no webhook or other secret ships in the public app.

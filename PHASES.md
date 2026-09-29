@@ -373,8 +373,17 @@
       - [ ] `drop_resume_buffer` on dismiss / watched / replaced entry,
             Clear cache, startup sweep, 25 buffers / ~600 MB cap
       - [ ] Verify live: Resume from Continue watching → first frame time
+- [ ] Contact and send logs (v0.4.0, see PLAN.md "Contact and send
+      logs"): one commit each -
+      - [ ] `export_logs`: zip logs + `system.txt` into Downloads, reveal;
+            Windows profile path/username replaced in the zipped copies
+      - [ ] Settings Help section: Contact modal (repo + Discord profile)
+      - [ ] Send logs modal: contents notice, Discord / GitHub (prefilled
+            issue, public notice) buttons
+      - [ ] Fill in the Discord user id
       - [ ] PLAN.md/FILE_INDEX.md sync, `npm run bump -- minor`, tag
-            `v0.4.0` locally (not pushed/published - see PLAN.md "Release plan")
+            `v0.4.0`, push the tag, build + publish the release (see PLAN.md
+            "Release plan")
 - [ ] Context menus (v0.5.0, see PLAN.md "Context menus"): one commit each -
       - [ ] `tauri-plugin-clipboard-manager` (Rust, capability, JS)
       - [ ] `contextMenu.ts` store + `ContextMenu.tsx` component
@@ -434,18 +443,8 @@
       - [ ] Seek-bar hover shows the frame above the time tooltip
             (debounced, cached; time only when not downloaded)
       - [ ] PLAN.md/FILE_INDEX.md sync, `npm run bump -- minor`, tag
-            `v0.8.0` locally (not pushed/published - see PLAN.md "Release plan")
-- [ ] Contact and send logs (v0.9.0, see PLAN.md "Contact and send
-      logs"): one commit each -
-      - [ ] `export_logs`: zip logs + `system.txt` into Downloads, reveal;
-            Windows profile path/username replaced in the zipped copies
-      - [ ] Settings Help section: Contact modal (repo + Discord profile)
-      - [ ] Send logs modal: contents notice, Discord / GitHub (prefilled
-            issue, public notice) buttons
-      - [ ] Fill in the Discord user id
-      - [ ] PLAN.md/FILE_INDEX.md sync, `npm run bump -- minor`, tag
-            `v0.9.0`, push the tag, build + publish the release (first
-            published build since v0.3.1)
+            `v0.8.0`, push the tag, build + publish the release (see PLAN.md
+            "Release plan")
 - [ ] Local release tooling (see PLAN.md "Release plan"): one commit each -
       - [x] `scripts/release.mjs` + `npm run release` (preflight, signed
             build, `latest.json`, `gh release create`; `--dry-run`,
