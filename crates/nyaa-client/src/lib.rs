@@ -3,11 +3,14 @@ use serde::{Deserialize, Serialize};
 
 mod cache;
 mod fansubbers;
+mod store;
 mod throttle;
 use cache::DiskCache;
+use store::Store;
 use throttle::Throttle;
 
 pub use fansubbers::group_tag;
+pub use store::release_id;
 
 const NYAA_BASE_URL: &str = "https://nyaa.si";
 
@@ -78,6 +81,16 @@ fn sanitize_query(query: &str) -> String {
     normalized.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
+/// `fetched` (fresh) followed by whatever of `stored` it doesn't repeat,
+/// newest release id first - nyaa.si's own order.
+fn merge_newest_first(fetched: Vec<NyaaResult>, stored: Vec<NyaaResult>) -> Vec<NyaaResult> {
+    let mut seen: std::collections::HashSet<i64> = fetched.iter().filter_map(|r| release_id(&r.view_url)).collect();
+    let mut merged = fetched;
+    merged.extend(stored.into_iter().filter(|r| release_id(&r.view_url).is_none_or(|id| seen.insert(id))));
+    merged.sort_by_key(|r| std::cmp::Reverse(release_id(&r.view_url).unwrap_or(0)));
+    merged
+}
+
 /// The path a search runs under: the whole site, or one user's uploads.
 fn user_path(user: Option<&str>) -> String {
     match user {
@@ -107,6 +120,7 @@ pub struct NyaaClient {
     http: reqwest::Client,
     /// See `cache` - None for an uncached client (dev tools).
     cache: Option<DiskCache>,
+    store: Option<Store>,
     throttle: std::sync::Arc<Throttle>,
 }
 
@@ -121,6 +135,7 @@ impl NyaaClient {
         Self {
             http: reqwest::Client::new(),
             cache: None,
+            store: None,
             throttle: std::sync::Arc::new(Throttle::new()),
         }
     }
@@ -131,7 +146,36 @@ impl NyaaClient {
         Self {
             http: reqwest::Client::new(),
             cache: Some(DiskCache::new(dir)),
+            store: None,
             throttle: std::sync::Arc::new(Throttle::new()),
+        }
+    }
+
+    /// A client with the disk cache under `cache_dir` plus the permanent
+    /// release database at `db_path` (see `store`). If the database can't be
+    /// opened the client still works from the disk cache alone.
+    pub fn with_storage(cache_dir: std::path::PathBuf, db_path: &std::path::Path) -> Self {
+        let mut client = Self::with_cache(cache_dir);
+        match Store::open(db_path) {
+            Ok(store) => client.store = Some(store),
+            Err(err) => tracing::error!(%err, path = %db_path.display(), "couldn't open the nyaa release database"),
+        }
+        client
+    }
+
+    /// Releases already in the local database whose titles contain every word
+    /// of `query` - instant, no request. Empty without a database.
+    pub async fn search_local(&self, query: &str, category: Category) -> Vec<NyaaResult> {
+        let Some(store) = &self.store else { return Vec::new() };
+        match store.search_local(category.code(), &sanitize_query(query), 1500).await {
+            Ok(results) => {
+                tracing::debug!(query, count = results.len(), "local release search");
+                results
+            }
+            Err(err) => {
+                tracing::warn!(query, %err, "local release search failed");
+                Vec::new()
+            }
         }
     }
 
@@ -162,12 +206,15 @@ impl NyaaClient {
         if sanitized != query {
             tracing::debug!(query, sanitized, "sanitized smart punctuation for nyaa.si search");
         }
-        let Some(cache) = &self.cache else {
-            return self.search_uncached(user, &sanitized, category).await;
-        };
         let key = match user {
             Some(user) => format!("{}|user:{}|{sanitized}", category.code(), user.to_lowercase()),
             None => format!("{}|{sanitized}", category.code()),
+        };
+        if let Some(store) = &self.store {
+            return self.search_with_store(store, &key, user, &sanitized, category).await;
+        }
+        let Some(cache) = &self.cache else {
+            return self.search_uncached(user, &sanitized, category, None).await;
         };
         let cached = cache.get::<Vec<NyaaResult>>("search", &key).await;
         if let Some(hit) = &cached {
@@ -176,7 +223,7 @@ impl NyaaClient {
                 return Ok(hit.value.clone());
             }
         }
-        match self.search_uncached(user, &sanitized, category).await {
+        match self.search_uncached(user, &sanitized, category, None).await {
             Ok(results) => {
                 cache.put("search", &key, &results).await;
                 Ok(results)
@@ -191,16 +238,66 @@ impl NyaaClient {
         }
     }
 
-    async fn search_uncached(&self, user: Option<&str>, sanitized: &str, category: Category) -> anyhow::Result<Vec<NyaaResult>> {
+    /// The database-backed search: replay a fresh stored answer; otherwise
+    /// fetch only as many pages as it takes to reach releases already stored
+    /// (nyaa.si is newest first), merge with the stored answer, save; and if
+    /// the fetch fails fall back to the stored answer or a local word match.
+    async fn search_with_store(&self, store: &Store, key: &str, user: Option<&str>, sanitized: &str, category: Category) -> anyhow::Result<Vec<NyaaResult>> {
+        let prior = store.search(key).await.unwrap_or_else(|err| {
+            tracing::warn!(%err, "reading the stored search failed");
+            None
+        });
+        if let Some(prior) = &prior {
+            if prior.age < cache::SEARCH_FRESH_FOR {
+                tracing::debug!(query = sanitized, age_s = prior.age.as_secs(), count = prior.results.len(), "nyaa.si search served from the local database");
+                return Ok(prior.results.clone());
+            }
+        }
+        let prior_results = prior.map(|p| p.results);
+        match self.search_uncached(user, sanitized, category, Some((store, prior_results.is_some()))).await {
+            Ok(fetched) => {
+                let merged = merge_newest_first(fetched, prior_results.unwrap_or_default());
+                if let Err(err) = store.save_search(key, category.code(), &merged).await {
+                    tracing::error!(%err, "saving the search to the local database failed");
+                }
+                Ok(merged)
+            }
+            Err(err) => {
+                if let Some(prior) = prior_results {
+                    tracing::warn!(query = sanitized, %err, count = prior.len(), "nyaa.si search failed, serving the stored answer");
+                    return Ok(prior);
+                }
+                let local = self.search_local(sanitized, category).await;
+                if local.is_empty() {
+                    return Err(err);
+                }
+                tracing::warn!(query = sanitized, %err, count = local.len(), "nyaa.si search failed, serving a local word match");
+                Ok(local)
+            }
+        }
+    }
+
+    /// Fetches result pages. With `stored` = (store, true) - this query was
+    /// fetched before - it stops after the first page whose releases are all
+    /// already stored, since everything older was seen last time.
+    async fn search_uncached(&self, user: Option<&str>, sanitized: &str, category: Category, stored: Option<(&Store, bool)>) -> anyhow::Result<Vec<NyaaResult>> {
         let sanitized = sanitized.to_string();
 
         let mut all_results = Vec::new();
         for page in 1..=MAX_SEARCH_PAGES {
             let page_results = self.search_page(user, &sanitized, category, page).await?;
             let page_count = page_results.len();
+            let page_ids: Vec<i64> = page_results.iter().filter_map(|r| release_id(&r.view_url)).collect();
             all_results.extend(page_results);
             if page_count < RESULTS_PER_PAGE {
                 break;
+            }
+            if let Some((store, true)) = stored {
+                let known = store.known_ids(&page_ids).await.unwrap_or_default();
+                if !page_ids.is_empty() && known.len() == page_ids.len() {
+                    tracing::debug!(query = sanitized, page, "reached already stored releases, not fetching older pages");
+                    break;
+                }
             }
         }
 

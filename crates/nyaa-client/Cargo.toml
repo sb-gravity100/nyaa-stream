@@ -13,3 +13,4 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 tracing = { workspace = true }
 scraper = "0.27.0"
+rusqlite = { version = "0.40.2", features = ["bundled"] }
