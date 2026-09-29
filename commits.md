@@ -2,6 +2,16 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `7b36720` · 2026-09-29 · fix: serve freshly verified pieces from libtorrent's own copy
+- `vendor/enginefs/src/piece_waiter.rs`
+- `vendor/enginefs/src/backend/libtorrent/disk_stream.rs`
+- `vendor/enginefs/VENDORED.md`
+- `PHASES.md`
+
+### `885cdc6` · 2026-09-29 · docs: plan the fresh-piece corruption fix
+- `PLAN.md`
+- `PHASES.md`
+
 ### `b152132` · 2026-09-29 · docs: index vendored libtorrent-sys in FILE_INDEX.md
 - `FILE_INDEX.md`
 
