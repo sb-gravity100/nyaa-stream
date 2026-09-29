@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `774419e` · 2026-09-29 · docs: mention the new icon and splash in the 0.3.2 notes
+- `src/changelog.ts`
+
 ### `29e0ab1` · 2026-09-29 · docs: tick splash and logo in PHASES.md
 - `PHASES.md`
 
