@@ -2,6 +2,11 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `14ecb3e` · 2026-09-29 · fix: widen the startup window and read-ahead to ~4 MB at priority 7
+- `PHASES.md`
+- `vendor/enginefs/src/backend/libtorrent/disk_stream.rs`
+- `vendor/enginefs/src/backend/priorities.rs`
+
 ### `542f1ee` · 2026-09-29 · fix: hold the playing file at priority 0 until its startup buffer verifies
 - `PHASES.md`
 - `vendor/enginefs/src/backend/libtorrent/disk_stream.rs`
