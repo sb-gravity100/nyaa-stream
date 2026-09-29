@@ -217,6 +217,7 @@ function MpvPlayerView({
    const [animeResolution, setAnimeResolutionState] = useState(() => getAnimeResolution(anime.id));
    const releasePrefs = {
       preferredGroup,
+      preferredFansubber: settings.preferredFansubber,
       preferredResolution: animeResolution ?? settings.preferredResolution,
    };
    const [selectedRelease, setSelectedRelease] = useState<NyaaResult>(() =>

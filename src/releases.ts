@@ -83,12 +83,22 @@ export function codecPlayable(codec: RiskyCodec | null): boolean {
 
 export interface ReleasePreferences {
   preferredGroup?: string | null;
+  preferredFansubber?: string;
   preferredResolution?: PreferredResolution;
 }
 
 // A release with too few seeders to actually stream isn't worth picking
 // just because it matches a preference.
 const MIN_PREFERRED_SEEDERS = 3;
+
+/** Whether the title contains every word of the user's preferred-fansubber
+ * text ("ToonsHub CR" matches "... 1080p CR WEB-DL ... -ToonsHub"). */
+export function matchesFansubber(release: NyaaResult, fansubber: string | undefined): boolean {
+  const words = fansubber?.toLowerCase().split(/\s+/).filter(Boolean) ?? [];
+  if (words.length === 0) return false;
+  const title = release.title.toLowerCase();
+  return words.every((word) => title.includes(word));
+}
 
 function score(release: NyaaResult, prefs: ReleasePreferences): number {
   let value = Math.log10(release.seeders + 1) * 10;
@@ -99,12 +109,14 @@ function score(release: NyaaResult, prefs: ReleasePreferences): number {
   if (release.seeders < MIN_PREFERRED_SEEDERS) return value;
   const group = releaseGroup(release);
   if (prefs.preferredGroup && group && group.toLowerCase() === prefs.preferredGroup.toLowerCase()) value += 100;
+  if (matchesFansubber(release, prefs.preferredFansubber)) value += 60;
   const resolution = releaseResolution(release);
   if (prefs.preferredResolution && prefs.preferredResolution !== "any" && resolution === prefs.preferredResolution) value += 40;
   return value;
 }
 
-// Preferred fansub group first (if remembered and reasonably seeded), then
+// This show's remembered fansub group first, then the preferred fansubber
+// setting (both only if reasonably seeded), then
 // preferred resolution, then seeders - fastest/most reliable swarm. Used
 // for the play button's auto-pick; `sortReleases` orders the player's
 // source picker the same way.
