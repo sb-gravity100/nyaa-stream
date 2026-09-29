@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `631837f` · 2026-09-29 · feat: blank episode thumbnails fall back to the local frame cache
+- `src/MediaPage.tsx`
+
 ### `d2ffba2` · 2026-09-29 · fix(player): restyle ASS subtitles once mpv has loaded the track header
 - `src/mpvVideo.ts`
 - `src/PlayerView.tsx`
