@@ -2,6 +2,11 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `4961d54` · 2026-09-29 · feat(player): remove the centre play/pause/skip icon overlays
+- `src/PlayerView.tsx`
+- `src/HlsPlayerView.tsx`
+- `src/App.css`
+
 ### `32d3eb5` · 2026-09-29 · fix(player): restore STATS_POLL_MS and drop the unused flash constant
 - `src/PlayerView.tsx`
 
