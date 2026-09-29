@@ -2,6 +2,12 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `27ed9a8` · 2026-09-29 · fix: re-anchor continue-watch mode at a seek into undownloaded data
+- `PHASES.md`
+- `vendor/enginefs/src/backend/libtorrent/disk_stream.rs`
+- `vendor/enginefs/src/backend/libtorrent/playback.rs`
+- `vendor/enginefs/src/backend/priorities.rs`
+
 ### `6beced4` · 2026-09-29 · fix: download a continue-watch file in order from its resume point
 - `PHASES.md`
 - `vendor/enginefs/src/backend/libtorrent/playback.rs`
