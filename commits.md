@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `b9925ec` · 2026-09-29 · fix(player): keyboard gestures no longer bring up the controls while the mouse is idle
+- `src/PlayerView.tsx`
+
 ### `b981b6e` · 2026-09-29 · feat(player): C toggles subtitles, hold C + scroll steps through tracks
 - `src/PlayerView.tsx`
 - `src/SettingsPanel.tsx`
