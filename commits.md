@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `ceff8b6` · 2026-09-29 · docs: rewrite README, remove releasing section
+- `README.md`
+
 ### `9e510a1` · 2026-09-29 · docs: add README
 - `README.md`
 
