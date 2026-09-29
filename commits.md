@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `4a26a8b` · 2026-09-29 · ci: build and publish signed releases on version tags
+- `.github/workflows/release.yml`
+- `FILE_INDEX.md`
+
 ### `4d3c28b` · 2026-09-29 · ci: build and publish signed releases on version tags
 - `.github/workflows/release.yml`
 - `FILE_INDEX.md`
