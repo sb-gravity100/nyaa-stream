@@ -2,6 +2,15 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `0788f6b` · 2026-09-29 · feat: AniList bannerImage as backdrop fallback when Kitsu has no cover
+- `crates/anilist-client/src/lib.rs`
+- `src-tauri/src/metadata_fallback.rs`
+- `src/types.ts`
+- `src/browserFallback.ts`
+- `src/watchProgress.ts`
+- `src/HomePage.tsx`
+- `src/MediaPage.tsx`
+
 ### `a712dec` · 2026-09-29 · style(home): shorten hero height
 - `src/App.css`
 
