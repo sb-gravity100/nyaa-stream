@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `963a00c` · 2026-09-29 · docs: record fast playback start implementation decisions
+- `PLAN.md`
+
 ### `bcabb4f` · 2026-09-29 · docs: sync FILE_INDEX.md with the fast playback start changes
 - `FILE_INDEX.md`
 
