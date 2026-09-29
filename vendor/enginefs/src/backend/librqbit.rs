@@ -202,6 +202,7 @@ impl TorrentHandle for LibrqbitHandle {
                         offset,
                         downloaded: 0, // TODO: Implement per-file progress for librqbit if needed
                         progress: 0.0,
+                        downloaded_ranges: Vec::new(),
                     });
                     total_size += f.len;
                     offset += f.len;
