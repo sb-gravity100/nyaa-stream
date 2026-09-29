@@ -1247,9 +1247,14 @@ pub fn run() {
         .plugin(media_keys::plugin())
         .manage(app_state.clone())
         .manage(player::PlayerState::default())
-        .setup(|app| {
-            player::warm_mpv(app.handle().clone());
-            Ok(())
+        // The embedded mpv is pre-spawned only after the page has loaded:
+        // spawning it into the window at launch, while WebView2 was still
+        // initializing there, delayed the page by up to ~34s (vs 0.5-2s).
+        .on_page_load(|webview, payload| {
+            if payload.event() == tauri::webview::PageLoadEvent::Finished {
+                tracing::debug!(url = %payload.url(), "page load finished");
+                player::warm_mpv_once(tauri::Manager::app_handle(webview).clone());
+            }
         })
         .register_asynchronous_uri_scheme_protocol(THUMBNAIL_SCHEME, move |_ctx, request, responder| {
             let state = app_state.clone();
