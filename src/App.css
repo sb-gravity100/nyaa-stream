@@ -599,7 +599,7 @@ a {
   align-items: flex-end;
   /* Runs up under the translucent app bar. */
   margin: -70px calc(-1 * var(--page-x)) 0;
-  min-height: clamp(300px, 44vh, 440px);
+  height: 340px;
   padding: 100px var(--page-x) 32px;
   overflow: hidden;
   isolation: isolate;
@@ -722,7 +722,7 @@ a {
 }
 
 .home-hero-empty {
-  min-height: clamp(300px, 44vh, 440px);
+  height: 340px;
   background:
     radial-gradient(55% 70% at 85% 20%, rgba(240, 122, 166, 0.22), transparent 70%),
     radial-gradient(45% 60% at 60% 70%, rgba(120, 132, 230, 0.16), transparent 70%);
