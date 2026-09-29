@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type { JSX } from "preact";
 import { DEFAULT_SUBTITLE_STYLE, resetSettings, updateSettings, useSettings, type PreferredResolution, type SubtitleStyle } from "./settings";
 import { CloseIcon } from "./icons";
+import { exportBackup, importBackup } from "./backup";
 
 interface Props {
   onClose: () => void;
@@ -107,6 +108,55 @@ function StorageSection() {
           </span>
         </div>
       ))}
+      {message && <div class="setting-hint">{message}</div>}
+    </section>
+  );
+}
+
+/** Library, progress and settings <-> a file in Documents, since they live
+ * in webview storage that a data clear would take with it. */
+function BackupSection() {
+  const [message, setMessage] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function run(action: () => Promise<string>) {
+    setBusy(true);
+    setMessage(null);
+    try {
+      setMessage(await action());
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : String(err));
+    }
+    setBusy(false);
+  }
+
+  return (
+    <section class="settings-section">
+      <h3>Backup</h3>
+      <div class="setting-row">
+        <span class="setting-text">
+          <span class="setting-label">Library, progress and settings</span>
+          <span class="setting-hint">Saved to nyaa-stream-backup.json in your Documents folder</span>
+        </span>
+        <span class="setting-control">
+          <button class="button button-quiet" disabled={busy} onClick={() => void run(async () => `Saved to ${await exportBackup()}`)}>
+            Export
+          </button>
+          <button
+            class="button button-quiet"
+            disabled={busy}
+            onClick={() =>
+              void run(async () => {
+                const count = await importBackup();
+                window.setTimeout(() => window.location.reload(), 800);
+                return `Restored ${count} entries - reloading…`;
+              })
+            }
+          >
+            Import
+          </button>
+        </span>
+      </div>
       {message && <div class="setting-hint">{message}</div>}
     </section>
   );
@@ -308,6 +358,8 @@ export function SettingsPanel({ onClose }: Props) {
               </button>
             </div>
           </section>
+
+          <BackupSection />
 
           <StorageSection />
 
