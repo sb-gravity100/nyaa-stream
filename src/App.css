@@ -599,8 +599,8 @@ a {
   align-items: flex-end;
   /* Runs up under the translucent app bar. */
   margin: -70px calc(-1 * var(--page-x)) 0;
-  min-height: clamp(360px, 58vh, 580px);
-  padding: 110px var(--page-x) 36px;
+  min-height: clamp(300px, 44vh, 440px);
+  padding: 100px var(--page-x) 32px;
   overflow: hidden;
   isolation: isolate;
 }
