@@ -1154,6 +1154,8 @@ pub fn run() {
             search_torrents,
             search_torrents_for_anime,
             default_clip_folder,
+            player::mpv_save_frame,
+            player::default_screenshot_folder,
             search_local_releases,
             search_fansubber_releases,
             get_popular_fansubbers,
