@@ -2,6 +2,11 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `7403cde` · 2026-09-29 · feat(nyaa-client): per-uploader search and cached popular fansubbers
+- `crates/nyaa-client/src/fansubbers.rs`
+- `crates/nyaa-client/src/lib.rs`
+- `FILE_INDEX.md`
+
 ### `8992f5d` · 2026-09-29 · feat: smarter nyaa title matching - fewer queries run in parallel, false positives dropped
 - `src-tauri/src/title_match.rs`
 - `src-tauri/src/lib.rs`
