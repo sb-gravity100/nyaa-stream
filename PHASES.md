@@ -454,6 +454,18 @@
             (debounced, cached; time only when not downloaded)
       - [ ] PLAN.md/FILE_INDEX.md sync, `npm run bump -- minor`, tag
             `v0.8.0` locally (not pushed/published - see PLAN.md "Release plan")
+- [ ] 32-bit Windows (v1.0.0, see PLAN.md "32-bit Windows support"): one
+      commit each -
+      - [ ] Audit 64-bit assumptions (`usize` casts, sizes/offsets as `u64`,
+            memory caps) across crates
+      - [ ] `i686-pc-windows-msvc` target + vcpkg `x86-windows-static-md`
+            FFmpeg/libtorrent build; Build prerequisites section
+      - [ ] 32-bit `libmpv-2.dll` in `src-tauri/lib/x86/`; arch-aware loader
+      - [ ] Per-arch memory caps (mpv cache, read-ahead, resume buffers)
+      - [ ] Tauri bundle per arch; `latest.json` `windows-i686`;
+            `scripts/release.mjs` builds and uploads both
+      - [ ] Verify live on a 32-bit build (WoW64 or VM): playback, subs,
+            resume, HLS fallback, updater
 - [ ] Stable release (v1.0.0, see PLAN.md "Release plan"): one commit each -
       - [ ] Stabilization pass over v0.4.0-v0.8.0: open bugs, live verify
             items still unchecked, README/What's new

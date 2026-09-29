@@ -559,7 +559,8 @@ after v0.8.0). The milestones in between - v0.5.0 (context menus) → v0.6.0
 (build thumbnails) → v0.7.0 (HD banners) → v0.8.0 (seek preview) - are each
 bumped (`npm run bump`) and tagged **locally only**, never pushed. Commits
 are pushed with plain `git push` (no tags); `npm run release` pushes only
-the tag it publishes. Installs update 0.3.1 → 0.3.2 → 0.4.0 → 1.0.0.
+the tag it publishes. Installs update 0.3.1 → 0.3.2 → 0.4.0 → 1.0.0 (v1.0.0 ships x86_64 and 32-bit
+i686 builds, see "32-bit Windows support").
 (Changed 2026-09-29 from "only v0.9.0 is published", so the playback fix
 doesn't wait on the features; contact/logs moved from v0.9.0 to v0.4.0; a
 multiplatform 1.0.0 was planned and dropped the same day - Windows only.)
@@ -1289,6 +1290,36 @@ yaa-stream\logs`, the last 7 daily files) plus a
   public. Tokens are never logged in the first place (logging rules + TMDB
   token plan), so none can leak.
 - Logged: button presses, zip path and size, failures.
+
+## 32-bit Windows support (planned, v1.0.0 - minor: new target)
+
+Assumes "32-bit" = Windows x86 (`i686-pc-windows-msvc`); tell me if Linux
+or ARM was meant. The stable v1.0.0 ships both `windows-x86_64` and
+`windows-i686` builds. Work starts after v0.8.0 (features stay 64-bit-tested
+until then, but must not add 64-bit-only assumptions).
+
+- **Toolchain**: add the `i686-pc-windows-msvc` Rust target; vcpkg triplet
+  `x86-windows-static-md` for the LGPL FFmpeg (and libtorrent/openssl deps
+  of enginefs); LLVM libclang must be the x86-capable one for bindgen.
+- **libmpv**: bundle a 32-bit `libmpv-2.dll` in `src-tauri/lib/x86/` (64-bit
+  stays in `lib/x64/`); the loader picks by `cfg(target_pointer_width)`.
+  `wid` embedding is unchanged.
+- **Memory limits**: a 32-bit process has ~2 GB (up to 4 GB large-address
+  aware) of address space, so the 64-bit tuning must be scaled: mpv
+  `--demuxer-max-bytes`/`max-back-bytes` (150 MiB), the enginefs read-ahead
+  cap (64 MB), the resume buffers and libtorrent's cache use per-arch caps;
+  mmap of multi-GB files is avoided (files are read in ranges, and file
+  sizes/offsets are `u64` end to end - audit `usize` casts).
+- **Packaging/updater**: separate NSIS/MSI per arch (`--target
+  i686-pc-windows-msvc`); `latest.json` gets a `windows-i686` platform entry
+  with its own signature; `scripts/release.mjs` builds and uploads both.
+  The in-app updater picks its own arch automatically.
+- **Verify**: 32-bit Windows VM or the WoW64 build of the 32-bit installer on
+  this PC (installs and runs on 64-bit Windows, so live QA is possible
+  here): playback, subtitles, resume, HLS fallback, updater. WebView2 is
+  available for x86.
+- Risks: 32-bit builds of vcpkg FFmpeg/libtorrent may need patches; memory
+  exhaustion on long HLS runs; small user base vs. extra build/QA cost.
 
 ## Dev build speed (tooling, no version bump)
 
