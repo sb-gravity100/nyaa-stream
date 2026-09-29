@@ -44,12 +44,33 @@ pub fn set_mpv_path(path: Option<String>) {
     mpv_player::set_library_path(path.map(std::path::PathBuf::from));
 }
 
-/// Starts mpv inside the window if it isn't running yet and makes the
-/// webview transparent over it. Idempotent - the player calls it on every
-/// open.
-#[tauri::command]
-pub async fn mpv_start(app: AppHandle, window: WebviewWindow, state: State<'_, PlayerState>) -> Result<(), String> {
-    tracing::debug!("mpv_start invoked");
+/// Spawns the embedded mpv at app launch - idle, below the still-opaque
+/// webview - so the first episode skips libmpv load + font install. Skipped
+/// when libmpv can't be found (the player then uses the HLS fallback, or
+/// `mpv_start` spawns lazily after a Settings path override).
+pub fn warm_mpv(app: AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        let available = tokio::task::spawn_blocking(mpv_player::is_available).await.unwrap_or(false);
+        if !available {
+            tracing::info!("libmpv not found at launch, embedded mpv not pre-spawned");
+            return;
+        }
+        let Some(window) = app.get_webview_window("main").or_else(|| app.webview_windows().into_values().next()) else {
+            tracing::warn!("no window to pre-spawn embedded mpv in");
+            return;
+        };
+        let started = std::time::Instant::now();
+        let state = app.state::<PlayerState>();
+        match ensure_mpv(&app, &window, &state).await {
+            Ok(()) => tracing::info!(elapsed_ms = started.elapsed().as_millis() as u64, "embedded mpv pre-spawned at launch"),
+            Err(err) => tracing::warn!(%err, "couldn't pre-spawn embedded mpv, the player will start it"),
+        }
+    });
+}
+
+/// Starts mpv inside `window` unless it's already running. The webview's
+/// background is left alone, so an idle mpv stays hidden behind it.
+async fn ensure_mpv(app: &AppHandle, window: &WebviewWindow, state: &PlayerState) -> Result<(), String> {
     let mut slot = state.mpv.lock().await;
     if slot.is_none() {
         let wid = window_handle(&window)?;
@@ -84,7 +105,19 @@ pub async fn mpv_start(app: AppHandle, window: WebviewWindow, state: State<'_, P
             let _ = forward_app.emit("mpv-exit", ());
         });
         tracing::info!(wid, "embedded mpv started");
+    } else {
+        tracing::debug!("embedded mpv already running");
     }
+    Ok(())
+}
+
+/// Starts mpv inside the window if it isn't running yet (normally it was
+/// pre-spawned at launch, see `warm_mpv`) and makes the webview transparent
+/// over it. Idempotent - the player calls it on every open.
+#[tauri::command]
+pub async fn mpv_start(app: AppHandle, window: WebviewWindow, state: State<'_, PlayerState>) -> Result<(), String> {
+    tracing::debug!("mpv_start invoked");
+    ensure_mpv(&app, &window, &state).await?;
     window.set_background_color(Some(Color(0, 0, 0, 0))).map_err(|err| err.to_string())?;
     let attached = state.attached.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
     tracing::debug!(attached, "mpv_start completed");

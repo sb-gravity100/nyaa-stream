@@ -1247,6 +1247,10 @@ pub fn run() {
         .plugin(media_keys::plugin())
         .manage(app_state.clone())
         .manage(player::PlayerState::default())
+        .setup(|app| {
+            player::warm_mpv(app.handle().clone());
+            Ok(())
+        })
         .register_asynchronous_uri_scheme_protocol(THUMBNAIL_SCHEME, move |_ctx, request, responder| {
             let state = app_state.clone();
             tauri::async_runtime::spawn_blocking(move || responder.respond(thumbnail_protocol(&state, &request)));
