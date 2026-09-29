@@ -1,0 +1,5 @@
+{
+  // rust-analyzer checks in its own target dir (target/rust-analyzer), so it
+  // never blocks or invalidates `tauri dev`'s build - PLAN.md "Dev build speed".
+  "rust-analyzer.cargo.targetDir": true
+}

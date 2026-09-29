@@ -402,4 +402,4 @@
 - [ ] Dev build speed (see PLAN.md "Dev build speed"): one commit each -
       - [x] Dev profile debug info: line-tables-only, dependencies 0
       - [x] rust-lld for dev links (verified + timed)
-      - [ ] rust-analyzer separate target dir (`.vscode/settings.json`)
+      - [x] rust-analyzer separate target dir (`.vscode/settings.json`)
