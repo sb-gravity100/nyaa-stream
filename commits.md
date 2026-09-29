@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `7eefcf4` · 2026-09-29 · docs: plan fast playback start for v0.3.2
+- `PLAN.md`
+- `PHASES.md`
+
 ### `3e7293d` · 2026-09-29 · chore: release v0.3.1
 - `package.json`
 - `src-tauri/Cargo.toml`
