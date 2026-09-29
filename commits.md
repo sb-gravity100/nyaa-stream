@@ -2,6 +2,13 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `cd74354` · 2026-09-29 · ci: run the release workflow manually only
+- `.github/workflows/release.yml`
+
+### `ae8e139` · 2026-09-29 · chore: add local release script
+- `scripts/release.mjs`
+- `package.json`
+
 ### `bac1f3a` · 2026-09-29 · docs: plan local release script
 - `PLAN.md`
 - `PHASES.md`
