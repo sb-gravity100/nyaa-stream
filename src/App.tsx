@@ -37,7 +37,9 @@ import {
 import "./App.css";
 
 const SEARCH_DEBOUNCE_MS = 350;
-const MAX_DROPDOWN_RESULTS = 15;
+const MAX_DROPDOWN_RESULTS = 20;
+// Results are rendered in chunks as the dropdown is scrolled.
+const DROPDOWN_CHUNK = 6;
 
 // "this week and last" — calendar-week-aligned (Monday start), not a
 // rolling 14-day window, matching the same calendar-aligned convention as
@@ -127,6 +129,9 @@ function App() {
   // which are both safe defaults for the correction to be a no-op.
   const [episodeOffsetByMedia, setEpisodeOffsetByMedia] = useState<Record<number, number>>({});
 
+  const [visibleResults, setVisibleResults] = useState(DROPDOWN_CHUNK);
+  const resultsWrapRef = useRef<HTMLDivElement>(null);
+  const moreSentinelRef = useRef<HTMLLIElement>(null);
   const skipNextSearch = useRef(false);
   const blurTimeout = useRef<number | undefined>(undefined);
 
@@ -152,6 +157,23 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query]);
 
+  // Reveals the next chunk when the sentinel under the list scrolls into view.
+  useEffect(() => {
+    const sentinel = moreSentinelRef.current;
+    if (!sentinel || !("IntersectionObserver" in window)) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          console.debug("[search] revealing more results");
+          setVisibleResults((n) => n + DROPDOWN_CHUNK);
+        }
+      },
+      { root: resultsWrapRef.current, rootMargin: "80px" },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [animeResults, visibleResults, dropdownOpen]);
+
   async function runSearch(q: string) {
     console.debug("[search_anime] invoked", { query: q });
     setLoading(true);
@@ -162,6 +184,7 @@ function App() {
         : await fallbackSearchAnime(q);
       console.info("[search_anime] succeeded", { query: q, count: results.length });
       setAnimeResults(results.slice(0, MAX_DROPDOWN_RESULTS));
+      setVisibleResults(DROPDOWN_CHUNK);
     } catch (err) {
       console.error("[search_anime] failed", { query: q, err });
       setError(`Search failed: couldn't reach AniList (${err instanceof Error ? err.message : String(err)}).`);
@@ -610,7 +633,7 @@ function App() {
           />
 
           {dropdownOpen && (
-            <div class="search-results-wrap" id="search-results">
+            <div class="search-results-wrap" id="search-results" ref={resultsWrapRef}>
               {loading && (
                 <ul class="search-results">
                   {Array.from({ length: 4 }, (_, i) => (
@@ -632,7 +655,7 @@ function App() {
               )}
               {!loading && animeResults.length > 0 && (
                 <ul class="search-results" role="listbox">
-                  {animeResults.map((anime) => {
+                  {animeResults.slice(0, visibleResults).map((anime) => {
                     const seasonLabel = formatSeason(anime.season, anime.seasonYear);
                     const facts = [
                       anime.format?.replace("_", " "),
@@ -649,7 +672,7 @@ function App() {
                       <li key={anime.id} role="option">
                         <a onMouseDown={(e) => e.preventDefault()} onClick={() => pickAnime(anime)}>
                           <div class="result-thumbnail">
-                            {anime.coverImage.large && <img src={anime.coverImage.large} alt="" />}
+                            {anime.coverImage.large && <img src={anime.coverImage.large} alt="" loading="lazy" decoding="async" />}
                           </div>
                           <div class="result-metadata">
                             <div class="result-title">{displayTitle(anime.title)}</div>
@@ -662,6 +685,7 @@ function App() {
                       </li>
                     );
                   })}
+                  {visibleResults < animeResults.length && <li ref={moreSentinelRef} class="search-more-sentinel" aria-hidden="true" />}
                 </ul>
               )}
             </div>
