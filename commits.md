@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `c496a57` · 2026-09-29 · docs: plan HD banner sources for v0.7.0
+- `PLAN.md`
+- `PHASES.md`
+
 ### `5272044` · 2026-09-29 · docs: prefer SubsPlease 480p for thumbnail captures
 - `PLAN.md`
 - `PHASES.md`
