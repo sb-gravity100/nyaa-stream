@@ -62,7 +62,7 @@ const SUBTITLE_DELAY_STEP = 0.1;
 const AUDIO_DELAY_STEP = 0.1;
 /** Playback speed presets stepped through by `[` / `]`. */
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
-/** Jump when Shift is tapped in a file with no chapter markers at all - a
+/** Jump when Shift is tapped in a file with no opening chapter marked - a
  * standard anime OP length. */
 const INTRO_SKIP_SECONDS = 85;
 const INTRO_CHAPTER = /^(op|opening|intro)\b|\bopening\b/i;
@@ -996,30 +996,31 @@ function MpvPlayerView({
       return null;
    }
 
-   /** The chapter (marked region) playing at `time` - whatever its title -
-    * as its end and label; null when the file has no chapters. */
-   function chapterAt(time: number): { end: number; title: string } | null {
-      for (let i = chapters.length - 1; i >= 0; i--) {
-         if (chapters[i].time > time) continue;
+   /** The opening (intro chapter) playing at `time` or still to come, as
+    * its end - so Shift in a prologue before the opening skips past the
+    * whole opening, not just to where it starts. Null when the file marks
+    * no opening ahead. */
+   function openingFrom(time: number): { end: number } | null {
+      for (let i = 0; i < chapters.length; i++) {
+         if (!INTRO_CHAPTER.test(chapters[i].title.trim())) continue;
          const end = chapters[i + 1] ? chapters[i + 1].time : episodeDuration;
-         return end - time > 0.5 ? { end, title: chapters[i].title.trim() } : null;
+         if (end - time > 0.5) return { end };
       }
       return null;
    }
 
-   /** Shift: jumps to the end of the marked region (chapter) playing - the
-    * opening, a recap, the ending... - and only in a file with no chapters
-    * at all a fixed 85s. */
+   /** Shift: jumps to the end of the opening chapter (see `openingFrom`);
+    * only in a file with no opening marked, a fixed 85s. */
    function skipIntro() {
       const video = videoRef.current;
       if (!video || !episodeDuration) return;
       cancelPendingKeyboardSeek();
       const now = video.currentTime;
-      const region = chapterAt(now);
-      const target = region ? region.end : Math.min(now + INTRO_SKIP_SECONDS, episodeDuration);
-      console.info("[player] skip region", { from: now, to: target, chapter: region?.title ?? null });
+      const opening = openingFrom(now);
+      const target = opening ? opening.end : Math.min(now + INTRO_SKIP_SECONDS, episodeDuration);
+      console.info("[player] skip intro", { from: now, to: target, marked: opening != null });
       showFlash("forward");
-      showToast(region ? (INTRO_CHAPTER.test(region.title) ? "Skipped opening" : region.title ? `Skipped “${region.title}”` : "Skipped chapter") : `Skipped ${INTRO_SKIP_SECONDS}s`);
+      showToast(opening ? "Skipped opening" : `Skipped ${INTRO_SKIP_SECONDS}s`);
       seekToEpisodeTime(target);
    }
 
