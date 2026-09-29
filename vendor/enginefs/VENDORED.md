@@ -75,3 +75,11 @@ Copied from https://github.com/stremio-native/stream-server at rev
 - `src/backend/libtorrent/disk_stream.rs`: the "waiting for verified piece"
   diagnostic reports the window of the effective intent (sequential after
   the first byte), not the stream's original intent.
+- `src/backend/libtorrent/playback.rs`, `src/engine.rs`: a file-priority
+  update that doesn't read back within the 2s acknowledgement timeout is
+  resubmitted once and then streamed anyway (warned as
+  `file_priority_unconfirmed`, with the mismatched file indices). Upstream
+  failed the activation, so the stream server answered "unknown file
+  index" and mpv waited with no error (a Kaleido-subs torrent, verified
+  live). `get_file_with_intent` now logs why `get_file_reader` failed
+  instead of discarding the error.

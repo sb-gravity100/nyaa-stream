@@ -416,6 +416,11 @@ impl<H: TorrentHandle> Engine<H> {
                 intent,
             )
             .await
+            // (nyaa-stream) Log why: callers only see `None`, which the
+            // stream server reported as an "unknown file index".
+            .inspect_err(|error| {
+                tracing::warn!(file_idx, start_offset, ?intent, %error, "get_file_reader failed");
+            })
             .ok()?;
         tracing::debug!(
             "startup: get_file_reader returned in {:?} for file {} offset {} (total={:?})",

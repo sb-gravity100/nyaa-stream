@@ -1985,6 +1985,54 @@ impl LibtorrentPlaybackCoordinator {
     }
 
     async fn apply_file_priorities(&self, info_hash: &str, priorities: &[i32]) -> Result<()> {
+        // (nyaa-stream) Upstream failed the whole activation when the
+        // priorities didn't read back after the ack timeout, leaving the
+        // file unknown to the stream server (Kaleido-subs source: "did not
+        // match after acknowledgement timeout", then "stream request for
+        // unknown file index" and a player waiting on nothing). Resubmit
+        // once, then fall through to streaming: the playing window's piece
+        // priorities and deadlines drive the download either way. Real
+        // errors (file error alert, torrent gone) still fail at once.
+        if self.apply_file_priorities_once(info_hash, priorities).await? {
+            return Ok(());
+        }
+        tracing::warn!(
+            info_hash = %info_hash,
+            file_count = priorities.len(),
+            "file priorities not acknowledged in time, resubmitting once"
+        );
+        if self.apply_file_priorities_once(info_hash, priorities).await? {
+            return Ok(());
+        }
+        let actual = {
+            let session = self.session.read().await;
+            session
+                .find_torrent(info_hash)
+                .map_err(|error| anyhow!("Torrent not found: {error}"))?
+                .get_file_priorities()
+        };
+        let mismatched = priorities
+            .iter()
+            .enumerate()
+            .filter(|(index, expected)| actual.get(*index) != Some(*expected))
+            .map(|(index, _)| index)
+            .take(10)
+            .collect::<Vec<_>>();
+        tracing::warn!(
+            info_hash = %info_hash,
+            file_count = priorities.len(),
+            actual_count = actual.len(),
+            ?mismatched,
+            stage = "file_priority_unconfirmed",
+            "libtorrent file priorities still differ after a retry, streaming anyway"
+        );
+        Ok(())
+    }
+
+    /// One submit + acknowledgement wait: `Ok(true)` when libtorrent
+    /// reports the priorities, `Ok(false)` when they didn't read back
+    /// before `FILE_PRIORITY_ACK_TIMEOUT`.
+    async fn apply_file_priorities_once(&self, info_hash: &str, priorities: &[i32]) -> Result<bool> {
         let submitted = Instant::now();
         {
             let session = self.session.read().await;
@@ -2001,7 +2049,7 @@ impl LibtorrentPlaybackCoordinator {
                     stage = "bulk_priority_skipped_seed",
                     "Skipped file-priority update for complete torrent"
                 );
-                return Ok(());
+                return Ok(true);
             }
         }
         let mut receiver = self.alerts.subscribe(info_hash);
@@ -2037,7 +2085,7 @@ impl LibtorrentPlaybackCoordinator {
                             stage = "file_priority_acknowledged",
                             "libtorrent playback startup stage"
                         );
-                        return Ok(());
+                        return Ok(true);
                     }
                 }
                 Ok(Ok(_)) | Ok(Err(broadcast::error::RecvError::Lagged(_))) => {}
@@ -2052,11 +2100,9 @@ impl LibtorrentPlaybackCoordinator {
                             stage = "file_priority_verified_after_alert_timeout",
                             "libtorrent playback startup stage"
                         );
-                        return Ok(());
+                        return Ok(true);
                     }
-                    return Err(anyhow!(
-                        "Libtorrent file priorities did not match after acknowledgement timeout"
-                    ));
+                    return Ok(false);
                 }
             }
         }
