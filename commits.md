@@ -2,6 +2,22 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `8e74f35` · 2026-09-29 · docs: describe in-process libmpv playback
+- `CLAUDE.md`
+- `FILE_INDEX.md`
+- `PHASES.md`
+- `PLAN.md`
+
+### `ee3c6f8` · 2026-09-29 · feat(settings): mpv path override now points at libmpv-2.dll
+- `src/PlayerView.tsx`
+- `src/SettingsPanel.tsx`
+- `src/settings.ts`
+
+### `1c1c758` · 2026-09-29 · build: bundle libmpv-2.dll as a Tauri resource
+- `.gitignore`
+- `src-tauri/tauri.conf.json`
+- `src-tauri/lib/README.md`
+
 ### `dd6e7ad` · 2026-09-29 · feat(mpv-player): play through in-process libmpv instead of spawned mpv
 - `crates/mpv-player/Cargo.toml`
 - `crates/mpv-player/src/libmpv.rs`
