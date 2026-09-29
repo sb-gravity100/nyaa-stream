@@ -2,6 +2,12 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `542f1ee` · 2026-09-29 · fix: hold the playing file at priority 0 until its startup buffer verifies
+- `PHASES.md`
+- `vendor/enginefs/src/backend/libtorrent/disk_stream.rs`
+- `vendor/enginefs/src/backend/libtorrent/playback.rs`
+- `vendor/enginefs/src/backend/priorities.rs`
+
 ### `efa6aa9` · 2026-09-29 · docs: note unpublished milestone tags in CLAUDE.md
 - `CLAUDE.md`
 
