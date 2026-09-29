@@ -134,6 +134,71 @@ pub fn seek_target_covered(target: i32, anchor: i32, frontier: i32, urgent_piece
     target >= anchor && target <= frontier.saturating_add(urgent_pieces)
 }
 
+/// (nyaa-stream) A resume (`WatchHint::Resume`) whose resume point isn't
+/// known yet keeps the startup hold this much longer than
+/// `STARTUP_BASELINE_FALLBACK_MS`: header, index and resume-point reads come
+/// one after another before the player reveals where it resumes.
+pub const RESUME_ANCHOR_FALLBACK_EXTRA_MS: u64 = 30_000;
+
+/// (nyaa-stream) The file tail requested with the header at playback start:
+/// MKV Cues / MP4 moov usually live there, and the player reads them right
+/// after the header, before it can seek.
+pub const TAIL_PREFETCH_BYTES: u64 = 4 * 1024 * 1024;
+
+/// (nyaa-stream) Seconds of playback the read-ahead window covers after the
+/// first byte, and its byte cap.
+pub const READ_AHEAD_SECONDS: u64 = 30;
+pub const MAX_READ_AHEAD_BYTES: u64 = 64 * 1024 * 1024;
+/// Duration assumed for a file with no bitrate estimate (one TV episode).
+const ASSUMED_DURATION_SECS: u64 = 24 * 60;
+
+/// (nyaa-stream) Pieces `first..=last` covering the file's last
+/// `TAIL_PREFETCH_BYTES`, or None for a small file (the startup window
+/// already reaches its tail). `file_offset` is torrent-absolute.
+pub fn tail_prefetch_pieces(
+    last_piece: i32,
+    file_offset: u64,
+    file_size: u64,
+    piece_length: u64,
+) -> Option<(i32, i32)> {
+    if piece_length == 0 || file_size < SMALL_FILE_BYTES {
+        return None;
+    }
+    let tail_start = file_offset + file_size.saturating_sub(TAIL_PREFETCH_BYTES);
+    Some(((tail_start / piece_length) as i32, last_piece))
+}
+
+/// (nyaa-stream) Read-ahead pieces after the first byte: at least
+/// `configured`, grown to `READ_AHEAD_SECONDS` of playback at the stream's
+/// bitrate (file size / one episode when unknown), capped at
+/// `MAX_READ_AHEAD_BYTES`.
+pub fn read_ahead_window_pieces(
+    configured: i32,
+    piece_length: u64,
+    bitrate_bytes_per_sec: Option<u64>,
+    file_size: u64,
+) -> i32 {
+    if piece_length == 0 {
+        return configured;
+    }
+    let bitrate = bitrate_bytes_per_sec
+        .filter(|rate| *rate > 0)
+        .unwrap_or(file_size / ASSUMED_DURATION_SECS);
+    let wanted = bitrate
+        .saturating_mul(READ_AHEAD_SECONDS)
+        .min(MAX_READ_AHEAD_BYTES);
+    configured.max(pieces_for_bytes(wanted, piece_length))
+}
+
+/// (nyaa-stream) Whether a resume's foreground read start is its resume
+/// point: past the header (`header_end`) and not a continuation of the
+/// header read (at most one piece past `read_frontier`, the furthest piece
+/// earlier non-tail reads reached) - the player returns there after
+/// reading the index at the file tail.
+pub fn is_resume_point(piece: i32, header_end: i32, read_frontier: Option<i32>) -> bool {
+    piece >= header_end && read_frontier.is_none_or(|frontier| piece > frontier.saturating_add(1))
+}
+
 /// Baseline of a streamed file once its startup buffer has verified.
 pub const STREAMING_FILE_BASELINE_PRIORITY: i32 = 1;
 
@@ -633,6 +698,34 @@ pub fn calculate_priorities(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn tail_prefetch_covers_the_last_4_mib_of_a_large_file() {
+        const MIB: u64 = 1024 * 1024;
+        // 2 GiB file at offset 0, 512 KiB pieces: last piece 4095.
+        assert_eq!(tail_prefetch_pieces(4095, 0, 2048 * MIB, MIB / 2), Some((4088, 4095)));
+        assert_eq!(tail_prefetch_pieces(100, 0, 32 * MIB, MIB / 2), None);
+    }
+
+    #[test]
+    fn read_ahead_grows_to_30s_of_playback_and_is_capped() {
+        const MIB: u64 = 1024 * 1024;
+        // 2 GiB / 24 min ~ 1.4 MiB/s -> ~43 MiB -> 86 pieces of 512 KiB.
+        assert_eq!(read_ahead_window_pieces(32, MIB / 2, None, 2048 * MIB), 86);
+        // 350 MiB episode: ~7 MiB of read-ahead, below the configured 32.
+        assert_eq!(read_ahead_window_pieces(32, MIB / 2, None, 350 * MIB), 32);
+        // A huge bitrate stops at 64 MiB.
+        assert_eq!(read_ahead_window_pieces(32, MIB, Some(10 * MIB), 0), 64);
+    }
+
+    #[test]
+    fn resume_point_skips_header_continuations() {
+        // Header ran to piece 15; the player returns at 16 after the tail read.
+        assert!(!is_resume_point(16, 16, Some(15)));
+        assert!(is_resume_point(386, 16, Some(15)));
+        assert!(is_resume_point(386, 16, None));
+        assert!(!is_resume_point(10, 16, None));
+    }
 
     fn base_context(intent: PlaybackIntent) -> PriorityContext {
         PriorityContext {
