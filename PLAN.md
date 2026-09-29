@@ -720,8 +720,13 @@ Episodes cards. A button on the Episodes section runs it on demand.
   only when N > 0 visible episode rows have no thumbnail from any source.
   While running: "Building 3/12 · Cancel"; at the end, "N failed" if any.
 - **Which release:** the smallest file among the row's sources with a live
-  swarm (>= 3 seeders; falls back to the next smallest, then to the
-  best-seeded one). Only the header and a few MB around the midpoint are
+  swarm: >= 3 seeders first, then any with >= 1 seeder, smallest first in
+  each tier. A source with 0 seeders is never used - if none of the row's
+  sources has a seeder, the row is skipped and counted as "no seeded
+  source", not as a failure. nyaa's counts are a snapshot, so the capture
+  also checks live: no peer connected within 20s of adding the torrent
+  abandons that source and tries the row's next candidate (up to 3), which
+  also avoids burning the 60s capture timeout on a dead swarm. Only the header and a few MB around the midpoint are
   downloaded, and a smaller (lower-bitrate, often 720p/480p) file covers
   that midpoint in fewer MB and decodes faster; the 640px thumbnail doesn't
   need 1080p. Single-episode releases win over batches, and a batch is

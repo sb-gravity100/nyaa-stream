@@ -335,8 +335,10 @@
       button"): one commit each -
       - [ ] `capture_torrent_thumbnail`: optional `file_idx` and `force`
       - [ ] Batch captures share one torrent across their episodes
-      - [ ] Capture source pick: smallest file with >= 3 seeders (batch =
-            size / episodes, single episodes first), fallbacks
+      - [ ] Capture source pick: smallest file with >= 3, then >= 1
+            seeders (batch = size / episodes, single episodes first); never
+            0 seeders - row skipped as "no seeded source"
+      - [ ] Live swarm check: no peer within 20s → next candidate (max 3)
       - [ ] Capture queue (list order, pause while playing, cancel)
       - [ ] Episodes header button with count/progress/failed state,
             spinner on rows being captured
