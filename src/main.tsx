@@ -9,10 +9,12 @@ import App from "./App";
 import { TitleBar } from "./TitleBar";
 import { WhatsNew } from "./WhatsNew";
 import { installDevLogger } from "./devLogger";
+import { installDownloadCacheSync } from "./downloadCache";
 import { installFullscreenHotkey } from "./fullscreen";
 
 installDevLogger();
 installFullscreenHotkey();
+installDownloadCacheSync();
 render(
   <>
     <TitleBar />

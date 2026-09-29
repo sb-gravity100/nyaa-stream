@@ -884,6 +884,21 @@ async fn play_magnet(
     Ok(PlaySession { torrent_id: added.id, files, default_file_idx })
 }
 
+/// The Continue watching row's episodes (`<animeId>:<episodeKey>`), whose
+/// torrents the download cache keeps past its cap; sent on every change.
+#[tauri::command]
+async fn set_download_cache_keep(state: State<'_, Arc<AppState>>, episodes: Vec<String>) -> Result<(), String> {
+    tracing::debug!(count = episodes.len(), "set_download_cache_keep invoked");
+    let playing = state.current_torrent.lock().await.clone();
+    let app = state.inner().clone();
+    tokio::task::spawn_blocking(move || {
+        app.download_cache.set_keep(episodes);
+        app.download_cache.evict(playing.as_deref(), false, "left Continue watching");
+    })
+    .await
+    .map_err(|err| err.to_string())
+}
+
 /// How long libtorrent may keep a removed torrent's files open.
 const FILE_RELEASE_DELAY: Duration = Duration::from_secs(2);
 
@@ -1360,6 +1375,7 @@ pub fn run() {
             media_keys::set_media_keys,
             cache::get_cache_sizes,
             cache::clear_cache,
+            set_download_cache_keep,
             cache::export_backup,
             cache::import_backup,
             player::mpv_available,

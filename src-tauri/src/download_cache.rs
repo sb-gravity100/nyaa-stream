@@ -19,8 +19,18 @@ struct Index {
     /// Cap in bytes; `None` = `DEFAULT_LIMIT_BYTES`, 0 = delete on stop.
     #[serde(default)]
     limit_bytes: Option<u64>,
+    /// Continue watching episodes (`<animeId>:<episodeKey>`): their
+    /// torrents are kept past the cap.
+    #[serde(default)]
+    keep: Vec<String>,
     #[serde(default)]
     torrents: HashMap<String, Entry>,
+}
+
+impl Index {
+    fn is_kept(&self, entry: &Entry) -> bool {
+        entry.episodes.iter().any(|e| self.keep.contains(e))
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -185,6 +195,10 @@ impl DownloadCache {
                 stale.push(hash.clone());
                 continue;
             }
+            if index.is_kept(entry) {
+                tracing::debug!(name = %entry.name, bytes, "download cache entry kept for Continue watching");
+                continue;
+            }
             items.push(Item { key: Some(hash.clone()), name: entry.name.clone(), bytes, last_used: entry.last_used, paths });
         }
         if include_orphans {
@@ -227,6 +241,30 @@ impl DownloadCache {
             self.save(&index);
         }
         tracing::info!(total, limit, reason, "download cache eviction done");
+    }
+
+    /// Replaces the Continue watching episode list. Entries that were kept
+    /// and no longer are become the first to evict.
+    pub fn set_keep(&self, keep: Vec<String>) {
+        let mut index = self.lock();
+        if index.keep == keep {
+            return;
+        }
+        let old = std::mem::replace(&mut index.keep, keep);
+        let released: Vec<String> = index
+            .torrents
+            .iter()
+            .filter(|(_, entry)| entry.episodes.iter().any(|e| old.contains(e)) && !index.is_kept(entry))
+            .map(|(hash, _)| hash.clone())
+            .collect();
+        for hash in &released {
+            if let Some(entry) = index.torrents.get_mut(hash) {
+                tracing::info!(name = %entry.name, "download cache entry left Continue watching");
+                entry.last_used = 0;
+            }
+        }
+        tracing::debug!(keep = index.keep.len(), released = released.len(), "download cache keep list updated");
+        self.save(&index);
     }
 
     /// Deletes a scratch torrent's files (thumbnail capture) unless it is a
