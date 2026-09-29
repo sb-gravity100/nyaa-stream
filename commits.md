@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `8f64aa3` · 2026-09-29 · fix: keep 150 MiB of played video in mpv's back buffer
+- `crates/mpv-player/src/embedded.rs`
+- `PHASES.md`
+
 ### `e1f28d0` · 2026-09-29 · docs: plan seek-bar downloaded and buffer indicators for v0.3.2
 - `PLAN.md`
 - `PHASES.md`
