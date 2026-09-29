@@ -1,6 +1,6 @@
 import type { NyaaResult } from "./types";
 import type { PreferredResolution } from "./settings";
-import { parseSubmitterFromTitle } from "./episodeParser";
+import { parseEpisode, parseSubmitterFromTitle } from "./episodeParser";
 
 // localStorage map of AniList id -> fansub group last chosen for that
 // anime, so the next episode auto-picks the same group (consistent
@@ -115,17 +115,36 @@ function score(release: NyaaResult, prefs: ReleasePreferences): number {
   return value;
 }
 
+// Whether the title is a season/batch pack rather than one episode.
+export function isBatchRelease(release: NyaaResult): boolean {
+  return parseEpisode(release.title).kind === "batch";
+}
+
+// Healthy single-episode releases rank before healthy batches, which rank
+// before anything with too few seeders to count: a season pack listed under
+// an episode (see App.tsx's range spreading) should never be auto-picked
+// over a real single-episode release just because its swarm is bigger, but
+// still beats a dead single.
+function tier(release: NyaaResult): number {
+  if (release.seeders < MIN_PREFERRED_SEEDERS) return 2;
+  return isBatchRelease(release) ? 1 : 0;
+}
+
+function rankBefore(a: NyaaResult, b: NyaaResult, prefs: ReleasePreferences): number {
+  return tier(a) - tier(b) || score(b, prefs) - score(a, prefs);
+}
+
 // This show's remembered fansub group first, then the preferred fansubber
 // setting (both only if reasonably seeded), then
 // preferred resolution, then seeders - fastest/most reliable swarm. Used
 // for the play button's auto-pick; `sortReleases` orders the player's
 // source picker the same way.
 export function bestRelease(releases: NyaaResult[], prefs: ReleasePreferences = {}): NyaaResult {
-  return releases.reduce((best, r) => (score(r, prefs) > score(best, prefs) ? r : best));
+  return releases.reduce((best, r) => (rankBefore(r, best, prefs) < 0 ? r : best));
 }
 
 export function sortReleases(releases: NyaaResult[], prefs: ReleasePreferences = {}): NyaaResult[] {
-  return [...releases].sort((a, b) => score(b, prefs) - score(a, prefs));
+  return [...releases].sort((a, b) => rankBefore(a, b, prefs));
 }
 
 // ---------------------------------------------------------------- badges
@@ -147,7 +166,7 @@ const SOURCE_PATTERN = /\b(BD|Blu-?Ray|BDRip|WEB-?DL|WEB-?Rip|DVD)\b/i;
 export function releaseBadges(release: NyaaResult): ReleaseBadge[] {
   const title = release.title;
   const badges: ReleaseBadge[] = [];
-  if (BATCH_PATTERN.test(title)) badges.push({ label: "Batch", kind: "info" });
+  if (BATCH_PATTERN.test(title) || isBatchRelease(release)) badges.push({ label: "Batch", kind: "info" });
   if (DUAL_AUDIO_PATTERN.test(title)) badges.push({ label: "Dual audio", kind: "good" });
   const source = title.match(SOURCE_PATTERN);
   if (source) badges.push({ label: source[1].replace(/-/g, "").toUpperCase().replace("BLURAY", "BD"), kind: "info" });

@@ -162,10 +162,22 @@ export function extractSeasonNumber(title: string): number {
   return 1;
 }
 
+// A season pack that also bundles other entries' content: "S01 + Whispers of
+// Dawn", "S01+Movie", "... + TV Special". It holds the season's episodes but
+// is a different (larger, mixed) torrent from a plain season pack, so it gets
+// its own bucket instead of sharing "Batch" with them.
+const BATCH_EXTRAS_PATTERN = /\bS\d{1,2}\s*\+\s*\S|\+\s*(?:movies?|films?|specials?|tv\s*specials?|ovas?|oads?|extras?|bonus)/i;
+
 export type EpisodeLabel =
   | { kind: "episode"; season: number; number: number }
-  | { kind: "batch"; season: number; episodeRange: [number, number] | null }
+  | { kind: "batch"; season: number; episodeRange: [number, number] | null; extras?: boolean }
   | { kind: "unknown" };
+
+function batchLabel(title: string, withRange = true): Extract<EpisodeLabel, { kind: "batch" }> {
+  const label: Extract<EpisodeLabel, { kind: "batch" }> = { kind: "batch", season: extractSeasonNumber(title), episodeRange: withRange ? extractEpisodeRange(title) : null };
+  if (BATCH_EXTRAS_PATTERN.test(title)) label.extras = true;
+  return label;
+}
 
 export function parseEpisode(title: string): EpisodeLabel {
   const seasonEpisodeMatch = title.match(SEASON_EPISODE_PATTERN);
@@ -177,7 +189,7 @@ export function parseEpisode(title: string): EpisodeLabel {
     }
   }
   if (BATCH_KEYWORD_PATTERN.test(title)) {
-    return { kind: "batch", season: extractSeasonNumber(title), episodeRange: extractEpisodeRange(title) };
+    return batchLabel(title);
   }
   const seasonDashMatch = title.match(SEASON_DASH_EPISODE_PATTERN);
   if (seasonDashMatch) {
@@ -187,7 +199,7 @@ export function parseEpisode(title: string): EpisodeLabel {
     }
   }
   if (EPISODE_RANGE_PATTERN.test(title)) {
-    return { kind: "batch", season: extractSeasonNumber(title), episodeRange: extractEpisodeRange(title) };
+    return batchLabel(title);
   }
   const episodeNumber = findEpisodeNumber(title);
   if (episodeNumber !== null) {
@@ -195,7 +207,7 @@ export function parseEpisode(title: string): EpisodeLabel {
   }
   for (const pattern of BATCH_PATTERNS) {
     if (pattern.test(title)) {
-      return { kind: "batch", season: extractSeasonNumber(title), episodeRange: null };
+      return batchLabel(title, false);
     }
   }
   return { kind: "unknown" };
@@ -223,8 +235,8 @@ export function episodeLabelText(label: EpisodeLabel): string {
       // like One Piece/Naruto/Bleach) — only call it out when it's not.
       return label.season === 1 ? `Episode ${label.number}` : `Season ${label.season} Episode ${label.number}`;
     case "batch":
-      if (label.season === FINAL_SEASON_NUMBER) return "Final Season Batch";
-      return label.season === 1 ? "Batch" : `Season ${label.season} Batch`;
+      if (label.season === FINAL_SEASON_NUMBER) return label.extras ? "Final Season Batch + extras" : "Final Season Batch";
+      return `${label.season === 1 ? "Batch" : `Season ${label.season} Batch`}${label.extras ? " + extras" : ""}`;
     case "unknown":
       return "Unknown";
   }
