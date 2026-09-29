@@ -3485,3 +3485,8 @@ html.mpv-active .player-view {
   color: var(--muted);
   overflow-wrap: anywhere;
 }
+
+.setting-text-input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
