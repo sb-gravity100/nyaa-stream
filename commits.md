@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `62a7824` · 2026-09-29 · docs: plan build thumbnails button for v0.6.0
+- `PLAN.md`
+- `PHASES.md`
+
 ### `ca6ed50` · 2026-09-29 · docs: plan continue-watching resume buffer for v0.4.0
 - `PLAN.md`
 - `PHASES.md`
