@@ -6,6 +6,12 @@
 use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::task::Waker;
+use std::time::{Duration, Instant};
+
+/// (nyaa-stream) Finish times older than this are pruned once the map grows
+/// past `FINISHED_PRUNE_LEN` entries.
+const FINISHED_RETENTION: Duration = Duration::from_secs(120);
+const FINISHED_PRUNE_LEN: usize = 4096;
 
 type PieceKey = (String, i32);
 
@@ -13,12 +19,17 @@ type PieceKey = (String, i32);
 pub struct PieceWaiterRegistry {
     /// Maps (info_hash, piece_idx) -> list of waiting wakers
     waiters: RwLock<HashMap<PieceKey, HashMap<usize, Waker>>>,
+    /// (nyaa-stream) When each piece last finished - readers serve recently
+    /// finished pieces from libtorrent's own copy, since libtorrent may not
+    /// have flushed them to disk yet (`finished_within`).
+    finished: RwLock<HashMap<PieceKey, Instant>>,
 }
 
 impl PieceWaiterRegistry {
     pub fn new() -> Self {
         Self {
             waiters: RwLock::new(HashMap::new()),
+            finished: RwLock::new(HashMap::new()),
         }
     }
 
@@ -36,6 +47,15 @@ impl PieceWaiterRegistry {
     /// Called once piece data is readable from cache - wake all waiters for this piece
     pub fn notify_piece_finished(&self, info_hash: &str, piece: i32) {
         let key = (info_hash.to_lowercase(), piece);
+        {
+            let mut finished = self.finished.write();
+            if finished.len() >= FINISHED_PRUNE_LEN {
+                finished.retain(|_, at| at.elapsed() < FINISHED_RETENTION);
+            }
+            // Keep the first finish time: repeat notifications for the same
+            // piece (reader readiness) mustn't extend its freshness.
+            finished.entry(key.clone()).or_insert_with(Instant::now);
+        }
         if let Some(waker_list) = self.waiters.write().remove(&key) {
             let count = waker_list.len();
             for (_, waker) in waker_list {
@@ -52,11 +72,24 @@ impl PieceWaiterRegistry {
         }
     }
 
+    /// (nyaa-stream) Whether `piece` finished less than `window` ago in this
+    /// session.
+    pub fn finished_within(&self, info_hash: &str, piece: i32, window: Duration) -> bool {
+        let key = (info_hash.to_lowercase(), piece);
+        self.finished
+            .read()
+            .get(&key)
+            .is_some_and(|at| at.elapsed() < window)
+    }
+
     /// Clear all waiters for a torrent (called when torrent is removed)
     #[allow(dead_code)]
     pub fn clear_torrent(&self, info_hash: &str) {
         let info_hash_lower = info_hash.to_lowercase();
         self.waiters
+            .write()
+            .retain(|(hash, _), _| hash != &info_hash_lower);
+        self.finished
             .write()
             .retain(|(hash, _), _| hash != &info_hash_lower);
     }
@@ -122,5 +155,22 @@ mod tests {
         let stats = registry.stats();
         assert_eq!(stats.keys, 1);
         assert_eq!(stats.wakers, 1);
+    }
+}
+
+#[cfg(test)]
+mod finished_tests {
+    use super::*;
+
+    #[test]
+    fn remembers_when_a_piece_first_finished() {
+        let registry = PieceWaiterRegistry::new();
+        assert!(!registry.finished_within("ABC", 3, Duration::from_secs(30)));
+        registry.notify_piece_finished("ABC", 3);
+        assert!(registry.finished_within("abc", 3, Duration::from_secs(30)));
+        assert!(!registry.finished_within("abc", 3, Duration::ZERO));
+        assert!(!registry.finished_within("abc", 4, Duration::from_secs(30)));
+        registry.clear_torrent("abc");
+        assert!(!registry.finished_within("abc", 3, Duration::from_secs(30)));
     }
 }

@@ -324,7 +324,7 @@
       - [x] Tail prefetch 1% of the file, clamped 4-16 MB
       - [x] Vendor libtorrent-sys: whole_pieces_threshold 2, strict end
             game off, request_queue_time 1
-      - [ ] enginefs: serve pieces verified < 30s ago from libtorrent's own
+      - [x] enginefs: serve pieces verified < 30s ago from libtorrent's own
             copy only (stale-bytes corruption)
       - [ ] Verify live: time from click to first frame, logged before/after
       - [ ] PLAN.md/FILE_INDEX.md sync, `npm run bump -- patch`, tag
