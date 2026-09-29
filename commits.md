@@ -2,6 +2,11 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `27e7a1e` · 2026-09-29 · fix: keep season packs, packs with extras and single episodes apart
+- `src/episodeParser.ts`
+- `src/App.tsx`
+- `src/releases.ts`
+
 ### `2bc44ed` · 2026-09-29 · docs: describe the release database and phased search
 - `FILE_INDEX.md`
 - `PLAN.md`
