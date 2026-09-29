@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 use crate::backend::priorities::{
     BLOCKED_REPLAN_INTERVAL_MS, MAX_STARTUP_PIECES, PlaybackIntent, SEEK_REANCHOR_DEBOUNCE_MS,
     container_metadata_start, disk_backed_forward_window_pieces_for, disk_backed_urgent_pieces,
-    playback_deadline_step_ms,
+    playback_deadline_step_ms, read_ahead_window_pieces,
 };
 use crate::metadata_pins::MetadataPinRegistry;
 use crate::piece_waiter::PieceWaiterRegistry;
@@ -49,6 +49,47 @@ fn piece_is_missing(presence: &[u8], first: i32, piece: i32) -> bool {
         .is_none_or(|present| *present == 0)
 }
 
+/// (nyaa-stream) Fix 5: read-ahead priority by distance from the read
+/// position, graded like Elementum's - the urgent band at 7, then 6, 5, 4,
+/// 3 and 2 across the rest of the window - so nearer pieces win when
+/// bandwidth is short.
+fn graded_read_ahead_priority(distance: i32, urgent_pieces: i32, window: i32) -> i32 {
+    if distance < urgent_pieces {
+        return 7;
+    }
+    let span = (window - urgent_pieces).max(1) as f64;
+    let fraction = (distance - urgent_pieces) as f64 / span;
+    if fraction < 0.1 {
+        6
+    } else if fraction < 0.25 {
+        5
+    } else if fraction < 0.45 {
+        4
+    } else if fraction < 0.7 {
+        3
+    } else {
+        2
+    }
+}
+
+/// (nyaa-stream) Fix 5: after the first byte a playback stream reads ahead
+/// `READ_AHEAD_SECONDS` of video (`read_ahead_window_pieces`); container
+/// metadata and pre-first-byte windows keep their configured size.
+fn effective_forward_window(
+    intent: PlaybackIntent,
+    first_read: bool,
+    active: i32,
+    piece_length: u64,
+    bitrate_bytes_per_sec: Option<u64>,
+    file_size: u64,
+) -> i32 {
+    if first_read && matches!(intent, PlaybackIntent::DirectSequential | PlaybackIntent::HlsSequential) {
+        read_ahead_window_pieces(active, piece_length, bitrate_bytes_per_sec, file_size)
+    } else {
+        active
+    }
+}
+
 pub(crate) struct LibtorrentDiskFileStream {
     handle: libtorrent_sys::LibtorrentHandle,
     info_hash: String,
@@ -80,6 +121,11 @@ pub(crate) struct LibtorrentDiskFileStream {
     /// `report_seek_blocked`.
     read_start: Option<(i32, Instant)>,
     seek_block_reported: bool,
+    /// (nyaa-stream) The current read start was reported as a playback
+    /// position (not a tail/background read) and bytes have flowed from it -
+    /// its end is then reported on seek/drop (`report_read_end`).
+    read_start_is_playback: bool,
+    read_progressed: bool,
     /// (nyaa-stream) Piece whose disk reads are currently coming back
     /// all-zero, when that started, and whether zeros were finally accepted
     /// as genuine - see `poll_read`.
@@ -152,6 +198,8 @@ impl LibtorrentDiskFileStream {
             read_start_reported: false,
             read_start: None,
             seek_block_reported: false,
+            read_start_is_playback: false,
+            read_progressed: false,
             zero_wait: None,
             last_blocked_replan: Instant::now(),
             file,
@@ -220,7 +268,7 @@ impl LibtorrentDiskFileStream {
         if self.is_background_reader() {
             return;
         }
-        if self.current_pos > 0 && self.current_pos >= container_metadata_start(self.file_size) {
+        if self.in_tail() {
             tracing::debug!(
                 info_hash = %self.info_hash,
                 file_idx = self.file_idx,
@@ -241,12 +289,43 @@ impl LibtorrentDiskFileStream {
         );
         self.read_start = Some((piece, Instant::now()));
         self.seek_block_reported = false;
+        self.read_start_is_playback = true;
         self.playback_permit.report_read_start(piece);
     }
 
     /// (nyaa-stream) Bytes flowed: the read start is no longer blocked.
     fn clear_read_start(&mut self) {
         self.read_start = None;
+        self.read_progressed = true;
+    }
+
+    /// (nyaa-stream) Where a playback read got to, reported when the stream
+    /// seeks away or closes: the coordinator tracks how far the header read
+    /// went, so the player returning there after the index read isn't taken
+    /// for a resume point (`is_resume_point`).
+    fn report_read_end(&mut self) {
+        if !(self.read_start_is_playback && self.read_progressed) || self.in_tail() {
+            return;
+        }
+        let Ok(piece) = self.current_piece() else {
+            return;
+        };
+        let piece = piece.min(self.last_piece);
+        tracing::debug!(
+            info_hash = %self.info_hash,
+            file_idx = self.file_idx,
+            stream_id = self.stream_id,
+            piece,
+            pos = self.current_pos,
+            "reporting playback read end"
+        );
+        self.playback_permit.report_read_end(piece);
+    }
+
+    /// (nyaa-stream) The read position is in the file tail, where the
+    /// container index (MKV Cues / MP4 moov) lives.
+    fn in_tail(&self) -> bool {
+        self.current_pos > 0 && self.current_pos >= container_metadata_start(self.file_size)
     }
 
     /// (nyaa-stream) A foreground read blocked `SEEK_REANCHOR_DEBOUNCE_MS` on
@@ -275,6 +354,17 @@ impl LibtorrentDiskFileStream {
     }
 
     fn priority_intent(&self) -> PlaybackIntent {
+        // (nyaa-stream) Fix 1: our stream server opens every request at 0
+        // and seeks, so upstream's request-offset check never tags the index
+        // read; a foreground read in the file tail is container metadata.
+        if self.in_tail()
+            && !matches!(
+                self.playback_intent,
+                PlaybackIntent::InternalProbe | PlaybackIntent::Background
+            )
+        {
+            return PlaybackIntent::ContainerMetadata;
+        }
         if self.first_read_logged {
             self.playback_intent.sequential_after_first_byte()
         } else {
@@ -367,7 +457,14 @@ impl LibtorrentDiskFileStream {
         // move; the coordinator owns it now (fix C, `sequential_wanted`).
         let configured_forward_window =
             disk_backed_forward_window_pieces_for(priority_intent, self.piece_length);
-        let forward_window = self.active_forward_window(priority_intent, configured_forward_window);
+        let forward_window = effective_forward_window(
+            priority_intent,
+            self.first_read_logged,
+            self.active_forward_window(priority_intent, configured_forward_window),
+            self.piece_length,
+            self.bitrate_bytes_per_sec,
+            self.file_size,
+        );
         let window_end = forward_window_end(piece, self.last_piece, forward_window);
         let presence = self.handle.piece_presence(piece, window_end);
 
@@ -396,17 +493,13 @@ impl LibtorrentDiskFileStream {
         // (nyaa-stream) Otherwise the first ~4 MB of read-ahead
         // (`disk_backed_urgent_pieces`) stays at 7, not just the current
         // piece, before and after the first byte.
-        let urgent_pieces = if cues_pending && !is_metadata_stream {
+        // (nyaa-stream) Fix 1: the whole index window is urgent.
+        let urgent_pieces = if is_metadata_stream {
+            forward_window
+        } else if cues_pending {
             1
         } else {
             disk_backed_urgent_pieces(self.piece_length)
-        };
-        let read_ahead_priority = if matches!(priority_intent, PlaybackIntent::Background) {
-            1
-        } else if matches!(priority_intent, PlaybackIntent::InternalProbe) {
-            2
-        } else {
-            4
         };
         let deadline_jitter = (self.stream_id % 10) as i32 * 5;
         let status = self.handle.status();
@@ -426,11 +519,7 @@ impl LibtorrentDiskFileStream {
                 };
                 super::playback::LibtorrentPiecePriority {
                     piece: p,
-                    priority: if distance < urgent_pieces {
-                        7
-                    } else {
-                        read_ahead_priority
-                    },
+                    priority: graded_read_ahead_priority(distance, urgent_pieces, forward_window),
                     deadline_ms: Some(deadline),
                 }
             })
@@ -466,7 +555,14 @@ impl LibtorrentDiskFileStream {
         let priority_intent = self.priority_intent();
         let mut forward_window =
             disk_backed_forward_window_pieces_for(priority_intent, self.piece_length);
-        forward_window = self.active_forward_window(priority_intent, forward_window);
+        forward_window = effective_forward_window(
+            priority_intent,
+            self.first_read_logged,
+            self.active_forward_window(priority_intent, forward_window),
+            self.piece_length,
+            self.bitrate_bytes_per_sec,
+            self.file_size,
+        );
         let window_end = forward_window_end(piece, self.last_piece, forward_window);
         let presence = self.handle.piece_presence(piece, window_end);
         let status = self.handle.status();
@@ -477,7 +573,9 @@ impl LibtorrentDiskFileStream {
         );
         let pinned_missing = self.pinned_metadata_missing();
         // (nyaa-stream) Same ~4 MB urgent read-ahead as `prioritize_from`.
-        let urgent_pieces = if pinned_missing.is_empty() {
+        let urgent_pieces = if matches!(priority_intent, PlaybackIntent::ContainerMetadata) {
+            forward_window
+        } else if pinned_missing.is_empty() {
             disk_backed_urgent_pieces(self.piece_length)
         } else {
             1
@@ -488,7 +586,7 @@ impl LibtorrentDiskFileStream {
                 let distance = p - piece;
                 super::playback::LibtorrentPiecePriority {
                     piece: p,
-                    priority: if distance < urgent_pieces { 7 } else { 4 },
+                    priority: graded_read_ahead_priority(distance, urgent_pieces, forward_window),
                     deadline_ms: Some(distance * deadline_step),
                 }
             })
@@ -1082,10 +1180,13 @@ impl tokio::io::AsyncSeek for LibtorrentDiskFileStream {
             }
         };
 
+        self.report_read_end();
         self.current_pos = new_pos.min(self.file_size);
         self.last_prioritized_piece = -1;
         self.read_start_reported = false;
         self.read_start = None;
+        self.read_start_is_playback = false;
+        self.read_progressed = false;
         self.verified_piece = None;
         self.broker_piece = None;
         if let Some((_, task)) = self.piece_read.take() {
@@ -1105,6 +1206,7 @@ impl tokio::io::AsyncSeek for LibtorrentDiskFileStream {
 
 impl Drop for LibtorrentDiskFileStream {
     fn drop(&mut self) {
+        self.report_read_end();
         if let Some((_, task)) = self.piece_read.take() {
             task.abort();
         }
@@ -1117,7 +1219,21 @@ impl Drop for LibtorrentDiskFileStream {
 
 #[cfg(test)]
 mod tests {
-    use super::{broker_slice_bounds, forward_window_end};
+    use super::{broker_slice_bounds, forward_window_end, graded_read_ahead_priority};
+
+    #[test]
+    fn read_ahead_priority_falls_off_with_distance() {
+        // 8 urgent pieces in a 58-piece window: 50 graded pieces after them.
+        assert_eq!(graded_read_ahead_priority(0, 8, 58), 7);
+        assert_eq!(graded_read_ahead_priority(7, 8, 58), 7);
+        assert_eq!(graded_read_ahead_priority(8, 8, 58), 6);
+        assert_eq!(graded_read_ahead_priority(15, 8, 58), 5);
+        assert_eq!(graded_read_ahead_priority(25, 8, 58), 4);
+        assert_eq!(graded_read_ahead_priority(40, 8, 58), 3);
+        assert_eq!(graded_read_ahead_priority(57, 8, 58), 2);
+        // A metadata window is all urgent.
+        assert_eq!(graded_read_ahead_priority(15, 16, 16), 7);
+    }
 
     #[test]
     fn broker_slices_a_file_that_starts_inside_a_shared_piece() {
