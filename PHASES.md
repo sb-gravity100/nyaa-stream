@@ -333,6 +333,10 @@
             `v0.5.0`
 - [ ] Build thumbnails button (v0.6.0, see PLAN.md "Build thumbnails
       button"): one commit each -
+      - [ ] nyaa view-page scrape collects description image URLs
+      - [ ] Frame thumbnail from a view-page image: frame filter, backend
+            fetch, letterbox crop, 640px JPEG into the thumb cache; auto
+            for rows without art
       - [ ] `capture_torrent_thumbnail`: optional `file_idx` and `force`
       - [ ] Batch captures share one torrent across their episodes
       - [ ] Capture source pick: SubsPlease 480p (>= 1 seeder) first, else
