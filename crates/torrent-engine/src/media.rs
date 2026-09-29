@@ -435,6 +435,52 @@ pub fn start_subtitle_run(source: InputSource, dir: &Path, start_seconds: f64, s
     start(context, "subtitle run", cancel)
 }
 
+/// One A-B clip to cut out of a media file.
+pub struct ClipExport<'a> {
+    pub input: InputSource,
+    pub out: &'a Path,
+    pub start_seconds: f64,
+    pub end_seconds: f64,
+    /// Which audio stream of the file to keep (`0:a:<n>`, 0 = first).
+    pub audio_stream: usize,
+    pub encoder: H264Encoder,
+}
+
+/// Cuts `[start, end)` into an MP4 with normalized codecs: 8-bit 4:2:0
+/// H.264 from `encoder` (NVENC when the machine has it - see
+/// `detect_h264_encoder`) and AAC audio, whatever the source used (10-bit
+/// HEVC, FLAC, E-AC-3...), so the clip plays anywhere. Always re-encodes:
+/// a stream copy could only start on the source's own keyframes. `faststart`
+/// moves the index up front for sharing. Blocking until the file is written -
+/// call from `spawn_blocking`.
+pub fn export_clip(clip: ClipExport<'_>) -> anyhow::Result<()> {
+    init();
+    anyhow::ensure!(clip.end_seconds > clip.start_seconds, "clip end must be after its start");
+    let (input, _cancel) = open_input(clip.input, clip.start_seconds);
+    let input = input
+        .set_format_opt("probesize", "2000000")
+        .set_format_opt("analyzeduration", "2000000")
+        .set_hwaccel("auto")
+        .set_recording_time_us(((clip.end_seconds - clip.start_seconds) * 1_000_000.0) as i64);
+    let mut output = Output::from(clip.out.to_string_lossy().to_string())
+        .set_format("mp4")
+        .set_format_opt("movflags", "+faststart")
+        .add_stream_map("0:v:0")
+        .set_video_codec(clip.encoder.ffmpeg_name())
+        .set_pix_fmt(clip.encoder.pix_fmt().0);
+    for (key, value) in clip.encoder.codec_opts() {
+        output = output.set_video_codec_opt(key, value);
+    }
+    let output = output.add_stream_map(format!("0:a:{}", clip.audio_stream)).set_audio_codec("aac");
+    let context = FfmpegContext::builder().input(input).output(output).build().map_err(|err| anyhow::anyhow!("clip export: {err}"))?;
+    tracing::info!(out = %clip.out.display(), start = clip.start_seconds, end = clip.end_seconds, encoder = clip.encoder.ffmpeg_name(), "exporting clip");
+    FfmpegScheduler::new(context)
+        .start()
+        .map_err(|err| anyhow::anyhow!("clip export: failed to start: {err}"))?
+        .wait()
+        .map_err(|err| anyhow::anyhow!("clip export: {err}"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -918,6 +918,47 @@ async fn stop_playback(state: State<'_, Arc<AppState>>) -> Result<(), String> {
     Ok(())
 }
 
+/// Cuts an A-B clip of the playing torrent file to `<Videos>/nyaa-stream
+/// clips/<name>.mp4` (normalized H.264/AAC - see `TorrentEngine::export_clip`)
+/// and returns the written path.
+#[tauri::command]
+async fn export_clip(
+    state: State<'_, Arc<AppState>>,
+    torrent_id: TorrentId,
+    file_idx: usize,
+    start_seconds: f64,
+    end_seconds: f64,
+    audio_stream: usize,
+    name: String,
+) -> Result<String, String> {
+    tracing::debug!(torrent_id = %torrent_id, file_idx, start_seconds, end_seconds, audio_stream, %name, "export_clip invoked");
+    if !(end_seconds > start_seconds) {
+        return Err("The clip's end must be after its start.".into());
+    }
+    let dir = dirs::video_dir().unwrap_or_else(std::env::temp_dir).join("nyaa-stream clips");
+    tokio::fs::create_dir_all(&dir).await.map_err(|err| format!("Couldn't create {}: {err}", dir.display()))?;
+    // Filesystem-safe stem; never overwrites an earlier clip.
+    let stem: String = name.chars().map(|c| if c.is_alphanumeric() || " -_.()".contains(c) { c } else { '_' }).collect();
+    let stem = stem.trim().chars().take(80).collect::<String>();
+    let mut out = dir.join(format!("{stem}.mp4"));
+    let mut n = 2;
+    while out.exists() {
+        out = dir.join(format!("{stem} ({n}).mp4"));
+        n += 1;
+    }
+    match state.torrent_engine.export_clip(&torrent_id, file_idx, start_seconds, end_seconds, audio_stream, out.clone()).await {
+        Ok(()) => {
+            tracing::info!(out = %out.display(), "export_clip succeeded");
+            Ok(out.to_string_lossy().into_owned())
+        }
+        Err(err) => {
+            tracing::warn!(%err, "export_clip failed");
+            let _ = tokio::fs::remove_file(&out).await;
+            Err(err.to_string())
+        }
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tracing_subscriber::fmt()
@@ -990,6 +1031,7 @@ pub fn run() {
             set_decoder_support,
             copy_frame_to_clipboard,
             stop_playback,
+            export_clip,
             player::mpv_available,
             player::mpv_start,
             player::mpv_command,
