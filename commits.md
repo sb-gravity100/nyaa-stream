@@ -1,3 +1,10 @@
+### `64d7618` · 2026-09-30 · feat: native splash window shown until app_ready
+- `public/splash.html`
+- `index.html`
+- `src/main.tsx`
+- `src-tauri/src/lib.rs`
+- `src-tauri/tauri.conf.json`
+
 ### `e022727` · 2026-09-29 · docs: plan navigation/home rehaul and Discover for v0.9.x
 - `PLAN.md`
 - `PHASES.md`
