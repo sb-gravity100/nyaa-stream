@@ -595,6 +595,7 @@ a {
 /* ---- Hero ---- */
 
 .home-hero {
+  position: relative;
   display: flex;
   align-items: flex-end;
   /* Runs up under the translucent app bar. */
@@ -648,6 +649,71 @@ a {
   from {
     opacity: 0;
     transform: translateY(14px);
+  }
+}
+
+/* Carousel slide between featured shows (direction follows the dots). */
+.home-hero-art.slide-in-next {
+  animation: hero-slide-in-next 0.9s var(--ease-out);
+}
+
+.home-hero-art.slide-in-prev {
+  animation: hero-slide-in-prev 0.9s var(--ease-out);
+}
+
+.home-hero-art.slide-out-next {
+  animation: hero-slide-out-next 0.9s var(--ease-out) forwards;
+}
+
+.home-hero-art.slide-out-prev {
+  animation: hero-slide-out-prev 0.9s var(--ease-out) forwards;
+}
+
+@keyframes hero-slide-in-next {
+  from {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes hero-slide-in-prev {
+  from {
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes hero-slide-out-next {
+  to {
+    transform: translateX(-100%);
+    opacity: 0.4;
+  }
+}
+
+@keyframes hero-slide-out-prev {
+  to {
+    transform: translateX(100%);
+    opacity: 0.4;
+  }
+}
+
+.home-hero-body[data-slide="next"] {
+  animation-name: hero-body-in-next;
+}
+
+.home-hero-body[data-slide="prev"] {
+  animation-name: hero-body-in-prev;
+}
+
+@keyframes hero-body-in-next {
+  from {
+    opacity: 0;
+    transform: translateX(48px);
+  }
+}
+
+@keyframes hero-body-in-prev {
+  from {
+    opacity: 0;
+    transform: translateX(-48px);
   }
 }
 

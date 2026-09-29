@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "preact/hooks";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { displayTitle, type AiringEntry, type AnimeMedia, type KitsuMetadata } from "./types";
 import { continueWatching, dismissContinueWatching, isEpisodeWatched, libraryStats, subscribeProgress, type ProgressEntry } from "./watchProgress";
 import { PlayIcon, SearchIcon } from "./icons";
@@ -94,6 +94,22 @@ function Hero({
   onHoverChange: (hovering: boolean) => void;
 }) {
   const art = useEnhancedImage(featured?.art);
+  const id = featured?.anime.id;
+  // Carousel slide: when the featured show changes, the previous art slides
+  // out while the new one slides in from the side the dots moved toward.
+  const shown = useRef<{ id: number; art?: string; index: number } | null>(null);
+  const slide = useRef<{ fromId: number; art?: string; dir: "next" | "prev" } | null>(null);
+  const prev = shown.current;
+  if (id != null && prev && prev.id !== id && slide.current?.fromId !== prev.id) {
+    const wrappedForward = prev.index === count - 1 && index === 0;
+    const wrappedBack = prev.index === 0 && index === count - 1 && count > 2;
+    const dir = wrappedForward || (index > prev.index && !wrappedBack) ? "next" : "prev";
+    slide.current = { fromId: prev.id, art: prev.art, dir };
+    console.debug("[hero] slide", { from: prev.id, to: id, dir });
+  }
+  useEffect(() => {
+    if (id != null) shown.current = { id, art, index };
+  }, [id, art, index]);
   if (!featured) {
     return (
       <section class="home-hero home-hero-empty">
@@ -112,9 +128,10 @@ function Hero({
   const { anime } = featured;
   const title = displayTitle(anime.title);
   return (
-    <section class="home-hero" key={anime.id} onMouseEnter={() => onHoverChange(true)} onMouseLeave={() => onHoverChange(false)} onFocusIn={() => onHoverChange(true)} onFocusOut={() => onHoverChange(false)}>
-      {art && <img class="home-hero-art" src={art} alt="" />}
-      <div class="home-hero-body">
+    <section class="home-hero" onMouseEnter={() => onHoverChange(true)} onMouseLeave={() => onHoverChange(false)} onFocusIn={() => onHoverChange(true)} onFocusOut={() => onHoverChange(false)}>
+      {slide.current?.art && <img key={`out-${slide.current.fromId}`} class={`home-hero-art slide-out-${slide.current.dir}`} src={slide.current.art} alt="" />}
+      {art && <img key={`in-${anime.id}`} class={`home-hero-art${slide.current ? ` slide-in-${slide.current.dir}` : ""}`} src={art} alt="" />}
+      <div class="home-hero-body" key={anime.id} data-slide={slide.current?.dir}>
         <div class="home-hero-reason">{featured.reason}</div>
         <h1 class="home-hero-title">{title}</h1>
         {anime.title.native && anime.title.native !== title && (
