@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `9870116` · 2026-09-29 · fix: let a release dry run proceed without the release tag
+- `scripts/release.mjs`
+- `PLAN.md`
+
 ### `9da2a4d` · 2026-09-29 · docs: point CLAUDE.md publishing at the local release script
 - `CLAUDE.md`
 - `PHASES.md`
