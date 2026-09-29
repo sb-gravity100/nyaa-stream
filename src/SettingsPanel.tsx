@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import { invoke } from "@tauri-apps/api/core";
+import { open as pickFolder } from "@tauri-apps/plugin-dialog";
 import type { JSX } from "preact";
 import { DEFAULT_SUBTITLE_STYLE, resetSettings, updateSettings, useSettings, type PreferredResolution, type SubtitleStyle } from "./settings";
 import { CloseIcon } from "./icons";
@@ -214,9 +215,13 @@ export function SettingsPanel({ onClose }: Props) {
   const style = settings.subtitleStyle;
   const panelRef = useRef<HTMLDivElement>(null);
   const [popularFansubbers, setPopularFansubbers] = useState<string[]>([]);
+  const [defaultScreenshotFolder, setDefaultScreenshotFolder] = useState("");
 
   useEffect(() => {
     // Suggestions only exist in the desktop app (the backend counts group tags from real searches).
+    invoke<string>("default_screenshot_folder")
+      .then(setDefaultScreenshotFolder)
+      .catch(() => undefined);
     invoke<string[]>("get_popular_fansubbers")
       .then(setPopularFansubbers)
       .catch(() => undefined);
@@ -275,6 +280,26 @@ export function SettingsPanel({ onClose }: Props) {
                 value={settings.mpvPath}
                 onChange={(e) => updateSettings({ mpvPath: (e.target as HTMLInputElement).value.trim() })}
               />
+            </Row>
+            <Row label="Screenshot folder" hint="Where X saves frames. Leave empty for Pictures
+yaa-stream screenshots.">
+              <input
+                type="text"
+                class="setting-text-input"
+                placeholder={defaultScreenshotFolder || "Pictures\nyaa-stream screenshots"}
+                value={settings.screenshotFolder}
+                onChange={(e) => updateSettings({ screenshotFolder: (e.target as HTMLInputElement).value.trim() })}
+              />
+              <button
+                class="button button-quiet"
+                type="button"
+                onClick={async () => {
+                  const picked = await pickFolder({ directory: true, multiple: false, title: "Save screenshots to" }).catch(() => null);
+                  if (typeof picked === "string") updateSettings({ screenshotFolder: picked });
+                }}
+              >
+                Browse…
+              </button>
             </Row>
             <Row label="Preferred fansubber" hint="Release tags to prefer when picking a source, e.g. ToonsHub CR. A release matches when its title has every word. Leave empty for no preference.">
               <input
@@ -393,7 +418,8 @@ export function SettingsPanel({ onClose }: Props) {
               <div><dt>← → / J L</dt><dd>Seek 5s / 10s</dd></div>
               <div><dt>↑ ↓</dt><dd>Volume</dd></div>
               <div><dt>C</dt><dd>Cycle subtitles</dd></div>
-              <div><dt>Z / X</dt><dd>Subtitle delay −/+ 0.1s</dd></div>
+              <div><dt>, / .</dt><dd>Subtitle delay −/+ 0.1s</dd></div>
+              <div><dt>X</dt><dd>Save the current frame as a PNG</dd></div>
               <div><dt>N</dt><dd>Next episode</dd></div>
               <div><dt>Shift</dt><dd>Skip the opening (90s if the file marks none)</dd></div>
               <div><dt>{"[ / ] / \\"}</dt><dd>Playback speed slower / faster / reset</dd></div>

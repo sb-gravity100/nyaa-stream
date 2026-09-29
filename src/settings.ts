@@ -51,6 +51,8 @@ export interface Settings {
   preferredFansubber: string;
   /** Where exported clips are saved; empty = the default clips folder. */
   exportFolder: string;
+  /** Where X saves frames; empty = the default screenshots folder. */
+  screenshotFolder: string;
   /** Only list rows that are real episodes per AniList/Kitsu - hides
    * off-list episode numbers, Batch and Unknown rows (see
    * `listedSources` in MediaPage). */
@@ -93,6 +95,7 @@ export const DEFAULT_SETTINGS: Settings = {
   rememberFansubGroup: true,
   preferredFansubber: "",
   exportFolder: "",
+  screenshotFolder: "",
   hideUnlistedSources: true,
   mpvPath: "",
 };
