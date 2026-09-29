@@ -319,7 +319,7 @@
       - [x] mpv `--cache-pause-initial=yes` + `--cache-pause-wait=10`
             (start/resume once 10s is buffered)
       - [x] Seek re-anchor debounce 300ms → 100ms
-      - [ ] Capture mpv warn/error log messages (rate limited)
+      - [x] Capture mpv warn/error log messages (rate limited)
       - [ ] Settings: hardware decoding Auto / Off (mpv `hwdec`)
       - [ ] Tail prefetch 1% of the file, clamped 4-16 MB
       - [ ] Vendor libtorrent-sys: whole_pieces_threshold 2, strict end
