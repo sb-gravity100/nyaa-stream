@@ -108,10 +108,10 @@ full architecture; summary:
   streaming HTTP server with Range support
 - `crates/nyaa-client` — nyaa.si search via RSS
 - `crates/anilist-client` — AniList GraphQL metadata client
-- `crates/mpv-player` — system `mpv` over JSON IPC: `EmbeddedMpv` (playback)
-  and headless `MpvPlayer` (torrent-thumbnail capture); requires `mpv` on
-  PATH
-- Real playback is the system mpv embedded in the app window (`--wid`,
+- `crates/mpv-player` — in-process libmpv (`libmpv-2.dll`, runtime-loaded,
+  bundled from `src-tauri/lib/`): `EmbeddedMpv` (playback) and headless
+  `MpvPlayer` (torrent-thumbnail capture)
+- Real playback is libmpv embedded in the app window (`wid`,
   `src-tauri/src/player.rs`) under a transparent *webview* background —
   never `transparent: true` on the window, which broke click input — with
   the HTML controls in `src/PlayerView.tsx` driving it via

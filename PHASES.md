@@ -252,7 +252,7 @@
 - [x] Settings panel (`SettingsPanel.tsx`/`settings.ts`): resume, autoplay
       next, sticky fansub group, preferred quality, subtitle default
       on/language, default subtitle style with live preview
-- [x] Settings: mpv path override (`set_mpv_path`), storage section (cache
+- [x] Settings: libmpv path override (`set_mpv_path`), storage section (cache
       sizes + clear per cache), library/progress/settings backup
       export/import (Documents/nyaa-stream-backup.json)
 - [ ] Settings still missing: ffmpeg path override, download directory
