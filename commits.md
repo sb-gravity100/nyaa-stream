@@ -2,6 +2,11 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `e84eae8` · 2026-09-29 · feat: home hero cycle, library sort/filter/badges, dismiss continue watching
+- `src/App.css`
+- `src/HomePage.tsx`
+- `src/watchProgress.ts`
+
 ### `47fddf4` · 2026-09-29 · feat: airing countdown, mark-previous-watched and no-seeder row flag on the media page
 - `crates/anilist-client/src/lib.rs`
 - `src-tauri/src/metadata_fallback.rs`
