@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `3c3d255` · 2026-09-29 · fix(player): Shift skips past the whole opening, even from before it starts
+- `src/PlayerView.tsx`
+- `src/SettingsPanel.tsx`
+
 ### `16ec8da` · 2026-09-29 · feat(player): Shift skips to the end of the current chapter, not a fixed 85s
 - `src/PlayerView.tsx`
 - `src/SettingsPanel.tsx`
