@@ -383,7 +383,8 @@
             `v0.8.0`
 - [ ] Contact and send logs (v0.9.0, see PLAN.md "Contact and send
       logs"): one commit each -
-      - [ ] `export_logs`: zip logs + `system.txt` into Downloads, reveal
+      - [ ] `export_logs`: zip logs + `system.txt` into Downloads, reveal;
+            Windows profile path/username replaced in the zipped copies
       - [ ] Settings Help section: Contact modal (repo + Discord profile)
       - [ ] Send logs modal: contents notice, Discord / GitHub (prefilled
             issue, public notice) buttons

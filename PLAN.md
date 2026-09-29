@@ -892,10 +892,16 @@ yaa-stream\logs`, the last 7 daily files) plus a
   - **GitHub** - opens a new issue on the repo prefilled (title, app version,
     OS, "describe what happened"); the user attaches the zip. The modal notes
     that GitHub issues are public.
-- **Logs are sent as-is** (author's call, 2026-09-29): they contain the
-  Windows user folder in paths and the torrent/episode titles watched. The
-  modal says so in one line before the zip is made. Tokens are never logged
-  in the first place (logging rules + TMDB token plan), so none can leak.
+- **Windows username hidden:** while zipping, every occurrence of the
+  user's profile path (`C:\Users\<name>`, also with forward slashes and in
+  JSON-escaped `\` form) is replaced with `%USERPROFILE%`, and the bare
+  account name (`%USERNAME%`) with `<user>`; the zip gets the scrubbed
+  copies, the files on disk stay untouched. Everything else is kept as-is
+  (author's call, 2026-09-29): torrent/episode titles and fansub groups
+  stay, since they're needed to debug matching and playback. The modal says
+  in one line that watched titles are included and GitHub issues are
+  public. Tokens are never logged in the first place (logging rules + TMDB
+  token plan), so none can leak.
 - Logged: button presses, zip path and size, failures.
 
 ## Known gaps / not yet implemented
