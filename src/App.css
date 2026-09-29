@@ -600,7 +600,8 @@ a {
   align-items: flex-end;
   /* Runs up under the translucent app bar. */
   margin: -70px calc(-1 * var(--page-x)) 0;
-  height: 340px;
+  /* Grows to fit a long title instead of pushing it under the app bar. */
+  min-height: 340px;
   padding: 100px var(--page-x) 32px;
   overflow: hidden;
   isolation: isolate;
@@ -748,6 +749,18 @@ a {
   letter-spacing: -0.04em;
   text-wrap: balance;
   text-shadow: 0 4px 30px rgba(4, 5, 12, 0.6);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  /* Keeps descenders from being clipped by the tight line-height. */
+  padding-bottom: 0.08em;
+}
+
+/* Long titles (over ~40 characters) drop a size so two lines fit and the
+   carousel's height barely changes between slides. */
+.home-hero-title.long {
+  font-size: clamp(2rem, 3.6vw, 3.2rem);
 }
 
 .home-hero-native {
@@ -788,7 +801,7 @@ a {
 }
 
 .home-hero-empty {
-  height: 340px;
+  min-height: 340px;
   background:
     radial-gradient(55% 70% at 85% 20%, rgba(240, 122, 166, 0.22), transparent 70%),
     radial-gradient(45% 60% at 60% 70%, rgba(120, 132, 230, 0.16), transparent 70%);

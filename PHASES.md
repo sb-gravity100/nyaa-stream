@@ -326,7 +326,7 @@
             game off, request_queue_time 1
       - [x] enginefs: serve pieces verified < 30s ago from libtorrent's own
             copy only (stale-bytes corruption)
-      - [ ] Home hero: grow to fit, clamp long titles to 2 lines
+      - [x] Home hero: grow to fit, clamp long titles to 2 lines
       - [x] libmpv: corruption log lines → `stream-corrupt` event
       - [x] MpvVideo: drop-buffers + exact seek to the current time on
             `stream-corrupt` (5s debounce, max 3 per 60s)
