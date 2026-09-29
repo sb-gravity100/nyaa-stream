@@ -758,6 +758,48 @@ still has those bytes on disk. `readyRanges` in `StreamStats` is HLS-only
   mid-file. Reading MKV Cues needs those bytes downloaded, which the tail of
   the file often isn't early on.
 
+**Playback buffering, round 2** (live test 2026-09-29 12:26-12:28, resume of
+Kaleido-subs Fate/strange Fake 11 at 1:43 - 2 GB HEVC, 512 KB pieces, 3-11
+MB/s): click → first frame took **46s**, then stalls after the first frame and
+5-13s per seek. From the log:
+
+| Time | What happened |
+|---|---|
+| +0-7s | mpv reads the header (piece 0) while peers ramp 4 → 18 |
+| +10-14s | header continues past 8 MB (font attachments); the startup buffer "verifies" on those header pieces, so baseline 1 is released |
+| +14-35s | mpv reads the **Cues at 99.6%** (pieces 3813-3823): **21s** of waiting while 286 other pieces (~143 MB) arrive rarest-first |
+| +35s | resume anchor fires on piece 16 (header continuation, not the resume point), then re-anchors on the real seek to piece 386 |
+| +35-46s | resume region downloads; first frame at +46s |
+| +49s | stall: reader at piece 454 with 26 of 32 read-ahead pieces missing |
+
+Fixes (vendored enginefs unless noted):
+
+1. **Index reads are metadata.** Our stream server opens every request at 0
+   and seeks, so enginefs' `is_container_metadata_request` (request-offset
+   based) never fires. A read/seek landing at or after
+   `container_metadata_start` becomes `ContainerMetadata`: priority 7 +
+   deadlines over the (16 MB-capped) window and pinned, so it outranks bulk
+   and read-ahead.
+2. **Prefetch the index at playback start.** When a file starts streaming,
+   its tail (last 4 MB, MKV Cues / MP4 moov) is requested at priority 7 in
+   parallel with the header, unless already downloaded - removing one
+   sequential round trip before mpv can seek.
+3. **Resume anchor on the real jump.** Anchor continue-watch on the first
+   read that is a forward *jump* (not contiguous with the previous read) and
+   not a metadata/tail read - never "first read past 8 MB", which header
+   attachments trip.
+4. **Resume keeps the baseline held until the resume region is ready.** With
+   `watch: resume`, baseline stays 0 until the anchor's buffer (8 MB from
+   the anchor) verifies, or 15s after the anchor - not when the header's
+   first 8 MB does.
+5. **Bitrate-sized read-ahead.** After the first byte, the priority window
+   covers >= 30s of playback (file size / duration from the stream's
+   bitrate estimate; 2 GB/24 min ≈ 1.4 MB/s → ~42 MB), capped at 64 MB,
+   instead of a fixed ~4 MB.
+6. **mpv resumes with more buffered** (`embedded.rs`): `--cache-pause-wait=3`
+   (default 1s) so after a stall it waits for 3s of data, trading one
+   slightly longer pause for fewer stop-start cycles.
+
 **Later (not in v0.3.2):** prefetch the head (~8 MB, then dropped if unused)
 of the most likely source when an episode page opens - depends on A/B.
 
