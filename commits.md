@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `a712dec` · 2026-09-29 · style(home): shorten hero height
+- `src/App.css`
+
 ### `631837f` · 2026-09-29 · feat: blank episode thumbnails fall back to the local frame cache
 - `src/MediaPage.tsx`
 
