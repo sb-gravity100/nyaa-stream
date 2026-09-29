@@ -749,6 +749,14 @@ still has those bytes on disk. `readyRanges` in `StreamStats` is HLS-only
   150 MiB) so a jump back into just-played video stays instant and its range
   stays on the bar. Costs up to ~100 MiB more RAM while playing.
 - Tooltip unchanged; the HLS fallback keeps its `readyRanges` layer.
+- **Implemented (2026-09-29) with the linear mapping only:** `StatsFile`
+  (vendored enginefs) → `StreamStats.downloadedByteRanges` (file-relative
+  bytes) → `downloadedTimeRanges` in `PlayerView.tsx` maps bytes/total ×
+  duration, joins runs < 1s apart, drops < 0.5s specks, and draws them with
+  the existing `.player-seek-ready` class. The keyframe-index mapping is not
+  done yet: on a VBR encode the dim layer can be off by some seconds
+  mid-file. Reading MKV Cues needs those bytes downloaded, which the tail of
+  the file often isn't early on.
 
 **Later (not in v0.3.2):** prefetch the head (~8 MB, then dropped if unused)
 of the most likely source when an episode page opens - depends on A/B.
