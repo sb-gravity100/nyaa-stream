@@ -2,6 +2,13 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `47fddf4` · 2026-09-29 · feat: airing countdown, mark-previous-watched and no-seeder row flag on the media page
+- `crates/anilist-client/src/lib.rs`
+- `src-tauri/src/metadata_fallback.rs`
+- `src/App.css`
+- `src/MediaPage.tsx`
+- `src/types.ts`
+
 ### `e72d44e` · 2026-09-29 · feat: recent searches in the search dropdown
 - `src/App.css`
 - `src/App.tsx`
