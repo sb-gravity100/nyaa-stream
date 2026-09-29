@@ -6,9 +6,253 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>nyaa-stream</title>
     <meta name="color-scheme" content="dark" />
+    <!-- Splash screen: inline so it paints before any script loads (a dev
+         server can take many seconds to serve the app's modules). main.tsx
+         fades it out after the app's first render. Colors mirror App.css's
+         :root tokens (--ink #171a2b, --accent #f07aa6). -->
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #171a2b;
+      }
+
+      #splash {
+        position: fixed;
+        inset: 0;
+        z-index: 1000;
+        display: grid;
+        place-items: center;
+        background:
+          radial-gradient(45% 55% at 50% 42%, rgba(240, 122, 166, 0.14), transparent 70%),
+          radial-gradient(60% 70% at 70% 80%, rgba(120, 132, 230, 0.1), transparent 70%),
+          #171a2b;
+        transition: opacity 0.45s ease, transform 0.45s ease;
+      }
+
+      #splash.splash-done {
+        opacity: 0;
+        transform: scale(1.04);
+        pointer-events: none;
+      }
+
+      .splash-stage {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 18px;
+      }
+
+      .splash-logo {
+        width: 220px;
+        height: 220px;
+        overflow: visible;
+      }
+
+      .splash-glow {
+        transform-box: fill-box;
+        transform-origin: center;
+        animation: splash-breathe 2.8s ease-in-out infinite;
+      }
+
+      .splash-orbit {
+        transform-box: view-box;
+        transform-origin: 110px 110px;
+        animation: splash-spin 1.5s linear infinite;
+      }
+
+      .splash-orbit-arc {
+        animation: splash-arc 3s ease-in-out infinite;
+      }
+
+      .splash-head {
+        transform-box: view-box;
+        transform-origin: 110px 150px;
+        animation: splash-bob 2.8s cubic-bezier(0.45, 0, 0.3, 1) infinite;
+      }
+
+      .splash-ear {
+        transform-box: fill-box;
+        animation: splash-twitch 2.8s ease-in-out infinite;
+      }
+
+      .splash-ear-left {
+        transform-origin: 62% 80%;
+      }
+
+      .splash-ear-right {
+        transform-origin: 38% 80%;
+        animation-delay: 0.12s;
+      }
+
+      .splash-play {
+        transform-box: fill-box;
+        transform-origin: 40% 50%;
+        animation: splash-pulse 1.4s ease-in-out infinite;
+      }
+
+      .splash-shine {
+        animation: splash-shine 3.2s ease-in-out infinite;
+      }
+
+      .splash-petal {
+        transform-box: fill-box;
+        transform-origin: center;
+        opacity: 0;
+        animation: splash-petal 4s ease-in-out infinite;
+      }
+
+      .splash-petal:nth-child(2) { animation-delay: 1s; }
+      .splash-petal:nth-child(3) { animation-delay: 2s; }
+      .splash-petal:nth-child(4) { animation-delay: 3s; }
+
+      .splash-word {
+        font-family: "Outfit Variable", "Outfit", "Segoe UI", system-ui, sans-serif;
+        font-size: 1.6rem;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        color: #eceaf6;
+        animation: splash-word 2.8s ease-in-out infinite;
+      }
+
+      .splash-word span {
+        color: #f07aa6;
+      }
+
+      @keyframes splash-breathe {
+        0%, 100% { opacity: 0.55; transform: scale(0.92); }
+        50% { opacity: 1; transform: scale(1.08); }
+      }
+
+      @keyframes splash-spin {
+        to { transform: rotate(360deg); }
+      }
+
+      @keyframes splash-arc {
+        0%, 100% { stroke-dasharray: 40 460; }
+        50% { stroke-dasharray: 180 320; }
+      }
+
+      /* Hop, a curious tilt each way, settle. */
+      @keyframes splash-bob {
+        0%, 100% { transform: translateY(0) rotate(0); }
+        18% { transform: translateY(-10px) rotate(0); }
+        30% { transform: translateY(0) rotate(0); }
+        45% { transform: translateY(-2px) rotate(-6deg); }
+        62% { transform: translateY(-2px) rotate(5deg); }
+        78% { transform: translateY(0) rotate(0); }
+      }
+
+      @keyframes splash-twitch {
+        0%, 30%, 40%, 70%, 100% { transform: rotate(0); }
+        34% { transform: rotate(-14deg); }
+        37% { transform: rotate(6deg); }
+        74% { transform: rotate(-10deg); }
+      }
+
+      @keyframes splash-pulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.14); }
+      }
+
+      /* In the logo's own 32-unit space: sweeps from off its left edge to
+         past its right edge, then rests. */
+      @keyframes splash-shine {
+        0%, 45% { transform: translateX(-14px); }
+        85%, 100% { transform: translateX(40px); }
+      }
+
+      @keyframes splash-petal {
+        0% { opacity: 0; transform: translate(0, 12px) rotate(0) scale(0.6); }
+        20% { opacity: 0.9; }
+        100% { opacity: 0; transform: translate(-18px, -70px) rotate(220deg) scale(1); }
+      }
+
+      @keyframes splash-word {
+        0%, 100% { opacity: 0.75; letter-spacing: -0.02em; }
+        50% { opacity: 1; letter-spacing: 0.01em; }
+      }
+    </style>
   </head>
 
   <body>
+    <div id="splash" role="status" aria-label="Loading nyaa-stream">
+      <div class="splash-stage">
+        <svg class="splash-logo" viewBox="0 0 220 220" aria-hidden="true">
+          <defs>
+            <!-- One gradient in user space so the head and the ears (drawn
+                 separately to twitch) blend without seams. -->
+            <linearGradient id="splash-fill" gradientUnits="userSpaceOnUse" x1="5" y1="2.5" x2="27" y2="29">
+              <stop offset="0" stop-color="#ffa9c8" />
+              <stop offset="1" stop-color="#d9578a" />
+            </linearGradient>
+            <radialGradient id="splash-glow-fill">
+              <stop offset="0" stop-color="#f07aa6" stop-opacity="0.45" />
+              <stop offset="1" stop-color="#f07aa6" stop-opacity="0" />
+            </radialGradient>
+            <linearGradient id="splash-arc-fill" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#ff94bb" />
+              <stop offset="1" stop-color="#8f95e8" />
+            </linearGradient>
+            <linearGradient id="splash-shine-fill" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0" stop-color="#fff" stop-opacity="0" />
+              <stop offset="0.5" stop-color="#fff" stop-opacity="0.55" />
+              <stop offset="1" stop-color="#fff" stop-opacity="0" />
+            </linearGradient>
+            <clipPath id="splash-head-clip">
+              <path d="M5 11 L7.5 2.5 L13 8 H19 L24.5 2.5 L27 11 V24 A5 5 0 0 1 22 29 H10 A5 5 0 0 1 5 24 Z" />
+            </clipPath>
+          </defs>
+
+          <circle class="splash-glow" cx="110" cy="110" r="100" fill="url(#splash-glow-fill)" />
+
+          <circle cx="110" cy="110" r="80" fill="none" stroke="rgba(236, 234, 246, 0.07)" stroke-width="3" />
+          <g class="splash-orbit">
+            <circle
+              class="splash-orbit-arc"
+              cx="110"
+              cy="110"
+              r="80"
+              fill="none"
+              stroke="url(#splash-arc-fill)"
+              stroke-width="3.5"
+              stroke-linecap="round"
+            />
+          </g>
+
+          <g>
+            <path class="splash-petal" d="M52 150 q6 -8 12 0 q-6 8 -12 0 z" fill="#ffa9c8" />
+            <path class="splash-petal" d="M160 158 q6 -8 12 0 q-6 8 -12 0 z" fill="#f07aa6" />
+            <path class="splash-petal" d="M150 62 q5 -7 10 0 q-5 7 -10 0 z" fill="#ff94bb" />
+            <path class="splash-petal" d="M58 70 q5 -7 10 0 q-5 7 -10 0 z" fill="#ffa9c8" />
+          </g>
+
+          <!-- The app's BrandMark (32-unit box) scaled 3.4x around the center. -->
+          <g class="splash-head">
+            <g transform="translate(55.6 55.6) scale(3.4)">
+              <path class="splash-ear splash-ear-left" d="M5.2 12 L7.5 2.5 L14 8.6 Z" fill="url(#splash-fill)" />
+              <path class="splash-ear splash-ear-right" d="M18 8.6 L24.5 2.5 L26.8 12 Z" fill="url(#splash-fill)" />
+              <path d="M5 11 L10 8 H22 L27 11 V24 A5 5 0 0 1 22 29 H10 A5 5 0 0 1 5 24 Z" fill="url(#splash-fill)" />
+              <g clip-path="url(#splash-head-clip)">
+                <g transform="skewX(-18)">
+                  <rect class="splash-shine" x="0" y="-4" width="10" height="40" fill="url(#splash-shine-fill)" />
+                </g>
+              </g>
+              <path
+                class="splash-play"
+                d="M13.5 13.5 v9 l7.5 -4.5 z"
+                fill="#2a0f1c"
+                stroke="#2a0f1c"
+                stroke-width="1.5"
+                stroke-linejoin="round"
+              />
+            </g>
+          </g>
+        </svg>
+        <div class="splash-word">nyaa<span>stream</span></div>
+      </div>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
