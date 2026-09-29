@@ -2,6 +2,11 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `7a26759` · 2026-09-29 · feat(player): remove the centre paused glyph overlay
+- `src/PlayerView.tsx`
+- `src/HlsPlayerView.tsx`
+- `src/App.css`
+
 ### `d38ff57` · 2026-09-29 · feat(player): , and . step one frame back/forward; subtitle delay moves to - and =
 - `src/mpvVideo.ts`
 - `src/PlayerView.tsx`
