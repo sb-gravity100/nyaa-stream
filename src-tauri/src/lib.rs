@@ -989,9 +989,20 @@ async fn stop_playback(state: State<'_, Arc<AppState>>) -> Result<(), String> {
     Ok(())
 }
 
-/// Cuts an A-B clip of the playing torrent file to `<Videos>/nyaa-stream
-/// clips/<name>.mp4` (normalized H.264/AAC - see `TorrentEngine::export_clip`)
-/// and returns the written path.
+/// Where clips go unless the export dialog picked a folder.
+fn default_clip_dir() -> std::path::PathBuf {
+    dirs::video_dir().unwrap_or_else(std::env::temp_dir).join("nyaa-stream clips")
+}
+
+/// The folder the export dialog starts with.
+#[tauri::command]
+fn default_clip_folder() -> String {
+    default_clip_dir().to_string_lossy().into_owned()
+}
+
+/// Cuts an A-B clip of the playing torrent file to `<folder>/<name>.mp4` (the
+/// folder defaults to `<Videos>/nyaa-stream clips`; normalized H.264/AAC - see
+/// `TorrentEngine::export_clip`) and returns the written path.
 #[tauri::command]
 async fn export_clip(
     state: State<'_, Arc<AppState>>,
@@ -1001,12 +1012,16 @@ async fn export_clip(
     end_seconds: f64,
     audio_stream: usize,
     name: String,
+    folder: Option<String>,
 ) -> Result<String, String> {
-    tracing::debug!(torrent_id = %torrent_id, file_idx, start_seconds, end_seconds, audio_stream, %name, "export_clip invoked");
+    tracing::debug!(torrent_id = %torrent_id, file_idx, start_seconds, end_seconds, audio_stream, %name, ?folder, "export_clip invoked");
     if !(end_seconds > start_seconds) {
         return Err("The clip's end must be after its start.".into());
     }
-    let dir = dirs::video_dir().unwrap_or_else(std::env::temp_dir).join("nyaa-stream clips");
+    let dir = match folder.as_deref().map(str::trim).filter(|f| !f.is_empty()) {
+        Some(folder) => std::path::PathBuf::from(folder),
+        None => default_clip_dir(),
+    };
     tokio::fs::create_dir_all(&dir).await.map_err(|err| format!("Couldn't create {}: {err}", dir.display()))?;
     // Filesystem-safe stem; never overwrites an earlier clip.
     let stem: String = name.chars().map(|c| if c.is_alphanumeric() || " -_.()".contains(c) { c } else { '_' }).collect();
@@ -1083,6 +1098,7 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(media_keys::plugin())
         .manage(app_state.clone())
         .manage(player::PlayerState::default())
@@ -1102,6 +1118,7 @@ pub fn run() {
             save_frame_thumbnail,
             search_torrents,
             search_torrents_for_anime,
+            default_clip_folder,
             search_local_releases,
             search_fansubber_releases,
             get_popular_fansubbers,

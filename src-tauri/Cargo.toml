@@ -41,6 +41,7 @@ arboard = { version = "3", default-features = false, features = ["image-data"] }
 # Decoding/downscaling mpv screenshots (player.rs: thumbnails, Ctrl+C copy).
 image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
 tauri-plugin-global-shortcut = "2"
+tauri-plugin-dialog = "2"
 
 [target.'cfg(windows)'.dependencies]
 # Finding mpv's child window and pushing it below the webview (player.rs).

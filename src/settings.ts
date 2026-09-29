@@ -49,6 +49,8 @@ export interface Settings {
    * matches when its title contains every word (case-insensitive). Empty =
    * no preference. */
   preferredFansubber: string;
+  /** Where exported clips are saved; empty = the default clips folder. */
+  exportFolder: string;
   /** Only list rows that are real episodes per AniList/Kitsu - hides
    * off-list episode numbers, Batch and Unknown rows (see
    * `listedSources` in MediaPage). */
@@ -90,6 +92,7 @@ export const DEFAULT_SETTINGS: Settings = {
   autoplayNext: true,
   rememberFansubGroup: true,
   preferredFansubber: "",
+  exportFolder: "",
   hideUnlistedSources: true,
   mpvPath: "",
 };
