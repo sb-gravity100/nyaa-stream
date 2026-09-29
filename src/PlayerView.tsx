@@ -281,6 +281,10 @@ function MpvPlayerView({
    const [audioDelay, setAudioDelay] = useState(0);
    const [chapters, setChapters] = useState<Chapter[]>([]);
    const [speed, setSpeed] = useState(1);
+   // A-B loop points in episode time (null = unset); both set = looping.
+   const [loopA, setLoopA] = useState<number | null>(null);
+   const [loopB, setLoopB] = useState<number | null>(null);
+   const [exporting, setExporting] = useState(false);
    const [toast, setToast] = useState<string | null>(null);
    const [nextCountdown, setNextCountdown] = useState<number | null>(null);
    const idleTimerRef = useRef<number | undefined>(undefined);
@@ -371,6 +375,8 @@ function MpvPlayerView({
       setActiveAudioId(null);
       setAudioDelay(0);
       setChapters([]);
+      setLoopA(null);
+      setLoopB(null);
       setNextCountdown(null);
    }, [selectedFile?.streamUrl]);
 
@@ -893,6 +899,59 @@ function MpvPlayerView({
       });
    }
 
+   /** A-B loop key: sets A, then B (playback loops A-B in mpv), then clears. */
+   function stepAbLoop() {
+      const video = videoRef.current;
+      if (!video) return;
+      const now = video.currentTime;
+      if (loopA == null) {
+         setLoopA(now);
+         void video.setProperty("ab-loop-a", now);
+         showToast(`Loop A: ${formatTime(now)}`);
+      } else if (loopB == null) {
+         if (now <= loopA + 0.5) {
+            showToast("Loop B must come after A");
+            return;
+         }
+         setLoopB(now);
+         void video.setProperty("ab-loop-b", now);
+         showToast(`Looping ${formatTime(loopA)} – ${formatTime(now)} · E exports`);
+      } else {
+         setLoopA(null);
+         setLoopB(null);
+         void video.setProperty("ab-loop-a", "no");
+         void video.setProperty("ab-loop-b", "no");
+         showToast("Loop cleared");
+      }
+   }
+
+   /** Cuts the looped section to an MP4 (normalized H.264/AAC, see
+    * `export_clip`). Needs the torrent to stay open until it finishes. */
+   async function exportLoop() {
+      if (loopA == null || loopB == null || !torrentId || !selectedFile || exporting) return;
+      const audioPos = audioTracks.findIndex((t) => t.index === activeAudioId);
+      setExporting(true);
+      showToast("Exporting clip…");
+      console.info("[player] exporting clip", { start: loopA, end: loopB });
+      try {
+         const out = await invoke<string>("export_clip", {
+            torrentId,
+            fileIdx: selectedFile.index,
+            startSeconds: loopA,
+            endSeconds: loopB,
+            audioStream: Math.max(0, audioPos),
+            name: `${displayTitle(anime.title)} ${episodeKey} ${formatTime(loopA)}-${formatTime(loopB)}`.replace(/:/g, "."),
+         });
+         console.info("[player] clip exported", { out });
+         showToast(`Clip saved: ${baseName(out)}`);
+      } catch (err) {
+         console.error("[player] clip export failed", { err: String(err) });
+         showToast("Couldn't export the clip");
+      } finally {
+         setExporting(false);
+      }
+   }
+
    function changeAudioDelay(delta: number) {
       setAudioDelay((d) => {
          const next = Math.round((d + delta) * 10) / 10;
@@ -1037,6 +1096,12 @@ function MpvPlayerView({
             case "n":
                if (onNext) onNext();
                break;
+            case "a":
+               stepAbLoop();
+               break;
+            case "e":
+               void exportLoop();
+               break;
             case "[":
                changeSpeed(-1);
                break;
@@ -1078,6 +1143,13 @@ function MpvPlayerView({
       playlistOpen,
       subtitleTracks,
       activeSubtitleIndex,
+      loopA,
+      loopB,
+      exporting,
+      torrentId,
+      selectedFile,
+      audioTracks,
+      activeAudioId,
    ]);
 
    const displayTime = seekPreview ?? episodeTime;
@@ -1507,6 +1579,15 @@ function MpvPlayerView({
                         }}
                      />
                   ))}
+               {episodeDuration > 0 && loopA != null && (
+                  <div
+                     class="player-seek-loop"
+                     style={{
+                        left: `${(loopA / episodeDuration) * 100}%`,
+                        width: `${(((loopB ?? loopA) - loopA) / episodeDuration) * 100}%`,
+                     }}
+                  />
+               )}
                <div class="player-seek-played" ref={playedFillRef} />
                {episodeDuration > 0 &&
                   chapters
@@ -1595,6 +1676,25 @@ function MpvPlayerView({
                   <span>/ {formatTime(episodeDuration)}</span>
                </button>
                <div class="player-spacer" />
+               <button
+                  class={`player-speed${loopA != null ? " on" : ""}`}
+                  onClick={stepAbLoop}
+                  aria-label="A-B loop"
+                  title="A-B loop (A: set A, set B, clear)"
+               >
+                  A–B
+               </button>
+               {loopA != null && loopB != null && (
+                  <button
+                     class="player-speed on"
+                     onClick={() => void exportLoop()}
+                     disabled={exporting}
+                     aria-label="Export looped clip"
+                     title="Export the looped section as MP4 (E)"
+                  >
+                     {exporting ? "Exporting…" : "Clip"}
+                  </button>
+               )}
                <button
                   class={`player-speed${speed !== 1 ? " on" : ""}`}
                   onClick={() => changeSpeed(speed >= SPEEDS[SPEEDS.length - 1] ? 0 : 1)}
