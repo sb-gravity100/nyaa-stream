@@ -2,6 +2,14 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `133bc36` · 2026-09-29 · docs: index .vscode/settings.json in FILE_INDEX.md
+- `FILE_INDEX.md`
+
+### `8edec7d` · 2026-09-29 · chore: give rust-analyzer its own target dir
+- `.vscode/settings.json`
+- `.gitignore`
+- `PHASES.md`
+
 ### `0c067c1` · 2026-09-29 · chore: link dev builds with rust-lld
 - `.cargo/config.toml`
 - `scripts/release.mjs`
