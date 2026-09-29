@@ -141,6 +141,12 @@ requires, beyond Rust/Node:
   until it reaches releases already stored. All requests share one throttle
   (`throttle.rs`: 2 in flight, paced, 429/503 back-off with `Retry-After`).
   The database is user data - "Clear cache" leaves it alone.
+- **Batch playback:** a batch source plays only its matched episode file (the
+  libtorrent coordinator keeps every other file at priority 0). While it plays,
+  the next episode's file is registered as a *preload file* (`preload_next_file`
+  → vendored `set_preload_file`, libtorrent priority 1) so it only takes spare
+  bandwidth; the next episode keeps using the same batch and torrent
+  (`lastBatchMagnet`, `play_magnet` reuse, 4s deferred `stop_playback`).
 - **Torrent source:** nyaa.si search, scraping its paginated HTML results
   table (its RSS feed was found to silently ignore the `p=` page param and
   always cap at 75 results — see `crates/nyaa-client`); responses are
