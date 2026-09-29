@@ -283,6 +283,9 @@
             startup buffer verifies (or 15s fallback)
       - [ ] enginefs: ~4 MB startup window at priority 7 + staggered
             deadlines; ~4 MB read-ahead at 7 after the first byte
+      - [ ] enginefs: sequential download when a foreground stream starts
+            at offset 0; off on seek past the downloaded range, resume
+            starts and background/probe/preload reads
       - [ ] enginefs: waiting-piece log reports the effective window
       - [ ] `VENDORED.md` notes for the three enginefs changes
       - [ ] Spawn embedded mpv at app launch instead of first play
