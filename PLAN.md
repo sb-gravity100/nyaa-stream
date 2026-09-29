@@ -728,6 +728,28 @@ real errors (file error alert, torrent gone) still fail at once, and
 `get_file_reader` failures are now logged with their cause instead of only
 the stream server's "unknown file index".
 
+**Seek-bar buffer indicators** (reported 2026-09-29: ranges vanish after a
+seek). The mpv player's bar only shows mpv's demuxer cache
+(`demuxer-cache-state.seekable-ranges`, `src/mpvVideo.ts` `buffered`); mpv
+evicts old ranges once its back-buffer limit (default 50 MiB) is hit, so
+after a jump the earlier buffered stretch disappears even though the torrent
+still has those bytes on disk. `readyRanges` in `StreamStats` is HLS-only
+(transcoded segments) and is empty for mpv. Fix - two layers:
+
+- **Downloaded (dim):** `StreamStats` gains `downloaded_ranges` (seconds): the
+  file's verified pieces merged into byte runs, mapped to time with the
+  container's keyframe index (MKV Cues / MP4 index, read once per file via
+  the in-process FFmpeg probe and cached next to `MediaProbes`), falling back
+  to a linear bytes/duration estimate until the index is known. Runs shorter
+  than ~1s of playback are merged into their neighbours so the bar isn't
+  speckled. The player already polls `get_stream_stats`; the bar draws these
+  under the buffer layer.
+- **Buffer (bright):** mpv keeps more of what was played seekable:
+  `--demuxer-max-back-bytes=150MiB` (from 50 MiB default; forward stays
+  150 MiB) so a jump back into just-played video stays instant and its range
+  stays on the bar. Costs up to ~100 MiB more RAM while playing.
+- Tooltip unchanged; the HLS fallback keeps its `readyRanges` layer.
+
 **Later (not in v0.3.2):** prefetch the head (~8 MB, then dropped if unused)
 of the most likely source when an episode page opens - depends on A/B.
 
