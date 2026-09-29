@@ -2480,12 +2480,14 @@ html.mpv-active .player-view {
   background: rgba(255, 255, 255, 0.2);
 }
 
+/* On disk: transcoded HLS segments (fallback player) or the torrent's
+   downloaded bytes (mpv player). */
 .player-seek-ready {
   background: rgba(255, 255, 255, 0.42);
 }
 
-/* What the <video> itself holds in memory - brighter than "ready"
-   (transcoded on disk) since it plays with zero fetch. */
+/* What the player itself holds in memory - brighter than "ready" since it
+   plays with zero fetch. */
 .player-seek-buffered {
   background: rgba(255, 255, 255, 0.62);
 }
