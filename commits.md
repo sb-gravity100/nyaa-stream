@@ -2,6 +2,13 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `f1d87db` · 2026-09-29 · docs: correct the startup delay cause in PLAN.md
+- `PLAN.md`
+
+### `a1cd03d` · 2026-09-29 · fix: serve the dev frontend on 127.0.0.1
+- `vite.config.ts`
+- `src-tauri/tauri.conf.json`
+
 ### `bbfa40b` · 2026-09-29 · docs: record the mpv pre-spawn regression and fix
 - `FILE_INDEX.md`
 - `PLAN.md`
