@@ -340,6 +340,15 @@
       - [x] PLAN.md/FILE_INDEX.md sync, `npm run bump -- patch`, tag
             `v0.3.2`, `npm run release -- --notes "..." --dry-run`, then
             publish (see PLAN.md "Release plan")
+- [ ] Native splash window + custom title bar (v0.4.0, see PLAN.md "Native
+      splash window and custom title bar"): one commit each -
+      - [ ] Splash window (`public/splash.html`), main window hidden until
+            `app_ready`, 20s fallback; drop the inline index.html splash
+      - [ ] Frameless main window + title bar strip blended with the app
+            bar: drag, double-click maximize, min / max / close, resize edges
+      - [ ] Player: strip fades with the top controls; hidden in fullscreen
+            and PiP
+      - [ ] Window capability permissions
 - [ ] Download cache (v0.4.0, see PLAN.md "Download cache"): one commit each -
       - [ ] `downloads/.cache-index.json`: files, bytes, last_used, episode
       - [ ] LRU eviction to the cap after stop and at startup (never the
