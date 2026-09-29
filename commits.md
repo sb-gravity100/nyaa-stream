@@ -1,3 +1,11 @@
+### `11f90ab` · 2026-09-30 · feat: save a resume buffer when an in-progress episode stops
+- `crates/torrent-engine/src/resume_buffer.rs`
+- `src-tauri/src/resume.rs`
+- `src-tauri/src/lib.rs`
+- `src/PlayerView.tsx`
+- `src/playback.ts`
+- `src/watchProgress.ts`
+
 ### `287cfb0` · 2026-09-30 · feat: keyframe byte offset lookup and verified file ranges
 - `crates/torrent-engine/src/media.rs`
 - `crates/torrent-engine/src/lib.rs`
