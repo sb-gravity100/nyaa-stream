@@ -1494,13 +1494,6 @@ function MpvPlayerView({
             </div>
          )}
 
-         {/* Large paused glyph - a state indicator, not a control (the
-          controls themselves stay bottom-hover only). */}
-         {paused && hasPlayed && !error && (
-            <div class="player-paused-glyph" aria-hidden="true">
-               <PlayIcon size={44} />
-            </div>
-         )}
 
          {toast && (
             <div class="player-toast" key={toast}>
