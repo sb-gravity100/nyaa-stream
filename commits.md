@@ -1,3 +1,8 @@
+### `87da9dc` · 2026-09-30 · feat: LRU-evict the download cache after stop and at startup
+- `src-tauri/src/download_cache.rs`
+- `src-tauri/src/lib.rs`
+- `src-tauri/Cargo.toml`
+
 ### `da0e6ca` · 2026-09-30 · feat: download cache index of played torrents
 - `src-tauri/src/download_cache.rs`
 - `src-tauri/src/lib.rs`
