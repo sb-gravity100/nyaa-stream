@@ -20,27 +20,31 @@ pub struct PlayerState {
 }
 
 /// Whether a system `mpv` is on PATH - the player falls back to HLS
-/// without it. Checked once per run.
+/// without it. The frontend asks once per run (and again when the path override changes).
 #[tauri::command]
 pub async fn mpv_available() -> bool {
-    static AVAILABLE: tokio::sync::OnceCell<bool> = tokio::sync::OnceCell::const_new();
-    *AVAILABLE
-        .get_or_init(|| async {
-            let mut command = tokio::process::Command::new("mpv");
-            #[cfg(windows)]
-            command.creation_flags(0x0800_0000);
-            let found = command
-                .arg("--version")
-                .stdin(std::process::Stdio::null())
-                .stdout(std::process::Stdio::null())
-                .stderr(std::process::Stdio::null())
-                .status()
-                .await
-                .is_ok_and(|status| status.success());
-            tracing::info!(found, "mpv availability checked");
-            found
-        })
+    let mut command = tokio::process::Command::new(mpv_ipc::mpv_program());
+    #[cfg(windows)]
+    command.creation_flags(0x0800_0000);
+    let found = command
+        .arg("--version")
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
         .await
+        .is_ok_and(|status| status.success());
+    tracing::info!(found, "mpv availability checked");
+    found
+}
+
+/// Points every mpv spawn at `path` (empty/`None`: mpv from PATH) - the
+/// Settings override.
+#[tauri::command]
+pub fn set_mpv_path(path: Option<String>) {
+    let path = path.map(|p| p.trim().to_string()).filter(|p| !p.is_empty());
+    tracing::debug!(?path, "set_mpv_path invoked");
+    mpv_ipc::set_mpv_path(path.map(std::path::PathBuf::from));
 }
 
 /// Starts mpv inside the window if it isn't running yet and makes the
