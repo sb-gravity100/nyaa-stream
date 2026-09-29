@@ -33,6 +33,10 @@ pub struct AnimeMedia {
     #[serde(default)]
     pub status: Option<String>,
     /// The next episode still to air, for the media page's countdown.
+    /// Alternative names (abbreviations, other languages) - extra nyaa.si
+    /// search terms. Missing in older snapshots and Kitsu fallback data.
+    #[serde(default)]
+    pub synonyms: Vec<String>,
     #[serde(default, rename = "nextAiringEpisode")]
     pub next_airing_episode: Option<NextAiring>,
 }
@@ -161,6 +165,7 @@ query ($search: String, $perPage: Int) {
       seasonYear
       duration
       status
+      synonyms
       nextAiringEpisode { airingAt episode }
     }
   }
@@ -181,6 +186,7 @@ query ($id: Int) {
     seasonYear
     duration
     status
+    synonyms
     nextAiringEpisode { airingAt episode }
   }
 }
