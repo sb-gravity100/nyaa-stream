@@ -95,20 +95,23 @@ All planning docs must stay consistent with each other at all times.
 updater only offers builds with a higher version than the installed one.
 
 - **Current exception (PLAN.md "Release plan"):** milestones v0.3.2-v0.8.0
-  are bumped and tagged locally only - never push those tags (a pushed
-  `v*` tag triggers the release workflow). Only v0.9.0 is published.
+  are bumped and tagged locally only - never push those tags or use
+  `git push --tags`/`--follow-tags`. Only v0.9.0 is published.
 - Bump with `npm run bump -- patch|minor|major` (keeps `package.json`,
   `tauri.conf.json`, `src-tauri/Cargo.toml` in lockstep), commit
   `chore: release vX.Y.Z`, tag `vX.Y.Z`.
 - Release builds need the key *contents* (the `_PATH` variant is not read):
   `export TAURI_SIGNING_PRIVATE_KEY="$(cat ~/.tauri/nyaa-stream.key)"` and
   `TAURI_SIGNING_PRIVATE_KEY_PASSWORD=""` (never commit the key).
-- Publishing: push the tag, `npm run tauri build`, then
-  `gh release create vX.Y.Z --verify-tag` with the NSIS `-setup.exe`, its
-  `.sig`, the MSI + `.sig` and a `latest.json` (`version`, `notes`,
-  `pub_date`, `platforms.windows-x86_64.{signature,url}` using the NSIS `.sig`
-  text). Endpoint: `tauri.conf.json` → `plugins.updater`. The tag-triggered
-  `.github/workflows/release.yml` does this in CI when Actions is available.
+- Publishing: on the tagged release commit, `npm run release -- --notes
+  "<text>"` (`scripts/release.mjs`; try `--dry-run` first). It builds with the
+  signing key, then uploads the NSIS `-setup.exe`, its `.sig`, the MSI +
+  `.sig` and a `latest.json` (`version`, `notes`, `pub_date`,
+  `platforms.windows-x86_64.{signature,url}` using the NSIS `.sig` text) via
+  `gh release create vX.Y.Z --verify-tag`, pushing main and only that tag.
+  Endpoint: `tauri.conf.json` → `plugins.updater`. GitHub Actions is
+  unavailable (account billing-locked); `.github/workflows/release.yml` is
+  manual-only (`workflow_dispatch`).
 - `.githooks/pre-commit` (`core.hooksPath`, set once per clone with
   `git config core.hooksPath .githooks`) warns when code changed but the
   version still equals the latest tag. Remind the user when it fires.

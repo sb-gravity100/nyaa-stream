@@ -397,4 +397,4 @@
             build, `latest.json`, `gh release create`; `--dry-run`,
             `--skip-build`)
       - [x] `release.yml`: manual `workflow_dispatch` trigger only
-      - [ ] CLAUDE.md versioning section + FILE_INDEX.md
+      - [x] CLAUDE.md versioning section + FILE_INDEX.md
