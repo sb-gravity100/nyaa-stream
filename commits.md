@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `d2ffba2` · 2026-09-29 · fix(player): restyle ASS subtitles once mpv has loaded the track header
+- `src/mpvVideo.ts`
+- `src/PlayerView.tsx`
+
 ### `b520776` · 2026-09-29 · feat(player): remove the pause dimming
 - `src/PlayerView.tsx`
 - `src/HlsPlayerView.tsx`
