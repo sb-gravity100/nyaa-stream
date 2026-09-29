@@ -2,6 +2,15 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `dd6e7ad` · 2026-09-29 · feat(mpv-player): play through in-process libmpv instead of spawned mpv
+- `crates/mpv-player/Cargo.toml`
+- `crates/mpv-player/src/libmpv.rs`
+- `crates/mpv-player/src/embedded.rs`
+- `crates/mpv-player/src/lib.rs`
+- `crates/mpv-player/examples/smoke.rs`
+- `src-tauri/src/player.rs`
+- `Cargo.lock`
+
 ### `3aabc6c` · 2026-09-29 · refactor: rename mpv-ipc crate to mpv-player
 - `crates/mpv-player/`
 - `src-tauri/Cargo.toml`
