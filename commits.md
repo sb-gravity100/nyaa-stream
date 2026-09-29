@@ -2,6 +2,11 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `9765d15` · 2026-09-29 · feat(nyaa-client): throttle requests and back off on 429/503
+- `crates/nyaa-client/src/throttle.rs`
+- `crates/nyaa-client/src/lib.rs`
+- `FILE_INDEX.md`
+
 ### `e844730` · 2026-09-29 · feat(settings): preferred fansubber text input for release picking
 - `src/settings.ts`
 - `src/releases.ts`
