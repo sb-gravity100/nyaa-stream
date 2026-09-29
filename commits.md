@@ -2,6 +2,16 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `50dea5a` · 2026-09-29 · docs: compare buffering plan with Elementum
+- `PLAN.md`
+
+### `5e244d9` · 2026-09-29 · feat: add tail prefetch, read-ahead and resume-point helpers to enginefs
+- `vendor/enginefs/src/backend/priorities.rs`
+
+### `2c72189` · 2026-09-29 · fix: let mpv refill 3s of cache before resuming after a stall
+- `crates/mpv-player/src/embedded.rs`
+- `PHASES.md`
+
 ### `1f58003` · 2026-09-29 · docs: plan playback buffering fixes from the live test
 - `PLAN.md`
 - `PHASES.md`
