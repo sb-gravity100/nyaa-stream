@@ -129,6 +129,50 @@ export function progressForAnime(animeId: number): Record<string, ProgressEntry>
   return out;
 }
 
+// "Remove from Continue watching": the row is hidden until the anime is
+// watched again (newer progress than the dismissal); progress itself stays.
+const DISMISSED_KEY = "nyaa-stream:dismissed-continue";
+
+function loadDismissed(): Record<string, number> {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(DISMISSED_KEY) ?? "{}");
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+let dismissed = loadDismissed();
+
+export function dismissContinueWatching(animeId: number): void {
+  console.info("[watchProgress] dismissed from continue watching", { animeId });
+  dismissed[String(animeId)] = Date.now();
+  try {
+    localStorage.setItem(DISMISSED_KEY, JSON.stringify(dismissed));
+  } catch (err) {
+    console.error("[watchProgress] failed to write dismissals", { err });
+  }
+  listeners.forEach((listener) => listener());
+}
+
+/** Per-anime totals for the library grid: completed numbered episodes and
+ * the last time anything was watched. */
+export function libraryStats(): Map<number, { watched: number; lastWatched: number }> {
+  const stats = new Map<number, { watched: number; lastWatched: number }>();
+  for (const entry of Object.values(store)) {
+    const current = stats.get(entry.animeId) ?? { watched: 0, lastWatched: 0 };
+    if (entry.completed && entry.episode != null) current.watched++;
+    current.lastWatched = Math.max(current.lastWatched, entry.updatedAt);
+    stats.set(entry.animeId, current);
+  }
+  return stats;
+}
+
+/** True when `episode` of the anime is already completed. */
+export function isEpisodeWatched(animeId: number, episode: number): boolean {
+  return Object.values(store).some((e) => e.animeId === animeId && e.episode === episode && e.completed);
+}
+
 /** Most recent in-progress (unfinished) entry per anime, newest first. */
 export function continueWatching(limit = 20): ProgressEntry[] {
   const latestPerAnime = new Map<number, ProgressEntry>();
@@ -138,6 +182,7 @@ export function continueWatching(limit = 20): ProgressEntry[] {
   }
   return [...latestPerAnime.values()]
     .filter((entry) => !entry.completed && entry.position >= MIN_RESUME_SECONDS)
+    .filter((entry) => entry.updatedAt > (dismissed[String(entry.animeId)] ?? 0))
     .sort((a, b) => b.updatedAt - a.updatedAt)
     .slice(0, limit);
 }
