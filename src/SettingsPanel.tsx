@@ -313,6 +313,12 @@ export function SettingsPanel({ onClose }: Props) {
             <h3>Playback</h3>
             <Toggle label="Resume where you left off" checked={settings.resumePlayback} onChange={(v) => updateSettings({ resumePlayback: v })} />
             <Toggle
+              label="Hardware video decoding"
+              hint="Turn off if video turns blocky or smeared until you seek"
+              checked={settings.hardwareDecoding}
+              onChange={(v) => updateSettings({ hardwareDecoding: v })}
+            />
+            <Toggle
               label="Play the next episode automatically"
               hint="Counts down when an episode ends"
               checked={settings.autoplayNext}
