@@ -1,3 +1,9 @@
+### `ebf8cd9` · 2026-09-30 · feat: download cache size setting and clear
+- `src-tauri/src/download_cache.rs`
+- `src-tauri/src/cache.rs`
+- `src-tauri/src/lib.rs`
+- `src/SettingsPanel.tsx`
+
 ### `f5ea62a` · 2026-09-30 · feat: keep Continue watching torrents past the download cache cap
 - `src-tauri/src/download_cache.rs`
 - `src-tauri/src/lib.rs`
