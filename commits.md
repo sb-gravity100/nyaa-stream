@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `574dd5e` · 2026-09-29 · perf(frontend): drop unused Zen Kaku 500 weight (CSS 467kB -> 329kB)
+- `src/main.tsx`
+
 ### `0cce65e` · 2026-09-29 · perf(build): add release profile (thin LTO, strip symbols)
 - `Cargo.toml`
 
