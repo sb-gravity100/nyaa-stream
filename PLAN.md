@@ -578,7 +578,8 @@ billing-locked, 2026-09-29). `npm run release -- --notes "<text>"`
    `gh release create v<v> --verify-tag` with the five files; notes = the
    `--notes` text.
 
-Flags: `--dry-run` (build + stage files, no push/publish), `--skip-build`
+Flags: `--dry-run` (build + stage files, no push/publish; a missing release
+tag is only a warning, so the build can be tested before tagging), `--skip-build`
 (reuse existing bundle output). `release.yml` keeps only its manual
 `workflow_dispatch` trigger, so a pushed tag can't also start a CI publish if
 the account is unlocked later.
