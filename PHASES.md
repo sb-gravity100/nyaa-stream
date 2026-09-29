@@ -296,7 +296,7 @@
       - [x] Spawn embedded mpv at app launch instead of first play
       - [x] `mpv_stop` resets per-file mpv state (A-B loop, speed, delays)
       - [x] libmpv: forward `playlist_entry_id` on `start-file`/`end-file`
-      - [ ] `MpvVideo` ignores `end-file` errors from a previous entry
+      - [x] `MpvVideo` ignores `end-file` errors from a previous entry
       - [ ] Source switch: capture the playhead, mpv `stop` (flush) at
             once, then `play_magnet`, load at the captured time with the
             `resume` hint

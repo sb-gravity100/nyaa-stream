@@ -26,6 +26,8 @@ interface MpvEvent {
    data?: unknown;
    reason?: string;
    file_error?: string;
+   /** mpv's playlist entry of a `start-file`/`end-file`. */
+   playlist_entry_id?: number;
 }
 
 /** Properties mirrored from mpv (observe ids are their index + 1). */
@@ -87,6 +89,14 @@ export class MpvVideo extends EventTarget {
    private seekReleaseTimer: number | undefined;
    /** Positions dropped during the current seek (debug logging). */
    private maskedPositions = 0;
+   // The playlist entry of the current `load` (mpv's ids only grow): an
+   // `end-file` for any other entry belongs to a replaced file - e.g. a
+   // source switch's old torrent failing to open a second later - and must
+   // not surface as this file's error. `staleUpTo` covers the gap before the
+   // new entry's id is known.
+   private entryId: number | null = null;
+   private staleUpTo = 0;
+   private maxSeenEntryId = 0;
    error: { message: string } | null = null;
 
    /** Starts mpv (idempotent), subscribes to its events and observes the
@@ -121,7 +131,23 @@ export class MpvVideo extends EventTarget {
       await command(["set_property", "pause", false]);
       // The previous close froze (muted) mpv - see `freeze`.
       await command(["set_property", "mute", false]);
-      await command(["loadfile", url, "replace"]);
+      this.entryId = null;
+      this.staleUpTo = this.maxSeenEntryId;
+      const result = await command(["loadfile", url, "replace"]);
+      const id = (result as { playlist_entry_id?: unknown } | null)?.playlist_entry_id;
+      if (typeof id === "number" && this.entryId == null) {
+         this.entryId = id;
+         this.maxSeenEntryId = Math.max(this.maxSeenEntryId, id);
+      }
+      console.debug("[mpv] loadfile issued", { entryId: this.entryId, staleUpTo: this.staleUpTo });
+   }
+
+   /** Whether an event's playlist entry is the current load's. Events
+    * without an id (older libmpv) are always current. */
+   private isCurrentEntry(id: number | undefined): boolean {
+      if (id == null) return true;
+      this.maxSeenEntryId = Math.max(this.maxSeenEntryId, id);
+      return this.entryId != null ? id === this.entryId : id > this.staleUpTo;
    }
 
    /** Silences playback at once - the player's close path calls this
@@ -391,7 +417,22 @@ export class MpvVideo extends EventTarget {
             this.emit("playing");
             this.emit("seeked");
             return;
+         case "start-file":
+            if (this.entryId == null && e.playlist_entry_id != null && this.isCurrentEntry(e.playlist_entry_id)) {
+               this.entryId = e.playlist_entry_id;
+               console.debug("[mpv] start-file", { entryId: this.entryId });
+            }
+            return;
          case "end-file":
+            if (!this.isCurrentEntry(e.playlist_entry_id)) {
+               console.info("[mpv] ignoring end-file of a previous entry", {
+                  entryId: e.playlist_entry_id,
+                  current: this.entryId,
+                  reason: e.reason,
+                  error: e.file_error,
+               });
+               return;
+            }
             // No playback-restart is coming for a seek into a closed file.
             window.clearTimeout(this.seekReleaseTimer);
             this.seekTarget = null;
