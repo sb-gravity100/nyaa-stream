@@ -15,6 +15,7 @@ import {
   isTauriAvailable,
 } from "./browserFallback";
 import { addToLibrary, getLibrary, isInLibrary, removeFromLibrary } from "./library";
+import { addRecentSearch, clearRecentSearches, getRecentSearches, removeRecentSearch } from "./recentSearches";
 import { fetchKitsuMetadata, kitsuSnapshot } from "./kitsu";
 import { cachedTorrentThumbnail, fetchTorrentThumbnail } from "./torrentThumbnail";
 import { MediaPage } from "./MediaPage";
@@ -129,6 +130,7 @@ function App() {
   // which are both safe defaults for the correction to be a no-op.
   const [episodeOffsetByMedia, setEpisodeOffsetByMedia] = useState<Record<number, number>>({});
 
+  const [recentSearches, setRecentSearches] = useState(getRecentSearches);
   const [visibleResults, setVisibleResults] = useState(DROPDOWN_CHUNK);
   const resultsWrapRef = useRef<HTMLDivElement>(null);
   const moreSentinelRef = useRef<HTMLLIElement>(null);
@@ -196,6 +198,7 @@ function App() {
 
   function pickAnime(anime: AnimeMedia) {
     knownAnime.current.set(anime.id, anime);
+    setRecentSearches(addRecentSearch(query));
     setDropdownOpen(false);
     navigate({ name: "anime", id: anime.id, watch: null });
   }
@@ -435,7 +438,7 @@ function App() {
 
   function handleInputFocus() {
     if (blurTimeout.current) window.clearTimeout(blurTimeout.current);
-    if (query.trim() && (animeResults.length > 0 || loading)) setDropdownOpen(true);
+    if (query.trim() ? animeResults.length > 0 || loading : recentSearches.length > 0) setDropdownOpen(true);
   }
 
   function handleInputBlur() {
@@ -632,7 +635,36 @@ function App() {
             aria-controls="search-results"
           />
 
-          {dropdownOpen && (
+          {dropdownOpen && !query.trim() && recentSearches.length > 0 && (
+            <div class="search-results-wrap" id="search-results">
+              <div class="search-recent-header">
+                <span>Recent searches</span>
+                <button class="link-button" onMouseDown={(e) => e.preventDefault()} onClick={() => setRecentSearches(clearRecentSearches())}>
+                  Clear
+                </button>
+              </div>
+              <ul class="search-results">
+                {recentSearches.map((recent) => (
+                  <li key={recent} role="option" class="search-recent-item">
+                    <a onMouseDown={(e) => e.preventDefault()} onClick={() => setQuery(recent)}>
+                      <SearchIcon size={14} />
+                      <span class="result-title">{recent}</span>
+                    </a>
+                    <button
+                      class="search-recent-remove"
+                      aria-label={`Remove ${recent}`}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => setRecentSearches(removeRecentSearch(recent))}
+                    >
+                      ×
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {dropdownOpen && query.trim() && (
             <div class="search-results-wrap" id="search-results" ref={resultsWrapRef}>
               {loading && (
                 <ul class="search-results">
