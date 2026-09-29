@@ -2,6 +2,12 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `4ca51da` · 2026-09-29 · fix: stream anyway when file priorities miss their ack timeout
+- `PHASES.md`
+- `vendor/enginefs/VENDORED.md`
+- `vendor/enginefs/src/backend/libtorrent/playback.rs`
+- `vendor/enginefs/src/engine.rs`
+
 ### `af7d8f3` · 2026-09-29 · fix: flush mpv and resume at the playhead on a source switch
 - `PHASES.md`
 - `src/PlayerView.tsx`
