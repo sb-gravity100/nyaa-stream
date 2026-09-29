@@ -12,7 +12,7 @@ import { displayTitle, isMovie } from "./types";
 import { getStreamStats, playMagnet, stopPlayback } from "./playback";
 import { saveFrameThumbnail } from "./torrentThumbnail";
 import { loadingProgress } from "./loadingProgress";
-import { bestRelease, getAnimeResolution, getPreferredGroup, releaseBadges, releaseGroup, releaseResolution, seederHealth, setAnimeResolution, setPreferredGroup, sortReleases } from "./releases";
+import { bestRelease, isBatchRelease, getAnimeResolution, getPreferredGroup, releaseBadges, releaseGroup, releaseResolution, seederHealth, setAnimeResolution, setPreferredGroup, sortReleases } from "./releases";
 import type { PreferredResolution } from "./settings";
 import { parseEpisode } from "./episodeParser";
 import { Buffering } from "./Buffering";
@@ -135,6 +135,24 @@ function baseName(path: string): string {
    return path.split(/[\\/]/).pop() ?? path;
 }
 
+/** The batch release each anime last played from, so the next episode
+ * continues in the same torrent instead of jumping to another source. */
+const lastBatchMagnet = new Map<number, string>();
+
+/** The video file of the episode after `current` in the same torrent
+ * (batches), if its name parses to that number. */
+function nextEpisodeFile(files: PlayFile[], current: PlayFile): PlayFile | null {
+   const videos = files.filter((f) => f.isVideo);
+   if (videos.length < 2) return null;
+   const label = parseEpisode(baseName(current.name));
+   if (label.kind !== "episode") return null;
+   const next = videos.filter((f) => {
+      const l = parseEpisode(baseName(f.name));
+      return l.kind === "episode" && l.number === label.number + 1;
+   });
+   return next.length > 0 ? next.reduce((a, b) => (b.length > a.length ? b : a)) : null;
+}
+
 /** The file inside the torrent to play: the one whose name parses to the
  * requested episode (batches), else the backend's default (largest video).
  * `matched` is true when a batch's file was identified as that episode. */
@@ -219,9 +237,16 @@ function MpvPlayerView({
       preferredFansubber: settings.preferredFansubber,
       preferredResolution: animeResolution ?? settings.preferredResolution,
    };
-   const [selectedRelease, setSelectedRelease] = useState<NyaaResult>(() =>
-      bestRelease(releases, releasePrefs),
+   const [selectedRelease, setSelectedRelease] = useState<NyaaResult>(
+      () =>
+         // Keep playing from the same batch across episodes: its next
+         // episode is already being preloaded (see the preload effect).
+         releases.find((r) => r.magnet === lastBatchMagnet.get(anime.id)) ?? bestRelease(releases, releasePrefs),
    );
+   useEffect(() => {
+      if (isBatchRelease(selectedRelease)) lastBatchMagnet.set(anime.id, selectedRelease.magnet);
+      else lastBatchMagnet.delete(anime.id);
+   }, [selectedRelease.magnet]);
    const [torrentId, setTorrentId] = useState<string | null>(null);
    const [files, setFiles] = useState<PlayFile[]>([]);
    const [selectedFile, setSelectedFile] = useState<PlayFile | null>(null);
@@ -371,6 +396,19 @@ function MpvPlayerView({
          cancelled = true;
       };
    }, [selectedRelease, anime.id, episodeKey, episode]);
+
+   // Batch source: once this episode is playing, fetch the next episode's
+   // file from the same torrent at the lowest priority (spare bandwidth
+   // only), so pressing next starts from data that is already there.
+   useEffect(() => {
+      if (!hasPlayed || !torrentId || !selectedFile || !fileMatched) return;
+      const next = nextEpisodeFile(files, selectedFile);
+      if (!next) return;
+      console.info("[player] preloading next episode file", { file: next.name });
+      invoke("preload_next_file", { torrentId, fileIdx: next.index }).catch((err) =>
+         console.debug("[player] preload unavailable", { err: String(err) }),
+      );
+   }, [hasPlayed, torrentId, selectedFile?.index, fileMatched]);
 
    // Per-file state resets (source switch or batch file switch).
    useEffect(() => {
