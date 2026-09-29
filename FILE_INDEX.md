@@ -21,6 +21,7 @@
 yaa-stream\logs
 yaa-stream.<date>.log`, last 7 kept - release builds have no console), app state wiring | backend, core |
 | `src-tauri/src/player.rs` | Embedded mpv commands: `mpv_available` (can libmpv load), `set_mpv_path`, `warm_mpv_once` / `warm_mpv` (pre-spawns the idle mpv 1.5s after the page first finishes loading, via `on_page_load`, when libmpv is found), `mpv_start` (start libmpv with `wid` unless pre-spawned, push mpv's window (class `mpv`) below the webview, zero-alpha webview background, bundled sub fonts), `mpv_command`, `mpv_stop` (`stop` + reset of per-file state: A-B loop, speed, delays, pause), `mpv_frame` (640px JPEG), `mpv_copy_frame` (clipboard), `mpv_save_frame` (PNG with subtitles into the screenshot folder) + `default_screenshot_folder`; forwards mpv events as `mpv-event` | backend, player, mpv |
+| `src-tauri/src/download_cache.rs` | Download cache: `downloads/.cache-index.json` (files, allocated bytes, `last_used`, episodes), LRU eviction to the cap after stop/at startup, Continue watching keep list, clear - see PLAN.md "Download cache" | backend, cache |
 | `src-tauri/src/cache.rs` | Cache sizes/clear commands (`get_cache_sizes`, `clear_cache`: nyaa, thumbnails, HLS, torrent data), `purge_hls_cache` (run at startup and exit), backup file I/O (`export_backup`/`import_backup`) | backend, cache, backup |
 | `src-tauri/src/media_keys.rs` | Global media-key shortcuts (`set_media_keys`, registered only while the player is open) forwarded as `media-key` events | backend, player |
 | `src-tauri/src/title_match.rs` | AniList show → nyaa.si matching: `normalize` (nyaa's punctuation-blind word compare), `build_candidates` (English/romaji/season-stripped/Latin-synonym queries, minus any whose words are a superset of another's, max 4), `matches_show` (whole-word name check that drops unrelated results); unit-tested | backend, search |
@@ -77,6 +78,7 @@ yaa-stream.<date>.log`, last 7 kept - release builds have no console), app state
 | `src/recentSearches.ts` | Recent search queries (`localStorage`) for the empty-focus search dropdown | frontend, search |
 | `src/backup.ts` | Exports/imports every `nyaa-stream:*` localStorage key through the backup commands | frontend, backup |
 | `src/library.ts` | Saved-anime persistence via `localStorage` (PLAN.md's real store choice is still open — this doesn't commit to sqlite/flat-file) | frontend |
+| `src/downloadCache.ts` | Sends the Continue watching episodes to `set_download_cache_keep` whenever the row changes | frontend, cache |
 | `src/watchProgress.ts` | Per-episode watch progress (`localStorage`): resume position, completed flag, Continue watching list, watched toggles | frontend |
 | `src/settings.ts` | Settings store (`localStorage`) + `useSettings` hook: playback prefs, subtitle defaults and default subtitle style; `hardwareDecoding` (mpv `hwdec` auto-safe / no) | frontend |
 | `src/SettingsPanel.tsx` | Settings drawer: playback, subtitles (with CSS preview of the default style), shortcut list | frontend |

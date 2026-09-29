@@ -350,12 +350,12 @@
             and PiP
       - [x] Window capability permissions
 - [ ] Download cache (v0.4.0, see PLAN.md "Download cache"): one commit each -
-      - [ ] `downloads/.cache-index.json`: files, bytes, last_used, episode
-      - [ ] LRU eviction to the cap after stop and at startup (never the
+      - [x] `downloads/.cache-index.json`: files, bytes, last_used, episode
+      - [x] LRU eviction to the cap after stop and at startup (never the
             playing torrent)
-      - [ ] Continue-watching episodes kept past the cap until they leave
+      - [x] Continue-watching episodes kept past the cap until they leave
             the row
-      - [ ] Settings "Download cache" size (default 10 GB, 0 = delete on
+      - [x] Settings "Download cache" size (default 10 GB, 0 = delete on
             stop) + usage; Clear cache empties downloads
       - [ ] Measure re-hash time on a mostly-downloaded 2 GB file; decide on
             fast resume (vendored libtorrent-sys)

@@ -1019,6 +1019,20 @@ available - seeking back or re-watching never downloads them again.
 - Commands: `download_cache_status` (size/entries, for Settings),
   `set_download_cache_limit`; eviction logged per torrent (name, bytes,
   reason).
+- **As built** (`src-tauri/src/download_cache.rs`, `src/downloadCache.ts`):
+  entries hold file paths relative to `downloads/` plus libtorrent's
+  `.<hash>.parts` file, and the `<animeId>:<episodeKey>` episodes played
+  from them (`play_magnet`'s new `episode` arg). Sizes are *allocated*
+  bytes (`GetCompressedFileSizeW`) - the files are sparse. Eviction runs 2s
+  after `stop_playback`'s removal (libtorrent releasing the files), at
+  startup (also sweeping unindexed leftovers, by mtime - only then, so a
+  just-added torrent is never mistaken for one), and on a limit or keep
+  change. The frontend sends the Continue watching row's episodes via
+  `set_download_cache_keep` whenever progress/dismissals change; an entry
+  leaving the row gets `last_used = 0`. Kept entries survive even a 0 cap.
+  Clear cache deletes everything but the playing torrent (kept ones too).
+  Thumbnail captures' scratch files are deleted unless that release is
+  cached.
 
 ## Continue-watching resume buffer (planned, v0.4.0 - minor: new feature)
 
