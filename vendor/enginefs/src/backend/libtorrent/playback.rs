@@ -376,6 +376,16 @@ impl TorrentPlaybackState {
         }
     }
 
+    /// (nyaa-stream) Fix C: whether the selected file downloads in order -
+    /// first watch (from piece 0). libtorrent ranks piece priority above
+    /// sequential order, so the priority-7 windows and pinned container
+    /// metadata still jump the queue.
+    fn sequential_wanted(&self) -> bool {
+        self.watch.is_some_and(|watch| {
+            self.selected_file == Some(watch.file_idx) && watch.hint == WatchHint::First
+        })
+    }
+
     /// Hands a pending `WatchHint` to `file_idx` when a foreground stream
     /// starts it fresh - a different file than the watched one, or the same
     /// file with no foreground stream left (reopened). A still-streaming
@@ -946,6 +956,20 @@ impl LibtorrentPlaybackCoordinator {
         let entry = self.entry(&info_hash).await;
         let selection = {
             let mut state = entry.state.lock().await;
+            // (nyaa-stream) The raw-stream / HLS lease is the file the player
+            // is opening, so it takes a pending watch hint too - before its
+            // activation decides on the startup hold and sequential mode.
+            let fresh =
+                state.active_foreground_permits() == 0 || state.selected_file != Some(file_idx);
+            if let Some(watch) = state.take_pending_watch(file_idx, fresh) {
+                tracing::info!(
+                    info_hash = %info_hash,
+                    file_idx = watch.file_idx,
+                    hint = ?watch.hint,
+                    source,
+                    "watch hint applied to file"
+                );
+            }
             state.select(
                 file_idx,
                 native_priority,
@@ -1167,9 +1191,27 @@ impl LibtorrentPlaybackCoordinator {
 
         // (nyaa-stream) Fix A: hold the rest of the file at 0 while the
         // startup window downloads - see `StartupHold`.
-        if selection.changed && disk_backed_file_baseline_priority(start.intent) == 0 {
+        // Skipped while sequential mode is on (fix C): in-order download
+        // from the read position already keeps the head first.
+        let (sequential, held) = {
+            let state = entry.state.lock().await;
+            (state.sequential_wanted(), state.startup_hold.is_some())
+        };
+        if selection.changed
+            && !sequential
+            && disk_backed_file_baseline_priority(start.intent) == 0
+        {
             self.begin_startup_hold(info_hash, entry, layout, start, selection)
                 .await?;
+        } else if sequential && held {
+            self.raise_startup_baseline_locked(
+                info_hash,
+                entry,
+                selection.generation,
+                false,
+                "sequential-mode",
+            )
+            .await?;
         }
 
         let first_piece = self
@@ -1357,6 +1399,20 @@ impl LibtorrentPlaybackCoordinator {
         reason: &'static str,
     ) -> Result<bool> {
         let _operation = entry.operation.lock().await;
+        self.raise_startup_baseline_locked(info_hash, entry, generation, require_buffer, reason)
+            .await
+    }
+
+    /// `raise_startup_baseline` for a caller already holding the entry's
+    /// operation lock.
+    async fn raise_startup_baseline_locked(
+        &self,
+        info_hash: &str,
+        entry: &TorrentPlaybackEntry,
+        generation: u64,
+        require_buffer: bool,
+        reason: &'static str,
+    ) -> Result<bool> {
         let session = self.session.read().await;
         let mut handle = session
             .find_torrent(info_hash)
@@ -1591,11 +1647,14 @@ impl LibtorrentPlaybackCoordinator {
         let start_offset = start.start_offset.min(file.size.max(0) as u64);
         let first_piece = ((file_offset + start_offset) / layout.piece_length) as i32;
 
+        // (nyaa-stream) Upstream forced sequential mode off here; fix C turns
+        // it on for the watched file (`sequential_wanted`).
+        let sequential = entry.state.lock().await.sequential_wanted();
         let session = self.session.read().await;
         let mut handle = session
             .find_torrent(info_hash)
             .map_err(|error| anyhow!("Torrent not found: {error}"))?;
-        handle.set_sequential_download(false);
+        handle.set_sequential_download(sequential);
         let status = handle.status();
         let native_memory = if matches!(self.storage_mode, LibtorrentStorageMode::MemoryOnly) {
             libtorrent_sys::memory_storage_stats().total_bytes
@@ -1660,6 +1719,7 @@ impl LibtorrentPlaybackCoordinator {
             piece = first_piece,
             intent = ?start.intent,
             source = start.source,
+            sequential,
             "libtorrent hot playback window applied"
         );
         Ok(first_piece)
@@ -2435,6 +2495,18 @@ mod tests {
         state.pending_watch = Some(WatchHint::First);
         assert!(state.take_pending_watch(4, true).is_some());
         assert_eq!(state.watch.map(|watch| watch.hint), Some(WatchHint::First));
+    }
+
+    #[test]
+    fn first_watch_downloads_the_selected_file_in_order() {
+        let mut state = TorrentPlaybackState::new();
+        state.pending_watch = Some(WatchHint::First);
+        state.take_pending_watch(2, true);
+        assert!(!state.sequential_wanted(), "nothing selected yet");
+        state.select(2, 1, true, false, true, true);
+        assert!(state.sequential_wanted());
+        state.select(3, 1, true, false, true, true);
+        assert!(!state.sequential_wanted(), "another file has no watch mode");
     }
 
     #[test]
