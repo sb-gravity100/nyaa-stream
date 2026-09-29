@@ -605,6 +605,12 @@ first seconds before C's mode is known):**
     sequential mode is on - so in-order download starts at the resume point,
     not piece 0. The skipped earlier pieces go back to 1 once the rest of the
     file has verified, or immediately when the player seeks back into them.
+  - *Hint delivery (decided while implementing):* the frontend picks the
+    file (a batch's episode) only after `play_magnet` returns, so the hint
+    is stored per torrent (`TorrentEngine::set_watch_hint`) and taken by
+    the next foreground stream of a file that isn't already streaming - a
+    different file, or the same file reopened with no stream left. The
+    previous episode still streaming never takes the next one's hint.
   - Both: libtorrent ranks piece priority above sequential order, so the
     priority-7 read window and pinned container metadata (MKV Cues / MP4
     moov) still jump the queue. Sequential mode never applies to
