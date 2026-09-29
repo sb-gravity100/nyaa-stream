@@ -1,3 +1,8 @@
+### `e022727` · 2026-09-29 · docs: plan navigation/home rehaul and Discover for v0.9.x
+- `PLAN.md`
+- `PHASES.md`
+- `CLAUDE.md`
+
 ### `bfe02c5` · 2026-09-29 · docs: plan 32-bit Windows support for v1.0.0
 - `PLAN.md`
 - `PHASES.md`
