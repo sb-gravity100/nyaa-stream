@@ -55,18 +55,19 @@ See [PLAN.md](PLAN.md) for architecture and [FILE_INDEX.md](FILE_INDEX.md) for a
 ### Prerequisites
 
 - [Rust](https://rustup.rs/) and Node.js
-- CMake and MSVC (Visual Studio 2022 Build Tools)
-- [vcpkg](https://github.com/microsoft/vcpkg) with `VCPKG_ROOT` set
+- MSVC (Visual Studio 2022 Build Tools)
 - LLVM (libclang)
 - A GPL build of `libmpv-2.dll` in `src-tauri/lib/` (see its README). Without it, the app uses the HLS fallback player.
 
-The first build compiles libtorrent, OpenSSL and FFmpeg through vcpkg (about 15 minutes, cached afterwards).
-More detail is in PLAN.md's "Build prerequisites".
+No vcpkg needed: `npm run setup` downloads prebuilt static libtorrent, OpenSSL and FFmpeg (about 1.3 GB,
+checksum-verified) into `vcpkg_installed/`. Only rebuilding that archive from `vcpkg.json` needs vcpkg and CMake
+(see PLAN.md's "Build prerequisites").
 
 ### Run
 
 ```bash
 npm install
+npm run setup      # once: downloads the prebuilt native libs
 npm run tauri dev
 ```
 
