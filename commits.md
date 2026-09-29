@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `e1f28d0` · 2026-09-29 · docs: plan seek-bar downloaded and buffer indicators for v0.3.2
+- `PLAN.md`
+- `PHASES.md`
+
 ### `133bc36` · 2026-09-29 · docs: index .vscode/settings.json in FILE_INDEX.md
 - `FILE_INDEX.md`
 
