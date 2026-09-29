@@ -89,3 +89,14 @@ Copied from https://github.com/stremio-native/stream-server at rev
   piece presence `stats()` already reads). The player's seek bar draws them
   as a "downloaded" layer; mpv's own demuxer cache forgets ranges after a
   seek, so it can't show what's on disk. Other backends leave it empty.
+- `src/backend/libtorrent/disk_stream.rs`, `playback.rs`, `src/backend/priorities.rs`
+  (buffering round 2, from a live resume that took 46s to the first frame):
+  foreground reads in the file tail are `ContainerMetadata` (our stream
+  server opens at 0 and seeks, so upstream's request-offset check never
+  fired) with the whole window at 7; the last 4 MB is requested at 7 with
+  the header (`TAIL_PREFETCH_STREAM_ID`); after the first byte the read-ahead
+  covers 30s of playback (cap 64 MB) with priorities graded 7→2 by distance,
+  like Elementum; streams report where playback reads ended so a resume
+  anchors only past that frontier (`is_resume_point`), and a resume keeps
+  the startup hold until it anchors (`RESUME_ANCHOR_FALLBACK_EXTRA_MS`);
+  `SEEK_REANCHOR_DEBOUNCE_MS` is 100ms.
