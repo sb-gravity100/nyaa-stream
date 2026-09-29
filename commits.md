@@ -1,3 +1,7 @@
+### `da8c1c6` · 2026-09-29 · docs: plan subtitle preloading for v0.4.0
+- `PLAN.md`
+- `PHASES.md`
+
 ### `1849140` · 2026-09-29 · docs: move contact and send logs to v0.4.0, publish v0.4.0 and v0.8.0
 - `PLAN.md`
 - `PHASES.md`
