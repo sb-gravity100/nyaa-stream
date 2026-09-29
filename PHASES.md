@@ -334,6 +334,8 @@
             `updatedFrom` marker set before install, `WhatsNew.tsx`)
       - [ ] Splash screen: animated logo inline in index.html, faded out
             after the first render
+      - [ ] Logo polish: new mark in BrandMark, splash, favicon, icon.svg;
+            app icons regenerated
       - [ ] Verify live: time from click to first frame, logged before/after
       - [x] PLAN.md/FILE_INDEX.md sync, `npm run bump -- patch`, tag
             `v0.3.2`, `npm run release -- --notes "..." --dry-run`, then

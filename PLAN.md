@@ -938,6 +938,17 @@ that gap, and the first moments of a release launch.
 - `main.tsx` fades it out (0.45s) two frames after the first render, then
   removes it.
 
+**Logo polish** (user request 2026-09-29, same idea - a sakura cat head
+with a play button - better drawn): friendlier rounded ear tips with a
+darker inner ear, softer head corners and chubbier cheeks, the play
+triangle rounded and optically centered in the face (a triangle's visual
+center sits right of its box center), a soft top highlight. Used
+everywhere: `BrandMark` (`src/icons.tsx`), the splash (`index.html`, ears
+split out to twitch), `public/favicon.svg`, `src-tauri/icons/icon.svg`, and
+the app/taskbar/installer icons regenerated from it
+(`npm run tauri icon src-tauri/icons/icon.svg`). Checked side by side with
+the old mark at 16, 32 and 128 px before switching.
+
 **Later (not in v0.3.2):** prefetch the head (~8 MB, then dropped if unused)
 of the most likely source when an episode page opens - depends on A/B.
 
