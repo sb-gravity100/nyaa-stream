@@ -1,3 +1,7 @@
+### `d340a55` · 2026-09-30 · docs: mark splash/title bar tasks done, index new files
+- `PHASES.md`
+- `FILE_INDEX.md`
+
 ### `5f52a7a` · 2026-09-30 · feat: frameless window with custom title bar
 - `src/TitleBar.tsx`
 - `src/main.tsx`
