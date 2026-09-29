@@ -2,6 +2,11 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `711714f` · 2026-09-29 · feat: release badges, seeder health, per-show quality and no-seeder warning
+- `src/App.css`
+- `src/PlayerView.tsx`
+- `src/releases.ts`
+
 ### `2c438a7` · 2026-09-29 · feat: media keys and taskbar progress in the player
 - `src-tauri/Cargo.toml`
 - `src-tauri/capabilities/default.json`
