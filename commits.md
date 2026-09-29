@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `911aef4` · 2026-09-29 · docs: note nyaa screenshot groups for episode thumbnails
+- `PLAN.md`
+- `PHASES.md`
+
 ### `7bbe309` · 2026-09-29 · docs: plan nyaa view-page screenshots as thumbnails
 - `PLAN.md`
 - `PHASES.md`
