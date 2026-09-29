@@ -228,6 +228,14 @@ impl TorrentHandleTrait for LibtorrentTorrentHandle {
         self.playback.set_preload_file(&self.info_hash, file_idx).await
     }
 
+    async fn set_watch_hint(
+        &self,
+        hint: Option<crate::backend::priorities::WatchHint>,
+    ) -> Result<()> {
+        self.playback.set_watch_hint(&self.info_hash, hint).await;
+        Ok(())
+    }
+
     async fn reconcile_file_priorities(&self, _plan: TorrentFilePriorityPlan) -> Result<()> {
         // The libtorrent coordinator is the sole owner of acknowledged bulk
         // file priorities and hot-piece ordering. Shared lifecycle calls are

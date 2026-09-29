@@ -58,6 +58,12 @@ pub trait TorrentHandle: Send + Sync + Clone {
     async fn set_preload_file(&self, _file_idx: Option<usize>) -> Result<()> {
         Ok(())
     }
+    /// (nyaa-stream) How the next file the player opens starts (see
+    /// `priorities::WatchHint`); applies to the next foreground stream of a
+    /// file that isn't already streaming. Backends that can't use it ignore it.
+    async fn set_watch_hint(&self, _hint: Option<priorities::WatchHint>) -> Result<()> {
+        Ok(())
+    }
     /// Whether this handle owns file selection, resume, and idle-pause
     /// lifecycle internally.
     fn manages_playback_lifecycle(&self) -> bool {

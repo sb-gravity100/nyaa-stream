@@ -801,8 +801,19 @@ struct PlaySession {
 /// stream URL (what the embedded mpv opens - see `player.rs`) plus its HLS
 /// playlist URL (the fallback player's, used when mpv isn't installed).
 #[tauri::command]
-async fn play_magnet(state: State<'_, Arc<AppState>>, magnet: String, title: String) -> Result<PlaySession, String> {
-    tracing::debug!(%title, "play_magnet invoked");
+async fn play_magnet(state: State<'_, Arc<AppState>>, magnet: String, title: String, watch: Option<String>) -> Result<PlaySession, String> {
+    tracing::debug!(%title, ?watch, "play_magnet invoked");
+    // How the file starts (see torrent_engine::WatchHint): "first" (no
+    // saved progress) or "resume" (a start time follows).
+    let watch_hint = match watch.as_deref() {
+        Some("first") => Some(torrent_engine::WatchHint::First),
+        Some("resume") => Some(torrent_engine::WatchHint::Resume),
+        None => None,
+        Some(other) => {
+            tracing::warn!(%title, watch = other, "play_magnet: unknown watch hint ignored");
+            None
+        }
+    };
 
     // Cancels a deferred removal from the previous player view (see
     // `stop_playback`).
@@ -842,6 +853,9 @@ async fn play_magnet(state: State<'_, Arc<AppState>>, magnet: String, title: Str
         err.to_string()
     })?;
     let default_file_idx = largest_video_file(&files).unwrap_or(0);
+    if let Err(err) = state.torrent_engine.set_watch_hint(&added.id, watch_hint).await {
+        tracing::warn!(%title, torrent_id = %added.id, %err, "play_magnet failed to set the watch hint");
+    }
     let files: Vec<PlayFile> = files
         .into_iter()
         .map(|file| PlayFile {

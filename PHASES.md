@@ -283,7 +283,7 @@
             startup buffer verifies (or 15s fallback)
       - [x] enginefs: ~4 MB startup window at priority 7 + staggered
             deadlines; ~4 MB read-ahead at 7 after the first byte
-      - [ ] `play_magnet` `watch: first|resume` hint → engine, per file
+      - [x] `play_magnet` `watch: first|resume` hint → engine, per file
       - [ ] enginefs: first watch - sequential download from piece 0
       - [ ] enginefs: continue watch - pieces before the resume point at 0,
             sequential from it, earlier pieces back to 1 when the rest is
