@@ -29,6 +29,9 @@ struct AppState {
     /// The player process itself (embedded mpv) is tracked separately, in
     /// `player::PlayerState`.
     current_torrent: Mutex<Option<TorrentId>>,
+    /// Bumped by every `stop_playback`/`play_magnet`: a deferred removal only
+    /// goes ahead if nothing bumped it since (see `stop_playback`).
+    stop_generation: std::sync::atomic::AtomicU64,
     thumbnail_cache_dir: PathBuf,
     /// Set after AniList turns us away - see `metadata_fallback`.
     anilist_cooldown: metadata_fallback::AniListCooldown,
@@ -801,19 +804,36 @@ struct PlaySession {
 async fn play_magnet(state: State<'_, Arc<AppState>>, magnet: String, title: String) -> Result<PlaySession, String> {
     tracing::debug!(%title, "play_magnet invoked");
 
-    // Defensive: the frontend calls stop_playback before navigating away or
-    // starting a new stream, but a leftover session (e.g. a client that
-    // skipped that call) shouldn't be allowed to leak alongside a new one.
-    cleanup_playback(&state).await;
+    // Cancels a deferred removal from the previous player view (see
+    // `stop_playback`).
+    state.stop_generation.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
 
-    let added = match state.torrent_engine.add(&magnet).await {
-        Ok(added) => added,
-        Err(err) => {
-            tracing::error!(%title, %err, "play_magnet failed to add torrent");
-            return Err(err.to_string());
+    // The next episode of the same torrent (a batch) reuses the session, with
+    // whatever the low-priority preload already downloaded. Anything else
+    // replaces it: the frontend calls stop_playback before navigating away or
+    // starting a new stream, but a leftover session (e.g. a client that
+    // skipped that call) shouldn't leak alongside a new one.
+    let wanted = magnet_info_hash(&magnet);
+    let current = state.current_torrent.lock().await.clone();
+    let added_id = match (wanted, current) {
+        (Some(wanted), Some(current)) if current.eq_ignore_ascii_case(&wanted) => {
+            tracing::info!(%title, torrent_id = %current, "play_magnet reusing the current torrent");
+            current
+        }
+        _ => {
+            cleanup_playback(&state).await;
+            let added = match state.torrent_engine.add(&magnet).await {
+                Ok(added) => added,
+                Err(err) => {
+                    tracing::error!(%title, %err, "play_magnet failed to add torrent");
+                    return Err(err.to_string());
+                }
+            };
+            *state.current_torrent.lock().await = Some(added.id.clone());
+            added.id
         }
     };
-    *state.current_torrent.lock().await = Some(added.id.clone());
+    let added = torrent_engine::AddedTorrent { id: added_id };
     // The HLS URL is only for the fallback player: raw container bytes
     // aren't reliably playable in a browser <video> element (see
     // torrent-engine's hls_playlist_handler), while mpv reads them fine.
@@ -981,12 +1001,47 @@ pub(crate) async fn set_clipboard_image(width: usize, height: usize, pixels: Vec
 
 /// Removes the active torrent (stop seeding, drop partial files) - called
 /// when the user closes the player or navigates away from the media page.
+///
+/// The removal is deferred a few seconds: an episode change unmounts the old
+/// player view (this call) just before the new one asks for its torrent, and
+/// a batch's next episode is the same torrent - `play_magnet` cancels the
+/// removal and keeps it, preloaded data included.
 #[tauri::command]
 async fn stop_playback(state: State<'_, Arc<AppState>>) -> Result<(), String> {
+    /// Long enough for the next episode's `play_magnet` to arrive.
+    const KEEP_FOR_NEXT_EPISODE: Duration = Duration::from_secs(4);
     tracing::debug!("stop_playback invoked");
-    cleanup_playback(&state).await;
-    tracing::info!("stop_playback completed");
+    let generation = state.stop_generation.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
+    let app = state.inner().clone();
+    tokio::spawn(async move {
+        tokio::time::sleep(KEEP_FOR_NEXT_EPISODE).await;
+        if app.stop_generation.load(std::sync::atomic::Ordering::SeqCst) == generation {
+            cleanup_playback(&app).await;
+            tracing::info!("stop_playback completed");
+        } else {
+            tracing::debug!("stop_playback removal cancelled, the torrent is in use again");
+        }
+    });
     Ok(())
+}
+
+/// Registers `file_idx` (the next episode's file in the playing batch) to be
+/// fetched at the lowest priority next to the playing file; `None` stops.
+/// Best effort - failures only mean no preload.
+#[tauri::command]
+async fn preload_next_file(state: State<'_, Arc<AppState>>, torrent_id: TorrentId, file_idx: Option<usize>) -> Result<(), String> {
+    state.torrent_engine.preload_file(&torrent_id, file_idx).await.map_err(|err| {
+        tracing::debug!(%err, "preload_next_file failed");
+        err.to_string()
+    })
+}
+
+/// The 40-hex info hash of a magnet link (`xt=urn:btih:...`), lowercased;
+/// `None` for anything else (base32 hashes, .torrent URLs).
+fn magnet_info_hash(magnet: &str) -> Option<String> {
+    let rest = magnet.split("btih:").nth(1)?;
+    let hash: String = rest.chars().take_while(char::is_ascii_alphanumeric).collect();
+    (hash.len() == 40 && hash.chars().all(|c| c.is_ascii_hexdigit())).then(|| hash.to_lowercase())
 }
 
 /// Where clips go unless the export dialog picked a folder.
@@ -1125,6 +1180,7 @@ pub fn run() {
             ),
             torrent_engine,
             current_torrent: Mutex::new(None),
+            stop_generation: Default::default(),
             thumbnail_cache_dir,
             anilist_cooldown: Default::default(),
             thumbnail_captures: tokio::sync::Semaphore::new(1),
@@ -1153,6 +1209,7 @@ pub fn run() {
             save_frame_thumbnail,
             search_torrents,
             search_torrents_for_anime,
+            preload_next_file,
             default_clip_folder,
             player::mpv_save_frame,
             player::default_screenshot_folder,
@@ -1187,4 +1244,17 @@ pub fn run() {
                 cache::purge_hls_cache();
             }
         });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::magnet_info_hash;
+
+    #[test]
+    fn magnet_info_hash_reads_hex_hashes_only() {
+        let hex = "0123456789ABCDEF0123456789abcdef01234567";
+        assert_eq!(magnet_info_hash(&format!("magnet:?xt=urn:btih:{hex}&dn=x&tr=y")).as_deref(), Some(hex.to_lowercase().as_str()));
+        assert_eq!(magnet_info_hash("magnet:?xt=urn:btih:MFRGGZDFMZTWQ2LKNNWG23TPOBYXE43U&dn=x"), None);
+        assert_eq!(magnet_info_hash("https://nyaa.si/download/1.torrent"), None);
+    }
 }

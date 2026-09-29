@@ -1199,6 +1199,15 @@ impl TorrentEngine {
         self.efs.get_backend().remove_torrent(&id).await
     }
 
+    /// Fetches `file_idx` (e.g. the next episode of a batch) at the lowest
+    /// priority alongside the file being played; `None` stops. Only spare
+    /// bandwidth goes to it - the playing file keeps its own priorities.
+    pub async fn preload_file(&self, id: &TorrentId, file_idx: Option<usize>) -> anyhow::Result<()> {
+        let engine = self.efs.get_engine(id).await.ok_or_else(|| anyhow::anyhow!("unknown torrent {id}"))?;
+        tracing::debug!(torrent_id = %id, ?file_idx, "preload file requested");
+        engine.handle.set_preload_file(file_idx).await
+    }
+
     /// Waits (up to `METADATA_TIMEOUT`) for `id`'s metadata and returns its
     /// file list. A magnet link carries no file list, so nothing about
     /// which file to stream can be decided before this resolves.
