@@ -857,6 +857,26 @@ yet:
    Auto): applied as mpv's `hwdec` property (`auto-safe` / `no`) on attach and
    when changed, so the corruption can be tested with software decoding.
 
+**Corrupt bytes on fresh pieces** (Slime S4E24, 2026-09-29 13:12-13:13; seen
+thanks to the mpv log capture): mpv's MKV demuxer logged `Corrupt file
+detected. Trying to resync` 7 times at 1.46-1.55 GB, all within 1-4s after a
+seek and all inside pieces verified in the previous 1-2s (2 MiB pieces
+697-698, etc.). No zero reads were logged, so the zero guard never fired -
+the reader handed out stale non-zero bytes. libtorrent hashes a piece from
+its own buffers and may queue its disk writes (`max_queued_disk_bytes` 128
+MB - up to ~12s at 10 MB/s), so the reader's separate OS file handle can
+see a verified piece's *old* disk content: zeros (caught) or data from an
+earlier failed/overwritten write (not caught). Software decoding hid the
+damage better (recovers at the next keyframe); the hardware decoder stayed
+corrupted until a seek.
+
+- **Fix:** pieces verified within the last 30s are served only from
+  libtorrent's own copy (`read_piece`, which includes unflushed writes) -
+  never the OS file handle. `PieceWaiterRegistry` records when each piece
+  finished (`finished_within`). Older pieces keep plain disk reads. If
+  libtorrent's copy fails (timeout/error), the disk path is used as before
+  (the zero guard still applies).
+
 **Later (not in v0.3.2):** prefetch the head (~8 MB, then dropped if unused)
 of the most likely source when an episode page opens - depends on A/B.
 
