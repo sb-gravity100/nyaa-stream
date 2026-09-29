@@ -2,6 +2,7 @@ mod cache;
 mod media_keys;
 mod metadata_fallback;
 mod player;
+mod title_match;
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -543,92 +544,58 @@ async fn search_torrents(state: State<'_, Arc<AppState>>, query: String) -> Resu
     }
 }
 
-/// Searches nyaa.si for an AniList anime using both its English and romaji
-/// titles and merges the results (deduplicated by view URL, since a release
-/// whose own title happens to contain both would otherwise show up twice).
+/// Searches nyaa.si for an AniList anime and merges the results
+/// (deduplicated by view URL).
 ///
-/// This used to search English first and only fall back to romaji if
-/// English returned fewer than a handful of results - but nyaa.si's own
-/// per-word AND-matching tokenizer means a real show's English-title search
-/// almost always clears that threshold on its own, so the romaji fallback
-/// essentially never fired in practice. Verified live against "That Time I
-/// Got Reincarnated as a Slime": many fansub groups (SubsPlease, Erai-raws,
-/// Ironclad, ASW, and others) title their releases in romaji only, with no
-/// English cross-reference text at all - 489 of that show's 950 real
-/// releases were being silently dropped by English-only search, entirely
-/// missed regardless of how many result pages got fetched. Searching both
-/// unconditionally (not as a fallback) is the only way to actually get all
-/// of a show's sources.
-/// Strips a trailing "Season N"/"Nth Season"/"Part N"/"Final Season"
-/// qualifier off an AniList title, e.g. "That Time I Got Reincarnated as a
-/// Slime Season 4" -> Some("That Time I Got Reincarnated as a Slime"). Used
-/// to build an extra, unqualified search candidate alongside the full
-/// title - see search_torrents_for_anime's doc comment: nyaa.si's search is
-/// per-word AND-matching, so a query carrying literal "Season 4" only
-/// matches releases whose *title text* also contains "Season" and "4" as
-/// separate words. Verified live: ToonsHub numbers this exact show
-/// "S04E21" (no "Season" token at all), so the full-title query returns
-/// zero of its ~100 real Season 4 releases even though a plain "Slime"
-/// search finds every one of them on the first page. Returns None when no
-/// such suffix is found, so the caller can skip adding a redundant
-/// duplicate candidate.
-fn strip_season_suffix(title: &str) -> Option<String> {
-    let words: Vec<&str> = title.split_whitespace().collect();
-    for (i, word) in words.iter().enumerate() {
-        let lower = word.trim_end_matches(|c: char| !c.is_alphanumeric()).to_lowercase();
-        if lower == "season" || lower == "cour" {
-            // A leading ordinal/number ("4th Season", "2nd Season") or
-            // "Final" (e.g. "Final Season") belongs to the suffix too, not
-            // the show's own name - cut before it.
-            let prev_is_qualifier = i > 0
-                && (words[i - 1].chars().next().is_some_and(|c| c.is_ascii_digit())
-                    || words[i - 1].eq_ignore_ascii_case("final"));
-            let cut = if prev_is_qualifier { i - 1 } else { i };
-            if cut == 0 {
-                return None; // "Season" is the whole title - nothing to strip.
-            }
-            return Some(words[..cut].join(" "));
-        }
-        if lower == "part" && i > 0 {
-            return Some(words[..i].join(" "));
-        }
-    }
-    None
-}
-
+/// It queries by both the English and romaji titles (plus season-stripped
+/// forms and Latin synonyms) unconditionally, not as a fallback: verified
+/// live against "That Time I Got Reincarnated as a Slime", many fansub
+/// groups (SubsPlease, Erai-raws, Ironclad, ASW, and others) title their
+/// releases in romaji only - 489 of that show's 950 real releases were being
+/// silently dropped by English-only search. `title_match` decides which
+/// queries are worth sending (nyaa.si AND-matches words, so a superset query
+/// only costs requests) and afterwards drops results that don't carry any of
+/// the show's names. The remaining queries run concurrently, but every
+/// request goes through nyaa-client's throttle, which paces them and backs
+/// off when nyaa.si rate limits.
 #[tauri::command]
 async fn search_torrents_for_anime(
     state: State<'_, Arc<AppState>>,
     title: AnimeTitle,
+    synonyms: Option<Vec<String>>,
 ) -> Result<Vec<NyaaResult>, String> {
-    let mut candidates: Vec<String> = Vec::new();
-    if let Some(english) = &title.english {
-        candidates.push(english.clone());
-    }
-    if let Some(romaji) = &title.romaji {
-        if Some(romaji) != title.english.as_ref() {
-            candidates.push(romaji.clone());
-        }
-    }
-    for base in [title.english.as_deref(), title.romaji.as_deref()].into_iter().flatten() {
-        if let Some(stripped) = strip_season_suffix(base) {
-            if !candidates.iter().any(|c| c.eq_ignore_ascii_case(&stripped)) {
-                candidates.push(stripped);
-            }
-        }
-    }
+    let synonyms = synonyms.unwrap_or_default();
+    let candidates = title_match::build_candidates(title.english.as_deref(), title.romaji.as_deref(), &synonyms);
     if candidates.is_empty() {
         tracing::warn!("search_torrents_for_anime called with no usable title");
         return Ok(Vec::new());
     }
-
     tracing::debug!(?candidates, "search_torrents_for_anime invoked");
+
+    let mut searches = tokio::task::JoinSet::new();
+    for (order, candidate) in candidates.into_iter().enumerate() {
+        let app = state.inner().clone();
+        searches.spawn(async move {
+            let outcome = app.nyaa.search(&candidate, Category::AnimeEnglishTranslated).await;
+            (order, candidate, outcome)
+        });
+    }
+    let mut outcomes = Vec::new();
+    while let Some(joined) = searches.join_next().await {
+        match joined {
+            Ok(outcome) => outcomes.push(outcome),
+            Err(err) => tracing::error!(%err, "candidate search task panicked"),
+        }
+    }
+    // Merge in candidate order so the result order doesn't depend on which
+    // query happened to finish first.
+    outcomes.sort_by_key(|(order, _, _)| *order);
 
     let mut seen_view_urls = std::collections::HashSet::new();
     let mut merged = Vec::new();
     let mut last_err = None;
-    for candidate in &candidates {
-        match state.nyaa.search(candidate, Category::AnimeEnglishTranslated).await {
+    for (_, candidate, outcome) in outcomes {
+        match outcome {
             Ok(results) => {
                 tracing::info!(query = candidate, count = results.len(), "candidate search completed");
                 for result in results {
@@ -648,6 +615,11 @@ async fn search_torrents_for_anime(
             return Err(err.to_string());
         }
     }
+
+    let names = title_match::match_names(title.english.as_deref(), title.romaji.as_deref(), &synonyms);
+    let before = merged.len();
+    merged.retain(|result| title_match::matches_show(&result.title, &names));
+    tracing::info!(kept = merged.len(), dropped = before - merged.len(), "dropped releases that don't name the show");
     Ok(merged)
 }
 
