@@ -614,6 +614,31 @@ first seconds before C's mode is known):**
 - `mpv_stop` resets per-file state after `stop` - `ab-loop-a/b`, `speed`,
   `sub-delay`, `audio-delay`, `pause` - so nothing leaks into the next file.
 
+**Stale "can't be played" error on source switch** (log 2026-09-29
+09:01:06-09:01:31, Fate/strange Fake 02, sources switched Kaleido → SubsPlease
+→ Erai-raws → SubsPlease): the error belongs to the source being left, not
+the one that then plays. Switching calls `play_magnet`, which removes the old
+torrent while mpv is still opening it; mpv's pending HTTP read gets
+`stream request for unknown torrent`, the open fails (`loading failed` /
+`unrecognized file format`) and its `end-file` arrives ~1s later - after the
+switch began - and `MpvVideo` treats any `end-file` error as the current
+file's (`src/mpvVideo.ts` `handleEvent`). Fix:
+
+- `libmpv.rs`: `EventEndFile` gains mpv's `playlist_entry_id` (the real
+  `mpv_event_end_file` layout: reason, error, playlist_entry_id, ...), and
+  `start-file` events carry theirs, both forwarded in `mpv-event`.
+- `MpvVideo.load` records the entry id of the `start-file` that follows its
+  `loadfile`; `end-file` for any other id is logged and ignored.
+- Switching sources sends mpv `stop` before `play_magnet` removes the old
+  torrent, so the old open is cancelled instead of failing.
+
+Also in that log: the Kaleido-subs source never started - `Libtorrent file
+priorities did not match after acknowledgement timeout` at load, then
+`stream request for unknown file index` 4s later, and mpv waited 10s with no
+error until the switch. Investigate the ack-timeout path in the vendored
+`apply_file_priorities`: a timeout should retry or fall through to streaming,
+not leave the file unknown; if it still fails, surface the error at once.
+
 **Later (not in v0.3.2):** prefetch the head (~8 MB, then dropped if unused)
 of the most likely source when an episode page opens - depends on A/B.
 

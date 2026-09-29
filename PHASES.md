@@ -294,6 +294,11 @@
       - [ ] `VENDORED.md` notes for the three enginefs changes
       - [ ] Spawn embedded mpv at app launch instead of first play
       - [ ] `mpv_stop` resets per-file mpv state (A-B loop, speed, delays)
+      - [ ] libmpv: forward `playlist_entry_id` on `start-file`/`end-file`
+      - [ ] `MpvVideo` ignores `end-file` errors from a previous entry
+      - [ ] Source switch stops mpv before `play_magnet` removes the torrent
+      - [ ] enginefs: file-priority ack timeout no longer leaves the file
+            unknown to the stream server (Kaleido-subs case)
       - [ ] Verify live: time from click to first frame, logged before/after
       - [ ] PLAN.md/FILE_INDEX.md sync, `npm run bump -- patch`, tag
             `v0.3.2`
