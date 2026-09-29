@@ -1135,14 +1135,52 @@ async fn export_clip(
     }
 }
 
+/// Where the rolling log files live: `<local data dir>/nyaa-stream/logs`.
+fn log_dir() -> std::path::PathBuf {
+    dirs::data_local_dir()
+        .unwrap_or_else(std::env::temp_dir)
+        .join("nyaa-stream")
+        .join("logs")
+}
+
+/// Keeps the file writer's flush thread alive for the whole run.
+static LOG_GUARD: std::sync::OnceLock<tracing_appender::non_blocking::WorkerGuard> =
+    std::sync::OnceLock::new();
+
+/// Logs to stdout (dev terminal) and to a daily-rotating file, since a release
+/// build has no console. Keeps the last 7 days.
+fn init_logging() {
+    use tracing_subscriber::prelude::*;
+
+    let filter = tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+        "nyaa_stream_lib=debug,anilist_client=debug,nyaa_client=debug,torrent_engine=debug,mpv_player=debug,frontend=debug,info"
+            .into()
+    });
+    let stdout = tracing_subscriber::fmt::layer();
+    let appender = tracing_appender::rolling::Builder::new()
+        .rotation(tracing_appender::rolling::Rotation::DAILY)
+        .filename_prefix("nyaa-stream")
+        .filename_suffix("log")
+        .max_log_files(7)
+        .build(log_dir());
+    match appender {
+        Ok(appender) => {
+            let (writer, guard) = tracing_appender::non_blocking(appender);
+            let _ = LOG_GUARD.set(guard);
+            let file = tracing_subscriber::fmt::layer().with_ansi(false).with_writer(writer);
+            tracing_subscriber::registry().with(filter).with(stdout).with(file).init();
+        }
+        Err(err) => {
+            tracing_subscriber::registry().with(filter).with(stdout).init();
+            tracing::warn!("file logging disabled: {err}");
+        }
+    }
+    tracing::info!(dir = %log_dir().display(), "logging initialised");
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-            "nyaa_stream_lib=debug,anilist_client=debug,nyaa_client=debug,torrent_engine=debug,mpv_player=debug,frontend=debug,info"
-                .into()
-        }))
-        .init();
+    init_logging();
 
     let app_state = tauri::async_runtime::block_on(async {
         tracing::info!("starting nyaa-stream");
