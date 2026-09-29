@@ -1059,6 +1059,11 @@ pub struct StreamStats {
     /// seek bar draws these; `ready_seconds` is the end of the stretch
     /// starting at 0, kept for callers that only want one number.
     pub ready_ranges: Vec<(f64, f64)>,
+    /// The file's verified bytes as merged `[start, end)` runs, relative to
+    /// the file start. The mpv player maps them onto its timeline for the
+    /// seek bar's "downloaded" layer (mpv's own buffer forgets ranges after
+    /// a seek). Empty when the engine can't tell.
+    pub downloaded_byte_ranges: Vec<(u64, u64)>,
     /// How the current run handles video: "direct" (stream copy) or e.g.
     /// "HEVC -> H.264 (h264_nvenc)". None before the first segment request.
     pub video_mode: Option<String>,
@@ -1319,6 +1324,7 @@ impl TorrentEngine {
         // The streamed file's own progress, not the whole torrent's - for
         // a batch those differ by an order of magnitude. Falls back to the
         // torrent total if the index is somehow out of range.
+        let downloaded_byte_ranges = stats.files.get(file_idx).map(|file| file.downloaded_ranges.clone()).unwrap_or_default();
         let (total_bytes, downloaded_bytes) = match stats.files.get(file_idx) {
             Some(file) => (file.length, file.downloaded),
             None => (stats.files.iter().map(|f| f.length).sum(), stats.files.iter().map(|f| f.downloaded).sum()),
@@ -1348,6 +1354,7 @@ impl TorrentEngine {
             total_bytes,
             ready_seconds: ready_ranges.first().filter(|(start, _)| *start == 0.0).map_or(0.0, |(_, end)| *end),
             ready_ranges,
+            downloaded_byte_ranges,
             video_mode: self.hls_jobs.video_mode(id, file_idx).await,
             torrent_name: stats.name.clone(),
             file_name: stats.files.get(file_idx).map(|f| f.name.clone()).unwrap_or_default(),
