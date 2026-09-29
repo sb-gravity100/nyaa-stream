@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `1530ecc` · 2026-09-29 · chore: trim dev-profile debug info
+- `Cargo.toml`
+
 ### `937fe35` · 2026-09-29 · docs: plan dev build speed changes
 - `PLAN.md`
 - `PHASES.md`
