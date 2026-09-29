@@ -5,6 +5,7 @@ import { getCurrentWindow, ProgressBarStatus } from "@tauri-apps/api/window";
 import { isFullscreen, setFullscreen, toggleFullscreen, useFullscreen } from "./fullscreen";
 import { MpvVideo, type Chapter } from "./mpvVideo";
 import { isTypingTarget } from "./keyboard";
+import { ExportDialog, type ExportRequest } from "./ExportDialog";
 import { HlsPlayerView } from "./HlsPlayerView";
 import type { AnimeMedia, NyaaResult, PlayFile, StreamStats, SubtitleTrack } from "./types";
 import { displayTitle, isMovie } from "./types";
@@ -291,6 +292,9 @@ function MpvPlayerView({
    const [loopA, setLoopA] = useState<number | null>(null);
    const [loopB, setLoopB] = useState<number | null>(null);
    const [exporting, setExporting] = useState(false);
+   const [exportOpen, setExportOpen] = useState(false);
+   const [exportSaved, setExportSaved] = useState<string | null>(null);
+   const [exportError, setExportError] = useState<string | null>(null);
    const [toast, setToast] = useState<string | null>(null);
    const [nextCountdown, setNextCountdown] = useState<number | null>(null);
    const idleTimerRef = useRef<number | undefined>(undefined);
@@ -931,28 +935,38 @@ function MpvPlayerView({
       }
    }
 
-   /** Cuts the looped section to an MP4 (normalized H.264/AAC, see
-    * `export_clip`). Needs the torrent to stay open until it finishes. */
-   async function exportLoop() {
+   /** Opens the export dialog for the looped section. */
+   function exportLoop() {
       if (loopA == null || loopB == null || !torrentId || !selectedFile || exporting) return;
-      const audioPos = audioTracks.findIndex((t) => t.index === activeAudioId);
+      setExportSaved(null);
+      setExportError(null);
+      setExportOpen(true);
+   }
+
+   /** Cuts the section to an MP4 (normalized H.264/AAC, see `export_clip`).
+    * Needs the torrent to stay open until it finishes. */
+   async function runExport(request: ExportRequest) {
+      if (!torrentId || !selectedFile || exporting) return;
       setExporting(true);
-      showToast("Exporting clip…");
-      console.info("[player] exporting clip", { start: loopA, end: loopB });
+      setExportSaved(null);
+      setExportError(null);
+      console.info("[player] exporting clip", { start: request.start, end: request.end, folder: request.folder || "(default)" });
       try {
          const out = await invoke<string>("export_clip", {
             torrentId,
             fileIdx: selectedFile.index,
-            startSeconds: loopA,
-            endSeconds: loopB,
-            audioStream: Math.max(0, audioPos),
-            name: `${displayTitle(anime.title)} ${episodeKey} ${formatTime(loopA)}-${formatTime(loopB)}`.replace(/:/g, "."),
+            startSeconds: request.start,
+            endSeconds: request.end,
+            audioStream: request.audioPosition,
+            name: request.name,
+            folder: request.folder || null,
          });
          console.info("[player] clip exported", { out });
+         setExportSaved(out);
          showToast(`Clip saved: ${baseName(out)}`);
       } catch (err) {
          console.error("[player] clip export failed", { err: String(err) });
-         showToast("Couldn't export the clip");
+         setExportError(`Couldn't export the clip: ${String(err)}`);
       } finally {
          setExporting(false);
       }
@@ -1163,7 +1177,7 @@ function MpvPlayerView({
                stepAbLoop();
                break;
             case "e":
-               void exportLoop();
+               exportLoop();
                break;
             case "[":
                changeSpeed(-1);
@@ -1432,6 +1446,23 @@ function MpvPlayerView({
                open={playlistOpen}
                onSelect={selectFromPlaylist}
                onClose={closePlaylist}
+            />
+         )}
+
+         {exportOpen && loopA != null && loopB != null && (
+            <ExportDialog
+               defaultName={`${displayTitle(anime.title)} ${episodeKey} ${formatTime(loopA)}-${formatTime(loopB)}`.replace(/:/g, ".")}
+               start={loopA}
+               end={loopB}
+               duration={episodeDuration}
+               audioTracks={audioTracks}
+               activeAudioId={activeAudioId}
+               folder={settings.exportFolder}
+               exporting={exporting}
+               savedPath={exportSaved}
+               error={exportError}
+               onExport={(request) => void runExport(request)}
+               onClose={() => setExportOpen(false)}
             />
          )}
 
@@ -1787,10 +1818,10 @@ function MpvPlayerView({
                {loopA != null && loopB != null && (
                   <button
                      class="player-speed on"
-                     onClick={() => void exportLoop()}
+                     onClick={exportLoop}
                      disabled={exporting}
                      aria-label="Export looped clip"
-                     title="Export the looped section as MP4 (E)"
+                     title="Export the looped section as MP4… (E)"
                   >
                      {exporting ? "Exporting…" : "Clip"}
                   </button>
