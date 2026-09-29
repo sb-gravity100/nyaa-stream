@@ -304,7 +304,7 @@
             unknown to the stream server (Kaleido-subs case)
       - [ ] Verify live: time from click to first frame, logged before/after
       - [ ] PLAN.md/FILE_INDEX.md sync, `npm run bump -- patch`, tag
-            `v0.3.2`
+            `v0.3.2` locally (not pushed/published - see PLAN.md "Release plan")
 - [ ] Continue-watching resume buffer (v0.4.0, see PLAN.md "Continue-watching
       resume buffer"): one commit each -
       - [ ] Stream handler records the byte ranges mpv reads until
@@ -320,7 +320,7 @@
             Clear cache, startup sweep, 25 buffers / ~600 MB cap
       - [ ] Verify live: Resume from Continue watching → first frame time
       - [ ] PLAN.md/FILE_INDEX.md sync, `npm run bump -- minor`, tag
-            `v0.4.0`
+            `v0.4.0` locally (not pushed/published - see PLAN.md "Release plan")
 - [ ] Context menus (v0.5.0, see PLAN.md "Context menus"): one commit each -
       - [ ] `tauri-plugin-clipboard-manager` (Rust, capability, JS)
       - [ ] `contextMenu.ts` store + `ContextMenu.tsx` component
@@ -330,7 +330,7 @@
       - [ ] Episode rows + source/torrent rows
       - [ ] Player surface (flat, no Subtitles/Speed)
       - [ ] FILE_INDEX.md/PLAN.md sync, `npm run bump -- minor`, tag
-            `v0.5.0`
+            `v0.5.0` locally (not pushed/published - see PLAN.md "Release plan")
 - [ ] Build thumbnails button (v0.6.0, see PLAN.md "Build thumbnails
       button"): one commit each -
       - [ ] nyaa view-page scrape collects description image URLs
@@ -351,7 +351,7 @@
             spinner on rows being captured
       - [ ] Verify live on a show with no Kitsu/AniList thumbnails
       - [ ] PLAN.md/FILE_INDEX.md sync, `npm run bump -- minor`, tag
-            `v0.6.0`
+            `v0.6.0` locally (not pushed/published - see PLAN.md "Release plan")
 - [ ] HD banner sources (v0.7.0, see PLAN.md "HD banner sources"): one
       commit each -
       - [ ] Fribb anime-lists id map: download, weekly refresh, offline
@@ -369,7 +369,7 @@
       - [ ] About attribution: TMDB logo (`src/assets/tmdb-logo.svg`) +
             notice, fanart.tv, Simkl; TMDB cache max 6 months
       - [ ] PLAN.md/FILE_INDEX.md sync, `npm run bump -- minor`, tag
-            `v0.7.0`
+            `v0.7.0` locally (not pushed/published - see PLAN.md "Release plan")
 - [ ] Seek-bar thumbnail preview (v0.8.0, see PLAN.md "Seek-bar thumbnail
       preview"): one commit each -
       - [ ] `media.rs`: keyframe-only storyboard job (5s buckets, 240x135
@@ -380,7 +380,7 @@
       - [ ] Seek-bar hover shows the frame above the time tooltip
             (debounced, cached; time only when not downloaded)
       - [ ] PLAN.md/FILE_INDEX.md sync, `npm run bump -- minor`, tag
-            `v0.8.0`
+            `v0.8.0` locally (not pushed/published - see PLAN.md "Release plan")
 - [ ] Contact and send logs (v0.9.0, see PLAN.md "Contact and send
       logs"): one commit each -
       - [ ] `export_logs`: zip logs + `system.txt` into Downloads, reveal;
@@ -390,4 +390,5 @@
             issue, public notice) buttons
       - [ ] Fill in the Discord user id
       - [ ] PLAN.md/FILE_INDEX.md sync, `npm run bump -- minor`, tag
-            `v0.9.0`
+            `v0.9.0`, push the tag, build + publish the release (first
+            published build since v0.3.1)
