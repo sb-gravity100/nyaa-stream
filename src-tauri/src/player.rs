@@ -158,10 +158,34 @@ pub async fn mpv_stop(window: WebviewWindow, state: State<'_, PlayerState>) -> R
         if let Err(err) = mpv.command(&["stop".into()]).await {
             tracing::warn!(%err, "mpv stop failed");
         }
+        reset_per_file_state(&mpv).await;
     }
     window.set_background_color(None).map_err(|err| err.to_string())?;
     tracing::info!("mpv_stop completed");
     Ok(())
+}
+
+/// Per-file playback state mpv keeps across `stop`/`loadfile` - reset so
+/// nothing (an A-B loop, a speed or delay tweak, a pause) leaks into the
+/// next file played by the persistent mpv.
+fn per_file_defaults() -> [(&'static str, Value); 6] {
+    [
+        ("ab-loop-a", Value::from("no")),
+        ("ab-loop-b", Value::from("no")),
+        ("speed", Value::from(1.0)),
+        ("sub-delay", Value::from(0.0)),
+        ("audio-delay", Value::from(0.0)),
+        ("pause", Value::from(false)),
+    ]
+}
+
+async fn reset_per_file_state(mpv: &EmbeddedMpv) {
+    for (property, value) in per_file_defaults() {
+        if let Err(err) = mpv.command(&["set_property".into(), property.into(), value.clone()]).await {
+            tracing::warn!(property, %value, %err, "couldn't reset mpv per-file state");
+        }
+    }
+    tracing::debug!("mpv per-file state reset");
 }
 
 /// Longest side of the last-frame thumbnail - matches the headless
