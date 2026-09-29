@@ -548,6 +548,13 @@ function App() {
         }
       }
 
+      // Season 0 is a franchise's specials/movies, which are their own
+      // AniList entries with their own pages - not episodes of a TV series
+      // (e.g. Fate/strange Fake's "S00E01 Whispers of Dawn").
+      if (label.kind === "episode" && label.season === 0 && (selectedAnime?.format === "TV" || selectedAnime?.format === "TV_SHORT")) {
+        continue;
+      }
+
       // See currentAnimeSeason's doc comment - drop releases we're
       // confident belong to a different season of the same franchise
       // rather than this anime's own episodes.
@@ -584,7 +591,8 @@ function App() {
         return a.label.number - b.label.number;
       }
       if (a.label.kind === "batch" && b.label.kind === "batch") {
-        return a.label.season - b.label.season;
+        // Plain season packs before packs bundling extras (movies/specials).
+        return a.label.season - b.label.season || Number(a.label.extras === true) - Number(b.label.extras === true);
       }
       return 0;
     });
