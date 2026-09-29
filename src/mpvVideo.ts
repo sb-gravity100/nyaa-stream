@@ -13,6 +13,12 @@ interface MpvTrack {
    selected?: boolean;
 }
 
+/** One entry of mpv's `chapter-list` property. */
+export interface Chapter {
+   title: string;
+   time: number;
+}
+
 interface MpvEvent {
    event: string;
    id?: number;
@@ -35,11 +41,13 @@ const OBSERVED = [
    "video-params",
    "track-list",
    "seeking",
+   "speed",
+   "chapter-list",
 ] as const;
 type Observed = (typeof OBSERVED)[number];
 
 /** Properties that belong to the loaded file (reset on `load`). */
-const FILE_PROPERTIES: Observed[] = ["time-pos", "duration", "eof-reached", "demuxer-cache-state", "video-params", "track-list", "seeking"];
+const FILE_PROPERTIES: Observed[] = ["time-pos", "duration", "eof-reached", "demuxer-cache-state", "video-params", "track-list", "seeking", "chapter-list"];
 
 // `<video>` fires timeupdate ~4x a second; the seek bar's own rAF loop
 // reads `currentTime` for smoothness. Re-rendering the player on every
@@ -254,6 +262,50 @@ export class MpvVideo extends EventTarget {
          }));
    }
 
+   /** Audio tracks from mpv's `track-list`, `index` = mpv track id. */
+   get audioTracks(): SubtitleTrack[] {
+      const tracks = (this.props["track-list"] as MpvTrack[] | undefined) ?? [];
+      return tracks
+         .filter((t) => t.type === "audio")
+         .map((t) => ({
+            index: t.id,
+            language: t.lang ?? null,
+            title: t.title ?? null,
+            codec: t.codec ?? "",
+            default: t.default === true,
+            url: "",
+         }));
+   }
+
+   /** Id of the audio track mpv is playing, else null. */
+   get activeAudioId(): number | null {
+      const tracks = (this.props["track-list"] as MpvTrack[] | undefined) ?? [];
+      return tracks.find((t) => t.type === "audio" && t.selected)?.id ?? null;
+   }
+
+   /** Chapter marks embedded in the file (empty when it has none). */
+   get chapters(): Chapter[] {
+      const list = this.props["chapter-list"];
+      return Array.isArray(list) ? (list as Chapter[]) : [];
+   }
+
+   /** Playback speed multiplier (`<video>.playbackRate`). */
+   get playbackRate(): number {
+      return typeof this.props.speed === "number" ? (this.props.speed as number) : 1;
+   }
+
+   set playbackRate(value: number) {
+      this.props.speed = value;
+      void command(["set_property", "speed", value]);
+   }
+
+   setAudio(id: number): void {
+      console.debug("[mpv] audio track", { id });
+      void command(["set_property", "aid", id]).catch((err) =>
+         console.warn("[mpv] aid failed", { id, err: String(err) }),
+      );
+   }
+
    async play(): Promise<void> {
       await command(["set_property", "pause", false]);
    }
@@ -389,6 +441,12 @@ export class MpvVideo extends EventTarget {
             return;
          case "track-list":
             this.emit("tracks");
+            return;
+         case "chapter-list":
+            this.emit("chapters");
+            return;
+         case "speed":
+            this.emit("ratechange");
             return;
          default:
             return;
