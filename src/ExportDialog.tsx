@@ -32,6 +32,8 @@ export interface ExportRequest {
   /** Position within the file's audio tracks. */
   audioPosition: number;
   folder: string;
+  /** Burn the active subtitle track into the video. */
+  includeSubs: boolean;
 }
 
 interface Props {
@@ -42,6 +44,8 @@ interface Props {
   duration: number;
   audioTracks: SubtitleTrack[];
   activeAudioId: number | null;
+  /** Label of the subtitle track showing now; null when subtitles are off. */
+  subtitleLabel: string | null;
   folder: string;
   exporting: boolean;
   /** Path of the clip that was just written. */
@@ -53,12 +57,13 @@ interface Props {
 
 /** Export options for the looped section: name, range, audio track and
  * destination folder. Rendered inside the player; owns no export logic. */
-export function ExportDialog({ defaultName, start, end, duration, audioTracks, activeAudioId, folder, exporting, savedPath, error, onExport, onClose }: Props) {
+export function ExportDialog({ defaultName, start, end, duration, audioTracks, activeAudioId, subtitleLabel, folder, exporting, savedPath, error, onExport, onClose }: Props) {
   const [name, setName] = useState(defaultName);
   const [startText, setStartText] = useState(formatClipTime(start));
   const [endText, setEndText] = useState(formatClipTime(end));
   const activePosition = Math.max(0, audioTracks.findIndex((t) => t.index === activeAudioId));
   const [audioPosition, setAudioPosition] = useState(activePosition);
+  const [includeSubs, setIncludeSubs] = useState(subtitleLabel != null);
   const [defaultFolder, setDefaultFolder] = useState("");
   const dialogRef = useRef<HTMLDivElement>(null);
   const nameRef = useRef<HTMLInputElement>(null);
@@ -94,7 +99,7 @@ export function ExportDialog({ defaultName, start, end, duration, audioTracks, a
 
   function submit() {
     if (!canExport || startSeconds == null || endSeconds == null) return;
-    onExport({ name: name.trim(), start: startSeconds, end: endSeconds, audioPosition, folder });
+    onExport({ name: name.trim(), start: startSeconds, end: endSeconds, audioPosition, folder, includeSubs: includeSubs && subtitleLabel != null });
   }
 
   return (
@@ -149,6 +154,14 @@ export function ExportDialog({ defaultName, start, end, duration, audioTracks, a
             </select>
           </label>
         )}
+
+        <label class="export-check">
+          <input type="checkbox" disabled={exporting || subtitleLabel == null} checked={includeSubs && subtitleLabel != null} onChange={(e) => setIncludeSubs((e.target as HTMLInputElement).checked)} />
+          <span>
+            Include subtitles
+            <small>{subtitleLabel != null ? `Burned in: ${subtitleLabel}, in your subtitle style` : "No subtitle track is showing"}</small>
+          </span>
+        </label>
 
         <div class="export-field">
           <span>Save to</span>

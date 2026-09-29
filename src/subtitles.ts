@@ -121,34 +121,37 @@ const MPV_REFERENCE_HEIGHT = 720;
 const CONVERTED_PLAY_RES_Y = 288;
 
 /**
- * Applies the user's default subtitle style to mpv. Plain tracks go through
- * mpv's own `sub-*` options (mpv styles non-ASS subtitles with them). Real
- * ASS tracks are only touched when `applyToStyled` is on, and then only
- * their dialogue-looking styles, via `sub-ass-style-overrides` sized
- * against the track's own `PlayResY` - the same rules `applySubtitleStyle`
- * applied to scripts.
+ * The mpv options (`sub-*`) that make mpv draw subtitles in the user's default
+ * style. Plain tracks go through mpv's own `sub-*` options (mpv styles
+ * non-ASS subtitles with them). Real ASS tracks are only touched when
+ * `applyToStyled` is on, and then only their dialogue-looking styles, via
+ * `sub-ass-style-overrides` sized against the track's own `PlayResY` - the
+ * same rules `applySubtitleStyle` applied to scripts. Shared by the live
+ * player (`applyMpvSubtitleStyle`) and clip export (burned-in subtitles).
  */
-export async function applyMpvSubtitleStyle(mpv: MpvSubtitleTarget, style: SubtitleStyle, styled: boolean): Promise<void> {
+export async function mpvSubtitleSettings(
+  mpv: Pick<MpvSubtitleTarget, "getProperty">,
+  style: SubtitleStyle,
+  styled: boolean,
+): Promise<Record<string, string | number | boolean>> {
   const px = (percent: number) => (percent / 100) * MPV_REFERENCE_HEIGHT;
   const backOpacity = style.backgroundOpacity / 100;
-  await Promise.all([
-    mpv.setProperty("sub-font", style.fontFamily),
-    mpv.setProperty("sub-font-size", px(style.sizePercent)),
-    mpv.setProperty("sub-bold", style.bold),
-    mpv.setProperty("sub-color", mpvColor(style.color)),
-    mpv.setProperty("sub-border-style", style.background ? "opaque-box" : "outline-and-shadow"),
-    mpv.setProperty("sub-border-color", style.background ? mpvColor(style.backgroundColor, backOpacity) : mpvColor(style.outlineColor)),
-    mpv.setProperty("sub-back-color", style.background ? mpvColor(style.backgroundColor, backOpacity) : mpvColor("#404040", 0x5f / 255)),
-    mpv.setProperty("sub-border-size", style.background ? 2 : px(style.outlineWidth)),
-    mpv.setProperty("sub-shadow-offset", (style.shadow / CONVERTED_PLAY_RES_Y) * MPV_REFERENCE_HEIGHT),
+  const settings: Record<string, string | number | boolean> = {
+    "sub-font": style.fontFamily,
+    "sub-font-size": px(style.sizePercent),
+    "sub-bold": style.bold,
+    "sub-color": mpvColor(style.color),
+    "sub-border-style": style.background ? "opaque-box" : "outline-and-shadow",
+    "sub-border-color": style.background ? mpvColor(style.backgroundColor, backOpacity) : mpvColor(style.outlineColor),
+    "sub-back-color": style.background ? mpvColor(style.backgroundColor, backOpacity) : mpvColor("#404040", 0x5f / 255),
+    "sub-border-size": style.background ? 2 : px(style.outlineWidth),
+    "sub-shadow-offset": (style.shadow / CONVERTED_PLAY_RES_Y) * MPV_REFERENCE_HEIGHT,
     // Integer option - mpv rejects fractional pixels.
-    mpv.setProperty("sub-margin-y", Math.round(px(style.marginPercent))),
-  ]);
+    "sub-margin-y": Math.round(px(style.marginPercent)),
+    "sub-ass-style-overrides": "",
+  };
+  if (!styled || !style.applyToStyled) return settings;
 
-  if (!styled || !style.applyToStyled) {
-    await mpv.setProperty("sub-ass-style-overrides", "");
-    return;
-  }
   // The active track's script header: its PlayResY and style names.
   let header = "";
   try {
@@ -174,5 +177,12 @@ export async function applyMpvSubtitleStyle(mpv: MpvSubtitleTarget, style: Subti
   // Commas separate overrides, so a font name can't contain one.
   const overrides = names.flatMap((name) => Object.entries(fields).map(([k, v]) => `${name}.${k}=${v.replace(/,/g, "")}`));
   console.debug("[subtitles] restyling ASS dialogue styles", { names, resY });
-  await mpv.setProperty("sub-ass-style-overrides", overrides.join(","));
+  settings["sub-ass-style-overrides"] = overrides.join(",");
+  return settings;
+}
+
+/** Applies the user's default subtitle style to the playing mpv. */
+export async function applyMpvSubtitleStyle(mpv: MpvSubtitleTarget, style: SubtitleStyle, styled: boolean): Promise<void> {
+  const settings = await mpvSubtitleSettings(mpv, style, styled);
+  await Promise.all(Object.entries(settings).map(([name, value]) => mpv.setProperty(name, value)));
 }
