@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `093d71b` · 2026-09-29 · chore(updater): point endpoint at sb-gravity100/nyaa-stream
+- `src-tauri/tauri.conf.json`
+
 ### `1e9cd69` · 2026-09-29 · feat(updater): in-app auto-update via GitHub Releases
 - `src/updater.ts`
 - `src/SettingsPanel.tsx`
