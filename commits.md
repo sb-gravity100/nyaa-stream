@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `978f077` · 2026-09-29 · docs: correct signing key env var and add manual release steps
+- `CLAUDE.md`
+
 ### `4a26a8b` · 2026-09-29 · ci: build and publish signed releases on version tags
 - `.github/workflows/release.yml`
 - `FILE_INDEX.md`
