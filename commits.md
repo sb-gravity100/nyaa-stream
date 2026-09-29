@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `772c709` · 2026-09-29 · fix(player): fallback opening skip is 90s, not 85s
+- `src/PlayerView.tsx`
+- `src/SettingsPanel.tsx`
+
 ### `7803545` · 2026-09-29 · feat(player): batch sources play their matched episode file without a file picker
 - `src/PlayerView.tsx`
 - `src/App.css`
