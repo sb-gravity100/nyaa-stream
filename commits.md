@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `6beced4` · 2026-09-29 · fix: download a continue-watch file in order from its resume point
+- `PHASES.md`
+- `vendor/enginefs/src/backend/libtorrent/playback.rs`
+
 ### `c60fd83` · 2026-09-29 · fix: download a first-watch file sequentially from piece 0
 - `PHASES.md`
 - `vendor/enginefs/src/backend/libtorrent/disk_stream.rs`
