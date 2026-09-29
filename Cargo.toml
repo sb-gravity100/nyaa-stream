@@ -21,6 +21,14 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 [patch."https://github.com/stremio-native/stream-server"]
 enginefs = { path = "vendor/enginefs" }
 
+# Dev builds: line tables only for our crates (panics keep file:line) and no
+# debug info for dependencies - full debug info meant ~830 MB of PDBs
+# rewritten by the linker after every change (PLAN.md "Dev build speed").
+[profile.dev]
+debug = "line-tables-only"
+[profile.dev.package."*"]
+debug = 0
+
 # The player's close-time frame grab decodes and downscales a full-res mpv
 # screenshot; unoptimized, that took long enough to be felt in dev builds.
 [profile.dev.package.image]
