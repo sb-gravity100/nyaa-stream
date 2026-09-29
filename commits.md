@@ -2,6 +2,14 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `bbfa40b` · 2026-09-29 · docs: record the mpv pre-spawn regression and fix
+- `FILE_INDEX.md`
+- `PLAN.md`
+
+### `25d8d82` · 2026-09-29 · fix: pre-spawn mpv after the page loads, not at launch
+- `src-tauri/src/lib.rs`
+- `src-tauri/src/player.rs`
+
 ### `774419e` · 2026-09-29 · docs: mention the new icon and splash in the 0.3.2 notes
 - `src/changelog.ts`
 
