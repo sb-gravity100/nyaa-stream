@@ -631,12 +631,28 @@ first seconds before C's mode is known):**
     in order, order matters more.
 - Log line fix: the "waiting for verified piece" diagnostic reports the window
   for the effective intent (it printed the original intent's window).
+- *Implementation decisions (v0.3.2):*
+  - A holds the rest of the file at 0 through **piece** priorities; the file
+    priority stays 1, since a 0 file priority makes libtorrent write that
+    file's pieces into its part file, away from the disk reader. Streams
+    report their first read position so the 8 MB buffer follows mpv's seek.
+  - Our raw-stream server opens every mpv request as a DirectInitial reader
+    at offset 0 and then seeks, so the engine learns positions from the
+    readers themselves (`ReadStarted`/`SeekBlocked`), not from the intent.
+    Tail reads (the MKV Cues / MP4 moov region) are never positions.
+  - Continue watch anchors at the first read starting past the 8 MB header
+    region. A seek back into skipped pieces restores them only when the
+    target piece is missing; a re-anchor needs an established mode (first
+    watch, or continue watch after its anchor) and a target more than ~4 MB
+    past the downloaded run from the current anchor.
 
 **Warm mpv:** mpv already persists after first use (`mpv_stop` only sends
 `stop`, dropping the file and its demuxer buffers). Changes:
 
 - Spawn the embedded mpv once at app launch (idle, below the webview) instead
   of on the first play, so the first episode skips libmpv load + font install.
+  Skipped when libmpv isn't found at launch (HLS fallback, or `mpv_start`
+  spawns lazily after a Settings path override).
 - `mpv_stop` resets per-file state after `stop` - `ab-loop-a/b`, `speed`,
   `sub-delay`, `audio-delay`, `pause` - so nothing leaks into the next file.
 
@@ -654,7 +670,10 @@ file's (`src/mpvVideo.ts` `handleEvent`). Fix:
   `mpv_event_end_file` layout: reason, error, playlist_entry_id, ...), and
   `start-file` events carry theirs, both forwarded in `mpv-event`.
 - `MpvVideo.load` records the entry id of the `start-file` that follows its
-  `loadfile`; `end-file` for any other id is logged and ignored.
+  `loadfile`; `end-file` for any other id is logged and ignored. (It takes
+  the id `loadfile` itself returns when libmpv reports one; ids only grow,
+  so an `end-file` arriving before the new id is known is stale when its
+  id is at most the highest one seen before the load.)
 - **Source switch = flush + seek back.** Picking another source (source
   menu, `setSelectedRelease`) first captures the playhead
   (`video.currentTime` once playback has started; otherwise the pending
@@ -676,6 +695,11 @@ priorities did not match after acknowledgement timeout` at load, then
 error until the switch. Investigate the ack-timeout path in the vendored
 `apply_file_priorities`: a timeout should retry or fall through to streaming,
 not leave the file unknown; if it still fails, surface the error at once.
+*Done:* the update is resubmitted once, then streaming proceeds
+(`file_priority_unconfirmed` warning with the mismatched file indices);
+real errors (file error alert, torrent gone) still fail at once, and
+`get_file_reader` failures are now logged with their cause instead of only
+the stream server's "unknown file index".
 
 **Later (not in v0.3.2):** prefetch the head (~8 MB, then dropped if unused)
 of the most likely source when an episode page opens - depends on A/B.
