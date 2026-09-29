@@ -355,3 +355,63 @@ fn allocated_size(path: &Path) -> Option<u64> {
 fn allocated_size(_path: &Path) -> Option<u64> {
     None
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn file(name: &str) -> TorrentFile {
+        TorrentFile { index: 0, name: name.to_string(), length: 4, is_video: true }
+    }
+
+    fn cache(test: &str) -> DownloadCache {
+        let dir = std::env::temp_dir().join(format!("nyaa-stream-dc-{test}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        for name in ["Show A/ep1.mkv", "ep2.mkv", "leftover.mkv"] {
+            let path = dir.join(name);
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(path, b"data").unwrap();
+        }
+        let cache = DownloadCache::load(dir);
+        cache.touch("AAAA", "a", &[file("Show A/ep1.mkv")], Some("1:1"));
+        cache.touch("bbbb", "b", &[file("ep2.mkv")], Some("2:1"));
+        cache
+    }
+
+    #[test]
+    fn zero_limit_evicts_all_but_playing_and_kept() {
+        let cache = cache("zero");
+        cache.set_limit(0);
+        cache.set_keep(vec!["2:1".into()]);
+        cache.evict(Some("bbbb"), false, "test");
+        assert!(!cache.dir.join("Show A").exists(), "evicted entry and its now-empty folder deleted");
+        assert!(cache.dir.join("ep2.mkv").exists());
+        assert!(cache.dir.join("leftover.mkv").exists(), "orphans only go at startup");
+        cache.set_keep(Vec::new());
+        cache.evict(None, true, "test");
+        assert!(!cache.dir.join("ep2.mkv").exists());
+        assert!(!cache.dir.join("leftover.mkv").exists());
+        assert!(cache.lock().torrents.is_empty());
+        let _ = std::fs::remove_dir_all(&cache.dir);
+    }
+
+    #[test]
+    fn under_limit_keeps_everything() {
+        let cache = cache("under");
+        cache.evict(None, true, "test");
+        assert!(cache.dir.join("Show A/ep1.mkv").exists());
+        assert!(cache.dir.join("leftover.mkv").exists());
+        assert!(cache.dir.join(INDEX_FILE).exists());
+        let _ = std::fs::remove_dir_all(&cache.dir);
+    }
+
+    #[test]
+    fn clear_spares_playing() {
+        let cache = cache("clear");
+        cache.clear(Some("aaaa")).unwrap();
+        assert!(cache.dir.join("Show A/ep1.mkv").exists());
+        assert!(!cache.dir.join("ep2.mkv").exists());
+        assert!(cache.dir.join("leftover.mkv").exists());
+        let _ = std::fs::remove_dir_all(&cache.dir);
+    }
+}
