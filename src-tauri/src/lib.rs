@@ -1110,6 +1110,14 @@ async fn stop_playback(state: State<'_, Arc<AppState>>) -> Result<(), String> {
     Ok(())
 }
 
+/// The player opened `file_idx` (mpv's `file-loaded`): what it read so far
+/// is what a resume buffer must hold - see torrent_engine::resume_buffer.
+#[tauri::command]
+fn stream_file_loaded(state: State<'_, Arc<AppState>>, torrent_id: TorrentId, file_idx: usize) {
+    tracing::debug!(torrent_id = %torrent_id, file_idx, "stream_file_loaded invoked");
+    state.torrent_engine.finish_open_reads(&torrent_id, file_idx);
+}
+
 /// Registers `file_idx` (the next episode's file in the playing batch) to be
 /// fetched at the lowest priority next to the playing file; `None` stops.
 /// Best effort - failures only mean no preload.
@@ -1389,6 +1397,7 @@ pub fn run() {
             search_torrents,
             search_torrents_for_anime,
             preload_next_file,
+            stream_file_loaded,
             default_clip_folder,
             player::mpv_save_frame,
             player::default_screenshot_folder,
