@@ -563,6 +563,7 @@ async fn search_torrents_for_anime(
     state: State<'_, Arc<AppState>>,
     title: AnimeTitle,
     synonyms: Option<Vec<String>>,
+    fansubber: Option<String>,
 ) -> Result<Vec<NyaaResult>, String> {
     let synonyms = synonyms.unwrap_or_default();
     let candidates = title_match::build_candidates(title.english.as_deref(), title.romaji.as_deref(), &synonyms);
@@ -620,7 +621,103 @@ async fn search_torrents_for_anime(
     let before = merged.len();
     merged.retain(|result| title_match::matches_show(&result.title, &names));
     tracing::info!(kept = merged.len(), dropped = before - merged.len(), "dropped releases that don't name the show");
+
+    // A preferred fansubber whose nyaa.si account isn't known yet: learn it
+    // from one of their releases here, so the next search can go straight to
+    // their uploads (`search_fansubber_releases`).
+    if let Some(tag) = fansubber.as_deref().and_then(|text| text.split_whitespace().next()) {
+        let app = state.inner().clone();
+        let (tag, releases) = (tag.to_string(), merged.clone());
+        tokio::spawn(async move {
+            if app.nyaa.resolve_fansubber(&tag).await.is_none() {
+                app.nyaa.learn_fansubber(&tag, &releases).await;
+            }
+        });
+    }
     Ok(merged)
+}
+
+/// Releases for the show already in the local database - instant, no nyaa.si
+/// request; whatever earlier searches stored (possibly incomplete).
+#[tauri::command]
+async fn search_local_releases(
+    state: State<'_, Arc<AppState>>,
+    title: AnimeTitle,
+    synonyms: Option<Vec<String>>,
+) -> Result<Vec<NyaaResult>, String> {
+    let synonyms = synonyms.unwrap_or_default();
+    let candidates = title_match::build_candidates(title.english.as_deref(), title.romaji.as_deref(), &synonyms);
+    let mut lists = Vec::new();
+    for candidate in &candidates {
+        lists.push(state.nyaa.search_local(candidate, Category::AnimeEnglishTranslated).await);
+    }
+    let names = title_match::match_names(title.english.as_deref(), title.romaji.as_deref(), &synonyms);
+    let mut merged = merge_unique(lists);
+    merged.retain(|result| title_match::matches_show(&result.title, &names));
+    tracing::info!(count = merged.len(), "local release search for the show");
+    Ok(merged)
+}
+
+/// The show's releases from one fansubber only (nyaa.si's per-uploader
+/// search - a few results instead of every group's pages). `fansubber` is
+/// the Settings text ("ToonsHub CR"): its first word names the group. With a
+/// known nyaa.si account it searches that account's uploads; otherwise (some
+/// groups, ToonsHub included, upload anonymously) it adds the group name to
+/// the query, which nyaa.si matches as a word of the release title.
+#[tauri::command]
+async fn search_fansubber_releases(
+    state: State<'_, Arc<AppState>>,
+    title: AnimeTitle,
+    synonyms: Option<Vec<String>>,
+    fansubber: String,
+) -> Result<Vec<NyaaResult>, String> {
+    let Some(tag) = fansubber.split_whitespace().next() else { return Ok(Vec::new()) };
+    let user = state.nyaa.resolve_fansubber(tag).await;
+    let synonyms = synonyms.unwrap_or_default();
+    let candidates = title_match::build_candidates(title.english.as_deref(), title.romaji.as_deref(), &synonyms);
+
+    let mut searches = tokio::task::JoinSet::new();
+    for (order, candidate) in candidates.into_iter().enumerate() {
+        let (app, user, tag) = (state.inner().clone(), user.clone(), tag.to_string());
+        searches.spawn(async move {
+            let outcome = match &user {
+                Some(user) => app.nyaa.search_user(user, &candidate, Category::AnimeEnglishTranslated).await,
+                None => app.nyaa.search(&format!("{tag} {candidate}"), Category::AnimeEnglishTranslated).await,
+            };
+            (order, outcome)
+        });
+    }
+    let mut outcomes = Vec::new();
+    while let Some(joined) = searches.join_next().await {
+        if let Ok(outcome) = joined {
+            outcomes.push(outcome);
+        }
+    }
+    outcomes.sort_by_key(|(order, _)| *order);
+    let lists: Vec<Vec<NyaaResult>> = outcomes
+        .into_iter()
+        .filter_map(|(_, outcome)| outcome.inspect_err(|err| tracing::warn!(%err, "uploader-only search failed")).ok())
+        .collect();
+
+    let names = title_match::match_names(title.english.as_deref(), title.romaji.as_deref(), &synonyms);
+    let mut merged = merge_unique(lists);
+    let tag_word = title_match::normalize(tag);
+    merged.retain(|result| title_match::matches_show(&result.title, &names) && (user.is_some() || title_match::normalize(&result.title).split(' ').any(|w| w == tag_word)));
+    tracing::info!(?user, count = merged.len(), "fansubber-only release search");
+    Ok(merged)
+}
+
+/// Popular fansub group names for Settings' suggestions.
+#[tauri::command]
+async fn get_popular_fansubbers(state: State<'_, Arc<AppState>>) -> Result<Vec<String>, String> {
+    Ok(state.nyaa.popular_fansubbers(40).await)
+}
+
+/// `lists` flattened, one entry per nyaa.si release (by view URL), first
+/// occurrence wins.
+fn merge_unique(lists: Vec<Vec<NyaaResult>>) -> Vec<NyaaResult> {
+    let mut seen = std::collections::HashSet::new();
+    lists.into_iter().flatten().filter(|r| seen.insert(r.view_url.clone())).collect()
 }
 
 /// Cap on simultaneous view-page fetches. Bounded deliberately: a search can
@@ -971,7 +1068,11 @@ pub fn run() {
         Arc::new(AppState {
             anilist: AniListClient::new(),
             kitsu: KitsuClient::new(),
-            nyaa: NyaaClient::with_cache(dirs::cache_dir().unwrap_or_else(std::env::temp_dir).join("nyaa-stream").join("nyaa_cache")),
+            // Cache is disposable ("Clear cache"); the release database is permanent user data.
+            nyaa: NyaaClient::with_storage(
+                dirs::cache_dir().unwrap_or_else(std::env::temp_dir).join("nyaa-stream").join("nyaa_cache"),
+                &dirs::data_dir().unwrap_or_else(std::env::temp_dir).join("nyaa-stream").join("nyaa.db"),
+            ),
             torrent_engine,
             current_torrent: Mutex::new(None),
             thumbnail_cache_dir,
@@ -1001,6 +1102,9 @@ pub fn run() {
             save_frame_thumbnail,
             search_torrents,
             search_torrents_for_anime,
+            search_local_releases,
+            search_fansubber_releases,
+            get_popular_fansubbers,
             get_torrent_details_batch,
             play_magnet,
             get_stream_stats,
