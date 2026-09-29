@@ -2,6 +2,11 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `566c617` · 2026-09-29 · feat: export_clip backend (A-B cut, NVENC H.264 + AAC)
+- `crates/torrent-engine/src/lib.rs`
+- `crates/torrent-engine/src/media.rs`
+- `src-tauri/src/lib.rs`
+
 ### `fac9a87` · 2026-09-29 · feat: player speed, chapter marks, skip-intro (Shift) and audio menu
 - `src/App.css`
 - `src/PlayerView.tsx`
