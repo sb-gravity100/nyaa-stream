@@ -2,6 +2,13 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `4680382` · 2026-09-29 · docs: note v0.3.2 is published in CLAUDE.md
+- `CLAUDE.md`
+
+### `8092cd0` · 2026-09-29 · docs: publish v0.3.2 as its own release
+- `PLAN.md`
+- `PHASES.md`
+
 ### `9870116` · 2026-09-29 · fix: let a release dry run proceed without the release tag
 - `scripts/release.mjs`
 - `PLAN.md`
