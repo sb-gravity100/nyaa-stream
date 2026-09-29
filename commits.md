@@ -2,6 +2,12 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `28205cf` · 2026-09-29 · feat(nyaa-client): permanent release database keyed by nyaa release id
+- `crates/nyaa-client/Cargo.toml`
+- `crates/nyaa-client/src/store.rs`
+- `crates/nyaa-client/src/lib.rs`
+- `FILE_INDEX.md`
+
 ### `7403cde` · 2026-09-29 · feat(nyaa-client): per-uploader search and cached popular fansubbers
 - `crates/nyaa-client/src/fansubbers.rs`
 - `crates/nyaa-client/src/lib.rs`
