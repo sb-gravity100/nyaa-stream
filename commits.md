@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `129b388` · 2026-09-29 · feat: lazy-load search dropdown results and covers
+- `src/App.css`
+- `src/App.tsx`
+
 ### `566c617` · 2026-09-29 · feat: export_clip backend (A-B cut, NVENC H.264 + AAC)
 - `crates/torrent-engine/src/lib.rs`
 - `crates/torrent-engine/src/media.rs`
