@@ -629,8 +629,20 @@ file's (`src/mpvVideo.ts` `handleEvent`). Fix:
   `start-file` events carry theirs, both forwarded in `mpv-event`.
 - `MpvVideo.load` records the entry id of the `start-file` that follows its
   `loadfile`; `end-file` for any other id is logged and ignored.
-- Switching sources sends mpv `stop` before `play_magnet` removes the old
-  torrent, so the old open is cancelled instead of failing.
+- **Source switch = flush + seek back.** Picking another source (source
+  menu, `setSelectedRelease`) first captures the playhead
+  (`video.currentTime` once playback has started; otherwise the pending
+  `resumeAtRef` stays), then sends mpv `stop` at once - dropping the old
+  file and its demuxer/cache buffers so nothing of the old source keeps
+  playing or rendering - and only then runs `play_magnet`. The new file loads
+  with `start` = that captured time and the `resume` watch hint, so C's
+  continue-watch mode downloads in order from there. Today `resumeAtRef` is
+  captured once per episode, so a switch mid-episode restarts at the
+  original resume point (or 0:00). The old torrent's open is cancelled by
+  the `stop` instead of failing, which also removes the stale error at the
+  source. Caveat: releases of one episode can differ by a few seconds
+  (different cuts/intros); the seek lands on the same timestamp, not the
+  same frame.
 
 Also in that log: the Kaleido-subs source never started - `Libtorrent file
 priorities did not match after acknowledgement timeout` at load, then
