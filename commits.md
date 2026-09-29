@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `ee97383` · 2026-09-29 · docs: record AniDB API research
+- `PLAN.md`
+
 ### `911aef4` · 2026-09-29 · docs: note nyaa screenshot groups for episode thumbnails
 - `PLAN.md`
 - `PHASES.md`
