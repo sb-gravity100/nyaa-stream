@@ -82,6 +82,7 @@ pub fn to_media(anime: KitsuAnime) -> AnimeMedia {
         description: anime.synopsis,
         episodes: anime.episode_count,
         cover_image: CoverImage { large: anime.poster_large, extra_large: anime.poster_original },
+        banner_image: None,
         average_score: anime.average_rating.map(|rating| rating.round() as i32),
         format,
         season,

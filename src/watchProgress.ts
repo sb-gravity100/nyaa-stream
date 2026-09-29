@@ -24,7 +24,7 @@ export interface ProgressEntry {
   completed: boolean;
   updatedAt: number;
   /** Snapshot for the home page's Continue Watching row. */
-  anime: Pick<AnimeMedia, "id" | "title" | "coverImage" | "episodes" | "duration" | "format" | "season" | "seasonYear" | "averageScore" | "description">;
+  anime: Pick<AnimeMedia, "id" | "title" | "coverImage" | "bannerImage" | "episodes" | "duration" | "format" | "season" | "seasonYear" | "averageScore" | "description">;
 }
 
 type Store = Record<string, ProgressEntry>;
@@ -95,6 +95,7 @@ export function saveProgress(anime: AnimeMedia, episodeKey: string, episode: num
       id: anime.id,
       title: anime.title,
       coverImage: anime.coverImage,
+      bannerImage: anime.bannerImage,
       episodes: anime.episodes,
       duration: anime.duration,
       format: anime.format,
