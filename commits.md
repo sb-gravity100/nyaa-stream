@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `0f2ad46` · 2026-09-29 · docs: plan the native splash window and custom title bar for v0.4.0
+- `PLAN.md`
+- `PHASES.md`
+
 ### `f1d87db` · 2026-09-29 · docs: correct the startup delay cause in PLAN.md
 - `PLAN.md`
 
