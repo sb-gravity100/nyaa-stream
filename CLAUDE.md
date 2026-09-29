@@ -89,6 +89,23 @@ All planning docs must stay consistent with each other at all times.
 
 ---
 
+## Versioning — bump every time
+
+**Every user-facing change (feat/fix) ships with a version bump.** The in-app
+updater only offers builds with a higher version than the installed one.
+
+- Bump with `npm run bump -- patch|minor|major` (keeps `package.json`,
+  `tauri.conf.json`, `src-tauri/Cargo.toml` in lockstep), commit
+  `chore: release vX.Y.Z`, tag `vX.Y.Z`.
+- Release builds need `TAURI_SIGNING_PRIVATE_KEY_PATH=~/.tauri/nyaa-stream.key`
+  (never commit it); upload the installer, its `.sig` and `latest.json` to the
+  GitHub release (endpoint in `tauri.conf.json` → `plugins.updater`).
+- `.githooks/pre-commit` (`core.hooksPath`, set once per clone with
+  `git config core.hooksPath .githooks`) warns when code changed but the
+  version still equals the latest tag. Remind the user when it fires.
+
+---
+
 ## Reference documents (adapt per project)
 - `FILE_INDEX.md` — **file system index with tags and descriptions — read this first**
 - `PLAN.md` — full tech stack, API endpoints, schema

@@ -1,0 +1,10 @@
+#!/bin/sh
+# Reminder (never blocks): code changed but the app version still equals the
+# latest release tag. Bump with `npm run bump -- patch|minor|major`.
+tag=$(git describe --tags --abbrev=0 2>/dev/null) || exit 0
+cur=$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' package.json | head -1)
+if [ "v$cur" = "$tag" ] && git diff --cached --name-only | grep -Eq '^(src|src-tauri/src|crates)/'; then
+  echo "REMINDER: app code changed but version is still $cur (= tag $tag)." >&2
+  echo "          Bump it before releasing: npm run bump -- patch|minor|major" >&2
+fi
+exit 0
