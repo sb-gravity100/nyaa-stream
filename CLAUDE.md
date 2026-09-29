@@ -94,6 +94,9 @@ All planning docs must stay consistent with each other at all times.
 **Every user-facing change (feat/fix) ships with a version bump.** The in-app
 updater only offers builds with a higher version than the installed one.
 
+- **Current exception (PLAN.md "Release plan"):** milestones v0.3.2-v0.8.0
+  are bumped and tagged locally only - never push those tags (a pushed
+  `v*` tag triggers the release workflow). Only v0.9.0 is published.
 - Bump with `npm run bump -- patch|minor|major` (keeps `package.json`,
   `tauri.conf.json`, `src-tauri/Cargo.toml` in lockstep), commit
   `chore: release vX.Y.Z`, tag `vX.Y.Z`.
