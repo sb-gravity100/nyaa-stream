@@ -890,6 +890,25 @@ function MpvPlayerView({
       }
    }
 
+   /** Saves the current frame (subtitles included, native resolution) as a
+    * PNG in the screenshot folder - X. */
+   async function saveFrame() {
+      if (!videoRef.current || videoRef.current.readyState < 2) return;
+      showToast("Saving frame…");
+      const stamp = formatTime(videoRef.current.currentTime).replace(/:/g, ".");
+      try {
+         const path = await invoke<string>("mpv_save_frame", {
+            folder: settings.screenshotFolder || null,
+            name: `${displayTitle(anime.title)} ${episodeKey} ${stamp}`,
+         });
+         console.info("[player] frame saved", { path });
+         showToast(`Frame saved: ${baseName(path)}`);
+      } catch (err) {
+         console.error("[player] frame save failed", { err: String(err) });
+         showToast("Couldn't save the frame");
+      }
+   }
+
    function cycleSubtitles() {
       const order: (number | null)[] = [
          null,
@@ -1175,11 +1194,14 @@ function MpvPlayerView({
             case "c":
                cycleSubtitles();
                break;
-            case "z":
+            case ",":
                changeSubtitleDelay(-SUBTITLE_DELAY_STEP);
                break;
-            case "x":
+            case ".":
                changeSubtitleDelay(SUBTITLE_DELAY_STEP);
+               break;
+            case "x":
+               void saveFrame();
                break;
             case "n":
                if (onNext) onNext();
