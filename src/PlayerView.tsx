@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { invoke } from "@tauri-apps/api/core";
 import { isFullscreen, setFullscreen, toggleFullscreen, useFullscreen } from "./fullscreen";
-import { MpvVideo } from "./mpvVideo";
+import { MpvVideo, type Chapter } from "./mpvVideo";
 import { isTypingTarget } from "./keyboard";
 import { HlsPlayerView } from "./HlsPlayerView";
 import type { AnimeMedia, NyaaResult, PlayFile, StreamStats, SubtitleTrack } from "./types";
@@ -56,6 +56,13 @@ const SEEK_STEP_SECONDS_LARGE = 10;
 const KEYBOARD_SEEK_COMMIT_MS = 300;
 const VOLUME_STEP = 5;
 const SUBTITLE_DELAY_STEP = 0.1;
+const AUDIO_DELAY_STEP = 0.1;
+/** Playback speed presets stepped through by `[` / `]`. */
+const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
+/** Jump when Shift is tapped outside an opening chapter - a standard
+ * anime OP length. */
+const INTRO_SKIP_SECONDS = 85;
+const INTRO_CHAPTER = /^(op|opening|intro)\b|\bopening\b/i;
 const PROGRESS_SAVE_MS = 5000;
 // Countdown shown before auto-starting the next episode.
 const AUTOPLAY_NEXT_SECONDS = 8;
@@ -269,6 +276,11 @@ function MpvPlayerView({
       number | null
    >(null);
    const [subtitleDelay, setSubtitleDelay] = useState(0);
+   const [audioTracks, setAudioTracks] = useState<SubtitleTrack[]>([]);
+   const [activeAudioId, setActiveAudioId] = useState<number | null>(null);
+   const [audioDelay, setAudioDelay] = useState(0);
+   const [chapters, setChapters] = useState<Chapter[]>([]);
+   const [speed, setSpeed] = useState(1);
    const [toast, setToast] = useState<string | null>(null);
    const [nextCountdown, setNextCountdown] = useState<number | null>(null);
    const idleTimerRef = useRef<number | undefined>(undefined);
@@ -355,6 +367,10 @@ function MpvPlayerView({
       setActiveSubtitleIndex(null);
       subtitlesPickedRef.current = false;
       setSubtitleDelay(0);
+      setAudioTracks([]);
+      setActiveAudioId(null);
+      setAudioDelay(0);
+      setChapters([]);
       setNextCountdown(null);
    }, [selectedFile?.streamUrl]);
 
@@ -395,7 +411,13 @@ function MpvPlayerView({
          setHasPlayed(true);
          rememberGroupOnPlay();
       });
-      on("tracks", () => setSubtitleTracks(video.subtitleTracks));
+      on("tracks", () => {
+         setSubtitleTracks(video.subtitleTracks);
+         setAudioTracks(video.audioTracks);
+         setActiveAudioId(video.activeAudioId);
+      });
+      on("chapters", () => setChapters(video.chapters));
+      on("ratechange", () => setSpeed(video.playbackRate));
       on("error", () =>
          setError(
             `This file can't be played: ${video.error?.message ?? "unknown error"}. Try another source.`,
@@ -481,6 +503,10 @@ function MpvPlayerView({
    useEffect(() => {
       void videoEl?.setProperty("sub-delay", subtitleDelay);
    }, [videoEl, subtitleDelay]);
+
+   useEffect(() => {
+      void videoEl?.setProperty("audio-delay", audioDelay);
+   }, [videoEl, audioDelay]);
 
    // The user's default style, applied by mpv (see applyMpvSubtitleStyle).
    useEffect(() => {
@@ -775,7 +801,9 @@ function MpvPlayerView({
       if (!tooltip) return;
       const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
       const x = Math.min(rect.width, Math.max(0, e.clientX - rect.left));
-      tooltip.textContent = formatTime((x / rect.width) * episodeDuration);
+      const at = (x / rect.width) * episodeDuration;
+      const chapter = [...chapters].reverse().find((c) => c.time <= at);
+      tooltip.textContent = chapter?.title ? `${formatTime(at)} · ${chapter.title}` : formatTime(at);
       tooltip.style.transform = `translateX(${x}px) translateX(-50%)`;
       tooltip.classList.add("shown");
    }
@@ -865,6 +893,85 @@ function MpvPlayerView({
       });
    }
 
+   function changeAudioDelay(delta: number) {
+      setAudioDelay((d) => {
+         const next = Math.round((d + delta) * 10) / 10;
+         showToast(`Audio delay ${next > 0 ? "+" : ""}${next.toFixed(1)}s`);
+         return next;
+      });
+   }
+
+   function pickAudio(id: number) {
+      setActiveAudioId(id);
+      videoRef.current?.setAudio(id);
+   }
+
+   /** Steps the playback speed through `SPEEDS`; 0 returns to 1x. */
+   function changeSpeed(direction: 1 | -1 | 0) {
+      const video = videoRef.current;
+      if (!video) return;
+      let next = 1;
+      if (direction !== 0) {
+         const i = SPEEDS.findIndex((s) => Math.abs(s - video.playbackRate) < 0.01);
+         const from = i === -1 ? SPEEDS.indexOf(1) : i;
+         next = SPEEDS[Math.min(SPEEDS.length - 1, Math.max(0, from + direction))];
+      }
+      video.playbackRate = next;
+      setSpeed(next);
+      showToast(`Speed ${next}×`);
+   }
+
+   /** The opening chapter playing at `time`, if the file marks one. */
+   function openingAt(time: number): { end: number } | null {
+      for (let i = 0; i < chapters.length; i++) {
+         if (!INTRO_CHAPTER.test(chapters[i].title.trim())) continue;
+         const end = chapters[i + 1] ? chapters[i + 1].time : episodeDuration;
+         if (time >= chapters[i].time && time < end - 0.5) return { end };
+      }
+      return null;
+   }
+
+   /** Jumps past the opening: to the end of its chapter when the file marks
+    * one, else a fixed 85s. */
+   function skipIntro() {
+      const video = videoRef.current;
+      if (!video || !episodeDuration) return;
+      cancelPendingKeyboardSeek();
+      const now = video.currentTime;
+      const opening = openingAt(now);
+      const target = opening ? opening.end : Math.min(now + INTRO_SKIP_SECONDS, episodeDuration);
+      console.info("[player] skip intro", { from: now, to: target, marked: opening != null });
+      showFlash("forward");
+      showToast(opening ? "Skipped opening" : `Skipped ${INTRO_SKIP_SECONDS}s`);
+      seekToEpisodeTime(target);
+   }
+
+   // Shift alone skips the intro. Armed on keydown and cleared by any other
+   // key, so Shift+letter combos and typing never trigger it.
+   const shiftArmedRef = useRef(false);
+   const skipIntroRef = useRef(skipIntro);
+   skipIntroRef.current = skipIntro;
+   useEffect(() => {
+      function down(e: KeyboardEvent) {
+         if (isTypingTarget(e.target)) return;
+         shiftArmedRef.current = e.key === "Shift" && !e.repeat && !e.ctrlKey && !e.altKey && !e.metaKey;
+      }
+      function up(e: KeyboardEvent) {
+         if (e.key !== "Shift" || !shiftArmedRef.current) return;
+         shiftArmedRef.current = false;
+         if (isTypingTarget(e.target)) return;
+         skipIntroRef.current();
+         flashControls();
+      }
+      window.addEventListener("keydown", down);
+      window.addEventListener("keyup", up);
+      return () => {
+         window.removeEventListener("keydown", down);
+         window.removeEventListener("keyup", up);
+      };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, []);
+
    // Player-wide keybinds, ignored only while typing in a text field.
    useEffect(() => {
       function handleKeyDown(e: KeyboardEvent) {
@@ -929,6 +1036,15 @@ function MpvPlayerView({
                break;
             case "n":
                if (onNext) onNext();
+               break;
+            case "[":
+               changeSpeed(-1);
+               break;
+            case "]":
+               changeSpeed(1);
+               break;
+            case "\\":
+               changeSpeed(0);
                break;
             case "escape":
                if (menu) {
@@ -1173,6 +1289,12 @@ function MpvPlayerView({
             />
          )}
 
+         {hasPlayed && !error && nextCountdown == null && openingAt(position) && (
+            <button class="player-skip-intro" onClick={skipIntro}>
+               Skip opening <kbd>Shift</kbd>
+            </button>
+         )}
+
          {nextCountdown != null && onNext && (
             <div class="player-next-card">
                <div
@@ -1199,7 +1321,7 @@ function MpvPlayerView({
             <div class={`player-menu${menu ? " open" : ""}`} ref={menuRef}>
                {renderedMenu === "subtitles" && (
                   <>
-                     <div class="player-menu-title">Subtitles</div>
+                     <div class="player-menu-title">Subtitles &amp; audio</div>
                      <button
                         class={`player-menu-item${activeSubtitleIndex == null ? " selected" : ""}`}
                         onClick={() => setActiveSubtitleIndex(null)}
@@ -1226,7 +1348,7 @@ function MpvPlayerView({
                         </div>
                      )}
                      <div class="player-menu-row">
-                        <span>Delay</span>
+                        <span>Sub delay</span>
                         <button
                            class="player-step"
                            onClick={() =>
@@ -1245,6 +1367,39 @@ function MpvPlayerView({
                               changeSubtitleDelay(SUBTITLE_DELAY_STEP)
                            }
                            aria-label="Later"
+                        >
+                           +
+                        </button>
+                     </div>
+                     {audioTracks.length > 0 && (
+                        <>
+                           <div class="player-menu-title">Audio</div>
+                           {audioTracks.map((track, i) => (
+                              <button
+                                 key={track.index}
+                                 class={`player-menu-item${track.index === activeAudioId ? " selected" : ""}`}
+                                 onClick={() => pickAudio(track.index)}
+                              >
+                                 {subtitleTrackLabel(track, i)}
+                                 <span class="player-menu-meta">{track.codec.toUpperCase()}</span>
+                              </button>
+                           ))}
+                        </>
+                     )}
+                     <div class="player-menu-row">
+                        <span>Audio delay</span>
+                        <button
+                           class="player-step"
+                           onClick={() => changeAudioDelay(-AUDIO_DELAY_STEP)}
+                           aria-label="Audio earlier"
+                        >
+                           −
+                        </button>
+                        <span class="player-menu-value">{audioDelay.toFixed(1)}s</span>
+                        <button
+                           class="player-step"
+                           onClick={() => changeAudioDelay(AUDIO_DELAY_STEP)}
+                           aria-label="Audio later"
                         >
                            +
                         </button>
@@ -1353,6 +1508,16 @@ function MpvPlayerView({
                      />
                   ))}
                <div class="player-seek-played" ref={playedFillRef} />
+               {episodeDuration > 0 &&
+                  chapters
+                     .filter((c) => c.time > 0.5 && c.time < episodeDuration - 0.5)
+                     .map((c) => (
+                        <div
+                           key={`c${c.time}`}
+                           class="player-seek-chapter"
+                           style={{ left: `${(c.time / episodeDuration) * 100}%` }}
+                        />
+                     ))}
                <div class="player-seek-thumb" ref={seekThumbRef} />
                <div class="player-seek-tooltip" ref={seekTooltipRef} />
             </div>
@@ -1430,6 +1595,18 @@ function MpvPlayerView({
                   <span>/ {formatTime(episodeDuration)}</span>
                </button>
                <div class="player-spacer" />
+               <button
+                  class={`player-speed${speed !== 1 ? " on" : ""}`}
+                  onClick={() => changeSpeed(speed >= SPEEDS[SPEEDS.length - 1] ? 0 : 1)}
+                  onContextMenu={(e) => {
+                     e.preventDefault();
+                     changeSpeed(0);
+                  }}
+                  aria-label="Playback speed"
+                  title="Playback speed ([ ] step, \ reset)"
+               >
+                  {speed}×
+               </button>
                <button
                   data-menu-toggle
                   class={`player-icon-button${menu === "subtitles" ? " active" : ""}${activeSubtitleIndex != null ? " on" : ""}`}

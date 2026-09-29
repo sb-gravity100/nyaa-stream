@@ -3037,3 +3037,68 @@ html.mpv-active .player-view {
   position: relative;
   height: 100%;
 }
+
+/* Chapter marks: thin gaps cut into the seek bar at each chapter start. */
+.player-seek-chapter {
+  position: absolute;
+  top: 50%;
+  width: 2px;
+  height: 6px;
+  margin: -3px 0 0 -1px;
+  background: rgba(10, 12, 24, 0.85);
+  pointer-events: none;
+  transition: height 0.12s var(--ease), margin-top 0.12s var(--ease);
+}
+
+.player-seek-wrap:hover .player-seek-chapter {
+  height: 8px;
+  margin-top: -4px;
+}
+
+.player-speed {
+  min-width: 42px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.72);
+  font: inherit;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.player-speed:hover,
+.player-speed.on {
+  color: var(--accent-strong);
+}
+
+.player-skip-intro {
+  position: absolute;
+  right: 24px;
+  bottom: 118px;
+  z-index: 4;
+  padding: 10px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-l);
+  background: rgba(23, 26, 43, 0.94);
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  animation: next-in 0.45s var(--ease-out);
+}
+
+.player-skip-intro:hover {
+  border-color: var(--accent);
+}
+
+.player-skip-intro kbd {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font: inherit;
+  font-size: 11px;
+  opacity: 0.7;
+}
