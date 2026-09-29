@@ -201,10 +201,12 @@ static void apply_streaming_performance_settings(lt::settings_pack &pack) {
                "dht.libtorrent.org:25401,"
                "router.bitcomet.com:6881");
 
-  // Deadline pieces drive playback. Strict end-game avoids waste before the
-  // true end game; libtorrent's time-critical picker handles adaptive duplicate
-  // requests for stalled deadline blocks.
-  pack.set_bool(lt::settings_pack::strict_end_game_mode, true);
+  // Deadline pieces drive playback. (nyaa-stream) Strict end-game is off: with
+  // it on, a piece whose blocks were all requested from one slow peer could
+  // sit unfinished 10-15s at priority 7 while hundreds of other pieces
+  // completed (live logs); off, other peers may request those blocks too, at
+  // the cost of some duplicate download.
+  pack.set_bool(lt::settings_pack::strict_end_game_mode, false);
   pack.set_bool(lt::settings_pack::prioritize_partial_pieces, true);
   pack.set_bool(lt::settings_pack::smooth_connects, false);
   pack.set_int(lt::settings_pack::piece_timeout, 5);
@@ -214,7 +216,9 @@ static void apply_streaming_performance_settings(lt::settings_pack &pack) {
   // the inbound value preserves enough upload pipeline for reciprocity.
   pack.set_int(lt::settings_pack::max_out_request_queue, 1500);
   pack.set_int(lt::settings_pack::max_allowed_in_request_queue, 2000);
-  pack.set_int(lt::settings_pack::request_queue_time, 3);
+  // (nyaa-stream) 3 -> 1: about 1s of requests queued per peer, so a new
+  // urgent (deadline) request isn't stuck behind ~3s of bulk requests.
+  pack.set_int(lt::settings_pack::request_queue_time, 1);
   pack.set_int(lt::settings_pack::unchoke_slots_limit, 20);
   pack.set_int(lt::settings_pack::alert_queue_size, 10000);
 }
@@ -319,7 +323,10 @@ std::unique_ptr<Session> create_session(SessionSettings const &settings) {
   pack.set_int(lt::settings_pack::max_queued_disk_bytes,
                128 * 1024 * 1024);
   pack.set_int(lt::settings_pack::aio_threads, 16);
-  pack.set_int(lt::settings_pack::whole_pieces_threshold, 30);
+  // (nyaa-stream) 30 -> 2: only a peer that can finish a whole piece within
+  // 2s is handed whole pieces. At 30, a ~20 KB/s peer qualified for a
+  // 512 KB piece and could own an urgent piece for ~25s.
+  pack.set_int(lt::settings_pack::whole_pieces_threshold, 2);
   pack.set_bool(lt::settings_pack::piece_extent_affinity, true);
   pack.set_bool(lt::settings_pack::no_atime_storage, true);
 
