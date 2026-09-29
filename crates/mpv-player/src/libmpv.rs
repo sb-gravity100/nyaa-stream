@@ -429,25 +429,48 @@ impl LogBudget {
     }
 }
 
-/// Writes one `mpv_event_log_message` to our log.
+/// Whether an mpv log line means the stream or decoded video is corrupt:
+/// the MKV/lavf demuxer resyncing past bad bytes, or the video decoder
+/// hitting damaged data. Not h264 `mmco` errors - an A-B loop jump makes
+/// those harmlessly.
+fn is_corruption_message(prefix: &str, text: &str) -> bool {
+    let text = text.to_ascii_lowercase();
+    match prefix {
+        "mkv" | "lavf" => text.contains("corrupt file detected") || text.contains("trying to resync"),
+        "ffmpeg/video" | "vd" => {
+            !text.contains("mmco") && (text.contains("error while decoding") || text.contains("concealing"))
+        }
+        _ => false,
+    }
+}
+
+/// Writes one `mpv_event_log_message` to our log; a corruption line also
+/// becomes a `stream-corrupt` event for the frontend (see
+/// `is_corruption_message`), regardless of the log rate limit.
 ///
 /// # Safety
 /// `event` must be a live MPV_EVENT_LOG_MESSAGE from `mpv_wait_event`.
-unsafe fn log_mpv_message(event: &MpvEvent, budget: &mut LogBudget) {
-    if event.data.is_null() || !budget.allow() {
-        return;
+unsafe fn log_mpv_message(event: &MpvEvent, budget: &mut LogBudget) -> Option<Value> {
+    if event.data.is_null() {
+        return None;
     }
     let message = &*(event.data as *const EventLogMessage);
     let prefix = cstr(message.prefix).unwrap_or_default();
     let level = cstr(message.level).unwrap_or_default();
     let text = cstr(message.text).unwrap_or_default();
     let text = text.trim_end();
+    let corrupt = is_corruption_message(&prefix, text)
+        .then(|| json!({ "event": "stream-corrupt", "prefix": prefix, "text": text }));
+    if !budget.allow() {
+        return corrupt;
+    }
     match level.as_str() {
         "fatal" | "error" => tracing::error!(target: "mpv", %prefix, "{text}"),
         "warn" => tracing::warn!(target: "mpv", %prefix, "{text}"),
         "info" => tracing::info!(target: "mpv", %prefix, "{text}"),
         _ => tracing::debug!(target: "mpv", %prefix, %level, "{text}"),
     }
+    corrupt
 }
 
 fn event_loop(lib: &Lib, handle: Handle, stop: &AtomicBool, sender: mpsc::UnboundedSender<Value>) {
@@ -466,7 +489,9 @@ fn event_loop(lib: &Lib, handle: Handle, stop: &AtomicBool, sender: mpsc::Unboun
         }
         if event_id == MPV_EVENT_LOG_MESSAGE {
             // SAFETY: a log-message event straight from mpv_wait_event.
-            unsafe { log_mpv_message(event, &mut log_budget) };
+            if let Some(corrupt) = unsafe { log_mpv_message(event, &mut log_budget) } {
+                let _ = sender.send(corrupt);
+            }
             continue;
         }
         // SAFETY: `event` came from mpv_wait_event just above.
@@ -633,4 +658,19 @@ pub fn apply_options(mpv: &Mpv, options: &[String]) -> anyhow::Result<()> {
         mpv.set_option(&name, &value)?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod corruption_tests {
+    use super::is_corruption_message;
+
+    #[test]
+    fn flags_demuxer_resyncs_and_decode_errors_but_not_mmco() {
+        assert!(is_corruption_message("mkv", "Corrupt file detected. Trying to resync starting from position 1463756843..."));
+        assert!(is_corruption_message("ffmpeg/video", "h264: error while decoding MB 58 30, bytestream -5"));
+        assert!(is_corruption_message("ffmpeg/video", "h264: concealing 1592 DC, 1592 AC, 1592 MV errors in P frame"));
+        assert!(!is_corruption_message("ffmpeg/video", "h264: mmco: unref short failure"));
+        assert!(!is_corruption_message("cplayer", "Audio/Video desynchronisation detected!"));
+        assert!(!is_corruption_message("mkv", "Cluster found at 1464199486."));
+    }
 }
