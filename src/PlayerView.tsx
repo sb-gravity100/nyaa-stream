@@ -65,7 +65,7 @@ const AUDIO_DELAY_STEP = 0.1;
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 /** Jump when Shift is tapped in a file with no opening chapter marked - a
  * standard anime OP length. */
-const INTRO_SKIP_SECONDS = 85;
+const INTRO_SKIP_SECONDS = 90;
 const INTRO_CHAPTER = /^(op|opening|intro)\b|\bopening\b/i;
 const PROGRESS_SAVE_MS = 5000;
 // Countdown shown before auto-starting the next episode.
