@@ -9,6 +9,7 @@ import { Buffering } from "./Buffering";
 import type { WatchTarget } from "./router";
 import { useSettings } from "./settings";
 import { cachedTorrentThumbnail, subscribeFrameSaved } from "./torrentThumbnail";
+import { useEnhancedImage } from "./enhanceImage";
 
 type SourceGroup = [string, { label: EpisodeLabel; releases: NyaaResult[] }];
 
@@ -255,6 +256,7 @@ export function MediaPage({
   // better per-episode coverage than AniList - see src/kitsu.ts), falling
   // back to AniList's poster.
   const backdrop = kitsu?.background ?? anime.bannerImage ?? anime.coverImage.extraLarge ?? anime.coverImage.large;
+  const enhancedBackdrop = useEnhancedImage(backdrop);
   const kitsuThumbnails = kitsu?.episodeThumbnails;
   // Frames already on disk (the player's last frame, or a capture) fill in
   // episodes Kitsu has no picture for, instead of a bare number tile.
@@ -359,7 +361,7 @@ export function MediaPage({
             <img src={backdrop} alt="" />
           </div>
           <div class="media-background-layer" aria-hidden="true">
-            <img class="media-background-image" src={backdrop} alt="" />
+            <img class="media-background-image" src={enhancedBackdrop} alt="" />
           </div>
         </>
       )}
