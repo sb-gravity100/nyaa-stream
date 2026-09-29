@@ -2,6 +2,15 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `ae9e472` · 2026-09-29 · feat(player): picture-in-picture mini always-on-top window (P / button)
+- `src/pip.ts`
+- `src/PlayerView.tsx`
+- `src/HlsPlayerView.tsx`
+- `src/icons.tsx`
+- `src/SettingsPanel.tsx`
+- `src-tauri/capabilities/default.json`
+- `FILE_INDEX.md`
+
 ### `1fb8bc8` · 2026-09-29 · chore: release v0.2.0
 - `package.json`
 - `src-tauri/tauri.conf.json`
