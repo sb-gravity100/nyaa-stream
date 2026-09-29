@@ -181,7 +181,7 @@ async fn screenshot(state: &PlayerState, extension: &str, flags: &str) -> Result
 /// The default subtitle style's font (Gandhi Sans) isn't installed on the
 /// system - write the bundled copies where mpv's `--sub-fonts-dir` finds
 /// them.
-async fn install_fonts() -> std::io::Result<std::path::PathBuf> {
+pub(crate) async fn install_fonts() -> std::io::Result<std::path::PathBuf> {
     const FONTS: &[(&str, &[u8])] = &[
         ("GandhiSans-Bold.otf", include_bytes!("../../src/assets/fonts/GandhiSans-Bold.otf")),
         ("GandhiSans-BoldItalic.otf", include_bytes!("../../src/assets/fonts/GandhiSans-BoldItalic.otf")),
