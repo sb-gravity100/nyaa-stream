@@ -568,7 +568,8 @@ pieces. Causes, in the vendored `enginefs`:
    piece became urgent only when the reader hit it, paying the queue delay
    again each time.
 
-**Fix (vendored `enginefs`, each change noted in `VENDORED.md`):**
+**Fix (vendored `enginefs`, each change noted in `VENDORED.md`; A/B cover
+resumes and seeks, C covers watching from the beginning):**
 
 - **A - startup baseline 0:** foreground streaming intents start the playing
   file at baseline priority 0 (only the priority window is wanted) and raise
@@ -580,6 +581,20 @@ pieces. Causes, in the vendored `enginefs`:
   (16 pieces at 256 KB) at priority 7 with staggered deadlines, and the
   post-first-byte read-ahead keeps the next ~4 MB at 7 instead of just the
   current piece, so mpv's startup prefill downloads in parallel.
+- **C - sequential mode when watching from the beginning:** a foreground
+  stream whose first read is at offset 0 (no resume position) turns on
+  libtorrent's `set_sequential_download(true)` with the file at baseline 1,
+  so the whole file fills in playback order instead of rarest-first - the
+  pieces the player needs next are always the ones in flight. Upstream turns
+  sequential off everywhere; our change keeps it on for this case only.
+  libtorrent still ranks piece priority above sequential order, so the
+  priority-7 window and pinned container metadata (MKV Cues / MP4 moov) still
+  jump the queue. Sequential mode switches off (back to A/B) on the first
+  seek beyond the downloaded range, on a resume start, and for background /
+  probe / preload reads. A's baseline-0 phase is skipped in sequential mode -
+  in-order download already keeps bulk work behind the head.
+  Trade-off: rarest-first protects swarm health; for one viewer streaming
+  from the start, order matters more.
 - Log line fix: the "waiting for verified piece" diagnostic reports the window
   for the effective intent (it printed the original intent's window).
 
