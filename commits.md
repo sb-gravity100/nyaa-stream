@@ -1,3 +1,7 @@
+### `bfe02c5` · 2026-09-29 · docs: plan 32-bit Windows support for v1.0.0
+- `PLAN.md`
+- `PHASES.md`
+
 ### `7e90fe0` · 2026-09-29 · docs: drop Linux/multiplatform, v1.0.0 is the stable Windows release
 - `PLAN.md`
 - `PHASES.md`
