@@ -121,18 +121,18 @@ export function ExportDialog({ defaultName, start, end, duration, audioTracks, a
 
         <label class="export-field">
           <span>File name</span>
-          <input ref={nameRef} type="text" class="setting-text-input" value={name} onInput={(e) => setName((e.target as HTMLInputElement).value)} />
+          <input ref={nameRef} type="text" class="setting-text-input" disabled={exporting} value={name} onInput={(e) => setName((e.target as HTMLInputElement).value)} />
           <small>Saved as MP4 (H.264 / AAC). An existing file is never overwritten.</small>
         </label>
 
         <div class="export-range">
           <label class="export-field">
             <span>Start</span>
-            <input type="text" class="setting-text-input" value={startText} onInput={(e) => setStartText((e.target as HTMLInputElement).value)} />
+            <input type="text" class="setting-text-input" disabled={exporting} value={startText} onInput={(e) => setStartText((e.target as HTMLInputElement).value)} />
           </label>
           <label class="export-field">
             <span>End</span>
-            <input type="text" class="setting-text-input" value={endText} onInput={(e) => setEndText((e.target as HTMLInputElement).value)} />
+            <input type="text" class="setting-text-input" disabled={exporting} value={endText} onInput={(e) => setEndText((e.target as HTMLInputElement).value)} />
           </label>
           <div class="export-length">{rangeError ? <span class="export-invalid">{rangeError}</span> : length != null ? `${formatClipTime(length)} long` : ""}</div>
         </div>
@@ -140,7 +140,7 @@ export function ExportDialog({ defaultName, start, end, duration, audioTracks, a
         {audioTracks.length > 1 && (
           <label class="export-field">
             <span>Audio track</span>
-            <select class="setting-text-input" value={audioPosition} onChange={(e) => setAudioPosition(Number((e.target as HTMLSelectElement).value))}>
+            <select class="setting-text-input" disabled={exporting} value={audioPosition} onChange={(e) => setAudioPosition(Number((e.target as HTMLSelectElement).value))}>
               {audioTracks.map((track, i) => (
                 <option key={track.index} value={i}>
                   {subtitleTrackLabel(track, i)} ({track.codec.toUpperCase()})
@@ -173,7 +173,7 @@ export function ExportDialog({ defaultName, start, end, duration, audioTracks, a
         {savedPath && !exporting && (
           <p class="export-saved">
             Saved <code>{savedPath}</code>{" "}
-            <button class="button button-quiet" type="button" onClick={() => void revealItemInDir(savedPath).catch(() => undefined)}>
+            <button class="button button-quiet" type="button" disabled={exporting} onClick={() => void revealItemInDir(savedPath).catch(() => undefined)}>
               Show in folder
             </button>
           </p>
