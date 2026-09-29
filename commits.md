@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `4a61101` · 2026-09-29 · docs: plan the hero long-title fix
+- `PLAN.md`
+- `PHASES.md`
+
 ### `7b36720` · 2026-09-29 · fix: serve freshly verified pieces from libtorrent's own copy
 - `vendor/enginefs/src/piece_waiter.rs`
 - `vendor/enginefs/src/backend/libtorrent/disk_stream.rs`
