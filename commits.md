@@ -1,3 +1,8 @@
+### `1849140` · 2026-09-29 · docs: move contact and send logs to v0.4.0, publish v0.4.0 and v0.8.0
+- `PLAN.md`
+- `PHASES.md`
+- `CLAUDE.md`
+
 # commits.md
 
 Commit log, newest first. Prepend a new entry after every commit.
