@@ -2,6 +2,11 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `1fb8bc8` · 2026-09-29 · chore: release v0.2.0
+- `package.json`
+- `src-tauri/tauri.conf.json`
+- `src-tauri/Cargo.toml`
+
 ### `0b76a74` · 2026-09-29 · feat(logging): write a rolling daily log file (release has no console)
 - `src-tauri/src/lib.rs`
 - `src-tauri/Cargo.toml`
