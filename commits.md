@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `49099cf` · 2026-09-29 · feat(player): export dialog disables all controls while exporting
+- `src/ExportDialog.tsx`
+- `src/App.css`
+
 ### `772c709` · 2026-09-29 · fix(player): fallback opening skip is 90s, not 85s
 - `src/PlayerView.tsx`
 - `src/SettingsPanel.tsx`
