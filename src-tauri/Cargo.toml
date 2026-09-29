@@ -49,4 +49,4 @@ tauri-plugin-process = "2"
 
 [target.'cfg(windows)'.dependencies]
 # Finding mpv's child window and pushing it below the webview (player.rs).
-windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging"] }
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_UI_WindowsAndMessaging"] }

@@ -527,6 +527,11 @@ async fn capture_thumbnail_uncached(
     if let Err(err) = state.torrent_engine.remove(torrent_id.clone()).await {
         tracing::warn!(torrent_id = %torrent_id, %err, "failed to remove scratch thumbnail torrent");
     }
+    let app = state.clone();
+    tokio::spawn(async move {
+        tokio::time::sleep(FILE_RELEASE_DELAY).await;
+        let _ = tokio::task::spawn_blocking(move || app.download_cache.discard_unindexed(&torrent_id, &files)).await;
+    });
 
     match capture_result {
         Ok(Ok(())) => Ok(()),
@@ -879,14 +884,24 @@ async fn play_magnet(
     Ok(PlaySession { torrent_id: added.id, files, default_file_idx })
 }
 
-/// Removes the backing torrent (stop seeding, drop partial files) - used by
+/// How long libtorrent may keep a removed torrent's files open.
+const FILE_RELEASE_DELAY: Duration = Duration::from_secs(2);
+
+/// Removes the backing torrent from the session (stop seeding) - used by
 /// `stop_playback` and defensively by `play_magnet` before starting a new
-/// session.
-async fn cleanup_playback(state: &AppState) {
+/// session. Its files stay in the download cache, which is then trimmed to
+/// its cap.
+async fn cleanup_playback(state: &Arc<AppState>) {
     if let Some(torrent_id) = state.current_torrent.lock().await.take() {
         if let Err(err) = state.torrent_engine.remove(torrent_id.clone()).await {
             tracing::warn!(torrent_id = %torrent_id, %err, "cleanup_playback: failed to remove torrent");
         }
+        let app = state.clone();
+        tokio::spawn(async move {
+            tokio::time::sleep(FILE_RELEASE_DELAY).await;
+            let playing = app.current_torrent.lock().await.clone();
+            let _ = tokio::task::spawn_blocking(move || app.download_cache.evict(playing.as_deref(), false, "playback stopped")).await;
+        });
     }
 }
 
@@ -1247,6 +1262,8 @@ pub fn run() {
             .join("downloads");
         tracing::debug!(?download_dir, "torrent download dir");
         let download_cache = download_cache::DownloadCache::load(download_dir.clone());
+        // Before the engine opens anything, so leftovers can go too.
+        download_cache.evict(None, true, "startup");
         let torrent_engine = TorrentEngine::start(download_dir).await.unwrap_or_else(|err| {
             tracing::error!(%err, "failed to start torrent engine");
             panic!("failed to start torrent engine: {err}");
