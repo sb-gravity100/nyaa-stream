@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `9234c19` · 2026-09-29 · docs: rewrite README as a full user and developer guide
+- `README.md`
+
 ### `27ea4ea` · 2026-09-29 · docs: document npm run setup in README and FILE_INDEX
 - `README.md`
 - `FILE_INDEX.md`
