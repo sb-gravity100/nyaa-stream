@@ -823,8 +823,22 @@ and quality and often missing. Researched 2026-09-29:
   on the home hero and media page, as Stremio does.
 - **New crate `crates/artwork-client`** (TMDB + fanart.tv + Simkl + the id
   map), disk-cached like `kitsu-client`, one `get_artwork(anilist_id)`
-  command returning `{ backdrop, logo, source }`. Keys: bundled app keys
-  with a Settings override for each; attribution in Settings → About.
+  command returning `{ backdrop, logo, source }`.
+- **TMDB key: user-supplied, never bundled.** The TMDB key was requested for
+  personal use (2026-09-29), with the application summary stating the key
+  is not shipped in published builds. So: a "TMDB API Read Access Token"
+  field in Settings (stored in the app's settings file, not the repo or
+  the installer), sent as `Authorization: Bearer` - never as a URL query
+  param - and never logged. No token → the TMDB steps (backdrops, logos,
+  episode stills) are skipped and the chain starts at fanart.tv. Settings
+  links to TMDB's API page to get one. fanart.tv / Simkl keys follow the
+  same user-supplied pattern unless their terms allow bundling.
+- **Attribution (TMDB terms):** Settings → About shows TMDB's official logo
+  (`src/assets/tmdb-logo.svg`, the "blue_short" asset), smaller than the
+  app's own branding, with "This product uses TMDB and the TMDB APIs but is
+  not endorsed, certified, or otherwise approved by TMDB." TMDB data and
+  images are cached at most 6 months (terms limit); fanart.tv and Simkl are
+  credited alongside.
 - **Sizes:** load a 1280-wide variant first (TMDB `w1280`, Simkl `_mobile`)
   and swap to full size once decoded, so hero slides don't stall.
 
