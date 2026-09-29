@@ -2,6 +2,12 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `0cce65e` · 2026-09-29 · perf(build): add release profile (thin LTO, strip symbols)
+- `Cargo.toml`
+
+### `bef7eca` · 2026-09-29 · perf(frontend): lazy-load HLS fallback player (main chunk 794kB -> 161kB)
+- `src/PlayerView.tsx`
+
 ### `edae935` · 2026-09-29 · fix(player): subtitle button tooltip lists the real mpv shortcuts
 - `src/PlayerView.tsx`
 
