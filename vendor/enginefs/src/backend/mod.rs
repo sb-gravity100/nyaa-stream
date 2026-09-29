@@ -53,6 +53,11 @@ pub trait TorrentHandle: Send + Sync + Clone {
     async fn is_finished(&self) -> bool {
         false
     }
+    /// Fetch `file_idx` at the lowest priority alongside the file being
+    /// played (`None` stops). Backends without per-file priorities ignore it.
+    async fn set_preload_file(&self, _file_idx: Option<usize>) -> Result<()> {
+        Ok(())
+    }
     /// Whether this handle owns file selection, resume, and idle-pause
     /// lifecycle internally.
     fn manages_playback_lifecycle(&self) -> bool {

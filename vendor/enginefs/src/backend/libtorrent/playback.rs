@@ -245,6 +245,9 @@ struct TorrentPlaybackState {
     idle_deadline: Option<Instant>,
     cancellation: CancellationToken,
     acknowledged_priorities: Option<Vec<i32>>,
+    /// A file to fetch at the lowest priority alongside the playing one
+    /// (`set_preload_file`), e.g. the next episode of a batch.
+    preload_file: Option<usize>,
     metadata_announced: bool,
     last_emergency_reannounce: Option<Instant>,
     priority_windows: ActivePriorityWindows,
@@ -268,6 +271,7 @@ impl TorrentPlaybackState {
             idle_deadline: None,
             cancellation: CancellationToken::new(),
             acknowledged_priorities: None,
+            preload_file: None,
             metadata_announced: false,
             last_emergency_reannounce: None,
             priority_windows: ActivePriorityWindows::default(),
@@ -944,10 +948,12 @@ impl LibtorrentPlaybackCoordinator {
             handle.clear_piece_deadlines();
         }
 
+        let preload_file = entry.state.lock().await.preload_file;
         let desired = desired_priorities(
             layout.files.len(),
             start.file_idx,
             selection.native_priority,
+            preload_file,
         )?;
         let local_fast_path = complete && !self.seeding_enabled.load(Ordering::Relaxed) && {
             let state = entry.state.lock().await;
@@ -1108,6 +1114,36 @@ impl LibtorrentPlaybackCoordinator {
     ) -> bool {
         let state = entry.state.lock().await;
         state.generation == generation && state.selected_file == Some(file_idx)
+    }
+
+    /// Fetches `file_idx` at the lowest priority next to the file being
+    /// played (`None` stops). Stored for later activations too; if a file is
+    /// playing right now the bulk priorities are updated immediately.
+    pub(crate) async fn set_preload_file(self: &Arc<Self>, info_hash: &str, file_idx: Option<usize>) -> Result<()> {
+        let entry = self.entry(info_hash).await;
+        let _operation = entry.operation.lock().await;
+        let (active, priority, active_phase, acknowledged) = {
+            let mut state = entry.state.lock().await;
+            state.preload_file = file_idx;
+            (
+                state.selected_file,
+                state.selected_priority,
+                state.phase == LibtorrentNetworkPhase::Active,
+                state.acknowledged_priorities.clone(),
+            )
+        };
+        let (Some(active), true, Some(acknowledged)) = (active, active_phase, acknowledged) else {
+            tracing::debug!(info_hash = %info_hash, ?file_idx, "preload file stored for the next activation");
+            return Ok(());
+        };
+        let desired = desired_priorities(acknowledged.len(), active, priority, file_idx)?;
+        if desired == acknowledged {
+            return Ok(());
+        }
+        self.apply_file_priorities(info_hash, &desired).await?;
+        entry.state.lock().await.acknowledged_priorities = Some(desired);
+        tracing::info!(info_hash = %info_hash, active_file = active, ?file_idx, "preload file priority applied");
+        Ok(())
     }
 
     async fn apply_file_priorities(&self, info_hash: &str, priorities: &[i32]) -> Result<()> {
@@ -1896,12 +1932,19 @@ impl LibtorrentPlaybackCoordinator {
     }
 }
 
-fn desired_priorities(file_count: usize, file_idx: usize, priority: i32) -> Result<Vec<i32>> {
+/// Priority of the preloaded file: libtorrent's lowest non-zero, so it only
+/// gets bandwidth the playing file's own (higher) pieces don't want.
+const PRELOAD_FILE_PRIORITY: i32 = 1;
+
+fn desired_priorities(file_count: usize, file_idx: usize, priority: i32, preload: Option<usize>) -> Result<Vec<i32>> {
     if file_idx >= file_count {
         return Err(anyhow!("File index {file_idx} out of range"));
     }
     let mut priorities = vec![0; file_count];
     priorities[file_idx] = priority;
+    if let Some(preload) = preload.filter(|p| *p != file_idx && *p < file_count && priority > 0) {
+        priorities[preload] = PRELOAD_FILE_PRIORITY;
+    }
     Ok(priorities)
 }
 
@@ -1932,7 +1975,7 @@ mod tests {
 
     #[test]
     fn priority_vector_size_is_constant_operation_for_large_torrent() {
-        let priorities = desired_priorities(366, 365, 1).expect("valid file");
+        let priorities = desired_priorities(366, 365, 1, None).expect("valid file");
         assert_eq!(
             priorities.iter().filter(|&&priority| priority > 0).count(),
             1
@@ -1971,8 +2014,17 @@ mod tests {
     }
 
     #[test]
+    fn preload_file_gets_the_lowest_priority_only_while_playing() {
+        assert_eq!(desired_priorities(4, 1, 7, Some(2)).unwrap(), vec![0, 7, 1, 0]);
+        // Never the playing file itself, an out-of-range index, or when nothing plays.
+        assert_eq!(desired_priorities(4, 1, 7, Some(1)).unwrap(), vec![0, 7, 0, 0]);
+        assert_eq!(desired_priorities(4, 1, 7, Some(9)).unwrap(), vec![0, 7, 0, 0]);
+        assert_eq!(desired_priorities(4, 1, 0, Some(2)).unwrap(), vec![0, 0, 0, 0]);
+    }
+
+    #[test]
     fn complete_file_uses_zero_priority_vector() {
-        let priorities = desired_priorities(3, 1, 0).expect("valid file");
+        let priorities = desired_priorities(3, 1, 0, None).expect("valid file");
         assert_eq!(priorities, vec![0, 0, 0]);
     }
 
