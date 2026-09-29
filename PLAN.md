@@ -131,6 +131,16 @@ requires, beyond Rust/Node:
   stream-server's own build config - this is a real minimum CPU
   requirement for anyone building or running this app, not just a compiler
   hint.
+- **Release database:** every nyaa.si release seen is stored permanently in a
+  local SQLite database (`nyaa.db` in the app data dir, `nyaa-client/src/store.rs`)
+  keyed by nyaa's release id (`/view/<id>`), so overlapping queries never
+  duplicate a torrent. A show page paints in phases: `search_local_releases`
+  (database only, instant) → `search_fansubber_releases` (only the Settings
+  preferred fansubber, ~1 request) → the full `search_torrents_for_anime`,
+  which replays a fresh stored query with no request and otherwise pages only
+  until it reaches releases already stored. All requests share one throttle
+  (`throttle.rs`: 2 in flight, paced, 429/503 back-off with `Retry-After`).
+  The database is user data - "Clear cache" leaves it alone.
 - **Torrent source:** nyaa.si search, scraping its paginated HTML results
   table (its RSS feed was found to silently ignore the `p=` page param and
   always cap at 75 results — see `crates/nyaa-client`); responses are
