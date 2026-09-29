@@ -2,6 +2,13 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `1924b71` · 2026-09-29 · build: fetch prebuilt native libs instead of building with vcpkg
+- `scripts/fetch-native-deps.mjs`
+- `package.json`
+- `README.md`
+- `PLAN.md`
+- `FILE_INDEX.md`
+
 ### `ceff8b6` · 2026-09-29 · docs: rewrite README, remove releasing section
 - `README.md`
 
