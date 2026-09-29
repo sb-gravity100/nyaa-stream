@@ -454,6 +454,26 @@
             (debounced, cached; time only when not downloaded)
       - [ ] PLAN.md/FILE_INDEX.md sync, `npm run bump -- minor`, tag
             `v0.8.0` locally (not pushed/published - see PLAN.md "Release plan")
+- [ ] Navigation and home rehaul (v0.9.0, see PLAN.md "Navigation and home
+      rehaul + Discover"): one commit each -
+      - [ ] Left rail component + layout shell (hidden in the player)
+      - [ ] Routes `#/library`, `#/discover`, `#/discover/browse`
+      - [ ] Library page; Home "Your library" row
+      - [ ] Search moved into the rail (+ global shortcut)
+      - [ ] Home restyled for the rail layout
+      - [ ] Verify live; PLAN.md/FILE_INDEX.md sync, `npm run bump -- minor`,
+            tag `v0.9.0` locally (not pushed/published)
+- [ ] Discover (v0.9.1, see PLAN.md "Navigation and home rehaul + Discover"):
+      one commit each -
+      - [ ] `anilist-client` queries: trending, season, upcoming, popular,
+            filtered browse, recommendations, airing schedules (+ tests)
+      - [ ] Tauri commands + session/disk cache; Kitsu fallback where it exists
+      - [ ] Discover page rows (trending / season / upcoming / popular)
+      - [ ] Browse page: filters, sort, infinite scroll, URL state
+      - [ ] Recommendations rows from library/watch history
+      - [ ] Airing schedule calendar
+      - [ ] PLAN.md/FILE_INDEX.md sync, `npm run bump -- patch`, tag
+            `v0.9.1` locally (not pushed/published)
 - [ ] 32-bit Windows (v1.0.0, see PLAN.md "32-bit Windows support"): one
       commit each -
       - [ ] Audit 64-bit assumptions (`usize` casts, sizes/offsets as `u64`,
