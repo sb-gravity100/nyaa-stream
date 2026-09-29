@@ -323,11 +323,107 @@ a {
   }
 }
 
+/* ---------- Title bar (frameless window) ---------- */
+
+:root {
+  --titlebar-h: 32px;
+}
+
+body {
+  padding-top: var(--titlebar-h);
+}
+
+/* The player is fixed full-window; the strip overlays it instead. */
+body:has(.player-view) {
+  padding-top: 0;
+}
+
+.titlebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 300;
+  height: var(--titlebar-h);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--glass);
+  backdrop-filter: var(--glass-blur);
+  user-select: none;
+  transition: opacity 0.28s var(--ease-out);
+}
+
+/* Player: fades with the top controls. */
+body:has(.player-view) .titlebar {
+  background: linear-gradient(rgba(0, 0, 0, 0.7), transparent);
+  backdrop-filter: none;
+}
+
+body:has(.player-view:not(.controls-shown)) .titlebar {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* The webview is see-through over mpv and the rest of body is hidden. */
+html.mpv-active .titlebar {
+  visibility: visible;
+}
+
+.titlebar-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 12px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-dim, var(--text));
+}
+
+.titlebar-title .app-brand-mark {
+  width: 16px;
+  height: 16px;
+}
+
+.titlebar-controls {
+  display: flex;
+  height: 100%;
+}
+
+.titlebar-btn {
+  width: 46px;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  cursor: default;
+}
+
+.titlebar-btn svg {
+  width: 10px;
+  height: 10px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1;
+}
+
+.titlebar-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.titlebar-close:hover {
+  background: #e81123;
+  color: #fff;
+}
+
 /* ---------- App bar + search ---------- */
 
 .app-bar {
   position: sticky;
-  top: 0;
+  top: var(--titlebar-h);
   z-index: 30;
   display: grid;
   grid-template-columns: 1fr minmax(0, 620px) 1fr;

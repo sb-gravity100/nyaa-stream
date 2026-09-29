@@ -6,6 +6,7 @@ import "@fontsource/zen-kaku-gothic-new/700.css";
 // falls through to Zen Kaku).
 import "@fontsource-variable/outfit";
 import App from "./App";
+import { TitleBar } from "./TitleBar";
 import { WhatsNew } from "./WhatsNew";
 import { installDevLogger } from "./devLogger";
 import { installFullscreenHotkey } from "./fullscreen";
@@ -14,6 +15,7 @@ installDevLogger();
 installFullscreenHotkey();
 render(
   <>
+    <TitleBar />
     <App />
     <WhatsNew />
   </>,

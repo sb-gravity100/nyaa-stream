@@ -17,6 +17,8 @@
         "width": 1100,
         "height": 720,
         "maximized": true,
+        "decorations": false,
+        "shadow": true,
         "visible": false
       },
       {
