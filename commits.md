@@ -2,6 +2,12 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `9e199a5` · 2026-09-29 · feat: upscale and sharpen hero and backdrop art
+- `src/enhanceImage.ts`
+- `src/HomePage.tsx`
+- `src/MediaPage.tsx`
+- `FILE_INDEX.md`
+
 ### `89c310e` · 2026-09-29 · feat(player): preload the next episode of a batch at low priority and keep playing from that batch
 - `src/PlayerView.tsx`
 - `FILE_INDEX.md`
