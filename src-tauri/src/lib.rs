@@ -1,3 +1,4 @@
+mod cache;
 mod metadata_fallback;
 mod player;
 
@@ -970,6 +971,8 @@ pub fn run() {
 
     let app_state = tauri::async_runtime::block_on(async {
         tracing::info!("starting nyaa-stream");
+        // Segments from the last run are unreachable garbage now.
+        cache::purge_hls_cache();
         // The user's actual Downloads folder isn't the right place for
         // torrent scratch data the app manages and cleans up itself
         // (stop_playback removes the torrent, but the on-disk file lingers
@@ -1032,13 +1035,21 @@ pub fn run() {
             copy_frame_to_clipboard,
             stop_playback,
             export_clip,
+            cache::get_cache_sizes,
+            cache::clear_cache,
             player::mpv_available,
+            player::set_mpv_path,
             player::mpv_start,
             player::mpv_command,
             player::mpv_stop,
             player::mpv_frame,
             player::mpv_copy_frame
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|_app, event| {
+            if let tauri::RunEvent::Exit = event {
+                cache::purge_hls_cache();
+            }
+        });
 }

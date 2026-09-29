@@ -40,7 +40,7 @@ impl EmbeddedMpv {
         let socket_path = ipc_path();
         tracing::debug!(wid, socket_path, "spawning embedded mpv");
 
-        let mut command = Command::new("mpv");
+        let mut command = Command::new(crate::mpv_program());
         #[cfg(windows)]
         command.creation_flags(0x0800_0000);
         command

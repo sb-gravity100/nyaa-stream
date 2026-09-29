@@ -2,7 +2,9 @@ mod embedded;
 
 pub use embedded::EmbeddedMpv;
 
+use std::path::PathBuf;
 use std::process::Stdio;
+use std::sync::{Mutex as StdMutex, OnceLock};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -14,6 +16,20 @@ use tokio::sync::Mutex;
 use tokio::net::windows::named_pipe::{ClientOptions, NamedPipeClient};
 #[cfg(unix)]
 use tokio::net::UnixStream;
+
+static MPV_PATH: OnceLock<StdMutex<Option<PathBuf>>> = OnceLock::new();
+
+/// Overrides which `mpv` executable every spawn uses (`None`: the one on
+/// PATH) - the user's Settings choice.
+pub fn set_mpv_path(path: Option<PathBuf>) {
+    tracing::info!(?path, "mpv path override set");
+    *MPV_PATH.get_or_init(Default::default).lock().unwrap() = path;
+}
+
+/// The `mpv` program to spawn: the override, else `mpv` from PATH.
+pub fn mpv_program() -> PathBuf {
+    MPV_PATH.get_or_init(Default::default).lock().unwrap().clone().unwrap_or_else(|| PathBuf::from("mpv"))
+}
 
 #[derive(Serialize)]
 struct MpvCommand<'a> {
@@ -93,7 +109,7 @@ impl MpvPlayer {
         let socket_path = ipc_path();
         tracing::debug!(label, stream_url, socket_path, "spawning mpv");
 
-        let mut command = Command::new("mpv");
+        let mut command = Command::new(mpv_program());
         // Hidden like every other child the release build spawns - see
         // torrent-engine's `hidden_command`. mpv is headless here anyway
         // (`--vo=null`-style thumbnail capture), so no window is lost.
