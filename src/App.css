@@ -3140,3 +3140,61 @@ html.mpv-active .player-view {
   font-variant-numeric: tabular-nums;
   opacity: 0.75;
 }
+
+/* Release badges and seeder health in the player's source list. */
+.release-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 3px 0 2px;
+}
+
+.release-badges:empty {
+  display: none;
+}
+
+.release-badge {
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--faint);
+}
+
+.release-badge-good {
+  color: var(--health);
+  border-color: currentColor;
+}
+
+.release-badge-warn {
+  color: #ffb454;
+  border-color: currentColor;
+}
+
+.player-menu-meta .seeders-dead {
+  color: #ff6b6b;
+}
+
+.player-menu-meta .seeders-weak {
+  color: #ffb454;
+}
+
+.player-menu-select {
+  max-width: 170px;
+  padding: 3px 6px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  font: inherit;
+  font-size: 0.8rem;
+}
+
+.player-dead-warning {
+  top: auto;
+  bottom: 24%;
+  transform: translateX(-50%);
+  border: 1px solid #ffb454;
+}
