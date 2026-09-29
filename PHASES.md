@@ -277,3 +277,13 @@
       glass dock), controls also revealed by hovering the top edge;
       verbose statistics popup (torrent, streaming run, playback,
       thumbnail)
+- [ ] Context menus (v0.4.0, see PLAN.md "Context menus"): one commit each -
+      - [ ] `tauri-plugin-clipboard-manager` (Rust, capability, JS)
+      - [ ] `contextMenu.ts` store + `ContextMenu.tsx` component
+      - [ ] Global listener: block native menu (dev Shift+right-click
+            exempt), text-input Cut/Copy/Paste/Select all, selection Copy
+      - [ ] Anime cards/posters + search dropdown + Continue watching
+      - [ ] Episode rows + source/torrent rows
+      - [ ] Player surface (flat, no Subtitles/Speed)
+      - [ ] FILE_INDEX.md/PLAN.md sync, `npm run bump -- minor`, tag
+            `v0.4.0`
