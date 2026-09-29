@@ -1235,14 +1235,25 @@ right; mpv just hasn't started reading the track's packets from the torrent
 stream at that point (the pick fires while the file is still opening,
 before the demuxer has the track's early packets).
 
-- **Diagnose first**: log the `sid`/`sub-text`/`sub-start` state at pick time
-  and ~2s after `playing`, on a repro file, before choosing the fix.
-- **Fix**: once per file, after the first `playing` event, re-assert the
-  picked track (`sid` set again, only if it is still the user's selection
-  and `sub-text` is empty), so the toggle happens automatically. If that
-  isn't enough for tracks whose packets sit later in the container, add an
-  explicit sub-track preload: enginefs treats subtitle-cluster ranges as
-  metadata reads (priority 7) - decide after the diagnosis.
+- **Log finding (2026-09-29, `nyaa-stream.2026-09-29.log`)**: every switch
+  to a track (`sid` 1) is followed ~100ms later by `[mpv] buffering`, and
+  the engine logs "waiting for verified piece". mpv discards subtitle packets
+  it read while the track was off, so selecting an embedded track mid-play
+  makes the demuxer re-read the subtitle packets from earlier in the file
+  (ASS needs every event since the start) - byte ranges of the torrent that
+  may not be downloaded yet. `sid=no` therefore also drops the track's
+  packets, so cycling EN → off → EN re-triggers the reload each time. This
+  is the same mechanism as the "subs don't show until toggled": the
+  on-open pick arrives after mpv already started demuxing without the track.
+- **Fix**: (1) Off = `sub-visibility=no`, keeping `sid` on the selected
+  track so its packets keep being demuxed (no buffering when cycling
+  EN ↔ off); `sid` only changes when the user picks a different track.
+  (2) Preload: pass the default track to mpv at load time (`sid=<default>`
+  / `--slang` from the setting, set before `loadfile`) so packets are read
+  from the first byte instead of after the on-open pick, and re-assert `sid`
+  once after the first `playing` if `sub-text` is still empty. (3) If a
+  track switch to a *different* track still stalls, treat the subtitle byte
+  ranges as metadata reads in enginefs (priority 7) - decide after (1)-(2).
 - Never changes the user's own on/off/track choice; no-op with subtitles
   off or no tracks.
 

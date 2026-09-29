@@ -375,10 +375,14 @@
       - [ ] Verify live: Resume from Continue watching → first frame time
 - [ ] Subtitle preloading (v0.4.0, see PLAN.md "Subtitle preloading"): one
       commit each -
-      - [ ] Log `sid`/`sub-text` at pick time and after `playing` (repro)
-      - [ ] Re-assert the picked track once per file after first `playing`
-      - [ ] If still late: enginefs subtitle-range preload
-      - [ ] Verify live: subs visible on first play without toggling
+      - [ ] Off = `sub-visibility=no` with `sid` kept (no re-demux buffering
+            when cycling EN / off)
+      - [ ] Preload: default `sid` set before `loadfile`; re-assert once after
+            first `playing` if `sub-text` is empty
+      - [ ] If a different-track switch still stalls: enginefs subtitle-range
+            metadata reads
+      - [ ] Verify live: subs visible on first play without toggling; EN / off cycling no
+            longer shows the buffering spinner
 - [ ] Contact and send logs (v0.4.0, see PLAN.md "Contact and send
       logs"): one commit each -
       - [ ] `export_logs`: zip logs + `system.txt` into Downloads, reveal;
