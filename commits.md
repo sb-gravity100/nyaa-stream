@@ -2,6 +2,26 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `29e0ab1` · 2026-09-29 · docs: tick splash and logo in PHASES.md
+- `PHASES.md`
+
+### `62d7829` · 2026-09-29 · chore: regenerate installer art from the new icon
+- `src-tauri/installer/banner.bmp`
+- `src-tauri/installer/dialog.bmp`
+
+### `2a01e3c` · 2026-09-29 · chore: regenerate app icons from the polished logo
+- `src-tauri/icons/`
+
+### `82d462a` · 2026-09-29 · feat: polish the logo
+- `src/icons.tsx`
+- `public/favicon.svg`
+- `src-tauri/icons/icon.svg`
+- `index.html`
+
+### `565e859` · 2026-09-29 · docs: plan the logo polish for v0.3.2
+- `PLAN.md`
+- `PHASES.md`
+
 ### `5ce72b2` · 2026-09-29 · feat: add an animated splash screen
 - `index.html`
 - `src/main.tsx`
