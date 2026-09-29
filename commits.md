@@ -1,3 +1,10 @@
+### `8b0532b` · 2026-09-30 · feat: record the byte ranges mpv reads to open a file
+- `crates/torrent-engine/src/resume_buffer.rs`
+- `crates/torrent-engine/src/lib.rs`
+- `src-tauri/src/lib.rs`
+- `src/playback.ts`
+- `src/PlayerView.tsx`
+
 ### `30756b8` · 2026-09-30 · docs: download cache as built, tasks done
 - `PHASES.md`
 - `PLAN.md`
