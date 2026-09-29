@@ -133,7 +133,9 @@ function Hero({
       {art && <img key={`in-${anime.id}`} class={`home-hero-art${slide.current ? ` slide-in-${slide.current.dir}` : ""}`} src={art} alt="" />}
       <div class="home-hero-body" key={anime.id} data-slide={slide.current?.dir}>
         <div class="home-hero-reason">{featured.reason}</div>
-        <h1 class="home-hero-title">{title}</h1>
+        <h1 class={`home-hero-title${title.length > 40 ? " long" : ""}`} title={title}>
+          {title}
+        </h1>
         {anime.title.native && anime.title.native !== title && (
           <div class="home-hero-native" lang="ja">
             {anime.title.native}
