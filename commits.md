@@ -1,3 +1,8 @@
+### `fda4a99` · 2026-09-29 · docs: plan Windows + Linux multiplatform debut as v1.0.0
+- `PLAN.md`
+- `PHASES.md`
+- `CLAUDE.md`
+
 ### `8fddaf3` · 2026-09-29 · docs: plan subtitle off as sub-visibility, from log findings
 - `PLAN.md`
 - `PHASES.md`
