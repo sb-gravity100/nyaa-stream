@@ -707,6 +707,41 @@ Depends on v0.3.2's `watch: resume` continue-watch mode.
 - **Commands:** `save_resume_buffer` (runs inside `stop_playback`),
   `drop_resume_buffer(anime_id, episode_key)`, `sweep_resume_buffers(keep)`.
 
+## Build thumbnails button (planned, v0.6.0 - minor: new feature)
+
+The media page's episode list only shows Kitsu / AniList art or frames
+already on disk (`useLocalThumbnails` → `cached_torrent_thumbnail`); an
+episode neither covers is a bare number tile. The torrent frame capture
+(`capture_torrent_thumbnail`: scratch torrent + headless mpv at half the
+episode's duration) already exists but only runs for the home page's Latest
+Episodes cards. A button on the Episodes section runs it on demand.
+
+- **Button:** in the Episodes section header, "Build thumbnails (N)", shown
+  only when N > 0 visible episode rows have no thumbnail from any source.
+  While running: "Building 3/12 · Cancel"; at the end, "N failed" if any.
+- **Which release:** the smallest file among the row's sources with a live
+  swarm (>= 3 seeders; falls back to the next smallest, then to the
+  best-seeded one). Only the header and a few MB around the midpoint are
+  downloaded, and a smaller (lower-bitrate, often 720p/480p) file covers
+  that midpoint in fewer MB and decodes faster; the 640px thumbnail doesn't
+  need 1080p. Single-episode releases win over batches, and a batch is
+  compared by its size divided by its episode count. Taken from the rows'
+  own nyaa listings, so no new search.
+- **Batches:** `capture_torrent_thumbnail` gains optional `file_idx`; for a
+  batch the queue adds its torrent once, matches each episode's file with
+  the player's episode-file matcher, and captures them one after another
+  from the same torrent before removing it.
+- **Queue:** one capture at a time (existing `thumbnail_captures` semaphore),
+  in list order. It pauses while playback is active (the command's existing
+  deferral) and continues after. Cancel stops the queue after the current
+  capture. A manual build ignores the "failed recently" marker (`force`
+  flag); failures still write it, so automatic lookups don't retry.
+- **Tiles:** a row being captured shows a spinner over its number tile; a
+  result fills it through the existing frame-saved notification
+  (`subscribeFrameSaved`), same as a player last frame.
+- **Cost:** each capture downloads the file header and a few MB around the
+  midpoint; the scratch torrent is removed afterwards (existing behaviour).
+
 ## Known gaps / not yet implemented
 
 - (HLS fallback player only - mpv reads the file's real duration.) The

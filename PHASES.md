@@ -331,3 +331,15 @@
       - [ ] Player surface (flat, no Subtitles/Speed)
       - [ ] FILE_INDEX.md/PLAN.md sync, `npm run bump -- minor`, tag
             `v0.5.0`
+- [ ] Build thumbnails button (v0.6.0, see PLAN.md "Build thumbnails
+      button"): one commit each -
+      - [ ] `capture_torrent_thumbnail`: optional `file_idx` and `force`
+      - [ ] Batch captures share one torrent across their episodes
+      - [ ] Capture source pick: smallest file with >= 3 seeders (batch =
+            size / episodes, single episodes first), fallbacks
+      - [ ] Capture queue (list order, pause while playing, cancel)
+      - [ ] Episodes header button with count/progress/failed state,
+            spinner on rows being captured
+      - [ ] Verify live on a show with no Kitsu/AniList thumbnails
+      - [ ] PLAN.md/FILE_INDEX.md sync, `npm run bump -- minor`, tag
+            `v0.6.0`
