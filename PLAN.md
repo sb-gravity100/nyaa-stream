@@ -958,6 +958,32 @@ the old mark at 16, 32 and 128 px before switching.
 **Later (not in v0.3.2):** prefetch the head (~8 MB, then dropped if unused)
 of the most likely source when an episode page opens - depends on A/B.
 
+## Native splash window and custom title bar (planned, v0.4.0 - minor: new feature)
+
+**Native splash window.** Startup gets its own small window instead of
+relying on the main page: a borderless, non-resizable, centered splash
+window (`label: "splash"`, ~360x400, no taskbar entry) showing the logo
+animation from v0.3.2's in-page splash (moved to `public/splash.html`).
+The main window starts hidden (`visible: false`); after the app's first
+paint, `main.tsx` calls an `app_ready` command that shows the main window
+(maximized) and closes the splash. If `app_ready` never arrives within 20s,
+Rust shows the main window anyway (logged as a warning) so a broken page
+can't leave the app invisible. The inline `index.html` splash goes (the main
+window is hidden until it has painted). Never `transparent: true` on either
+window - it broke click input (CLAUDE.md).
+
+**Custom title bar.** The main window becomes frameless
+(`decorations: false`); a slim strip (~32px) across the top of every page
+replaces the system title bar and *blends with the app bar* below it (same
+translucent glass, no visible seam): drag region (`data-tauri-drag-region`,
+double-click toggles maximize), a small logo + "nyaa-stream" on the left,
+minimize / maximize-restore / close on the right (Windows-style hit targets,
+close turns red on hover). Resize edges stay (undecorated resizing, window
+shadow on). In the player the strip shows and fades with the player's top
+controls, and is hidden in fullscreen and PiP. Needs the window
+permissions (`core:window:allow-start-dragging`, `-minimize`,
+`-toggle-maximize`, `-close`, `-show`) in the main capability.
+
 ## Download cache (planned, v0.4.0 - minor: new feature)
 
 Downloaded pieces are kept on purpose and reused, instead of piling up by
