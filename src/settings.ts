@@ -41,6 +41,9 @@ export interface Settings {
   preferredResolution: PreferredResolution;
   /** Resume an episode from its saved position. */
   resumePlayback: boolean;
+  /** GPU video decoding in mpv (`hwdec=auto-safe`); off = software
+   * decoding, which recovers from a bad frame at the next keyframe. */
+  hardwareDecoding: boolean;
   /** Offer/auto-start the next episode when one ends. */
   autoplayNext: boolean;
   /** Remember the fansub group last played per anime and prefer it. */
@@ -91,6 +94,7 @@ export const DEFAULT_SETTINGS: Settings = {
   subtitleLanguage: "en",
   preferredResolution: "1080",
   resumePlayback: true,
+  hardwareDecoding: true,
   autoplayNext: true,
   rememberFansubGroup: true,
   preferredFansubber: "",

@@ -605,6 +605,13 @@ function MpvPlayerView({
       void videoEl?.setProperty("audio-delay", audioDelay);
    }, [videoEl, audioDelay]);
 
+   useEffect(() => {
+      if (!videoEl) return;
+      const hwdec = settings.hardwareDecoding ? "auto-safe" : "no";
+      console.info("[player] hardware decoding", { hwdec });
+      void videoEl.setProperty("hwdec", hwdec);
+   }, [videoEl, settings.hardwareDecoding]);
+
    // The user's default style, applied by mpv (see applyMpvSubtitleStyle).
    // ASS restyling needs the track's header, which only exists once mpv has
    // loaded the track - on first play that is after this effect first runs,
