@@ -2934,53 +2934,9 @@ html.mpv-active .player-view {
   bottom: 118px;
 }
 
-/* Paused: the frame dims slightly and a large glyph breathes in the
-   center until playback resumes. */
+/* Paused: the frame dims slightly. */
 .player-view.is-paused .player-video-surface {
   background: rgba(0, 0, 0, 0.22);
-}
-
-.player-paused-glyph {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  z-index: 1;
-  display: grid;
-  place-items: center;
-  width: 96px;
-  height: 96px;
-  margin: -48px 0 0 -48px;
-  border-radius: 50%;
-  color: #fff;
-  background: rgba(var(--ambient), 0.35);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  box-shadow: 0 0 60px rgba(var(--ambient), 0.5);
-  pointer-events: none;
-  animation:
-    paused-in 0.35s var(--ease-spring),
-    paused-breathe 2.8s ease-in-out 0.35s infinite;
-}
-
-.player-paused-glyph svg {
-  margin-left: 4px;
-}
-
-@keyframes paused-in {
-  from {
-    opacity: 0;
-    transform: scale(0.7);
-  }
-}
-
-@keyframes paused-breathe {
-  0%,
-  100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.05);
-  }
 }
 
 .player-view .player-playlist {
