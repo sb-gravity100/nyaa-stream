@@ -1,4 +1,5 @@
-//! Embedded mpv playback (the approach stremio-shell-ng uses): mpv draws
+//! Embedded mpv playback (the approach stremio-shell-ng uses, here with
+//! in-process libmpv): mpv draws
 //! into the app window via `--wid`, its child window is pushed to the
 //! bottom of the z-order, and the webview's own background is made
 //! transparent (alpha 0) so the HTML player controls sit on top of the
@@ -19,32 +20,22 @@ pub struct PlayerState {
     mpv: Mutex<Option<Arc<EmbeddedMpv>>>,
 }
 
-/// Whether a system `mpv` is on PATH - the player falls back to HLS
-/// without it. The frontend asks once per run (and again when the path override changes).
+/// Whether libmpv can be loaded - the player falls back to HLS without it.
+/// The frontend asks once per run (and again when the path override changes).
 #[tauri::command]
 pub async fn mpv_available() -> bool {
-    let mut command = tokio::process::Command::new(mpv_player::mpv_program());
-    #[cfg(windows)]
-    command.creation_flags(0x0800_0000);
-    let found = command
-        .arg("--version")
-        .stdin(std::process::Stdio::null())
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .status()
-        .await
-        .is_ok_and(|status| status.success());
-    tracing::info!(found, "mpv availability checked");
+    let found = tokio::task::spawn_blocking(mpv_player::is_available).await.unwrap_or(false);
+    tracing::info!(found, "libmpv availability checked");
     found
 }
 
-/// Points every mpv spawn at `path` (empty/`None`: mpv from PATH) - the
-/// Settings override.
+/// Points libmpv loading at `path` (a `libmpv-2.dll` or its folder; empty/
+/// `None`: the default search) - the Settings override.
 #[tauri::command]
 pub fn set_mpv_path(path: Option<String>) {
     let path = path.map(|p| p.trim().to_string()).filter(|p| !p.is_empty());
     tracing::debug!(?path, "set_mpv_path invoked");
-    mpv_player::set_mpv_path(path.map(std::path::PathBuf::from));
+    mpv_player::set_library_path(path.map(std::path::PathBuf::from));
 }
 
 /// Starts mpv inside the window if it isn't running yet and makes the
@@ -65,9 +56,7 @@ pub async fn mpv_start(app: AppHandle, window: WebviewWindow, state: State<'_, P
             }
         };
         let mpv = EmbeddedMpv::spawn(wid, &extra_args, events_tx).await.map_err(|err| err.to_string())?;
-        if let Some(pid) = mpv.pid() {
-            tokio::spawn(push_mpv_window_to_bottom(wid, pid));
-        }
+        tokio::spawn(push_mpv_window_to_bottom(wid));
         let mpv = Arc::new(mpv);
         *slot = Some(mpv.clone());
 
@@ -218,26 +207,22 @@ fn window_handle(_window: &WebviewWindow) -> Result<i64, String> {
     Err("embedded mpv is only implemented on Windows".into())
 }
 
-/// mpv creates its own child window inside `--wid` once it starts, which
-/// lands on top of the webview's. Wait for it (matched by process id) and
-/// send it to the bottom so the webview stays on top.
+/// mpv creates its own child window (class `mpv`) inside `wid` once it
+/// starts, which lands on top of the webview's. Wait for it and send it to
+/// the bottom so the webview stays on top.
 #[cfg(windows)]
-async fn push_mpv_window_to_bottom(parent: i64, pid: u32) {
+async fn push_mpv_window_to_bottom(parent: i64) {
     use windows_sys::Win32::Foundation::{HWND, LPARAM};
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        EnumChildWindows, GetWindowThreadProcessId, SetWindowPos, HWND_BOTTOM, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
+        EnumChildWindows, GetClassNameW, SetWindowPos, HWND_BOTTOM, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
     };
 
-    struct Search {
-        pid: u32,
-        found: HWND,
-    }
     unsafe extern "system" fn visit(hwnd: HWND, lparam: LPARAM) -> i32 {
-        let search = &mut *(lparam as *mut Search);
-        let mut owner = 0;
-        GetWindowThreadProcessId(hwnd, &mut owner);
-        if owner == search.pid {
-            search.found = hwnd;
+        let found = &mut *(lparam as *mut HWND);
+        let mut class = [0u16; 16];
+        let len = GetClassNameW(hwnd, class.as_mut_ptr(), class.len() as i32).max(0) as usize;
+        if String::from_utf16_lossy(&class[..len]) == "mpv" {
+            *found = hwnd;
             return 0;
         }
         1
@@ -245,11 +230,11 @@ async fn push_mpv_window_to_bottom(parent: i64, pid: u32) {
 
     // Raw handles aren't Send, so the lookup stays in a sync helper.
     let find = || {
-        let mut search = Search { pid, found: std::ptr::null_mut() };
-        // SAFETY: `visit` only writes through the `Search` pointer, which
+        let mut found: HWND = std::ptr::null_mut();
+        // SAFETY: `visit` only writes through the `HWND` pointer, which
         // outlives the synchronous enumeration.
-        unsafe { EnumChildWindows(parent as HWND, Some(visit), &mut search as *mut Search as LPARAM) };
-        (!search.found.is_null()).then(|| search.found as isize)
+        unsafe { EnumChildWindows(parent as HWND, Some(visit), &mut found as *mut HWND as LPARAM) };
+        (!found.is_null()).then(|| found as isize)
     };
     for _ in 0..100 {
         if let Some(found) = find() {
@@ -264,4 +249,4 @@ async fn push_mpv_window_to_bottom(parent: i64, pid: u32) {
 }
 
 #[cfg(not(windows))]
-async fn push_mpv_window_to_bottom(_parent: i64, _pid: u32) {}
+async fn push_mpv_window_to_bottom(_parent: i64) {}
