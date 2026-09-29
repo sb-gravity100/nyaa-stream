@@ -316,7 +316,7 @@
             verifies (or 15s)
       - [ ] enginefs: read-ahead window >= 30s of playback by bitrate, cap
             64 MB
-      - [ ] mpv `--cache-pause-wait=3`
+      - [x] mpv `--cache-pause-wait=3`
       - [ ] Verify live: time from click to first frame, logged before/after
       - [ ] PLAN.md/FILE_INDEX.md sync, `npm run bump -- patch`, tag
             `v0.3.2`, `npm run release -- --notes "..." --dry-run`, then
