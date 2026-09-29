@@ -5,6 +5,7 @@
 | `Cargo.toml` | Workspace root, shared dependency versions | workspace, config |
 | `package.json` | Frontend deps + Tauri CLI scripts | frontend, config |
 | `scripts/bump-version.mjs` | `npm run bump -- patch\|minor\|major\|x.y.z`: sets the app version in `package.json`, `tauri.conf.json` and `src-tauri/Cargo.toml` together; release = commit + `vX.Y.Z` git tag | config, release |
+| `scripts/make-installer-art.ps1`, `src-tauri/installer/{banner,dialog}.bmp` | Renders the MSI (WiX) banner + welcome-dialog artwork from the app icon and brand colors (System.Drawing); wired in via `bundle.windows.wix` in `tauri.conf.json` | config, release, installer |
 | `PLAN.md` | Stack, architecture, data flow, known gaps | docs |
 | `PHASES.md` | Build order / task list | docs |
 | `commits.md` | Commit log (prepend after every commit) | docs |
