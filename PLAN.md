@@ -518,6 +518,36 @@ nyaa_stream/
    can't map are dropped. Other AniList calls (airing feed, relations
    offset) still just fail soft.
 
+## Context menus (planned, v0.4.0 - minor: new feature)
+
+WebView2's default right-click menu (Back/Reload/Print/Inspect) is replaced
+by an app-styled HTML menu whose items depend on what was right-clicked.
+
+- **Global block:** one `contextmenu` listener in `src/main.tsx`
+  `preventDefault`s every right-click. Dev builds only: Shift+right-click
+  lets the native menu through (keeps Inspect).
+- **Store + component:** `src/contextMenu.ts` (`openContextMenu(e, items)`;
+  item = label, optional shortcut hint, disabled, separator) and
+  `src/ContextMenu.tsx` (viewport-clamped, animated, arrow keys/Enter,
+  closes on Esc/outside click/scroll/window blur/route change). Flat
+  menus only - no submenus.
+- **Clipboard:** `tauri-plugin-clipboard-manager` (Rust + capability + JS)
+  for Paste - `navigator.clipboard.readText()` isn't reliable in WebView2.
+- **Menus by target:**
+
+  | Target | Items |
+  |---|---|
+  | Text inputs (global fallback) | Cut · Copy · Paste · Select all |
+  | Selected text outside inputs | Copy |
+  | Anime card/poster (home rows, library grid, search dropdown) | Open · Add to / Remove from library · Copy title · Open on AniList |
+  | Continue-watching card | Resume · Mark watched · Remove from Continue watching · Go to anime |
+  | Episode row | Play · Mark watched/unwatched · Copy episode title |
+  | Source/torrent row | Play this source · Copy magnet · Open on nyaa.si · Always prefer this group |
+  | Player surface | Play/Pause · Copy frame · Save screenshot · Statistics · PiP · Fullscreen (no Subtitles/Speed) |
+  | Anything else | No menu |
+
+  The speed button keeps its existing right-click = reset speed.
+
 ## Known gaps / not yet implemented
 
 - (HLS fallback player only - mpv reads the file's real duration.) The
