@@ -1,3 +1,10 @@
+### `da0e6ca` · 2026-09-30 · feat: download cache index of played torrents
+- `src-tauri/src/download_cache.rs`
+- `src-tauri/src/lib.rs`
+- `src/playback.ts`
+- `src/PlayerView.tsx`
+- `src/HlsPlayerView.tsx`
+
 ### `d340a55` · 2026-09-30 · docs: mark splash/title bar tasks done, index new files
 - `PHASES.md`
 - `FILE_INDEX.md`
