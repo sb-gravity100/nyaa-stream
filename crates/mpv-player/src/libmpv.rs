@@ -27,6 +27,10 @@ const MPV_FORMAT_NODE_ARRAY: c_int = 7;
 const MPV_FORMAT_NODE_MAP: c_int = 8;
 
 const MPV_EVENT_SHUTDOWN: c_int = 1;
+const MPV_EVENT_LOG_MESSAGE: c_int = 2;
+/// Most mpv log lines written to our log per second; a decoder error storm
+/// is summarized instead of flooding it.
+const MAX_LOG_LINES_PER_SEC: u32 = 20;
 const MPV_EVENT_START_FILE: c_int = 6;
 const MPV_EVENT_END_FILE: c_int = 7;
 const MPV_EVENT_PROPERTY_CHANGE: c_int = 22;
@@ -66,6 +70,15 @@ struct MpvEvent {
     data: *mut c_void,
 }
 
+/// `mpv_event_log_message`.
+#[repr(C)]
+struct EventLogMessage {
+    prefix: *const c_char,
+    level: *const c_char,
+    text: *const c_char,
+    log_level: c_int,
+}
+
 #[repr(C)]
 struct EventProperty {
     name: *const c_char,
@@ -102,6 +115,7 @@ type WaitEventFn = unsafe extern "C" fn(*mut c_void, f64) -> *mut MpvEvent;
 type WakeupFn = unsafe extern "C" fn(*mut c_void);
 type FreeNodeContentsFn = unsafe extern "C" fn(*mut MpvNode);
 type NameFn = unsafe extern "C" fn(c_int) -> *const c_char;
+type RequestLogMessagesFn = unsafe extern "C" fn(*mut c_void, *const c_char) -> c_int;
 
 /// The resolved client-API entry points. `_library` keeps the DLL mapped for
 /// as long as any function pointer (or `Mpv`) is alive.
@@ -121,6 +135,7 @@ pub struct Lib {
     free_node_contents: FreeNodeContentsFn,
     error_string: NameFn,
     event_name: NameFn,
+    request_log_messages: RequestLogMessagesFn,
 }
 
 impl Lib {
@@ -157,6 +172,7 @@ impl Lib {
             free_node_contents: symbol!("mpv_free_node_contents"),
             error_string: symbol!("mpv_error_string"),
             event_name: symbol!("mpv_event_name"),
+            request_log_messages: symbol!("mpv_request_log_messages"),
             path: path.to_path_buf(),
             _library: library,
         })
@@ -288,6 +304,18 @@ impl Mpv {
         self.lib.check(code).context("mpv_initialize")
     }
 
+    /// Writes mpv's own log messages at `level` and above ("warn", "error"...)
+    /// to our log (target `mpv`) from the event thread - decoder and demuxer
+    /// errors otherwise never reach it.
+    pub fn request_log_messages(&self, level: &str) -> anyhow::Result<()> {
+        let level_c = CString::new(level)?;
+        // SAFETY: valid handle and NUL-terminated string.
+        let code = unsafe { (self.lib.request_log_messages)(self.handle.0, level_c.as_ptr()) };
+        self.lib.check(code).with_context(|| format!("mpv_request_log_messages({level})"))?;
+        tracing::debug!(level, "mpv log messages requested");
+        Ok(())
+    }
+
     /// Forwards every mpv event to `sender` as an IPC-shaped JSON object from
     /// a dedicated thread. The channel closing means mpv shut down.
     pub fn start_events(&self, sender: mpsc::UnboundedSender<Value>) {
@@ -370,8 +398,61 @@ impl Drop for Mpv {
     }
 }
 
+/// Per-second budget for mpv log lines (`MAX_LOG_LINES_PER_SEC`).
+struct LogBudget {
+    window_start: std::time::Instant,
+    lines: u32,
+    suppressed: u32,
+}
+
+impl LogBudget {
+    fn new() -> Self {
+        Self { window_start: std::time::Instant::now(), lines: 0, suppressed: 0 }
+    }
+
+    /// Whether this line may be logged; opens a new window each second and
+    /// reports what the previous one suppressed.
+    fn allow(&mut self) -> bool {
+        if self.window_start.elapsed() >= std::time::Duration::from_secs(1) {
+            if self.suppressed > 0 {
+                tracing::warn!(target: "mpv", suppressed = self.suppressed, "mpv log lines suppressed (rate limit)");
+            }
+            *self = Self::new();
+        }
+        if self.lines < MAX_LOG_LINES_PER_SEC {
+            self.lines += 1;
+            true
+        } else {
+            self.suppressed += 1;
+            false
+        }
+    }
+}
+
+/// Writes one `mpv_event_log_message` to our log.
+///
+/// # Safety
+/// `event` must be a live MPV_EVENT_LOG_MESSAGE from `mpv_wait_event`.
+unsafe fn log_mpv_message(event: &MpvEvent, budget: &mut LogBudget) {
+    if event.data.is_null() || !budget.allow() {
+        return;
+    }
+    let message = &*(event.data as *const EventLogMessage);
+    let prefix = cstr(message.prefix).unwrap_or_default();
+    let level = cstr(message.level).unwrap_or_default();
+    let text = cstr(message.text).unwrap_or_default();
+    let text = text.trim_end();
+    match level.as_str() {
+        "fatal" | "error" => tracing::error!(target: "mpv", %prefix, "{text}"),
+        "warn" => tracing::warn!(target: "mpv", %prefix, "{text}"),
+        "info" => tracing::info!(target: "mpv", %prefix, "{text}"),
+        _ => tracing::debug!(target: "mpv", %prefix, %level, "{text}"),
+    }
+}
+
 fn event_loop(lib: &Lib, handle: Handle, stop: &AtomicBool, sender: mpsc::UnboundedSender<Value>) {
     tracing::debug!("mpv event thread started");
+    let mut log_budget = LogBudget::new();
     while !stop.load(Ordering::Relaxed) {
         // SAFETY: valid handle; the event is only read before the next wait.
         let event = unsafe { &*(lib.wait_event)(handle.0, 1.0) };
@@ -382,6 +463,11 @@ fn event_loop(lib: &Lib, handle: Handle, stop: &AtomicBool, sender: mpsc::Unboun
         if event_id == MPV_EVENT_SHUTDOWN {
             tracing::info!("mpv shut down");
             break;
+        }
+        if event_id == MPV_EVENT_LOG_MESSAGE {
+            // SAFETY: a log-message event straight from mpv_wait_event.
+            unsafe { log_mpv_message(event, &mut log_budget) };
+            continue;
         }
         // SAFETY: `event` came from mpv_wait_event just above.
         let Some(message) = (unsafe { event_to_json(lib, event) }) else { continue };

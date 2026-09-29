@@ -54,6 +54,11 @@ impl EmbeddedMpv {
             let mpv = Mpv::new()?;
             apply_options(&mpv, &options)?;
             mpv.initialize()?;
+            // Decoder/demuxer warnings and errors go to our log (rate
+            // limited) - e.g. why a frame came out corrupted.
+            if let Err(err) = mpv.request_log_messages("warn") {
+                tracing::warn!(%err, "couldn't request mpv log messages");
+            }
             mpv.start_events(events);
             Ok(mpv)
         })
