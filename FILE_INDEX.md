@@ -5,6 +5,7 @@
 | `Cargo.toml` | Workspace root, shared dependency versions | workspace, config |
 | `package.json` | Frontend deps + Tauri CLI scripts | frontend, config |
 | `scripts/bump-version.mjs` | `npm run bump -- patch\|minor\|major\|x.y.z`: sets the app version in `package.json`, `tauri.conf.json` and `src-tauri/Cargo.toml` together; release = commit + `vX.Y.Z` git tag | config, release |
+| `.githooks/pre-commit` | Non-blocking reminder to bump the version when code changed since the latest tag (enable: `git config core.hooksPath .githooks`) | config, release |
 | `scripts/make-installer-art.ps1`, `src-tauri/installer/{banner,dialog}.bmp` | Renders the MSI (WiX) banner + welcome-dialog artwork from the app icon and brand colors (System.Drawing); wired in via `bundle.windows.wix` in `tauri.conf.json` | config, release, installer |
 | `PLAN.md` | Stack, architecture, data flow, known gaps | docs |
 | `PHASES.md` | Build order / task list | docs |
@@ -50,6 +51,7 @@ yaa-stream.<date>.log`, last 7 kept - release builds have no console), app state
 | `src/router.ts` | Hash routes (`#/`, `#/anime/:id`, `#/anime/:id/episode/:n`, `#/anime/:id/play/:key`): `useRoute`, `navigate` (push/replace), `goBack` with an in-app history depth so back never leaves the app | frontend, routing |
 | `src/fullscreen.ts` | App-wide window fullscreen state (`useFullscreen`/`setFullscreen`/`toggleFullscreen`), adopts the window's real state on load, installs the global F hotkey | frontend, fullscreen |
 | `src/pip.ts` | Picture-in-picture (`usePip`/`setPip`/`togglePip`): shrinks the native window to a 480x270 always-on-top corner window and restores size/position on exit (Chromium's PiP can't lift out mpv's window-embedded video); P hotkey + control-bar button in both players | frontend, player, pip |
+| `src/updater.ts` | Auto-update via `tauri-plugin-updater` (GitHub Releases `latest.json`): `checkForUpdate`, `installUpdate` (download + install + relaunch); driven by Settings' Updates section | frontend, updater |
 | `src/keyboard.ts` | `isTypingTarget`: whether a keydown is text entry (text inputs/textarea/contenteditable) - the one rule every hotkey handler uses | frontend, keyboard |
 | `src/HomePage.tsx` | Default view: featured hero (resume target, else newest library episode, else a library show) whose key art also tints the page as a blurred ambient layer, Continue watching row (from `watchProgress.ts`), New episodes row (current + previous calendar month, across saved library), Library poster grid | frontend |
 | `src/MediaPage.tsx` | Per-anime detail page (or, when entered from an episode card, a player-only view that returns home on close): key-art backdrop, facts, Resume/Play and library buttons, episode list with progress bars and watched toggles; renders `PlayerView` for the chosen group (or `autoplayEpisode`) and wires next-episode | frontend |

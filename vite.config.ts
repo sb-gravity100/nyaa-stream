@@ -1,5 +1,8 @@
 import { defineConfig } from "vite";
 import preact from "@preact/preset-vite";
+import { readFileSync } from "node:fs";
+
+const appVersion = JSON.parse(readFileSync("package.json", "utf8")).version as string;
 
 // @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
@@ -7,6 +10,7 @@ const host = process.env.TAURI_DEV_HOST;
 // https://vite.dev/config/
 export default defineConfig(async () => ({
   plugins: [preact()],
+  define: { __APP_VERSION__: JSON.stringify(appVersion) },
   // JASSUB (libass renderer, see src/assRenderer.ts) runs in a module
   // worker; its worker/wasm are imported as explicit asset URLs.
   worker: { format: "es" as const },
