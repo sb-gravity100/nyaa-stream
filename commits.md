@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `bc65313` · 2026-09-29 · docs: plan far seeks re-anchoring continue-watch mode
+- `PLAN.md`
+- `PHASES.md`
+
 ### `fe731c2` · 2026-09-29 · docs: plan source switch flush and seek back for v0.3.2
 - `PLAN.md`
 - `PHASES.md`
