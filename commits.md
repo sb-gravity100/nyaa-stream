@@ -2,6 +2,14 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `5ce72b2` · 2026-09-29 · feat: add an animated splash screen
+- `index.html`
+- `src/main.tsx`
+
+### `4dad80a` · 2026-09-29 · docs: plan the splash screen for v0.3.2
+- `PLAN.md`
+- `PHASES.md`
+
 ### `89a1dd5` · 2026-09-29 · docs: index the what's new files in FILE_INDEX.md
 - `FILE_INDEX.md`
 
