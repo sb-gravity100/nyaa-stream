@@ -2,6 +2,14 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `9da2a4d` · 2026-09-29 · docs: point CLAUDE.md publishing at the local release script
+- `CLAUDE.md`
+- `PHASES.md`
+
+### `e506b39` · 2026-09-29 · docs: index the local release script in FILE_INDEX.md
+- `FILE_INDEX.md`
+- `PHASES.md`
+
 ### `cd74354` · 2026-09-29 · ci: run the release workflow manually only
 - `.github/workflows/release.yml`
 
