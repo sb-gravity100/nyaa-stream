@@ -346,3 +346,17 @@
       - [ ] Verify live on a show with no Kitsu/AniList thumbnails
       - [ ] PLAN.md/FILE_INDEX.md sync, `npm run bump -- minor`, tag
             `v0.6.0`
+- [ ] HD banner sources (v0.7.0, see PLAN.md "HD banner sources"): one
+      commit each -
+      - [ ] Fribb anime-lists id map: download, weekly refresh, offline
+            lookup, arm-server fallback
+      - [ ] `crates/artwork-client`: TMDB backdrops + logos
+      - [ ] fanart.tv `showbackground`/`clearlogo`
+      - [ ] Simkl fanart
+      - [ ] `get_artwork` command + disk cache; frontend backdrop chain
+            (media page, home hero, Continue watching)
+      - [ ] Title logos on the home hero and media page
+      - [ ] Settings: API key overrides + About attribution (TMDB,
+            fanart.tv, Simkl)
+      - [ ] PLAN.md/FILE_INDEX.md sync, `npm run bump -- minor`, tag
+            `v0.7.0`

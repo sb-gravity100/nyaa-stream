@@ -751,6 +751,42 @@ Episodes cards. A button on the Episodes section runs it on demand.
 - **Cost:** each capture downloads the file header and a few MB around the
   midpoint; the scratch torrent is removed afterwards (existing behaviour).
 
+## HD banner sources (planned, v0.7.0 - minor: new feature)
+
+Today every wide backdrop (media page, home hero, Continue watching) is
+`kitsu.background` (Kitsu `coverImage.original`) → AniList `bannerImage`
+(~1900x400, a thin strip) → the poster. Kitsu covers are inconsistent in size
+and quality and often missing. Researched 2026-09-29:
+
+| Source | Wide art | Key / terms | ID needed |
+|---|---|---|---|
+| **TMDB** | backdrops up to 3840x2160 (`original`), textless ones tagged `iso_639_1 = null`; also transparent title **logos** | free for non-commercial use with attribution (TMDB logo + "This product uses the TMDB API but is not endorsed or certified by TMDB" in About) | TMDB tv/movie id |
+| **fanart.tv** | `showbackground` 1920x1080, `clearlogo`, `tvthumb` | free project key; public apps must credit fanart.tv; no commercial use without consent; optional per-user personal key | TVDB id |
+| **Simkl** | fanart `_medium` 1920x1080 WebP, `_d` original | free `client_id`; asks clients to load images through the wsrv.nl proxy | Simkl id |
+| TheTVDB v4 | 1920x1080 fanart | licence per project, or every user pays $12/yr - **skip** | - |
+| metahub.space | Stremio's backgrounds/logos by IMDb id | unofficial, no terms - **skip** | IMDb id |
+| MAL / Jikan, AniDB | posters only - **skip** | | |
+
+- **ID mapping:** [Fribb/anime-lists](https://github.com/Fribb/anime-lists)
+  `anime-list-full.json` maps `anilist_id` → `themoviedb_id` (tv/movie),
+  `tvdb_id`, `imdb_id`, `simkl_id`, `kitsu_id`. Downloaded once into
+  `<cache_dir>/nyaa-stream/`, refreshed weekly, looked up offline - no
+  per-anime mapping request. Fallback for ids missing there: arm-server
+  (`arm.haglund.dev/api/v2/ids?source=anilist&id=`), built on the same data.
+- **Chain:** TMDB textless backdrop (highest vote, >= 1920 wide) → fanart.tv
+  `showbackground` → Simkl fanart → Kitsu → AniList banner → poster.
+  TMDB/TVDB are per *show*, AniList per *season*: all seasons of a show share
+  backdrops, so for a season entry prefer images not used by another
+  season's AniList entry when there is a choice; otherwise accept show art.
+- **Logos (bonus):** TMDB / fanart.tv title logos can replace the text title
+  on the home hero and media page, as Stremio does.
+- **New crate `crates/artwork-client`** (TMDB + fanart.tv + Simkl + the id
+  map), disk-cached like `kitsu-client`, one `get_artwork(anilist_id)`
+  command returning `{ backdrop, logo, source }`. Keys: bundled app keys
+  with a Settings override for each; attribution in Settings → About.
+- **Sizes:** load a 1280-wide variant first (TMDB `w1280`, Simkl `_mobile`)
+  and swap to full size once decoded, so hero slides don't stall.
+
 ## Known gaps / not yet implemented
 
 - (HLS fallback player only - mpv reads the file's real duration.) The
