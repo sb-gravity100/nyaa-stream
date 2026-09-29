@@ -15,6 +15,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     features: [
       "The seek bar now shows which parts of the episode are already downloaded.",
       "New setting: Hardware video decoding (Settings → Playback). Turn it off if video turns blocky until you seek.",
+      "A refreshed app icon and an animated loading screen while the app starts.",
       "This What's new window, after each update.",
     ],
     fixes: [
