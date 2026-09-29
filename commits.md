@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `80e71ff` · 2026-09-29 · fix: ignore end-file errors from a previous mpv entry
+- `PHASES.md`
+- `src/mpvVideo.ts`
+
 ### `e7236c9` · 2026-09-29 · fix: forward mpv's playlist_entry_id on start-file and end-file
 - `PHASES.md`
 - `crates/mpv-player/src/libmpv.rs`
