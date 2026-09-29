@@ -3109,3 +3109,17 @@ html.mpv-active .player-view {
   height: 24px;
   list-style: none;
 }
+
+/* A-B loop region on the seek bar. */
+.player-seek-loop {
+  position: absolute;
+  top: 50%;
+  height: 8px;
+  margin-top: -4px;
+  min-width: 2px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.28);
+  border-left: 2px solid var(--accent-strong);
+  border-right: 2px solid var(--accent-strong);
+  pointer-events: none;
+}
