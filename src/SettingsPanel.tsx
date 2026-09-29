@@ -54,8 +54,18 @@ const CACHES: { kind: keyof CacheSizes; label: string; hint: string }[] = [
   { kind: "nyaa", label: "Search cache", hint: "nyaa.si search results and torrent details" },
   { kind: "thumbnails", label: "Thumbnails", hint: "Episode thumbnails and Kitsu metadata" },
   { kind: "hls", label: "Transcoded video (HLS)", hint: "Temporary segments - also cleared on every start and exit" },
-  { kind: "torrents", label: "Downloaded torrent data", hint: "Partial downloads kept so playback resumes quickly" },
+  { kind: "torrents", label: "Downloaded torrent data", hint: "Played torrents kept so re-watching and seeking back don't download again" },
 ];
+
+const GB = 1024 ** 3;
+/** Settings -> "Download cache" choices (bytes); 0 deletes on stop. */
+const DOWNLOAD_CACHE_LIMITS = [0, 2 * GB, 5 * GB, 10 * GB, 20 * GB, 50 * GB];
+
+interface DownloadCacheStatus {
+  usedBytes: number;
+  limitBytes: number;
+  entries: number;
+}
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
@@ -66,15 +76,30 @@ function formatBytes(bytes: number): string {
 /** Sizes of the on-disk caches with a clear button each. */
 function StorageSection() {
   const [sizes, setSizes] = useState<CacheSizes | null>(null);
+  const [downloads, setDownloads] = useState<DownloadCacheStatus | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
   async function refresh() {
     try {
       setSizes(await invoke<CacheSizes>("get_cache_sizes"));
+      setDownloads(await invoke<DownloadCacheStatus>("download_cache_status"));
     } catch (err) {
       console.warn("[settings] cache sizes unavailable", { err: String(err) });
     }
+  }
+
+  async function setLimit(limitBytes: number) {
+    console.info("[settings] download cache limit", { limitBytes });
+    setBusy("limit");
+    setMessage(null);
+    try {
+      await invoke("set_download_cache_limit", { limitBytes });
+    } catch (err) {
+      setMessage(String(err));
+    }
+    await refresh();
+    setBusy(null);
   }
 
   useEffect(() => {
@@ -97,6 +122,31 @@ function StorageSection() {
   return (
     <section class="settings-section">
       <h3>Storage</h3>
+      {downloads && (
+        <div class="setting-row">
+          <span class="setting-text">
+            <span class="setting-label">Download cache</span>
+            <span class="setting-hint">
+              {`${formatBytes(downloads.usedBytes)} in ${downloads.entries} torrent${downloads.entries === 1 ? "" : "s"}. Oldest are deleted past the limit; Continue watching episodes are kept.`}
+            </span>
+          </span>
+          <span class="setting-control">
+            <select
+              value={String(downloads.limitBytes)}
+              disabled={busy != null}
+              onChange={(e) => void setLimit(Number((e.target as HTMLSelectElement).value))}
+            >
+              {[...new Set([...DOWNLOAD_CACHE_LIMITS, downloads.limitBytes])]
+                .sort((a, b) => a - b)
+                .map((bytes) => (
+                  <option key={bytes} value={String(bytes)}>
+                    {bytes === 0 ? "Delete on stop" : `${+(bytes / GB).toFixed(1)} GB`}
+                  </option>
+                ))}
+            </select>
+          </span>
+        </div>
+      )}
       {CACHES.map(({ kind, label, hint }) => (
         <div class="setting-row" key={kind}>
           <span class="setting-text">

@@ -145,14 +145,20 @@ impl DownloadCache {
     }
 
     /// Deletes `paths` (files or directories) and prunes directories left
-    /// empty up to `downloads/`. Missing paths are fine.
+    /// empty up to `downloads/`. Missing paths are fine; one failing path
+    /// doesn't stop the rest (the last error is returned).
     fn delete_paths(&self, paths: &[PathBuf]) -> std::io::Result<()> {
+        let mut failed = Ok(());
         for path in paths {
             let result = if path.is_dir() { std::fs::remove_dir_all(path) } else { std::fs::remove_file(path) };
             match result {
                 Ok(()) => {}
                 Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
-                Err(err) => return Err(err),
+                Err(err) => {
+                    tracing::debug!(path = %path.display(), %err, "download cache delete failed");
+                    failed = Err(err);
+                    continue;
+                }
             }
             let mut parent = path.parent();
             while let Some(dir) = parent {
@@ -162,7 +168,7 @@ impl DownloadCache {
                 parent = dir.parent();
             }
         }
-        Ok(())
+        failed
     }
 
     /// Deletes least-recently-used torrents until the cache fits its cap.
@@ -241,6 +247,41 @@ impl DownloadCache {
             self.save(&index);
         }
         tracing::info!(total, limit, reason, "download cache eviction done");
+    }
+
+    /// Bytes on disk, the cap, and the number of cached torrents.
+    pub fn status(&self) -> (u64, u64, usize) {
+        let index = self.lock();
+        (disk_size(&self.dir), index.limit_bytes.unwrap_or(DEFAULT_LIMIT_BYTES), index.torrents.len())
+    }
+
+    pub fn set_limit(&self, limit_bytes: u64) {
+        let mut index = self.lock();
+        tracing::info!(limit_bytes, "download cache limit set");
+        index.limit_bytes = Some(limit_bytes);
+        self.save(&index);
+    }
+
+    /// Settings -> Clear cache: deletes every cached torrent but `playing`,
+    /// Continue watching ones included. Unindexed items only go when
+    /// nothing plays (a just-added torrent may not be indexed yet).
+    pub fn clear(&self, playing: Option<&str>) -> std::io::Result<()> {
+        let playing = playing.map(str::to_ascii_lowercase);
+        let mut index = self.lock();
+        let mut paths: Vec<PathBuf> = if playing.is_none() { self.orphans(&index) } else { Vec::new() };
+        let hashes: Vec<String> = index.torrents.keys().filter(|h| playing.as_deref() != Some(h.as_str())).cloned().collect();
+        for hash in &hashes {
+            paths.extend(self.entry_paths(hash, &index.torrents[hash]));
+        }
+        let result = self.delete_paths(&paths);
+        // Whatever failed to delete is still on disk; stale entries are
+        // dropped by the next eviction.
+        for hash in &hashes {
+            index.torrents.remove(hash);
+        }
+        self.save(&index);
+        tracing::info!(cleared = hashes.len(), ok = result.is_ok(), "download cache cleared");
+        result
     }
 
     /// Replaces the Continue watching episode list. Entries that were kept
