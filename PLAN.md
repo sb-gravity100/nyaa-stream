@@ -903,6 +903,22 @@ re-reading heals whatever got through.
 - **Guard rails:** at most one rebuild per 5s; after 3 rebuilds within 60s
   it stops and logs an error rather than looping on a spot that stays bad.
 
+**What's new dialog** (user request 2026-09-29): after an in-app update
+restarts the app, a dialog lists the new version's features and fixes -
+never on a fresh install or a normal launch.
+
+- `src/changelog.ts`: bundled notes, `{ version, date, features[], fixes[] }`
+  per release, newest first, in plain user-facing words.
+- `installUpdate` (`src/updater.ts`) stores `nyaa-stream:updatedFrom` =
+  `{ from, to }` in localStorage *before* `downloadAndInstall` - on Windows
+  the passive NSIS installer takes over there and the app may never reach
+  `relaunch()`.
+- At startup (`src/WhatsNew.tsx`, mounted in `App.tsx`): if the marker's `to`
+  equals the running version (`getVersion()`), show every changelog entry
+  newer than `from` up to it (a skipped release, e.g. 0.3.1 → 0.9.0, shows
+  all of them), then clear the marker. A marker whose `to` doesn't match
+  (failed install) is cleared silently. Closes with a button or Escape.
+
 **Later (not in v0.3.2):** prefetch the head (~8 MB, then dropped if unused)
 of the most likely source when an episode page opens - depends on A/B.
 
