@@ -27,6 +27,7 @@ const MPV_FORMAT_NODE_ARRAY: c_int = 7;
 const MPV_FORMAT_NODE_MAP: c_int = 8;
 
 const MPV_EVENT_SHUTDOWN: c_int = 1;
+const MPV_EVENT_START_FILE: c_int = 6;
 const MPV_EVENT_END_FILE: c_int = 7;
 const MPV_EVENT_PROPERTY_CHANGE: c_int = 22;
 
@@ -72,10 +73,22 @@ struct EventProperty {
     data: *mut c_void,
 }
 
+/// `mpv_event_end_file` (client API >= 1.108 layout).
 #[repr(C)]
 struct EventEndFile {
     reason: c_int,
     error: c_int,
+    /// The playlist entry that ended - matches its `start-file`'s id, so a
+    /// late `end-file` of a replaced file can be told apart.
+    playlist_entry_id: i64,
+    playlist_insert_id: i64,
+    playlist_insert_num_entries: c_int,
+}
+
+/// `mpv_event_start_file`.
+#[repr(C)]
+struct EventStartFile {
+    playlist_entry_id: i64,
 }
 
 type CreateFn = unsafe extern "C" fn() -> *mut c_void;
@@ -400,6 +413,12 @@ unsafe fn event_to_json(lib: &Lib, event: &MpvEvent) -> Option<Value> {
                 message.insert("data".into(), node_to_json(&*(property.data as *const MpvNode)));
             }
         }
+        MPV_EVENT_START_FILE => {
+            if !event.data.is_null() {
+                let start = &*(event.data as *const EventStartFile);
+                message.insert("playlist_entry_id".into(), json!(start.playlist_entry_id));
+            }
+        }
         MPV_EVENT_END_FILE => {
             let end = &*(event.data as *const EventEndFile);
             let reason = match end.reason {
@@ -411,6 +430,7 @@ unsafe fn event_to_json(lib: &Lib, event: &MpvEvent) -> Option<Value> {
                 _ => "unknown",
             };
             message.insert("reason".into(), json!(reason));
+            message.insert("playlist_entry_id".into(), json!(end.playlist_entry_id));
             if end.reason == 4 {
                 message.insert("file_error".into(), Value::String(lib.error_message(end.error)));
             }
