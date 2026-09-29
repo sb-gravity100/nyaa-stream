@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `32d3eb5` · 2026-09-29 · fix(player): restore STATS_POLL_MS and drop the unused flash constant
+- `src/PlayerView.tsx`
+
 ### `b9925ec` · 2026-09-29 · fix(player): keyboard gestures no longer bring up the controls while the mouse is idle
 - `src/PlayerView.tsx`
 
