@@ -2,6 +2,13 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `efa6aa9` · 2026-09-29 · docs: note unpublished milestone tags in CLAUDE.md
+- `CLAUDE.md`
+
+### `75dcc97` · 2026-09-29 · docs: plan local-only milestone tags, publish only v0.9.0
+- `PLAN.md`
+- `PHASES.md`
+
 ### `dcd2fc0` · 2026-09-29 · docs: hide Windows username in exported logs
 - `PLAN.md`
 - `PHASES.md`
