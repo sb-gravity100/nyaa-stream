@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `edae935` · 2026-09-29 · fix(player): subtitle button tooltip lists the real mpv shortcuts
+- `src/PlayerView.tsx`
+
 ### `9e199a5` · 2026-09-29 · feat: upscale and sharpen hero and backdrop art
 - `src/enhanceImage.ts`
 - `src/HomePage.tsx`
