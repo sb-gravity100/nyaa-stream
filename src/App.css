@@ -3477,3 +3477,11 @@ html.mpv-active .player-view {
   gap: 8px;
   margin-top: 4px;
 }
+
+.player-menu-note {
+  padding: 4px 14px 10px;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}

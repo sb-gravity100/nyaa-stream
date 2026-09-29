@@ -139,12 +139,13 @@ function baseName(path: string): string {
 }
 
 /** The file inside the torrent to play: the one whose name parses to the
- * requested episode (batches), else the backend's default (largest video). */
+ * requested episode (batches), else the backend's default (largest video).
+ * `matched` is true when a batch's file was identified as that episode. */
 function pickFile(
    files: PlayFile[],
    defaultIdx: number,
    episode: number | null,
-): PlayFile | null {
+): { file: PlayFile; matched: boolean } | null {
    const videos = files.filter((f) => f.isVideo);
    if (videos.length > 1 && episode != null) {
       const matches = videos.filter((f) => {
@@ -157,7 +158,7 @@ function pickFile(
             episode,
             file: pick.name,
          });
-         return pick;
+         return { file: pick, matched: true };
       }
       console.warn(
          "[player] no file in torrent matched episode, using default",
@@ -167,13 +168,13 @@ function pickFile(
    // A batch opened as a whole (no episode number): start from its first
    // file by name rather than the largest, which is an arbitrary episode.
    if (videos.length > 1 && episode == null) {
-      return [...videos].sort((x, y) =>
+      const first = [...videos].sort((x, y) =>
          x.name.localeCompare(y.name, undefined, { numeric: true }),
       )[0];
+      return { file: first, matched: false };
    }
-   return (
-      files.find((f) => f.index === defaultIdx) ?? videos[0] ?? files[0] ?? null
-   );
+   const fallback = files.find((f) => f.index === defaultIdx) ?? videos[0] ?? files[0] ?? null;
+   return fallback ? { file: fallback, matched: videos.length <= 1 } : null;
 }
 
 function fileLabel(file: PlayFile): string {
@@ -291,6 +292,8 @@ function MpvPlayerView({
    // A-B loop points in episode time (null = unset); both set = looping.
    const [loopA, setLoopA] = useState<number | null>(null);
    const [loopB, setLoopB] = useState<number | null>(null);
+   // Whether the playing file was identified as the requested episode (always true for a single-file torrent).
+   const [fileMatched, setFileMatched] = useState(true);
    const [exporting, setExporting] = useState(false);
    const [exportOpen, setExportOpen] = useState(false);
    const [exportSaved, setExportSaved] = useState<string | null>(null);
@@ -348,15 +351,17 @@ function MpvPlayerView({
             if (cancelled) return;
             // A movie is the torrent's largest video (the backend's
             // default) - never an extra that happens to parse as "01".
-            const file = isMovie(anime)
-               ? (session.files.find((f) => f.index === session.defaultFileIdx) ?? null)
+            const picked = isMovie(anime)
+               ? ((f) => (f ? { file: f, matched: true } : null))(session.files.find((f) => f.index === session.defaultFileIdx))
                : pickFile(session.files, session.defaultFileIdx, episode);
-            if (!file) {
+            const file = picked?.file ?? null;
+            if (!picked || !file) {
                setError("This torrent has no playable video file.");
                return;
             }
             setTorrentId(session.torrentId);
             setFiles(session.files);
+            setFileMatched(picked.matched);
             setSelectedFile(file);
             setStatus("Preparing stream…");
          } catch (err) {
@@ -1585,9 +1590,17 @@ function MpvPlayerView({
                )}
                {renderedMenu === "sources" && (
                   <>
-                     {videoFiles.length > 1 && (
+                     {videoFiles.length > 1 && fileMatched && selectedFile && (
                         <>
-                           <div class="player-menu-title">Episode file</div>
+                           <div class="player-menu-title">Batch source</div>
+                           <div class="player-menu-note">
+                              Playing {fileLabel(selectedFile)}. Only this episode is downloaded from the batch.
+                           </div>
+                        </>
+                     )}
+                     {videoFiles.length > 1 && !fileMatched && (
+                        <>
+                           <div class="player-menu-title">Batch source · pick the episode file</div>
                            <div class="player-menu-scroll">
                               {videoFiles.map((file) => (
                                  <button
@@ -1595,6 +1608,7 @@ function MpvPlayerView({
                                     class={`player-menu-item${file.index === selectedFile?.index ? " selected" : ""}`}
                                     onClick={() => {
                                        resumeAtRef.current = null;
+                                       setFileMatched(true);
                                        setSelectedFile(file);
                                        setMenu(null);
                                     }}
