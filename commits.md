@@ -2,6 +2,36 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `b152132` · 2026-09-29 · docs: index vendored libtorrent-sys in FILE_INDEX.md
+- `FILE_INDEX.md`
+
+### `52f028d` · 2026-09-29 · fix: stop slow peers from holding urgent pieces
+- `vendor/libtorrent-sys/cpp/wrapper.cpp`
+- `vendor/libtorrent-sys/VENDORED.md`
+- `PHASES.md`
+
+### `d3a633c` · 2026-09-29 · build: use the vendored libtorrent-sys
+- `Cargo.toml`
+
+### `e7c5459` · 2026-09-29 · chore: vendor libtorrent-sys unchanged from stream-server f585ab6
+- `vendor/libtorrent-sys/`
+
+### `375a539` · 2026-09-29 · fix: prefetch 1% of the file tail, 4-16 MB
+- `vendor/enginefs/src/backend/priorities.rs`
+- `vendor/enginefs/VENDORED.md`
+- `PHASES.md`
+
+### `0cdf5bf` · 2026-09-29 · feat: add a hardware video decoding setting
+- `src/settings.ts`
+- `src/SettingsPanel.tsx`
+- `src/PlayerView.tsx`
+- `PHASES.md`
+
+### `7378931` · 2026-09-29 · feat: log mpv's own warnings and errors
+- `crates/mpv-player/src/libmpv.rs`
+- `crates/mpv-player/src/embedded.rs`
+- `PHASES.md`
+
 ### `f86c1de` · 2026-09-29 · docs: plan buffering round 3 and decoder diagnostics
 - `PLAN.md`
 - `PHASES.md`
