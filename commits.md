@@ -2,6 +2,11 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `b520776` · 2026-09-29 · feat(player): remove the pause dimming
+- `src/PlayerView.tsx`
+- `src/HlsPlayerView.tsx`
+- `src/App.css`
+
 ### `7a26759` · 2026-09-29 · feat(player): remove the centre paused glyph overlay
 - `src/PlayerView.tsx`
 - `src/HlsPlayerView.tsx`
