@@ -1013,6 +1013,10 @@ async fn export_clip(
     audio_stream: usize,
     name: String,
     folder: Option<String>,
+    include_subs: Option<bool>,
+    audio_id: Option<i64>,
+    subtitle_id: Option<i64>,
+    subtitle_settings: Option<std::collections::HashMap<String, serde_json::Value>>,
 ) -> Result<String, String> {
     tracing::debug!(torrent_id = %torrent_id, file_idx, start_seconds, end_seconds, audio_stream, %name, ?folder, "export_clip invoked");
     if !(end_seconds > start_seconds) {
@@ -1032,7 +1036,38 @@ async fn export_clip(
         out = dir.join(format!("{stem} ({n}).mp4"));
         n += 1;
     }
-    match state.torrent_engine.export_clip(&torrent_id, file_idx, start_seconds, end_seconds, audio_stream, out.clone()).await {
+    // Burned-in subtitles go through libmpv's encoder (libass, the player's
+    // own style); without them the in-process FFmpeg export is used.
+    let exported = if include_subs.unwrap_or(false) && subtitle_id.is_some() {
+        let mut options: Vec<(String, String)> = subtitle_settings
+            .unwrap_or_default()
+            .into_iter()
+            .map(|(name, value)| {
+                let text = match value {
+                    serde_json::Value::Bool(flag) => (if flag { "yes" } else { "no" }).to_string(),
+                    serde_json::Value::String(text) => text,
+                    other => other.to_string(),
+                };
+                (name, text)
+            })
+            .collect();
+        if let Ok(fonts) = player::install_fonts().await {
+            options.push(("sub-fonts-dir".into(), fonts.to_string_lossy().into_owned()));
+        }
+        mpv_player::encode_clip(mpv_player::EncodeClip {
+            input: state.torrent_engine.stream_url(&torrent_id, file_idx),
+            out: out.clone(),
+            start_seconds,
+            end_seconds,
+            audio_id,
+            subtitle_id,
+            options,
+        })
+        .await
+    } else {
+        state.torrent_engine.export_clip(&torrent_id, file_idx, start_seconds, end_seconds, audio_stream, out.clone()).await
+    };
+    match exported {
         Ok(()) => {
             tracing::info!(out = %out.display(), "export_clip succeeded");
             Ok(out.to_string_lossy().into_owned())
