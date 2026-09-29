@@ -4,6 +4,7 @@
 |---|---|---|
 | `Cargo.toml` | Workspace root, shared dependency versions | workspace, config |
 | `package.json` | Frontend deps + Tauri CLI scripts | frontend, config |
+| `scripts/bump-version.mjs` | `npm run bump -- patch\|minor\|major\|x.y.z`: sets the app version in `package.json`, `tauri.conf.json` and `src-tauri/Cargo.toml` together; release = commit + `vX.Y.Z` git tag | config, release |
 | `PLAN.md` | Stack, architecture, data flow, known gaps | docs |
 | `PHASES.md` | Build order / task list | docs |
 | `commits.md` | Commit log (prepend after every commit) | docs |
