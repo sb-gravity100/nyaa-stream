@@ -300,7 +300,7 @@
       - [x] Source switch: capture the playhead, mpv `stop` (flush) at
             once, then `play_magnet`, load at the captured time with the
             `resume` hint
-      - [ ] enginefs: file-priority ack timeout no longer leaves the file
+      - [x] enginefs: file-priority ack timeout no longer leaves the file
             unknown to the stream server (Kaleido-subs case)
       - [ ] Verify live: time from click to first frame, logged before/after
       - [ ] PLAN.md/FILE_INDEX.md sync, `npm run bump -- patch`, tag
