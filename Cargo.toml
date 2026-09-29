@@ -20,6 +20,9 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # reader - see vendor/enginefs/VENDORED.md for what changed and why.
 [patch."https://github.com/stremio-native/stream-server"]
 enginefs = { path = "vendor/enginefs" }
+# libtorrent session settings (piece picking for streaming) - see
+# vendor/libtorrent-sys/VENDORED.md.
+libtorrent-sys = { path = "vendor/libtorrent-sys" }
 
 # Dev builds: line tables only for our crates (panics keep file:line) and no
 # debug info for dependencies - full debug info meant ~830 MB of PDBs
