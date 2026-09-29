@@ -419,7 +419,8 @@ yaa-stream screenshots.">
               <div><dt>↑ ↓</dt><dd>Volume</dd></div>
               <div><dt>C</dt><dd>Subtitles on / off</dd></div>
               <div><dt>Hold C + scroll</dt><dd>Step through subtitle tracks</dd></div>
-              <div><dt>, / .</dt><dd>Subtitle delay −/+ 0.1s</dd></div>
+              <div><dt>, / .</dt><dd>Step one frame back / forward</dd></div>
+              <div><dt>- / =</dt><dd>Subtitle delay −/+ 0.1s</dd></div>
               <div><dt>X</dt><dd>Save the current frame as a PNG</dd></div>
               <div><dt>N</dt><dd>Next episode</dd></div>
               <div><dt>Shift</dt><dd>Skip the opening (90s if the file marks none)</dd></div>
