@@ -1,3 +1,6 @@
+### `904814a` · 2026-09-30 · test: download cache eviction, keep and clear
+- `src-tauri/src/download_cache.rs`
+
 ### `ebf8cd9` · 2026-09-30 · feat: download cache size setting and clear
 - `src-tauri/src/download_cache.rs`
 - `src-tauri/src/cache.rs`
