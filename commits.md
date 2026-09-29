@@ -2,6 +2,13 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `98c75d8` · 2026-09-29 · feat: cache size/clear commands, HLS purge on start/exit, mpv path override
+- `crates/mpv-ipc/src/embedded.rs`
+- `crates/mpv-ipc/src/lib.rs`
+- `src-tauri/src/cache.rs`
+- `src-tauri/src/lib.rs`
+- `src-tauri/src/player.rs`
+
 ### `ed6899b` · 2026-09-29 · feat: player A-B loop with clip export
 - `src/App.css`
 - `src/PlayerView.tsx`
