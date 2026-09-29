@@ -2,6 +2,16 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `d3bc670` · 2026-09-29 · feat(player): X saves the current frame; subtitle delay moves to , and .
+- `src/PlayerView.tsx`
+- `src/SettingsPanel.tsx`
+- `src/settings.ts`
+- `FILE_INDEX.md`
+
+### `64faaf1` · 2026-09-29 · feat: mpv_save_frame saves the current frame as a PNG in a folder
+- `src-tauri/src/player.rs`
+- `src-tauri/src/lib.rs`
+
 ### `5723f87` · 2026-09-29 · feat(player): Include subtitles option in the export dialog
 - `src/subtitles.ts`
 - `src/ExportDialog.tsx`
