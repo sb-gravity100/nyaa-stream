@@ -1,3 +1,8 @@
+### `30756b8` · 2026-09-30 · docs: download cache as built, tasks done
+- `PHASES.md`
+- `PLAN.md`
+- `FILE_INDEX.md`
+
 ### `904814a` · 2026-09-30 · test: download cache eviction, keep and clear
 - `src-tauri/src/download_cache.rs`
 
