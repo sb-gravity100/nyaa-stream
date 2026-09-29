@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `1bd0413` · 2026-09-29 · fix: first-season pages no longer list later seasons' episodes
+- `src/App.tsx`
+
 ### `30b2714` · 2026-09-29 · feat(player): export dialog for A-B clips
 - `src/ExportDialog.tsx`
 - `src/PlayerView.tsx`
