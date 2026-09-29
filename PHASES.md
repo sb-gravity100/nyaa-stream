@@ -319,6 +319,11 @@
       - [x] mpv `--cache-pause-initial=yes` + `--cache-pause-wait=10`
             (start/resume once 10s is buffered)
       - [x] Seek re-anchor debounce 300ms → 100ms
+      - [ ] Capture mpv warn/error log messages (rate limited)
+      - [ ] Settings: hardware decoding Auto / Off (mpv `hwdec`)
+      - [ ] Tail prefetch 1% of the file, clamped 4-16 MB
+      - [ ] Vendor libtorrent-sys: whole_pieces_threshold 2, strict end
+            game off, request_queue_time 1
       - [ ] Verify live: time from click to first frame, logged before/after
       - [ ] PLAN.md/FILE_INDEX.md sync, `npm run bump -- patch`, tag
             `v0.3.2`, `npm run release -- --notes "..." --dry-run`, then

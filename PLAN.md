@@ -822,6 +822,41 @@ already queued at peers - the backlog behind "max outstanding piece requests
 reached". Not adopted (it disconnects every peer); the fallback if fixes 1-5
 don't clear the queue delay.
 
+**Round 3 (live test 2026-09-29 12:50, first watch of a 2 GB Kaleido-subs
+HEVC file at 10-14 MB/s: ~31s to moving video).** Piece 0 now arrives in
+2.8s, but two stalls remain, both *single pieces stuck 10-15s at priority 7
+while hundreds of others complete*: the index read (piece 3803, 13s) and head
+pieces 18-20 (15s). libtorrent-sys' hard-coded session settings
+(`wrapper.cpp`) let one slow peer own an urgent piece: `whole_pieces_threshold
+= 30` hands whole pieces to any peer that could finish one within 30s,
+`strict_end_game_mode = true` stops other peers requesting its blocks, and
+`request_queue_time = 3` queues ~3s of requests ahead of urgent ones. The
+index also started 5.6 MB from the end (Kaleido's fonts), outside the 4 MB
+tail prefetch.
+
+1. **Vendor `libtorrent-sys`** (`vendor/libtorrent-sys`, same `[patch]` as
+   enginefs, rev f585ab6): `whole_pieces_threshold` 30 → 2,
+   `strict_end_game_mode` → false (stalled blocks can be requested from
+   other peers too, at the cost of a little duplicate download),
+   `request_queue_time` 3 → 1. Also the base for fast resume later.
+2. **Tail prefetch = 1% of the file, clamped 4-16 MB.**
+
+**Decoder corruption on downloaded data** (ToonsHub movie, ~40s after a seek
+to 34:21): smeared blocky frames for about a minute; seeking back to the
+same spot played cleanly, so the bytes on disk are right. A one-off bad input
+leaving the hardware decoder (`--hwdec=auto-safe`, D3D11) in a bad state
+until a seek flushed it fits; software decoding recovers at the next
+keyframe. mpv's own messages aren't logged, so the cause can't be confirmed
+yet:
+
+3. **Capture mpv warnings/errors:** `mpv_request_log_messages("warn")`,
+   log-message events written to our log (`mpv` target, level mapped), rate
+   limited (max 20 lines/s, suppressed count summarized) so a decoder error
+   storm can't flood it.
+4. **Hardware decoding setting** (Settings → Playback: Auto / Off, default
+   Auto): applied as mpv's `hwdec` property (`auto-safe` / `no`) on attach and
+   when changed, so the corruption can be tested with software decoding.
+
 **Later (not in v0.3.2):** prefetch the head (~8 MB, then dropped if unused)
 of the most likely source when an episode page opens - depends on A/B.
 
