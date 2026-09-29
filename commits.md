@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `937fe35` · 2026-09-29 · docs: plan dev build speed changes
+- `PLAN.md`
+- `PHASES.md`
+
 ### `4680382` · 2026-09-29 · docs: note v0.3.2 is published in CLAUDE.md
 - `CLAUDE.md`
 
