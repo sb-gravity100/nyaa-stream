@@ -1225,6 +1225,27 @@ it, like YouTube/Stremio.
 - Not a second libmpv instance: live seeks per hover would decode full
   frames and request undownloaded pieces.
 
+## Subtitle preloading (planned, v0.4.0 - patch: fix)
+
+Symptom: on first play the default subtitle track is selected (the pick
+effect in `PlayerView.tsx` runs once per file when mpv's `track-list`
+first arrives and sends `sid`) but nothing renders until the user toggles
+subtitles off and on. Re-sending `sid` works, so the selection itself is
+right; mpv just hasn't started reading the track's packets from the torrent
+stream at that point (the pick fires while the file is still opening,
+before the demuxer has the track's early packets).
+
+- **Diagnose first**: log the `sid`/`sub-text`/`sub-start` state at pick time
+  and ~2s after `playing`, on a repro file, before choosing the fix.
+- **Fix**: once per file, after the first `playing` event, re-assert the
+  picked track (`sid` set again, only if it is still the user's selection
+  and `sub-text` is empty), so the toggle happens automatically. If that
+  isn't enough for tracks whose packets sit later in the container, add an
+  explicit sub-track preload: enginefs treats subtitle-cluster ranges as
+  metadata reads (priority 7) - decide after the diagnosis.
+- Never changes the user's own on/off/track choice; no-op with subtitles
+  off or no tracks.
+
 ## Contact and send logs (planned, v0.4.0 - minor: new feature)
 
 Settings gets a **Help** section with two buttons. Nothing is uploaded
