@@ -126,6 +126,25 @@ function formatTime(seconds: number): string {
    return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
 }
 
+/** Maps the torrent's downloaded byte runs onto the timeline for the seek
+ * bar's dim "downloaded" layer. Linear bytes -> seconds (no container
+ * index yet - PLAN.md "Seek-bar buffer indicators"); runs less than a
+ * second apart are joined and sub-second specks dropped so the bar stays
+ * readable. */
+function downloadedTimeRanges(byteRanges: [number, number][], totalBytes: number, duration: number): [number, number][] {
+   if (!totalBytes || !duration || byteRanges.length === 0) return [];
+   const toTime = (bytes: number) => Math.min(duration, (bytes / totalBytes) * duration);
+   const merged: [number, number][] = [];
+   for (const [startByte, endByte] of byteRanges) {
+      const start = toTime(startByte);
+      const end = toTime(endByte);
+      const last = merged[merged.length - 1];
+      if (last && start - last[1] < 1) last[1] = Math.max(last[1], end);
+      else merged.push([start, end]);
+   }
+   return merged.filter(([start, end]) => end - start >= 0.5);
+}
+
 function infoHashFromMagnet(magnet: string): string | null {
    return (
       magnet.match(/xt=urn:btih:([a-zA-Z0-9]+)/)?.[1]?.toLowerCase() ?? null
@@ -598,6 +617,10 @@ function MpvPlayerView({
    // mpv reports real file time and the file's own exact duration.
    const episodeTime = position;
    const episodeDuration = duration;
+   const downloadedRanges = useMemo(
+      () => downloadedTimeRanges(stats?.downloadedByteRanges ?? [], stats?.totalBytes ?? 0, episodeDuration),
+      [stats?.downloadedByteRanges, stats?.totalBytes, episodeDuration],
+   );
 
    function persistProgress() {
       const video = videoRef.current;
@@ -1839,6 +1862,17 @@ function MpvPlayerView({
                onMouseLeave={hideSeekTooltip}
             >
                <div class="player-seek-track" />
+               {episodeDuration > 0 &&
+                  downloadedRanges.map(([start, end]) => (
+                     <div
+                        key={`d${start}`}
+                        class="player-seek-ready"
+                        style={{
+                           left: `${(start / episodeDuration) * 100}%`,
+                           width: `${((end - start) / episodeDuration) * 100}%`,
+                        }}
+                     />
+                  ))}
                {episodeDuration > 0 &&
                   bufferedRanges.map(([start, end]) => (
                      <div
