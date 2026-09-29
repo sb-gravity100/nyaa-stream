@@ -330,7 +330,7 @@
       - [x] libmpv: corruption log lines → `stream-corrupt` event
       - [x] MpvVideo: drop-buffers + exact seek to the current time on
             `stream-corrupt` (5s debounce, max 3 per 60s)
-      - [ ] What's new dialog after an in-app update (`changelog.ts`,
+      - [x] What's new dialog after an in-app update (`changelog.ts`,
             `updatedFrom` marker set before install, `WhatsNew.tsx`)
       - [ ] Verify live: time from click to first frame, logged before/after
       - [x] PLAN.md/FILE_INDEX.md sync, `npm run bump -- patch`, tag

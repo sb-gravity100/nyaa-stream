@@ -5,9 +5,16 @@ import "@fontsource/zen-kaku-gothic-new/700.css";
 // falls through to Zen Kaku).
 import "@fontsource-variable/outfit";
 import App from "./App";
+import { WhatsNew } from "./WhatsNew";
 import { installDevLogger } from "./devLogger";
 import { installFullscreenHotkey } from "./fullscreen";
 
 installDevLogger();
 installFullscreenHotkey();
-render(<App />, document.getElementById("root")!);
+render(
+  <>
+    <App />
+    <WhatsNew />
+  </>,
+  document.getElementById("root")!,
+);
