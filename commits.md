@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `536e008` · 2026-09-29 · docs: require seeders for thumbnail capture sources
+- `PLAN.md`
+- `PHASES.md`
+
 ### `62a7824` · 2026-09-29 · docs: plan build thumbnails button for v0.6.0
 - `PLAN.md`
 - `PHASES.md`
