@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `fe731c2` · 2026-09-29 · docs: plan source switch flush and seek back for v0.3.2
+- `PLAN.md`
+- `PHASES.md`
+
 ### `6dc6182` · 2026-09-29 · docs: plan stale source-switch error fix for v0.3.2
 - `PLAN.md`
 - `PHASES.md`
