@@ -2,6 +2,22 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `5723f87` · 2026-09-29 · feat(player): Include subtitles option in the export dialog
+- `src/subtitles.ts`
+- `src/ExportDialog.tsx`
+- `src/PlayerView.tsx`
+- `src/App.css`
+- `FILE_INDEX.md`
+
+### `4f9a0c8` · 2026-09-29 · feat: export_clip can burn the active subtitle track into the clip
+- `src-tauri/src/lib.rs`
+- `src-tauri/src/player.rs`
+
+### `b614fc9` · 2026-09-29 · feat(mpv-player): encode clips with burned-in subtitles through libmpv
+- `crates/mpv-player/src/encode.rs`
+- `crates/mpv-player/src/lib.rs`
+- `crates/mpv-player/examples/encode_smoke.rs`
+
 ### `49099cf` · 2026-09-29 · feat(player): export dialog disables all controls while exporting
 - `src/ExportDialog.tsx`
 - `src/App.css`
