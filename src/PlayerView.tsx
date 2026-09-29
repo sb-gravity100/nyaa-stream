@@ -350,6 +350,23 @@ function MpvPlayerView({
    );
    const videoFiles = files.filter((f) => f.isVideo);
 
+   // Source switch = flush + seek back (PLAN.md "Fast playback start"):
+   // capture the playhead (once playback started; before that the pending
+   // resume point stays), drop the old file from mpv at once, then let the
+   // play_magnet effect start the new source at that time with the
+   // "resume" watch hint.
+   async function switchSource(release: NyaaResult) {
+      setMenu(null);
+      if (release.magnet === selectedRelease.magnet) return;
+      const video = videoRef.current;
+      if (video && hasPlayed) resumeAtRef.current = video.currentTime;
+      console.info("[player] switching source", { title: release.title, resumeAt: resumeAtRef.current, hasPlayed });
+      if (video) {
+         await video.stop().catch((err) => console.warn("[player] mpv stop before source switch failed", { err: String(err) }));
+      }
+      setSelectedRelease(release);
+   }
+
    function showToast(message: string) {
       setToast(message);
       window.clearTimeout(toastTimerRef.current);
@@ -1758,10 +1775,7 @@ function MpvPlayerView({
                               <button
                                  key={r.magnet}
                                  class={`player-menu-item player-source-item${r.magnet === selectedRelease.magnet ? " selected" : ""}`}
-                                 onClick={() => {
-                                    setSelectedRelease(r);
-                                    setMenu(null);
-                                 }}
+                                 onClick={() => void switchSource(r)}
                               >
                                  <span class="player-source-title">
                                     {r.title}
