@@ -1732,10 +1732,6 @@ html.mpv-active .player-view {
   opacity: 1;
 }
 
-.player-view.is-paused .player-video.shown {
-  filter: brightness(0.78);
-}
-
 /* JASSUB's libass canvas sits right after the <video>; keep it under the
    UI layers. The slight blur softens libass's native-resolution edges
    (replaced 2x supersampling, which doubled the render cost). */
@@ -2932,11 +2928,6 @@ html.mpv-active .player-view {
 .player-view .player-menu,
 .player-view .player-next-card {
   bottom: 118px;
-}
-
-/* Paused: the frame dims slightly. */
-.player-view.is-paused .player-video-surface {
-  background: rgba(0, 0, 0, 0.22);
 }
 
 .player-view .player-playlist {
