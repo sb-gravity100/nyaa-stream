@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `2a774cc` · 2026-09-29 · fix: reset per-file mpv state in mpv_stop
+- `PHASES.md`
+- `src-tauri/src/player.rs`
+
 ### `d1be839` · 2026-09-29 · fix: spawn the embedded mpv at app launch
 - `PHASES.md`
 - `src-tauri/src/lib.rs`
