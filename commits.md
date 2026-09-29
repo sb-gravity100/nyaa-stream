@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `dcd2fc0` · 2026-09-29 · docs: hide Windows username in exported logs
+- `PLAN.md`
+- `PHASES.md`
+
 ### `a93e779` · 2026-09-29 · docs: plan contact and send logs for v0.9.0
 - `PLAN.md`
 - `PHASES.md`
