@@ -11,7 +11,7 @@ const STORAGE_KEY = "nyaa-stream:watch-progress";
  * ED/preview usually fills the rest. */
 export const COMPLETED_FRACTION = 0.9;
 /** Positions this close to the start aren't worth resuming. */
-const MIN_RESUME_SECONDS = 20;
+export const MIN_RESUME_SECONDS = 20;
 const MAX_ENTRIES = 500;
 
 export interface ProgressEntry {

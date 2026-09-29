@@ -3,6 +3,7 @@ mod download_cache;
 mod media_keys;
 mod metadata_fallback;
 mod player;
+mod resume;
 mod title_match;
 
 use std::path::PathBuf;
@@ -1091,15 +1092,29 @@ pub(crate) async fn set_clipboard_image(width: usize, height: usize, pixels: Vec
 /// player view (this call) just before the new one asks for its torrent, and
 /// a batch's next episode is the same torrent - `play_magnet` cancels the
 /// removal and keeps it, preloaded data included.
+///
+/// `resume` (an episode still in progress) first saves its resume buffer
+/// while the torrent is still in the engine - see `resume`.
 #[tauri::command]
-async fn stop_playback(state: State<'_, Arc<AppState>>) -> Result<(), String> {
+async fn stop_playback(state: State<'_, Arc<AppState>>, resume: Option<resume::ResumeRequest>) -> Result<(), String> {
     /// Long enough for the next episode's `play_magnet` to arrive.
     const KEEP_FOR_NEXT_EPISODE: Duration = Duration::from_secs(4);
-    tracing::debug!("stop_playback invoked");
+    tracing::debug!(?resume, "stop_playback invoked");
     let generation = state.stop_generation.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
     let app = state.inner().clone();
+    let playing = app.current_torrent.lock().await.clone();
     tokio::spawn(async move {
-        tokio::time::sleep(KEEP_FOR_NEXT_EPISODE).await;
+        let started = tokio::time::Instant::now();
+        match (resume, playing) {
+            (Some(request), Some(torrent_id)) if magnet_info_hash(&request.magnet).is_some_and(|h| h.eq_ignore_ascii_case(&torrent_id)) => {
+                if let Err(err) = resume::save(&app.torrent_engine, &torrent_id, request).await {
+                    tracing::warn!(torrent_id = %torrent_id, %err, "resume buffer not saved");
+                }
+            }
+            (Some(_), playing) => tracing::debug!(?playing, "resume request doesn't match the playing torrent, no buffer"),
+            (None, _) => {}
+        }
+        tokio::time::sleep(KEEP_FOR_NEXT_EPISODE.saturating_sub(started.elapsed())).await;
         if app.stop_generation.load(std::sync::atomic::Ordering::SeqCst) == generation {
             cleanup_playback(&app).await;
             tracing::info!("stop_playback completed");
