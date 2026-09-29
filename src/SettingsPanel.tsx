@@ -417,7 +417,8 @@ yaa-stream screenshots.">
               <div><dt>Space / K</dt><dd>Play or pause</dd></div>
               <div><dt>← → / J L</dt><dd>Seek 5s / 10s</dd></div>
               <div><dt>↑ ↓</dt><dd>Volume</dd></div>
-              <div><dt>C</dt><dd>Cycle subtitles</dd></div>
+              <div><dt>C</dt><dd>Subtitles on / off</dd></div>
+              <div><dt>Hold C + scroll</dt><dd>Step through subtitle tracks</dd></div>
               <div><dt>, / .</dt><dd>Subtitle delay −/+ 0.1s</dd></div>
               <div><dt>X</dt><dd>Save the current frame as a PNG</dd></div>
               <div><dt>N</dt><dd>Next episode</dd></div>

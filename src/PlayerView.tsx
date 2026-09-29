@@ -909,20 +909,31 @@ function MpvPlayerView({
       }
    }
 
-   function cycleSubtitles() {
-      const order: (number | null)[] = [
-         null,
-         ...subtitleTracks.map((t) => t.index),
-      ];
-      const next =
-         order[(order.indexOf(activeSubtitleIndex) + 1) % order.length];
+   /** The subtitle track that was showing before subtitles were switched
+    * off - what a C tap brings back. */
+   const lastSubtitleRef = useRef<number | null>(null);
+   if (activeSubtitleIndex != null) lastSubtitleRef.current = activeSubtitleIndex;
+
+   function announceSubtitle(index: number | null) {
+      const track = subtitleTracks.find((t) => t.index === index);
+      showToast(track ? `Subtitles: ${subtitleTrackLabel(track, subtitleTracks.indexOf(track))}` : "Subtitles off");
+   }
+
+   /** C tap: subtitles off, or back to the track that was showing. */
+   function toggleSubtitles() {
+      if (subtitleTracks.length === 0) return;
+      const next = activeSubtitleIndex != null ? null : (subtitleTracks.find((t) => t.index === lastSubtitleRef.current)?.index ?? subtitleTracks[0].index);
       setActiveSubtitleIndex(next);
-      const track = subtitleTracks.find((t) => t.index === next);
-      showToast(
-         track
-            ? `Subtitles: ${subtitleTrackLabel(track, subtitleTracks.indexOf(track))}`
-            : "Subtitles off",
-      );
+      announceSubtitle(next);
+   }
+
+   /** C held + wheel: steps through off and every subtitle track. */
+   function stepSubtitle(direction: 1 | -1) {
+      const order: (number | null)[] = [null, ...subtitleTracks.map((t) => t.index)];
+      if (order.length < 2) return;
+      const next = order[(order.indexOf(activeSubtitleIndex) + direction + order.length) % order.length];
+      setActiveSubtitleIndex(next);
+      announceSubtitle(next);
    }
 
    function changeSubtitleDelay(delta: number) {
@@ -1112,6 +1123,53 @@ function MpvPlayerView({
       [],
    );
 
+   // C alone toggles subtitles (on release, so holding it for the wheel
+   // doesn't also toggle); C held + wheel steps through the tracks.
+   const subtitleKeysRef = useRef({ toggle: toggleSubtitles, step: stepSubtitle });
+   subtitleKeysRef.current = { toggle: toggleSubtitles, step: stepSubtitle };
+   useEffect(() => {
+      let held = false;
+      let wheelUsed = false;
+      let lastStep = 0;
+      function down(e: KeyboardEvent) {
+         if (e.key.toLowerCase() !== "c" || e.ctrlKey || e.altKey || e.metaKey || isTypingTarget(e.target)) return;
+         if (!e.repeat) {
+            held = true;
+            wheelUsed = false;
+         }
+      }
+      function up(e: KeyboardEvent) {
+         if (e.key.toLowerCase() !== "c" || !held) return;
+         held = false;
+         if (!wheelUsed) subtitleKeysRef.current.toggle();
+         flashControls();
+      }
+      function wheel(e: WheelEvent) {
+         if (!held) return;
+         e.preventDefault();
+         wheelUsed = true;
+         // Wheels/touchpads fire in bursts: one step per notch-ish.
+         const now = performance.now();
+         if (now - lastStep < 140 || e.deltaY === 0) return;
+         lastStep = now;
+         subtitleKeysRef.current.step(e.deltaY > 0 ? 1 : -1);
+      }
+      const release = () => {
+         held = false;
+      };
+      window.addEventListener("keydown", down);
+      window.addEventListener("keyup", up);
+      window.addEventListener("wheel", wheel, { passive: false });
+      window.addEventListener("blur", release);
+      return () => {
+         window.removeEventListener("keydown", down);
+         window.removeEventListener("keyup", up);
+         window.removeEventListener("wheel", wheel);
+         window.removeEventListener("blur", release);
+      };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, []);
+
    // Shift alone skips the intro. Armed on keydown and cleared by any other
    // key, so Shift+letter combos and typing never trigger it.
    const shiftArmedRef = useRef(false);
@@ -1190,9 +1248,6 @@ function MpvPlayerView({
                break;
             case "m":
                toggleMute();
-               break;
-            case "c":
-               cycleSubtitles();
                break;
             case ",":
                changeSubtitleDelay(-SUBTITLE_DELAY_STEP);
