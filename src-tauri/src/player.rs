@@ -157,6 +157,47 @@ pub async fn mpv_copy_frame(state: State<'_, PlayerState>) -> Result<(), String>
     Ok(())
 }
 
+/// Where saved frames go unless Settings picked a folder.
+fn default_screenshot_dir() -> std::path::PathBuf {
+    dirs::picture_dir().unwrap_or_else(std::env::temp_dir).join("nyaa-stream screenshots")
+}
+
+/// The folder frame saves start with.
+#[tauri::command]
+pub fn default_screenshot_folder() -> String {
+    default_screenshot_dir().to_string_lossy().into_owned()
+}
+
+/// Saves the frame on screen (subtitles included, at the video's native
+/// resolution) as `<folder>/<name>.png` and returns the path. Never
+/// overwrites an earlier file.
+#[tauri::command]
+pub async fn mpv_save_frame(state: State<'_, PlayerState>, folder: Option<String>, name: String) -> Result<String, String> {
+    tracing::debug!(?folder, %name, "mpv_save_frame invoked");
+    let mpv = state.mpv.lock().await.clone().ok_or_else(|| "mpv is not running".to_string())?;
+    let dir = match folder.as_deref().map(str::trim).filter(|f| !f.is_empty()) {
+        Some(folder) => std::path::PathBuf::from(folder),
+        None => default_screenshot_dir(),
+    };
+    tokio::fs::create_dir_all(&dir).await.map_err(|err| format!("Couldn't create {}: {err}", dir.display()))?;
+    let stem: String = name.chars().map(|c| if c.is_alphanumeric() || " -_.()".contains(c) { c } else { '_' }).collect();
+    let stem = stem.trim().chars().take(100).collect::<String>();
+    let mut path = dir.join(format!("{stem}.png"));
+    let mut n = 2;
+    while path.exists() {
+        path = dir.join(format!("{stem} ({n}).png"));
+        n += 1;
+    }
+    mpv.command(&["screenshot-to-file".into(), path.to_string_lossy().into_owned().into(), "subtitles".into()])
+        .await
+        .map_err(|err| {
+            tracing::warn!(%err, "mpv frame save failed");
+            err.to_string()
+        })?;
+    tracing::info!(path = %path.display(), "frame saved");
+    Ok(path.to_string_lossy().into_owned())
+}
+
 /// App-owned scratch directory for mpv (screenshots, fonts).
 fn scratch_dir() -> std::path::PathBuf {
     dirs::cache_dir().unwrap_or_else(std::env::temp_dir).join("nyaa-stream").join("mpv")
