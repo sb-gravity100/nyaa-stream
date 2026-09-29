@@ -1282,7 +1282,7 @@ export function HlsPlayerView({
    return (
       <div
          ref={rootRef}
-         class={`player-view hls-player${controlsVisible || menu ? " controls-shown" : ""}${playlistOpen ? " playlist-open" : ""}${paused && hasPlayed ? " is-paused" : ""}`}
+         class={`player-view hls-player${controlsVisible || menu ? " controls-shown" : ""}${playlistOpen ? " playlist-open" : ""}`}
          style={{ cursor: cursorHidden ? "none" : "auto" }}
       >
          {selectedFile && (

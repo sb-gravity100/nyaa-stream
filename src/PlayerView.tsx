@@ -1416,7 +1416,7 @@ function MpvPlayerView({
    return (
       <div
          ref={rootRef}
-         class={`player-view${controlsVisible || menu ? " controls-shown" : ""}${playlistOpen ? " playlist-open" : ""}${paused && hasPlayed ? " is-paused" : ""}`}
+         class={`player-view${controlsVisible || menu ? " controls-shown" : ""}${playlistOpen ? " playlist-open" : ""}`}
          style={{ cursor: cursorHidden ? "none" : "auto" }}
       >
          {/* mpv draws under the transparent webview; this layer sits over
