@@ -327,7 +327,7 @@
       - [x] enginefs: serve pieces verified < 30s ago from libtorrent's own
             copy only (stale-bytes corruption)
       - [ ] Home hero: grow to fit, clamp long titles to 2 lines
-      - [ ] libmpv: corruption log lines → `stream-corrupt` event
+      - [x] libmpv: corruption log lines → `stream-corrupt` event
       - [ ] MpvVideo: drop-buffers + exact seek to the current time on
             `stream-corrupt` (5s debounce, max 3 per 60s)
       - [ ] Verify live: time from click to first frame, logged before/after
