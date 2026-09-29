@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "preact/hooks";
+import { invoke } from "@tauri-apps/api/core";
 import { displayTitle, formatSeason, isMovie, type AnimeMedia, type KitsuMetadata, type NyaaResult } from "./types";
 import type { EpisodeLabel } from "./episodeParser";
 import { PlayerView } from "./PlayerView";
@@ -76,6 +77,49 @@ function useAnimeProgress(animeId: number): Record<string, ProgressEntry> {
   return progress;
 }
 
+type NextAiring = { airingAt: number; episode: number } | null;
+
+// AniList details fetched once per anime per session, for snapshots (library,
+// Continue watching) saved before `nextAiringEpisode` was requested.
+const nextAiringCache = new Map<number, NextAiring>();
+
+/** The next episode still to air, from the anime itself when it carries the
+ * field, else one AniList lookup. */
+function useNextAiring(anime: AnimeMedia): NextAiring {
+  const [next, setNext] = useState<NextAiring>(() =>
+    anime.nextAiringEpisode !== undefined ? anime.nextAiringEpisode : (nextAiringCache.get(anime.id) ?? null),
+  );
+  useEffect(() => {
+    if (anime.nextAiringEpisode !== undefined) {
+      setNext(anime.nextAiringEpisode);
+      return;
+    }
+    if (anime.status === "FINISHED" || isMovie(anime) || nextAiringCache.has(anime.id)) return;
+    let cancelled = false;
+    invoke<AnimeMedia>("get_anime_details", { id: anime.id })
+      .then((fresh) => {
+        nextAiringCache.set(anime.id, fresh.nextAiringEpisode ?? null);
+        if (!cancelled) setNext(fresh.nextAiringEpisode ?? null);
+      })
+      .catch((err) => console.debug("[media] next airing lookup failed", { id: anime.id, err: String(err) }));
+    return () => {
+      cancelled = true;
+    };
+  }, [anime.id]);
+  return next;
+}
+
+function airingCountdown(airingAt: number): string {
+  const seconds = airingAt - Date.now() / 1000;
+  if (seconds <= 0) return "airing now";
+  const days = Math.floor(seconds / 86_400);
+  const hours = Math.floor((seconds % 86_400) / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  if (days > 0) return `in ${days}d ${hours}h`;
+  if (hours > 0) return `in ${hours}h ${minutes}m`;
+  return `in ${Math.max(1, minutes)}m`;
+}
+
 function remainingLabel(entry: ProgressEntry): string {
   const minutes = Math.max(1, Math.round((entry.duration - entry.position) / 60));
   return `${minutes} min left`;
@@ -107,6 +151,14 @@ export function MediaPage({
   );
   const hiddenCount = groupedSources.length - visibleSources.length;
   const progress = useAnimeProgress(anime.id);
+  const nextAiring = useNextAiring(anime);
+  // Re-renders the countdown once a minute.
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!nextAiring) return;
+    const timer = window.setInterval(() => setTick((t) => t + 1), 60_000);
+    return () => window.clearInterval(timer);
+  }, [nextAiring]);
   const [expanded, setExpanded] = useState(false);
   // The group the route's player target resolves to, once releases load.
   // Numbered episodes match by number (season-agnostic, like the cards
@@ -194,6 +246,14 @@ export function MediaPage({
       }),
     [visibleSources, thumbnails, progress],
   );
+
+  /** Marks every numbered episode listed before `index` as watched. */
+  function markPreviousWatched(index: number) {
+    for (const [key, group] of visibleSources.slice(0, index)) {
+      if (group.label.kind !== "episode" || progress[key]?.completed) continue;
+      setWatched(anime, key, group.label.number, true);
+    }
+  }
 
   // Stable for the memoized player playlist.
   const selectFromPlayer = useCallback((key: string) => play(key, true), [groupedSources, onWatch]);
@@ -313,6 +373,14 @@ export function MediaPage({
                 <dd>{seasonLabel}</dd>
               </div>
             )}
+            {nextAiring && (
+              <div>
+                <dt>Next</dt>
+                <dd>
+                  Ep {nextAiring.episode} {airingCountdown(nextAiring.airingAt)}
+                </dd>
+              </div>
+            )}
           </dl>
           <div class="media-actions">
             {continueTarget && !sourcesLoading && (
@@ -401,9 +469,20 @@ export function MediaPage({
                           {group.releases.length} {group.releases.length === 1 ? "release" : "releases"}
                           {entry && !watched && ` · ${remainingLabel(entry)}`}
                           {group.label.kind === "batch" && " · pick the episode in the player"}
+                          {group.releases.every((r) => r.seeders === 0) && <span class="video-dead"> · no seeders</span>}
                         </div>
                       </div>
                     </button>
+                    {index > 0 && !watched && (
+                      <button
+                        class="video-watched-toggle video-mark-previous"
+                        onClick={() => markPreviousWatched(index)}
+                        title="Mark all previous episodes as watched"
+                        aria-label="Mark all previous episodes as watched"
+                      >
+                        ✓✓
+                      </button>
+                    )}
                     <button
                       class={`video-watched-toggle${watched ? " on" : ""}`}
                       onClick={() => setWatched(anime, key, episodeNumber, !watched)}
