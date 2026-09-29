@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `bac1f3a` · 2026-09-29 · docs: plan local release script
+- `PLAN.md`
+- `PHASES.md`
+
 ### `963a00c` · 2026-09-29 · docs: record fast playback start implementation decisions
 - `PLAN.md`
 
