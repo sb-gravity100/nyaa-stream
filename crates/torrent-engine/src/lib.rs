@@ -1274,6 +1274,20 @@ impl TorrentEngine {
         format!("http://{}/subtitles/{}/{}/{}", self.stream_addr, torrent_id, file_idx, stream_index)
     }
 
+    /// Cuts `[start_seconds, end_seconds)` of a torrent file into an MP4 at
+    /// `out` with normalized codecs (hardware H.264 when available + AAC) -
+    /// see `media::export_clip`. Reads the torrent at foreground priority, so
+    /// it waits on pieces the player hasn't downloaded yet. Returns once the
+    /// file is written.
+    pub async fn export_clip(&self, torrent_id: &TorrentId, file_idx: usize, start_seconds: f64, end_seconds: f64, audio_stream: usize, out: PathBuf) -> anyhow::Result<()> {
+        let encoder = detect_h264_encoder().await;
+        let input = media::InputSource::Torrent(self.hls_jobs.sources.reader(torrent_id, file_idx, false));
+        tracing::info!(torrent_id = %torrent_id, file_idx, start_seconds, end_seconds, audio_stream, out = %out.display(), "clip export requested");
+        tokio::task::spawn_blocking(move || media::export_clip(media::ClipExport { input, out: &out, start_seconds, end_seconds, audio_stream, encoder }))
+            .await
+            .map_err(|err| anyhow::anyhow!("clip export panicked: {err}"))?
+    }
+
     /// Download progress/speed/peer-count snapshot for an in-progress
     /// torrent, polled by the frontend to show buffering feedback while
     /// mpv waits for enough data to start decoding.
