@@ -2,6 +2,16 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `6f37211` · 2026-09-29 · docs: note hero slide in FILE_INDEX.md
+- `FILE_INDEX.md`
+
+### `f37c0ef` · 2026-09-29 · feat: slide the home hero between featured shows
+- `src/App.css`
+- `src/HomePage.tsx`
+
+### `3bacb2e` · 2026-09-29 · fix: give the home hero a fixed, shorter height
+- `src/App.css`
+
 ### `11a1aff` · 2026-09-29 · docs: plan custom context menus for v0.4.0
 - `PLAN.md`
 - `PHASES.md`
