@@ -78,11 +78,11 @@
       }
 
       .splash-ear-left {
-        transform-origin: 62% 80%;
+        transform-origin: 55% 78%;
       }
 
       .splash-ear-right {
-        transform-origin: 38% 80%;
+        transform-origin: 45% 78%;
         animation-delay: 0.12s;
       }
 
@@ -183,9 +183,14 @@
           <defs>
             <!-- One gradient in user space so the head and the ears (drawn
                  separately to twitch) blend without seams. -->
-            <linearGradient id="splash-fill" gradientUnits="userSpaceOnUse" x1="5" y1="2.5" x2="27" y2="29">
-              <stop offset="0" stop-color="#ffa9c8" />
-              <stop offset="1" stop-color="#d9578a" />
+            <linearGradient id="splash-fill" gradientUnits="userSpaceOnUse" x1="6" y1="2" x2="26" y2="30">
+              <stop offset="0" stop-color="#ffb3cf" />
+              <stop offset="0.55" stop-color="#f07aa6" />
+              <stop offset="1" stop-color="#d4528a" />
+            </linearGradient>
+            <linearGradient id="splash-top-shine" gradientUnits="userSpaceOnUse" x1="0" y1="2" x2="0" y2="30">
+              <stop offset="0" stop-color="#fff" stop-opacity="0.32" />
+              <stop offset="0.45" stop-color="#fff" stop-opacity="0" />
             </linearGradient>
             <radialGradient id="splash-glow-fill">
               <stop offset="0" stop-color="#f07aa6" stop-opacity="0.45" />
@@ -201,7 +206,7 @@
               <stop offset="1" stop-color="#fff" stop-opacity="0" />
             </linearGradient>
             <clipPath id="splash-head-clip">
-              <path d="M5 11 L7.5 2.5 L13 8 H19 L24.5 2.5 L27 11 V24 A5 5 0 0 1 22 29 H10 A5 5 0 0 1 5 24 Z" />
+              <path d="M4.5 13.5 C4.5 11.6 4.8 10 5.3 8.6 L6.6 3.2 Q7.1 1.4 8.6 2.4 L13.4 7.6 Q16 7 18.6 7.6 L23.4 2.4 Q24.9 1.4 25.4 3.2 L26.7 8.6 C27.2 10 27.5 11.6 27.5 13.5 V22.2 C27.5 26.4 24.6 29.3 20.4 29.3 H11.6 C7.4 29.3 4.5 26.4 4.5 22.2 Z" />
             </clipPath>
           </defs>
 
@@ -230,10 +235,22 @@
 
           <!-- The app's BrandMark (32-unit box) scaled 3.4x around the center. -->
           <g class="splash-head">
-            <g transform="translate(55.6 55.6) scale(3.4)">
-              <path class="splash-ear splash-ear-left" d="M5.2 12 L7.5 2.5 L14 8.6 Z" fill="url(#splash-fill)" />
-              <path class="splash-ear splash-ear-right" d="M18 8.6 L24.5 2.5 L26.8 12 Z" fill="url(#splash-fill)" />
-              <path d="M5 11 L10 8 H22 L27 11 V24 A5 5 0 0 1 22 29 H10 A5 5 0 0 1 5 24 Z" fill="url(#splash-fill)" />
+            <g transform="translate(55.6 57.5) scale(3.4)">
+              <!-- Ears (with their inner shading) drawn apart from the head so
+                   they can twitch; their bases reach into the head, so no gap
+                   shows while they rotate. -->
+              <g class="splash-ear splash-ear-left">
+                <path d="M5.3 8.6 L6.6 3.2 Q7.1 1.4 8.6 2.4 L13.4 7.6 L12.4 10.6 L5 11.8 Z" fill="url(#splash-fill)" />
+                <path d="M7.6 4.6 Q7.9 3.6 8.7 4.2 L11.9 7.7 Q9.8 8.4 8 9.8 Z" fill="#c43f78" opacity="0.55" />
+              </g>
+              <g class="splash-ear splash-ear-right">
+                <path d="M26.7 8.6 L25.4 3.2 Q24.9 1.4 23.4 2.4 L18.6 7.6 L19.6 10.6 L27 11.8 Z" fill="url(#splash-fill)" />
+                <path d="M24.4 4.6 Q24.1 3.6 23.3 4.2 L20.1 7.7 Q22.2 8.4 24 9.8 Z" fill="#c43f78" opacity="0.55" />
+              </g>
+              <path d="M4.5 13.5 C4.5 11.6 4.8 10 5.3 8.6 Q9 7.9 13.4 7.6 Q16 7 18.6 7.6 Q23 7.9 26.7 8.6 C27.2 10 27.5 11.6 27.5 13.5 V22.2 C27.5 26.4 24.6 29.3 20.4 29.3 H11.6 C7.4 29.3 4.5 26.4 4.5 22.2 Z" fill="url(#splash-fill)" />
+              <!-- Top highlight over the whole silhouette, ears included, so
+                   the head and ears don't show a seam. -->
+              <rect x="0" y="0" width="32" height="32" fill="url(#splash-top-shine)" clip-path="url(#splash-head-clip)" />
               <g clip-path="url(#splash-head-clip)">
                 <g transform="skewX(-18)">
                   <rect class="splash-shine" x="0" y="-4" width="10" height="40" fill="url(#splash-shine-fill)" />
@@ -241,10 +258,10 @@
               </g>
               <path
                 class="splash-play"
-                d="M13.5 13.5 v9 l7.5 -4.5 z"
+                d="M14 14.6 V23 L21 18.8 Z"
                 fill="#2a0f1c"
                 stroke="#2a0f1c"
-                stroke-width="1.5"
+                stroke-width="2.2"
                 stroke-linejoin="round"
               />
             </g>
