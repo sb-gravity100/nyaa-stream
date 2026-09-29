@@ -19,7 +19,7 @@ import { Buffering } from "./Buffering";
 import { StatisticsMenu } from "./StatisticsMenu";
 import { getSettings as getSettingsSnapshot, useSettings } from "./settings";
 import { applyMpvSubtitleStyle, mpvSubtitleSettings, defaultSubtitleIndex, isStyledTrack, subtitleTrackLabel } from "./subtitles";
-import { COMPLETED_FRACTION, MIN_RESUME_SECONDS, resumePosition, saveProgress } from "./watchProgress";
+import { COMPLETED_FRACTION, MIN_RESUME_SECONDS, getProgress, resumePosition, saveProgress } from "./watchProgress";
 import { PlayerPlaylist, type PlaylistItem } from "./PlayerPlaylist";
 import {
   BackIcon,
@@ -159,6 +159,13 @@ function baseName(path: string): string {
  * continues in the same torrent instead of jumping to another source. */
 const lastBatchMagnet = new Map<number, string>();
 
+/** The source an unfinished episode was last watched from, if any. */
+function resumeSourceMagnet(animeId: number, episodeKey: string): string | undefined {
+   if (!getSettingsSnapshot().resumePlayback) return undefined;
+   const entry = getProgress(animeId, episodeKey);
+   return entry && !entry.completed ? entry.source?.magnet : undefined;
+}
+
 /** The video file of the episode after `current` in the same torrent
  * (batches), if its name parses to that number. */
 function nextEpisodeFile(files: PlayFile[], current: PlayFile): PlayFile | null {
@@ -245,7 +252,7 @@ function MpvPlayerView({
 }: Props) {
    const settings = useSettings();
    const videoRef = useRef<MpvVideo | null>(null);
-   const selectedFileIdxRef = useRef<number | null>(null);
+   const selectedFileRef = useRef<PlayFile | null>(null);
    const rootRef = useRef<HTMLDivElement>(null);
    const [videoEl, setVideoEl] = useState<MpvVideo | null>(null);
    const preferredGroup = settings.rememberFansubGroup
@@ -262,7 +269,11 @@ function MpvPlayerView({
       () =>
          // Keep playing from the same batch across episodes: its next
          // episode is already being preloaded (see the preload effect).
-         releases.find((r) => r.magnet === lastBatchMagnet.get(anime.id)) ?? bestRelease(releases, releasePrefs),
+         // A resume prefers the release it was watched from (its resume
+         // buffer matches those bytes), when still listed.
+         releases.find((r) => r.magnet === resumeSourceMagnet(anime.id, episodeKey)) ??
+         releases.find((r) => r.magnet === lastBatchMagnet.get(anime.id)) ??
+         bestRelease(releases, releasePrefs),
    );
    useEffect(() => {
       if (isBatchRelease(selectedRelease)) lastBatchMagnet.set(anime.id, selectedRelease.magnet);
@@ -271,7 +282,7 @@ function MpvPlayerView({
    const [torrentId, setTorrentId] = useState<string | null>(null);
    const [files, setFiles] = useState<PlayFile[]>([]);
    const [selectedFile, setSelectedFile] = useState<PlayFile | null>(null);
-   selectedFileIdxRef.current = selectedFile?.index ?? null;
+   selectedFileRef.current = selectedFile;
    const [stats, setStats] = useState<StreamStats | null>(null);
    const [error, setError] = useState<string | null>(null);
    const [status, setStatus] = useState("Connecting to peers…");
@@ -647,7 +658,7 @@ function MpvPlayerView({
     * resume buffer". Reads refs: runs from the unmount cleanup. */
    function resumeRequest(): ResumeRequest | undefined {
       const video = videoRef.current;
-      const fileIdx = selectedFileIdxRef.current;
+      const fileIdx = selectedFileRef.current?.index;
       if (!video || fileIdx == null || !video.duration) return undefined;
       const position = video.currentTime;
       if (position < MIN_RESUME_SECONDS || position / video.duration >= COMPLETED_FRACTION) return undefined;
@@ -659,12 +670,14 @@ function MpvPlayerView({
       // readyState check instead of the `ready` state: this runs from an
       // interval whose closure would otherwise see a stale value.
       if (!video || !video.duration || video.readyState < 1) return;
+      const file = selectedFileRef.current;
       saveProgress(
          anime,
          episodeKey,
          episode,
          video.currentTime,
          video.duration,
+         file ? { magnet: selectedReleaseRef.current.magnet, fileIdx: file.index, fileName: file.name } : undefined,
       );
    }
 
