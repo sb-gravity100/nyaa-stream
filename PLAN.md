@@ -716,20 +716,40 @@ episode neither covers is a bare number tile. The torrent frame capture
 episode's duration) already exists but only runs for the home page's Latest
 Episodes cards. A button on the Episodes section runs it on demand.
 
-- **Step 1 - screenshots from the nyaa view page (no download):** many
-  release descriptions embed full-size frames of the episode (e.g.
-  `nyaa.si/view/2167380`, ToonsHub: three 1920x1080 PNG frames on
-  `i.kek.sh`). The existing view-page scrape (`nyaa-client`, cached forever)
-  also collects the description's image URLs. For a row without a
-  thumbnail, its sources' view pages are checked first; the first image that
-  looks like a frame (>= 1280 wide, aspect 16:9 +- 5% before black-bar
-  cropping, not a poster/logo/MediaInfo) is fetched *by the backend* (never
-  hotlinked - these hosts expire), black letterbox bars cropped, resized to
-  640px JPEG and stored as the episode's thumbnail (`thumb://` cache, same
-  key as a capture). Middle image preferred when there are several (first
-  ones are often the title card). Also runs automatically for rows with no
-  art, since it's one small page + one image. Torrent capture below is only
-  the fallback when no view page has a usable frame.
+- **Step 1 - screenshots from the nyaa view page (no download):** some
+  groups embed episode frames (or the streaming platform's own episode
+  thumbnail) in their release description. The existing view-page scrape
+  (`nyaa-client`, cached forever) also collects the description's image
+  URLs. For a row without a thumbnail, its sources' view pages are checked,
+  known screenshot groups first (table below); the first image that looks
+  like a frame (>= 960 wide, aspect 16:9 +- 5% after black-bar cropping; not
+  a GIF, logo or poster) is fetched *by the backend* (never hotlinked - these
+  hosts expire), letterbox bars cropped, resized to 640px JPEG and stored as
+  the episode's thumbnail (`thumb://` cache, same key as a capture). With
+  several frames the middle one wins (the first is often a title card).
+  Runs automatically for rows with no art (one page + one image). Torrent
+  capture below is only the fallback when no view page has a usable frame.
+  Episode thumbnails only - these frames are not used as banners.
+
+  Survey 2026-09-29 (top-seeded releases per group, 4 view pages each):
+
+  | Group | Images per release | Host | What they are |
+  |---|---|---|---|
+  | **ASW** | 2 | i.ibb.co | 1920x1080 WebP episode frames |
+  | **ToonsHub** | 3 | i.kek.sh | 1920x1080 PNG frames (letterboxed for movies) |
+  | **Doomdos** | 2 | fumodub.com + platform CDN | 2nd image = the platform's episode thumbnail (oceanveil / ivi / iQIYI, 1920x1080 or 1080x608); 1st is the group's own |
+  | Judas | 3 | i.ibb.co | 1920x1080 PNG frames |
+  | Varyg | 3 | i.kek.sh | frames (same layout as ToonsHub) |
+  | Anime Time | 3-85 | i.slow.pics | 1432x1080 comparison frames - usable, cropped to 16:9 |
+  | Yameii | 1 | i.ibb.co | GIF banner - not a frame, skip |
+  | Kaleido-subs | 0-1 | cdn-eu.anidb.net | AniDB poster - skip |
+  | SubsPlease, Erai-raws, EMBER, DKB, New-raws, SanKyuu, MiniMTBB, Tsundere-Raws | 0 | - | never checked for frames |
+
+  Known screenshot groups (ASW, ToonsHub, Doomdos, Judas, Varyg, Anime Time)
+  are a built-in list; groups with no frames are skipped without fetching
+  their view page. Groups outside both lists are checked once, and the
+  result (frames yes/no) is remembered per group in the release database so
+  the list grows by itself.
 - **Button:** in the Episodes section header, "Build thumbnails (N)", shown
   only when N > 0 visible episode rows have no thumbnail from any source.
   While running: "Building 3/12 · Cancel"; at the end, "N failed" if any.
@@ -788,9 +808,7 @@ and quality and often missing. Researched 2026-09-29:
   per-anime mapping request. Fallback for ids missing there: arm-server
   (`arm.haglund.dev/api/v2/ids?source=anilist&id=`), built on the same data.
 - **Chain:** TMDB textless backdrop (highest vote, >= 1920 wide) → fanart.tv
-  `showbackground` → Simkl fanart → Kitsu → a nyaa view-page frame (see
-  "Build thumbnails button", letterbox-cropped; mid-episode, so last among
-  real art) → AniList banner → poster.
+  `showbackground` → Simkl fanart → Kitsu → AniList banner → poster.
   TMDB/TVDB are per *show*, AniList per *season*: all seasons of a show share
   backdrops, so for a season entry prefer images not used by another
   season's AniList entry when there is a choice; otherwise accept show art.

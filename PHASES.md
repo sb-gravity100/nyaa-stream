@@ -337,6 +337,8 @@
       - [ ] Frame thumbnail from a view-page image: frame filter, backend
             fetch, letterbox crop, 640px JPEG into the thumb cache; auto
             for rows without art
+      - [ ] Screenshot groups: built-in yes/no lists (survey in PLAN.md),
+            unknown groups checked once and remembered
       - [ ] `capture_torrent_thumbnail`: optional `file_idx` and `force`
       - [ ] Batch captures share one torrent across their episodes
       - [ ] Capture source pick: SubsPlease 480p (>= 1 seeder) first, else
