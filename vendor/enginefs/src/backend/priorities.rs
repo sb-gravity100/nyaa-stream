@@ -97,26 +97,48 @@ pub fn disk_backed_sequential_download(intent: PlaybackIntent) -> bool {
     matches!(intent, PlaybackIntent::DownloadFull)
 }
 
+/// (nyaa-stream) Bytes from the read position that must verify before a
+/// foreground stream's startup baseline (see
+/// `disk_backed_file_baseline_priority`) rises from 0 to
+/// `STREAMING_FILE_BASELINE_PRIORITY`.
+pub const STARTUP_BUFFER_BYTES: u64 = 8 * 1024 * 1024;
+/// (nyaa-stream) The startup baseline rises after this long even if the
+/// startup buffer hasn't verified yet (slow swarm, rare head pieces).
+pub const STARTUP_BASELINE_FALLBACK_MS: u64 = 15_000;
+/// Baseline of a streamed file once its startup buffer has verified.
+pub const STREAMING_FILE_BASELINE_PRIORITY: i32 = 1;
+
+/// Pieces covering `STARTUP_BUFFER_BYTES` (at least one).
+pub fn startup_buffer_pieces(piece_length: u64) -> i32 {
+    pieces_for_bytes(STARTUP_BUFFER_BYTES, piece_length).max(1)
+}
+
+/// Baseline priority of the rest of the file (outside the priority windows)
+/// when a stream with this intent activates it.
 pub fn disk_backed_file_baseline_priority(intent: PlaybackIntent) -> i32 {
     match intent {
         PlaybackIntent::DownloadFull | PlaybackIntent::DownloadRange => 7,
-        // Every streaming intent keeps the WHOLE file minimally wanted
-        // (priority 1). A baseline of 0 leaves only the forward window wanted, so
-        // once that small window verifies the torrent reports is_finished and
-        // drops to seeding/idle -- the download rate craters, read-ahead stops,
-        // and (with seeding disabled) the upload is throttled mid-stream. With
-        // baseline 1 the file stays "downloading" until it is actually complete;
-        // the forward window (priority 7 + deadlines) still concentrates
-        // bandwidth on the requested region, so seek/startup stay fast.
+        // (nyaa-stream) Foreground streaming starts at 0: only the priority
+        // window is wanted. Upstream started at 1, which made libtorrent fill
+        // every peer's request queue with rarest-first bulk pieces before the
+        // head was asked for ("max outstanding piece requests reached"); the
+        // head piece then queued behind seconds of in-flight bulk work - 20s
+        // for piece 0 in a measured SubsPlease start. The coordinator raises
+        // the file to STREAMING_FILE_BASELINE_PRIORITY once the startup
+        // buffer (STARTUP_BUFFER_BYTES from the read position) verifies, or
+        // after STARTUP_BASELINE_FALLBACK_MS - so the whole file is still
+        // wanted and the torrent never reports is_finished once only the
+        // forward window completes (upstream's reason for 1: that stalls
+        // read-ahead and idles the download).
         PlaybackIntent::DirectInitial
         | PlaybackIntent::DirectSeek
         | PlaybackIntent::HlsInitial
         | PlaybackIntent::HlsSeek
-        | PlaybackIntent::ContainerMetadata
         | PlaybackIntent::DirectSequential
-        | PlaybackIntent::HlsSequential
+        | PlaybackIntent::HlsSequential => 0,
+        PlaybackIntent::ContainerMetadata
         | PlaybackIntent::InternalProbe
-        | PlaybackIntent::Background => 1,
+        | PlaybackIntent::Background => STREAMING_FILE_BASELINE_PRIORITY,
     }
 }
 
@@ -729,31 +751,38 @@ mod tests {
     }
 
     #[test]
-    fn disk_backed_streaming_keeps_whole_file_wanted() {
-        // Streaming intents keep the whole file minimally wanted (priority 1) so
-        // the torrent never reports is_finished after just the forward window
-        // completes (which stalls read-ahead / idles the download). Downloads
-        // stay at 7.
-        assert_eq!(
-            disk_backed_file_baseline_priority(PlaybackIntent::DirectInitial),
-            1
-        );
-        assert_eq!(
-            disk_backed_file_baseline_priority(PlaybackIntent::DirectSeek),
-            1
-        );
+    fn disk_backed_streaming_starts_at_baseline_zero() {
+        // (nyaa-stream) Foreground streaming starts with only its window
+        // wanted; the coordinator raises the file to 1 after the startup
+        // buffer. Non-foreground reads keep 1, downloads stay at 7.
+        for intent in [
+            PlaybackIntent::DirectInitial,
+            PlaybackIntent::DirectSeek,
+            PlaybackIntent::DirectSequential,
+            PlaybackIntent::HlsInitial,
+            PlaybackIntent::HlsSeek,
+            PlaybackIntent::HlsSequential,
+        ] {
+            assert_eq!(disk_backed_file_baseline_priority(intent), 0, "{intent:?}");
+        }
         assert_eq!(
             disk_backed_file_baseline_priority(PlaybackIntent::ContainerMetadata),
-            1
+            STREAMING_FILE_BASELINE_PRIORITY
         );
         assert_eq!(
-            disk_backed_file_baseline_priority(PlaybackIntent::DirectSequential),
-            1
+            disk_backed_file_baseline_priority(PlaybackIntent::Background),
+            STREAMING_FILE_BASELINE_PRIORITY
         );
         assert_eq!(
             disk_backed_file_baseline_priority(PlaybackIntent::DownloadFull),
             7
         );
+    }
+
+    #[test]
+    fn startup_buffer_covers_eight_megabytes() {
+        assert_eq!(startup_buffer_pieces(256 * 1024), 32);
+        assert_eq!(startup_buffer_pieces(16 * 1024 * 1024), 1);
     }
 
     #[test]

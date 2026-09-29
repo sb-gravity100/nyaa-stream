@@ -279,7 +279,7 @@
       thumbnail)
 - [ ] Fast playback start (v0.3.2, see PLAN.md "Fast playback start"): one
       commit each -
-      - [ ] enginefs: startup baseline priority 0, raised to 1 once the
+      - [x] enginefs: startup baseline priority 0, raised to 1 once the
             startup buffer verifies (or 15s fallback)
       - [ ] enginefs: ~4 MB startup window at priority 7 + staggered
             deadlines; ~4 MB read-ahead at 7 after the first byte
