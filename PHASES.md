@@ -331,7 +331,7 @@
       - [x] MpvVideo: drop-buffers + exact seek to the current time on
             `stream-corrupt` (5s debounce, max 3 per 60s)
       - [ ] Verify live: time from click to first frame, logged before/after
-      - [ ] PLAN.md/FILE_INDEX.md sync, `npm run bump -- patch`, tag
+      - [x] PLAN.md/FILE_INDEX.md sync, `npm run bump -- patch`, tag
             `v0.3.2`, `npm run release -- --notes "..." --dry-run`, then
             publish (see PLAN.md "Release plan")
 - [ ] Download cache (v0.4.0, see PLAN.md "Download cache"): one commit each -
