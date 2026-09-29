@@ -2,6 +2,17 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `8992f5d` · 2026-09-29 · feat: smarter nyaa title matching - fewer queries run in parallel, false positives dropped
+- `src-tauri/src/title_match.rs`
+- `src-tauri/src/lib.rs`
+- `FILE_INDEX.md`
+
+### `32d4154` · 2026-09-29 · feat(anilist): carry AniList synonyms as extra release-search names
+- `crates/anilist-client/src/lib.rs`
+- `src-tauri/src/metadata_fallback.rs`
+- `src/types.ts`
+- `src/App.tsx`
+
 ### `9765d15` · 2026-09-29 · feat(nyaa-client): throttle requests and back off on 429/503
 - `crates/nyaa-client/src/throttle.rs`
 - `crates/nyaa-client/src/lib.rs`
