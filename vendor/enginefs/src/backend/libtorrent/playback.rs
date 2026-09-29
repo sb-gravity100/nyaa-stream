@@ -11,8 +11,9 @@ use tokio_util::sync::CancellationToken;
 
 use crate::backend::priorities::{
     MemoryPressure, PlaybackIntent, PlaybackPriorityPolicy, PriorityContext,
-    STARTUP_BASELINE_FALLBACK_MS, WatchHint, disk_backed_file_baseline_priority,
-    disk_backed_urgent_pieces, seek_target_covered, startup_buffer_pieces,
+    RESUME_ANCHOR_FALLBACK_EXTRA_MS, STARTUP_BASELINE_FALLBACK_MS, WatchHint,
+    disk_backed_file_baseline_priority, disk_backed_urgent_pieces, is_resume_point,
+    seek_target_covered, startup_buffer_pieces, tail_prefetch_pieces,
 };
 
 use super::alerts::LibtorrentAlertHub;
@@ -28,6 +29,9 @@ const EMERGENCY_REANNOUNCE_DELAY: Duration = Duration::from_secs(2);
 const EMERGENCY_REANNOUNCE_COOLDOWN: Duration = Duration::from_secs(60);
 const METADATA_TIMEOUT: Duration = Duration::from_secs(30);
 const HLS_PRIORITY_STREAM_ID: usize = usize::MAX;
+/// (nyaa-stream) Fix 2: the priority window holding the file tail (container
+/// index) requested with the header at playback start.
+const TAIL_PREFETCH_STREAM_ID: usize = usize::MAX - 1;
 /// (nyaa-stream) How often a verified piece may trigger the "has the rest of
 /// the file verified?" check that restores continue-watch's skipped pieces.
 const SKIPPED_RESTORE_CHECK_INTERVAL: Duration = Duration::from_secs(2);
@@ -79,6 +83,20 @@ impl LibtorrentPlaybackPermit {
             return;
         }
         let _ = self.command_tx.send(PlaybackCommand::ReadStarted {
+            info_hash: self.info_hash.clone(),
+            file_idx: self.file_idx,
+            generation: self.generation,
+            piece,
+        });
+    }
+
+    /// (nyaa-stream) How far a playback read got before its stream seeked
+    /// away or closed - see `LibtorrentPlaybackCoordinator::on_read_ended`.
+    pub(crate) fn report_read_end(&self, piece: i32) {
+        if self.released || self.cancellation.is_cancelled() {
+            return;
+        }
+        let _ = self.command_tx.send(PlaybackCommand::ReadEnded {
             info_hash: self.info_hash.clone(),
             file_idx: self.file_idx,
             generation: self.generation,
@@ -286,6 +304,10 @@ struct WatchState {
     /// Pieces before `anchor` held at 0 (`first..=last`) until the rest of
     /// the file verified or the player seeks back into them.
     skipped: Option<(i32, i32)>,
+    /// Furthest piece a playback read (not the file tail) reached before
+    /// seeking away or closing - the player returning there after the index
+    /// read is a continuation, not the resume point (`is_resume_point`).
+    read_frontier: Option<i32>,
 }
 
 impl WatchState {
@@ -295,7 +317,13 @@ impl WatchState {
             hint,
             anchor: None,
             skipped: None,
+            read_frontier: None,
         }
+    }
+
+    /// Continue watch whose resume point isn't known yet.
+    fn resume_unanchored(&self) -> bool {
+        self.hint == WatchHint::Resume && self.anchor.is_none()
     }
 }
 
@@ -679,6 +707,13 @@ enum PlaybackCommand {
     /// (nyaa-stream) A foreground stream's first read position, see
     /// `LibtorrentPlaybackPermit::report_read_start`.
     ReadStarted {
+        info_hash: String,
+        file_idx: usize,
+        generation: u64,
+        piece: i32,
+    },
+    /// (nyaa-stream) See `LibtorrentPlaybackPermit::report_read_end`.
+    ReadEnded {
         info_hash: String,
         file_idx: usize,
         generation: u64,
@@ -1342,6 +1377,15 @@ impl LibtorrentPlaybackCoordinator {
             }
             state.selected_first_piece = Some(first_piece);
         }
+        if selection.changed
+            && !matches!(
+                start.intent,
+                PlaybackIntent::InternalProbe | PlaybackIntent::Background
+            )
+        {
+            self.prefetch_file_tail(info_hash, entry, layout, start.file_idx, selection.generation)
+                .await?;
+        }
         let session = self.session.read().await;
         let mut native_handle = session
             .find_torrent(info_hash)
@@ -1532,6 +1576,20 @@ impl LibtorrentPlaybackCoordinator {
             let Some(hold) = state.startup_hold else {
                 return Ok(false);
             };
+            // (nyaa-stream) Fix 4: a resume keeps the hold until its resume
+            // point is known (the anchor replaces the hold) - the header's
+            // buffer verifying says nothing about the resume region.
+            if reason != "resume-fallback"
+                && state.selected_watch().is_some_and(|watch| watch.resume_unanchored())
+            {
+                tracing::debug!(
+                    info_hash = %info_hash,
+                    generation,
+                    reason,
+                    "startup hold kept: resume point not known yet"
+                );
+                return Ok(false);
+            }
             if require_buffer && !buffer_verified(&handle, &hold) {
                 return Ok(false);
             }
@@ -1745,12 +1803,12 @@ impl LibtorrentPlaybackCoordinator {
                 Action::None
             } else {
                 let watch = state.selected_watch();
-                let resume_unanchored = watch
-                    .is_some_and(|watch| watch.hint == WatchHint::Resume && watch.anchor.is_none());
+                let resume_unanchored = watch.is_some_and(|watch| watch.resume_unanchored());
+                let read_frontier = watch.and_then(|watch| watch.read_frontier);
                 let in_skipped = watch
                     .and_then(|watch| watch.skipped)
                     .is_some_and(|(first, last)| piece >= first && piece <= last);
-                if resume_unanchored && piece >= header_end {
+                if resume_unanchored && is_resume_point(piece, header_end, read_frontier) {
                     Action::Anchor
                 } else if in_skipped {
                     Action::RestoreSkipped
@@ -1820,6 +1878,110 @@ impl LibtorrentPlaybackCoordinator {
             }
         }
         Ok(())
+    }
+
+    /// (nyaa-stream) Fix 2: requests the file tail (container index - MKV
+    /// Cues / MP4 moov) at priority 7 together with the header, so the
+    /// player's index read after the header doesn't start a second cold
+    /// wait. Its own window (`TAIL_PREFETCH_STREAM_ID`), replaced per
+    /// generation; already-downloaded pieces are skipped. Caller holds the
+    /// operation lock.
+    async fn prefetch_file_tail(
+        &self,
+        info_hash: &str,
+        entry: &TorrentPlaybackEntry,
+        layout: &TorrentLayout,
+        file_idx: usize,
+        generation: u64,
+    ) -> Result<()> {
+        let Some(file) = layout.files.get(file_idx) else {
+            return Ok(());
+        };
+        let Some((tail_first, tail_last)) = tail_prefetch_pieces(
+            file.last_piece,
+            file.offset.max(0) as u64,
+            file.size.max(0) as u64,
+            layout.piece_length,
+        ) else {
+            tracing::debug!(info_hash = %info_hash, file_idx, "file too small for a tail prefetch");
+            return Ok(());
+        };
+        let tail_first = tail_first.max(file.first_piece);
+        let missing: Vec<i32> = {
+            let session = self.session.read().await;
+            let handle = session
+                .find_torrent(info_hash)
+                .map_err(|error| anyhow!("Torrent not found: {error}"))?;
+            let presence = handle.piece_presence(tail_first, tail_last);
+            (tail_first..=tail_last)
+                .zip(presence)
+                .filter(|(_, present)| *present == 0)
+                .map(|(piece, _)| piece)
+                .collect()
+        };
+        if missing.is_empty() {
+            tracing::debug!(info_hash = %info_hash, file_idx, "file tail already downloaded");
+            return Ok(());
+        }
+        let assignments = missing
+            .iter()
+            .map(|&piece| LibtorrentPiecePriority {
+                piece,
+                priority: 7,
+                deadline_ms: Some(0),
+            })
+            .collect();
+        self.replace_priority_window_locked(
+            info_hash,
+            entry,
+            file_idx,
+            generation,
+            TAIL_PREFETCH_STREAM_ID,
+            assignments,
+        )
+        .await?;
+        tracing::info!(
+            info_hash = %info_hash,
+            file_idx,
+            generation,
+            tail_first,
+            tail_last,
+            missing = missing.len(),
+            stage = "tail_prefetch_requested",
+            "libtorrent playback startup stage"
+        );
+        Ok(())
+    }
+
+    /// (nyaa-stream) Fix 3: remembers how far playback reads (never the file
+    /// tail - the disk reader doesn't report those) got, so the player
+    /// returning there after the index read isn't taken for the resume
+    /// point.
+    async fn on_read_ended(
+        &self,
+        info_hash: &str,
+        entry: &TorrentPlaybackEntry,
+        file_idx: usize,
+        generation: u64,
+        piece: i32,
+    ) {
+        let mut state = entry.state.lock().await;
+        if state.generation != generation || state.selected_file != Some(file_idx) {
+            return;
+        }
+        let Some(watch) = state.watch.as_mut().filter(|watch| watch.file_idx == file_idx) else {
+            return;
+        };
+        let frontier = watch.read_frontier.map_or(piece, |frontier| frontier.max(piece));
+        watch.read_frontier = Some(frontier);
+        tracing::debug!(
+            info_hash = %info_hash,
+            file_idx,
+            generation,
+            piece,
+            frontier,
+            "playback read end recorded"
+        );
     }
 
     /// (nyaa-stream) Fix C - a seek into undownloaded data is continue watch:
@@ -1909,20 +2071,63 @@ impl LibtorrentPlaybackCoordinator {
         generation: u64,
         cancellation: CancellationToken,
     ) {
-        let coordinator = Arc::downgrade(self);
+        let weak = Arc::downgrade(self);
         tokio::spawn(async move {
             tokio::select! {
                 _ = cancellation.cancelled() => return,
                 _ = tokio::time::sleep(Duration::from_millis(STARTUP_BASELINE_FALLBACK_MS)) => {}
             }
-            let Some(coordinator) = coordinator.upgrade() else {
+            let Some(coordinator) = weak.upgrade() else {
                 return;
             };
             let Some(entry) = coordinator.entries.lock().await.get(&info_hash).cloned() else {
                 return;
             };
-            if let Err(error) = coordinator
+            match coordinator
                 .raise_startup_baseline(&info_hash, &entry, generation, false, "fallback-timeout")
+                .await
+            {
+                Ok(true) => return,
+                Ok(false) => {}
+                Err(error) => {
+                    tracing::warn!(
+                        info_hash = %info_hash,
+                        file_idx,
+                        generation,
+                        %error,
+                        "Failed to raise the startup baseline after its fallback timeout"
+                    );
+                    return;
+                }
+            }
+            // (nyaa-stream) Fix 4: a resume still looking for its resume
+            // point keeps the hold a while longer, then gives up on it.
+            let resume_pending = {
+                let state = entry.state.lock().await;
+                state.generation == generation
+                    && state.startup_hold.is_some()
+                    && state.selected_watch().is_some_and(|watch| watch.resume_unanchored())
+            };
+            if !resume_pending {
+                return;
+            }
+            tracing::debug!(
+                info_hash = %info_hash,
+                file_idx,
+                generation,
+                extra_ms = RESUME_ANCHOR_FALLBACK_EXTRA_MS,
+                "startup hold extended while the resume point is unknown"
+            );
+            drop(coordinator);
+            tokio::select! {
+                _ = cancellation.cancelled() => return,
+                _ = tokio::time::sleep(Duration::from_millis(RESUME_ANCHOR_FALLBACK_EXTRA_MS)) => {}
+            }
+            let Some(coordinator) = weak.upgrade() else {
+                return;
+            };
+            if let Err(error) = coordinator
+                .raise_startup_baseline(&info_hash, &entry, generation, false, "resume-fallback")
                 .await
             {
                 tracing::warn!(
@@ -1930,7 +2135,7 @@ impl LibtorrentPlaybackCoordinator {
                     file_idx,
                     generation,
                     %error,
-                    "Failed to raise the startup baseline after its fallback timeout"
+                    "Failed to raise the startup baseline after the resume fallback"
                 );
             }
         });
@@ -2615,6 +2820,19 @@ impl LibtorrentPlaybackCoordinator {
                         "Failed to handle a foreground read start"
                     );
                 }
+            }
+            PlaybackCommand::ReadEnded {
+                info_hash,
+                file_idx,
+                generation,
+                piece,
+            } => {
+                let entry = self.entries.lock().await.get(&info_hash).cloned();
+                let Some(entry) = entry else {
+                    return;
+                };
+                self.on_read_ended(&info_hash, &entry, file_idx, generation, piece)
+                    .await;
             }
             PlaybackCommand::SeekBlocked {
                 info_hash,
