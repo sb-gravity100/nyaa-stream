@@ -125,7 +125,7 @@ pub const STARTUP_BASELINE_FALLBACK_MS: u64 = 15_000;
 /// (nyaa-stream) A foreground read blocked this long on the piece it started
 /// at (after open or a seek) re-anchors continue-watch mode there - long
 /// enough that scrubbing through the seek bar doesn't thrash priorities.
-pub const SEEK_REANCHOR_DEBOUNCE_MS: u64 = 300;
+pub const SEEK_REANCHOR_DEBOUNCE_MS: u64 = 100;
 
 /// (nyaa-stream) Whether a blocked seek target is covered by in-order
 /// download: it lies at most `urgent_pieces` past the first missing piece
