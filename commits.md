@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `11a1aff` · 2026-09-29 · docs: plan custom context menus for v0.4.0
+- `PLAN.md`
+- `PHASES.md`
+
 ### `978f077` · 2026-09-29 · docs: correct signing key env var and add manual release steps
 - `CLAUDE.md`
 
