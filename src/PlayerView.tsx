@@ -1029,7 +1029,7 @@ function MpvPlayerView({
    }
 
    /** Shift: jumps to the end of the opening chapter (see `openingFrom`);
-    * only in a file with no opening marked, a fixed 85s. */
+    * only in a file with no opening marked, a fixed 90s. */
    function skipIntro() {
       const video = videoRef.current;
       if (!video || !episodeDuration) return;
