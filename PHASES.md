@@ -335,7 +335,8 @@
       button"): one commit each -
       - [ ] `capture_torrent_thumbnail`: optional `file_idx` and `force`
       - [ ] Batch captures share one torrent across their episodes
-      - [ ] Capture source pick: smallest file with >= 3, then >= 1
+      - [ ] Capture source pick: SubsPlease 480p (>= 1 seeder) first, else
+            smallest file with >= 3, then >= 1
             seeders (batch = size / episodes, single episodes first); never
             0 seeders - row skipped as "no seeded source"
       - [ ] Live swarm check: no peer within 20s → next candidate (max 3)

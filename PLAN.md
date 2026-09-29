@@ -719,7 +719,11 @@ Episodes cards. A button on the Episodes section runs it on demand.
 - **Button:** in the Episodes section header, "Build thumbnails (N)", shown
   only when N > 0 visible episode rows have no thumbnail from any source.
   While running: "Building 3/12 · Cancel"; at the end, "N failed" if any.
-- **Which release:** the smallest file among the row's sources with a live
+- **Which release:** first choice is the row's **SubsPlease 480p** release
+  when it has >= 1 seeder - single-episode, ~150 MB, consistently named and
+  usually the best-seeded small release. SubsPlease only covers Crunchyroll
+  simulcasts (~2020 on), so older/non-simulcast shows and dead old episodes
+  fall back to: the smallest file among the row's sources with a live
   swarm: >= 3 seeders first, then any with >= 1 seeder, smallest first in
   each tier. A source with 0 seeders is never used - if none of the row's
   sources has a seeder, the row is skipped and counted as "no seeded
