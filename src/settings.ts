@@ -45,6 +45,10 @@ export interface Settings {
   autoplayNext: boolean;
   /** Remember the fansub group last played per anime and prefer it. */
   rememberFansubGroup: boolean;
+  /** Fansub group/release tags to prefer, e.g. "ToonsHub CR": a release
+   * matches when its title contains every word (case-insensitive). Empty =
+   * no preference. */
+  preferredFansubber: string;
   /** Only list rows that are real episodes per AniList/Kitsu - hides
    * off-list episode numbers, Batch and Unknown rows (see
    * `listedSources` in MediaPage). */
@@ -85,6 +89,7 @@ export const DEFAULT_SETTINGS: Settings = {
   resumePlayback: true,
   autoplayNext: true,
   rememberFansubGroup: true,
+  preferredFansubber: "",
   hideUnlistedSources: true,
   mpvPath: "",
 };

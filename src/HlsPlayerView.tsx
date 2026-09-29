@@ -231,6 +231,7 @@ export function HlsPlayerView({
       : null;
    const releasePrefs = {
       preferredGroup,
+      preferredFansubber: settings.preferredFansubber,
       preferredResolution: settings.preferredResolution,
    };
    const [selectedRelease, setSelectedRelease] = useState<NyaaResult>(() =>

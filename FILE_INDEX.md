@@ -47,7 +47,7 @@
 | `src/Buffering.tsx` | Stremio-style buffering indicator: a pulsing mark that fills via `clip-path` using `loadingProgress.ts`'s weighted readiness score, ported from stremio-web's `Player/Buffering` | frontend |
 | `src/StatisticsMenu.tsx` | Statistics popup (grew from stremio-web's `Player/StatisticsMenu`): headline peers/speed/completed, then Torrent (swarm/upload), Playback (mpv resolution, codecs + hwdec, buffer, read speed, dropped frames), Playback (resolution, buffer, dropped frames, bandwidth) and the episode's saved thumbnail, plus info-hash copy | frontend |
 | `src/loadingProgress.ts` | Weighted buffering-readiness score (peers/downloaded-bytes-vs-threshold/speed, capped at 99%) ported from stremio-web's `useStatistics.ts`'s `getLoadingProgress` | frontend |
-| `src/releases.ts` | Release ranking (`bestRelease`/`sortReleases`: remembered fansub group, preferred resolution, seeders) and per-anime preferred-group persistence (`localStorage`) | frontend |
+| `src/releases.ts` | Release ranking (`bestRelease`/`sortReleases`: remembered fansub group, preferred-fansubber text (`matchesFansubber`: every word in the title), preferred resolution, seeders) and per-anime preferred-group persistence (`localStorage`) | frontend |
 | `src/episodeParser.ts` | Deterministic nyaa title → season/episode/batch parser (regex-only, no fuzzy matching), fansub group-tag submitter extraction | frontend |
 | `src/recentSearches.ts` | Recent search queries (`localStorage`) for the empty-focus search dropdown | frontend, search |
 | `src/backup.ts` | Exports/imports every `nyaa-stream:*` localStorage key through the backup commands | frontend, backup |

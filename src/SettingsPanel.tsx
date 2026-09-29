@@ -268,6 +268,15 @@ export function SettingsPanel({ onClose }: Props) {
                 onChange={(e) => updateSettings({ mpvPath: (e.target as HTMLInputElement).value.trim() })}
               />
             </Row>
+            <Row label="Preferred fansubber" hint="Release tags to prefer when picking a source, e.g. ToonsHub CR. A release matches when its title has every word. Leave empty for no preference.">
+              <input
+                type="text"
+                class="setting-text-input"
+                placeholder="e.g. ToonsHub CR"
+                value={settings.preferredFansubber}
+                onChange={(e) => updateSettings({ preferredFansubber: (e.target as HTMLInputElement).value.trim() })}
+              />
+            </Row>
             <Row label="Preferred quality" hint="Used when picking a release automatically">
               <select
                 value={settings.preferredResolution}
