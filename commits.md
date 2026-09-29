@@ -2,6 +2,22 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `89a1dd5` · 2026-09-29 · docs: index the what's new files in FILE_INDEX.md
+- `FILE_INDEX.md`
+
+### `8f99515` · 2026-09-29 · feat: show what's new after an update
+- `src/changelog.ts`
+- `src/WhatsNew.tsx`
+- `src/updater.ts`
+- `src/main.tsx`
+- `src/App.css`
+- `PHASES.md`
+- `PLAN.md`
+
+### `448c117` · 2026-09-29 · docs: plan the what's new dialog for v0.3.2
+- `PLAN.md`
+- `PHASES.md`
+
 ### `60b9215` · 2026-09-29 · chore: release v0.3.2
 - `package.json`
 - `src-tauri/Cargo.toml`
