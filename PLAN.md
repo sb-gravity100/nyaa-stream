@@ -872,6 +872,32 @@ it, like YouTube/Stremio.
 - Not a second libmpv instance: live seeks per hover would decode full
   frames and request undownloaded pieces.
 
+## Contact and send logs (planned, v0.9.0 - minor: new feature)
+
+Settings gets a **Help** section with two buttons. Nothing is uploaded
+automatically - no webhook or other secret ships in the public app.
+
+- **Contact** opens a modal with two links: the repo
+  (`https://github.com/sb-gravity100/nyaa-stream`) and the author's Discord
+  profile (`https://discord.com/users/<DISCORD_USER_ID>` - placeholder until
+  the id is provided). Links open in the system browser (opener plugin).
+- **Send logs** (`export_logs` command) zips the log folder
+  (`%LOCALAPPDATA%
+yaa-stream\logs`, the last 7 daily files) plus a
+  `system.txt` (app version, Windows version, mpv available, libmpv
+  version) into `nyaa-stream-logs-<date>.zip` in Downloads, reveals it in
+  Explorer, then offers two ways to send it:
+  - **Discord** - opens the author's Discord profile; the user drags the
+    zip into a DM.
+  - **GitHub** - opens a new issue on the repo prefilled (title, app version,
+    OS, "describe what happened"); the user attaches the zip. The modal notes
+    that GitHub issues are public.
+- **Logs are sent as-is** (author's call, 2026-09-29): they contain the
+  Windows user folder in paths and the torrent/episode titles watched. The
+  modal says so in one line before the zip is made. Tokens are never logged
+  in the first place (logging rules + TMDB token plan), so none can leak.
+- Logged: button presses, zip path and size, failures.
+
 ## Known gaps / not yet implemented
 
 - (HLS fallback player only - mpv reads the file's real duration.) The
