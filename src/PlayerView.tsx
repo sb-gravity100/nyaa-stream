@@ -1770,8 +1770,9 @@ function MpvPlayerView({
    );
 }
 
-// Asked once per app run: mpv is a system install, it doesn't come and go.
+// Asked once per app run (and again when the mpv path setting changes).
 let mpvAvailable: Promise<boolean> | null = null;
+let mpvAvailablePath: string | null = null;
 
 /** The player: embedded mpv when it's installed, otherwise the HLS
  * fallback (`HlsPlayerView`). */
@@ -1780,11 +1781,17 @@ export function PlayerView(props: Props) {
    useEffect(() => {
       // A failed check (an older backend without the command) isn't
       // evidence mpv is missing - mpv stays the default.
-      mpvAvailable ??= invoke<boolean>("mpv_available").catch((err) => {
-         console.warn("[player] mpv availability check failed, assuming mpv", { err: String(err) });
-         return true;
-      });
-      void mpvAvailable.then((available) => {
+      const path = getSettingsSnapshot().mpvPath;
+      if (mpvAvailable == null || mpvAvailablePath !== path) {
+         mpvAvailablePath = path;
+         mpvAvailable = invoke("set_mpv_path", { path: path || null })
+            .then(() => invoke<boolean>("mpv_available"))
+            .catch((err) => {
+               console.warn("[player] mpv availability check failed, assuming mpv", { err: String(err) });
+               return true;
+            });
+      }
+      void mpvAvailable!.then((available) => {
          console.info("[player] backend", { mpv: available });
          setUseMpv(available);
       });

@@ -49,6 +49,8 @@ export interface Settings {
    * off-list episode numbers, Batch and Unknown rows (see
    * `listedSources` in MediaPage). */
   hideUnlistedSources: boolean;
+  /** Path to the mpv executable; empty = the one on PATH. */
+  mpvPath: string;
 }
 
 /** Crunchyroll's own dialogue style (its English ASS tracks, e.g. a
@@ -84,6 +86,7 @@ export const DEFAULT_SETTINGS: Settings = {
   autoplayNext: true,
   rememberFansubGroup: true,
   hideUnlistedSources: true,
+  mpvPath: "",
 };
 
 function load(): Settings {

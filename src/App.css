@@ -3123,3 +3123,20 @@ html.mpv-active .player-view {
   border-right: 2px solid var(--accent-strong);
   pointer-events: none;
 }
+
+.setting-text-input {
+  width: 220px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  color: inherit;
+  font: inherit;
+  font-size: 0.85rem;
+}
+
+.setting-value {
+  margin-right: 10px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+}
