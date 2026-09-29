@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `6dc6182` · 2026-09-29 · docs: plan stale source-switch error fix for v0.3.2
+- `PLAN.md`
+- `PHASES.md`
+
 ### `7c3cd69` · 2026-09-29 · docs: split sequential download plan into first and continue watch
 - `PLAN.md`
 - `PHASES.md`
