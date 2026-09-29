@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `305b5cf` · 2026-09-29 · fix(build): pin @tauri-apps/plugin-dialog to 2.7.3 to match the crate
+- `package.json`
+- `package-lock.json`
+
 ### `01479ba` · 2026-09-29 · feat(installer): branded MSI banner and welcome-dialog art
 - `scripts/make-installer-art.ps1`
 - `src-tauri/installer/banner.bmp`
