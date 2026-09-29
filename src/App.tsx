@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { invoke } from "@tauri-apps/api/core";
+import { getSettings as getSettingsSnapshot } from "./settings";
 import {
   episodeLabelText,
   extractSeasonNumber,
@@ -135,6 +136,8 @@ function App() {
   const resultsWrapRef = useRef<HTMLDivElement>(null);
   const moreSentinelRef = useRef<HTMLLIElement>(null);
   const skipNextSearch = useRef(false);
+  // Bumped per openAnime call: slower phases of an earlier open must not overwrite a newer one.
+  const openSeq = useRef(0);
   const blurTimeout = useRef<number | undefined>(undefined);
 
   useEffect(() => {
@@ -244,6 +247,7 @@ function App() {
   }, [routeAnimeId]);
 
   async function openAnime(anime: AnimeMedia) {
+    const seq = ++openSeq.current;
     const releaseQuery = displayTitle(anime.title);
     skipNextSearch.current = true;
     setQuery(releaseQuery);
@@ -262,10 +266,35 @@ function App() {
       setSources([]);
       setDetails({});
       setSourcesLoading(true);
+      let shown = false;
+      let fullLoaded = false;
+      // Earlier phases only ever paint sooner than the full search; they never replace its result.
+      const showEarly = (phase: string, early: NyaaResult[]) => {
+        if (fullLoaded || openSeq.current !== seq || early.length === 0) return;
+        console.info(`[${phase}] shown before the full search`, { anime: releaseQuery, count: early.length });
+        shown = true;
+        setSources(early);
+        setSourcesLoading(false);
+      };
+      const preferredFansubber = getSettingsSnapshot().preferredFansubber.trim();
+      const args = { title: anime.title, synonyms: anime.synonyms ?? [] };
+      if (isTauriAvailable()) {
+        // 1) what the local database already holds (instant), 2) only the preferred fansubber's uploads (a few requests).
+        void invoke<NyaaResult[]>("search_local_releases", args)
+          .then((local) => showEarly("search_local_releases", local))
+          .catch((err) => console.warn("[search_local_releases] failed", { err }));
+        if (preferredFansubber) {
+          void invoke<NyaaResult[]>("search_fansubber_releases", { ...args, fansubber: preferredFansubber })
+            .then((mine) => showEarly("search_fansubber_releases", mine))
+            .catch((err) => console.warn("[search_fansubber_releases] failed", { err }));
+        }
+      }
       try {
         const results = isTauriAvailable()
-          ? await invoke<NyaaResult[]>("search_torrents_for_anime", { title: anime.title, synonyms: anime.synonyms ?? [] })
+          ? await invoke<NyaaResult[]>("search_torrents_for_anime", { ...args, fansubber: preferredFansubber || null })
           : await fallbackSearchTorrentsForAnime(anime.title);
+        fullLoaded = true;
+        if (openSeq.current !== seq) return;
         console.info("[search_torrents_for_anime] succeeded", { anime: releaseQuery, count: results.length });
         setSources(results);
         setSourcesByMedia((current) => ({ ...current, [anime.id]: results }));
@@ -275,8 +304,12 @@ function App() {
         // into nyaa.si's rate limit - every movie title parses "unknown").
         if (!isMovie(anime)) await loadDetails(anime.id, results);
       } catch (err) {
+        fullLoaded = true;
         console.error("[search_torrents_for_anime] failed", { anime: releaseQuery, err });
-        setError(`Couldn't load releases from nyaa.si (${err instanceof Error ? err.message : String(err)}). Check your connection and reopen this page.`);
+        // Releases from the local database/fansubber search are still usable.
+        if (!shown && openSeq.current === seq) {
+          setError(`Couldn't load releases from nyaa.si (${err instanceof Error ? err.message : String(err)}). Check your connection and reopen this page.`);
+        }
         setSourcesLoading(false);
       }
     }

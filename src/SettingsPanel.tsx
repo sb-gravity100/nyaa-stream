@@ -213,6 +213,14 @@ export function SettingsPanel({ onClose }: Props) {
   const settings = useSettings();
   const style = settings.subtitleStyle;
   const panelRef = useRef<HTMLDivElement>(null);
+  const [popularFansubbers, setPopularFansubbers] = useState<string[]>([]);
+
+  useEffect(() => {
+    // Suggestions only exist in the desktop app (the backend counts group tags from real searches).
+    invoke<string[]>("get_popular_fansubbers")
+      .then(setPopularFansubbers)
+      .catch(() => undefined);
+  }, []);
 
   function setStyle(patch: Partial<SubtitleStyle>) {
     updateSettings({ subtitleStyle: { ...style, ...patch } });
@@ -273,10 +281,16 @@ export function SettingsPanel({ onClose }: Props) {
                 type="text"
                 class="setting-text-input"
                 placeholder="e.g. ToonsHub CR"
+                list="popular-fansubbers"
                 value={settings.preferredFansubber}
                 onChange={(e) => updateSettings({ preferredFansubber: (e.target as HTMLInputElement).value.trim() })}
               />
             </Row>
+            <datalist id="popular-fansubbers">
+              {popularFansubbers.map((name) => (
+                <option key={name} value={name} />
+              ))}
+            </datalist>
             <Row label="Preferred quality" hint="Used when picking a release automatically">
               <select
                 value={settings.preferredResolution}
