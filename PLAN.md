@@ -812,6 +812,13 @@ and quality and often missing. Researched 2026-09-29:
   TMDB/TVDB are per *show*, AniList per *season*: all seasons of a show share
   backdrops, so for a season entry prefer images not used by another
   season's AniList entry when there is a choice; otherwise accept show art.
+- **Episode stills (thumbnails):** TMDB has a still per episode
+  (`/tv/{id}/season/{n}/episode/{e}/images`). The Fribb entry gives the TMDB
+  tv id and season (`season.tmdb`); the episode number is the AniList one,
+  corrected for split-cour entries by the same absolute-offset logic the
+  release matcher uses. From v0.7.0 the episode thumbnail order is
+  Kitsu / AniList → **TMDB still** → nyaa view-page screenshot → torrent
+  capture (v0.6.0 ships without the TMDB step).
 - **Logos (bonus):** TMDB / fanart.tv title logos can replace the text title
   on the home hero and media page, as Stremio does.
 - **New crate `crates/artwork-client`** (TMDB + fanart.tv + Simkl + the id
@@ -820,6 +827,36 @@ and quality and often missing. Researched 2026-09-29:
   with a Settings override for each; attribution in Settings → About.
 - **Sizes:** load a 1280-wide variant first (TMDB `w1280`, Simkl `_mobile`)
   and swap to full size once decoded, so hero slides don't stall.
+
+## Seek-bar thumbnail preview (planned, v0.8.0 - minor: new feature)
+
+Hovering the player's seek bar shows only a time tooltip today
+(`handleSeekHover`, `src/PlayerView.tsx`). Add a small frame preview above
+it, like YouTube/Stremio.
+
+- **Storyboard, not live seeks:** a background job in `torrent-engine` (the
+  in-process FFmpeg in `media.rs`) decodes **keyframes only**
+  (`skip_frame = nokey`) of the playing file and writes one 240x135 JPEG per
+  ~5s bucket (the nearest keyframe) to
+  `<cache_dir>/nyaa-stream/storyboard/<info_hash>-<file_idx>/`. Keyframe-only
+  decode is cheap; a 24-min episode is ~290 frames of a few KB.
+- **Downloaded data only:** the job reads through a `TorrentReader` that
+  never waits on or prioritizes a missing piece - it skips ranges that
+  aren't verified yet and revisits them as pieces arrive (piece-verified
+  notifications). The preview must never cause downloading or compete with
+  playback. With v0.3.2's in-order download the storyboard fills from the
+  playhead forward.
+- **Paced:** runs at low priority, pauses while playback is buffering, and
+  stops with the player.
+- **Hover:** the frontend asks for the bucket under the pointer
+  (`storyboard_frame(torrent, file, seconds)` → `thumb://` URL or none),
+  debounced ~80ms and cached. No frame yet (not downloaded) → time tooltip
+  only, as today. Letterboxed sources cropped like view-page screenshots.
+- **Cleanup:** the storyboard folder is deleted with the torrent in
+  `stop_playback`, and kept alongside a v0.4.0 resume buffer if the episode
+  is in Continue watching.
+- Not a second libmpv instance: live seeks per hover would decode full
+  frames and request undownloaded pieces.
 
 ## Known gaps / not yet implemented
 

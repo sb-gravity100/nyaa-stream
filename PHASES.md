@@ -361,8 +361,21 @@
       - [ ] Simkl fanart
       - [ ] `get_artwork` command + disk cache; frontend backdrop chain
             (media page, home hero, Continue watching)
+      - [ ] TMDB episode stills as the first episode-thumbnail fallback
+            after Kitsu/AniList (split-cour offset correction)
       - [ ] Title logos on the home hero and media page
       - [ ] Settings: API key overrides + About attribution (TMDB,
             fanart.tv, Simkl)
       - [ ] PLAN.md/FILE_INDEX.md sync, `npm run bump -- minor`, tag
             `v0.7.0`
+- [ ] Seek-bar thumbnail preview (v0.8.0, see PLAN.md "Seek-bar thumbnail
+      preview"): one commit each -
+      - [ ] `media.rs`: keyframe-only storyboard job (5s buckets, 240x135
+            JPEG) over verified pieces only, revisiting as pieces arrive
+      - [ ] Paced/low priority, pauses while buffering, stops with player
+      - [ ] `storyboard_frame` command + cleanup in `stop_playback`
+            (kept with a resume buffer)
+      - [ ] Seek-bar hover shows the frame above the time tooltip
+            (debounced, cached; time only when not downloaded)
+      - [ ] PLAN.md/FILE_INDEX.md sync, `npm run bump -- minor`, tag
+            `v0.8.0`
