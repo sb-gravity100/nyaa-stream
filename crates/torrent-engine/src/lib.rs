@@ -11,6 +11,7 @@ use axum_extra::headers::Range;
 use axum_extra::TypedHeader;
 use axum_range::{KnownSize, Ranged};
 use enginefs::backend::{BackendConfig, TorrentBackend, TorrentHandle, TorrentSource};
+pub use enginefs::backend::priorities::WatchHint;
 use enginefs::EngineFS;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex as AsyncMutex;
@@ -1206,6 +1207,17 @@ impl TorrentEngine {
         let engine = self.efs.get_engine(id).await.ok_or_else(|| anyhow::anyhow!("unknown torrent {id}"))?;
         tracing::debug!(torrent_id = %id, ?file_idx, "preload file requested");
         engine.handle.set_preload_file(file_idx).await
+    }
+
+    /// How the next file the player opens in `id` starts (`First`: from
+    /// 0:00, sequential download from the head; `Resume`: the first seek
+    /// after the header read is the resume point) - see PLAN.md "Fast
+    /// playback start". Taken by the next foreground stream of a file that
+    /// isn't already streaming.
+    pub async fn set_watch_hint(&self, id: &TorrentId, hint: Option<WatchHint>) -> anyhow::Result<()> {
+        let engine = self.efs.get_engine(id).await.ok_or_else(|| anyhow::anyhow!("unknown torrent {id}"))?;
+        tracing::debug!(torrent_id = %id, ?hint, "watch hint requested");
+        engine.handle.set_watch_hint(hint).await
     }
 
     /// Waits (up to `METADATA_TIMEOUT`) for `id`'s metadata and returns its

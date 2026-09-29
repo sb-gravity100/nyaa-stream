@@ -70,6 +70,19 @@ pub enum PlaybackIntent {
     Background,
 }
 
+/// (nyaa-stream) How the player starts a file, from the frontend: the engine
+/// can't tell on its own, since mpv always reads the header at offset 0
+/// first and only then seeks to its start time.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum WatchHint {
+    /// No saved progress: playback starts at 0:00.
+    First,
+    /// Continue watching / Resume: the first seek after the header read is
+    /// the resume point.
+    Resume,
+}
+
 impl PlaybackIntent {
     pub fn is_hls(self) -> bool {
         matches!(self, Self::HlsInitial | Self::HlsSeek | Self::HlsSequential)

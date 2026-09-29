@@ -11,7 +11,8 @@ use tokio_util::sync::CancellationToken;
 
 use crate::backend::priorities::{
     MemoryPressure, PlaybackIntent, PlaybackPriorityPolicy, PriorityContext,
-    STARTUP_BASELINE_FALLBACK_MS, disk_backed_file_baseline_priority, startup_buffer_pieces,
+    STARTUP_BASELINE_FALLBACK_MS, WatchHint, disk_backed_file_baseline_priority,
+    startup_buffer_pieces,
 };
 
 use super::alerts::LibtorrentAlertHub;
@@ -255,6 +256,14 @@ impl StartupHold {
     }
 }
 
+/// (nyaa-stream) Fix C - the watch mode of the file being played, from the
+/// frontend's `WatchHint`. Kept across generations of the same file.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct WatchState {
+    file_idx: usize,
+    hint: WatchHint,
+}
+
 /// (nyaa-stream) What a piece falls back to when it leaves every priority
 /// window: the selected file baseline, or 0 while a `StartupHold` is active.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -333,6 +342,10 @@ struct TorrentPlaybackState {
     priority_windows: ActivePriorityWindows,
     /// (nyaa-stream) Fix A, see `StartupHold`. Per generation.
     startup_hold: Option<StartupHold>,
+    /// (nyaa-stream) `set_watch_hint` waiting for the next foreground file.
+    pending_watch: Option<WatchHint>,
+    /// (nyaa-stream) Fix C, see `WatchState`.
+    watch: Option<WatchState>,
 }
 
 impl TorrentPlaybackState {
@@ -358,7 +371,26 @@ impl TorrentPlaybackState {
             last_emergency_reannounce: None,
             priority_windows: ActivePriorityWindows::default(),
             startup_hold: None,
+            pending_watch: None,
+            watch: None,
         }
+    }
+
+    /// Hands a pending `WatchHint` to `file_idx` when a foreground stream
+    /// starts it fresh - a different file than the watched one, or the same
+    /// file with no foreground stream left (reopened). A still-streaming
+    /// file (e.g. the previous episode of a batch, until the player moves
+    /// on) never takes the next file's hint. `fresh` is computed before the
+    /// stream's own permit is counted.
+    fn take_pending_watch(&mut self, file_idx: usize, fresh: bool) -> Option<WatchState> {
+        let other_file = self.watch.is_none_or(|watch| watch.file_idx != file_idx);
+        if !(fresh || other_file) {
+            return None;
+        }
+        let hint = self.pending_watch.take()?;
+        let watch = WatchState { file_idx, hint };
+        self.watch = Some(watch);
+        Some(watch)
     }
 
     fn piece_baseline(&self) -> PieceBaseline {
@@ -836,6 +868,18 @@ impl LibtorrentPlaybackCoordinator {
         let entry = self.entry(&info_hash).await;
         let selection = {
             let mut state = entry.state.lock().await;
+            if foreground && disk_backed_file_baseline_priority(start.intent) == 0 {
+                let fresh = state.active_foreground_permits() == 0
+                    || state.selected_file != Some(start.file_idx);
+                if let Some(watch) = state.take_pending_watch(start.file_idx, fresh) {
+                    tracing::info!(
+                        info_hash = %info_hash,
+                        file_idx = watch.file_idx,
+                        hint = ?watch.hint,
+                        "watch hint applied to file"
+                    );
+                }
+            }
             if !foreground
                 && state.active_foreground_permits() > 0
                 && state.selected_file != Some(start.file_idx)
@@ -1402,6 +1446,14 @@ impl LibtorrentPlaybackCoordinator {
     ) -> bool {
         let state = entry.state.lock().await;
         state.generation == generation && state.selected_file == Some(file_idx)
+    }
+
+    /// (nyaa-stream) Stores how the next file the player opens starts (see
+    /// `WatchHint`); taken by that file's first foreground stream.
+    pub(crate) async fn set_watch_hint(&self, info_hash: &str, hint: Option<WatchHint>) {
+        let entry = self.entry(info_hash).await;
+        entry.state.lock().await.pending_watch = hint;
+        tracing::info!(info_hash = %info_hash, ?hint, "watch hint stored for the next file");
     }
 
     /// Fetches `file_idx` at the lowest priority next to the file being
@@ -2363,6 +2415,26 @@ mod tests {
         state.select(0, 1, true, false, true, true);
         assert!(state.startup_hold.is_none());
         assert!(state.acknowledged_priorities.is_none());
+    }
+
+    #[test]
+    fn pending_watch_hint_goes_to_the_next_fresh_file_only() {
+        let mut state = TorrentPlaybackState::new();
+        state.pending_watch = Some(WatchHint::First);
+        let first = state.take_pending_watch(3, true).expect("fresh file takes the hint");
+        assert_eq!((first.file_idx, first.hint), (3, WatchHint::First));
+        assert!(state.pending_watch.is_none());
+
+        // The next episode's hint while file 3 still streams: not file 3's.
+        state.pending_watch = Some(WatchHint::Resume);
+        assert!(state.take_pending_watch(3, false).is_none());
+        let next = state.take_pending_watch(4, false).expect("another file takes it");
+        assert_eq!((next.file_idx, next.hint), (4, WatchHint::Resume));
+
+        // Reopening the same file with nothing streaming takes a new hint.
+        state.pending_watch = Some(WatchHint::First);
+        assert!(state.take_pending_watch(4, true).is_some());
+        assert_eq!(state.watch.map(|watch| watch.hint), Some(WatchHint::First));
     }
 
     #[test]
