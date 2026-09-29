@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `ed6899b` · 2026-09-29 · feat: player A-B loop with clip export
+- `src/App.css`
+- `src/PlayerView.tsx`
+
 ### `129b388` · 2026-09-29 · feat: lazy-load search dropdown results and covers
 - `src/App.css`
 - `src/App.tsx`
