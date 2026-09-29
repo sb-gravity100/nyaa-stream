@@ -2,6 +2,21 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `89c310e` · 2026-09-29 · feat(player): preload the next episode of a batch at low priority and keep playing from that batch
+- `src/PlayerView.tsx`
+- `FILE_INDEX.md`
+- `PLAN.md`
+
+### `f8453f8` · 2026-09-29 · feat: preload_next_file command; same-torrent episode changes keep the torrent
+- `crates/torrent-engine/src/lib.rs`
+- `src-tauri/src/lib.rs`
+
+### `737ce7f` · 2026-09-29 · feat(enginefs): low-priority preload file next to the playing one
+- `vendor/enginefs/`
+
+### `2cae1b1` · 2026-09-29 · fix(player): a late mpv_stop from the previous episode no longer hides the new video
+- `src-tauri/src/player.rs`
+
 ### `0788f6b` · 2026-09-29 · feat: AniList bannerImage as backdrop fallback when Kitsu has no cover
 - `crates/anilist-client/src/lib.rs`
 - `src-tauri/src/metadata_fallback.rs`
