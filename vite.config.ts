@@ -23,7 +23,11 @@ export default defineConfig(async () => ({
   server: {
     port: 1420,
     strictPort: true,
-    host: host || false,
+    // An explicit IPv4 address, matching tauri.conf.json's devUrl: plain
+    // "localhost" made Vite listen on IPv6 (::1) only, and the webview's
+    // IPv4 attempts took ~2s each to fail - the page arrived up to ~34s
+    // late, so the window sat gray without even the splash.
+    host: host || "127.0.0.1",
     hmr: host
       ? {
           protocol: "ws",
