@@ -381,3 +381,12 @@
             (debounced, cached; time only when not downloaded)
       - [ ] PLAN.md/FILE_INDEX.md sync, `npm run bump -- minor`, tag
             `v0.8.0`
+- [ ] Contact and send logs (v0.9.0, see PLAN.md "Contact and send
+      logs"): one commit each -
+      - [ ] `export_logs`: zip logs + `system.txt` into Downloads, reveal
+      - [ ] Settings Help section: Contact modal (repo + Discord profile)
+      - [ ] Send logs modal: contents notice, Discord / GitHub (prefilled
+            issue, public notice) buttons
+      - [ ] Fill in the Discord user id
+      - [ ] PLAN.md/FILE_INDEX.md sync, `npm run bump -- minor`, tag
+            `v0.9.0`
