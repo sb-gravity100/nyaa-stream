@@ -9,7 +9,7 @@ import { isTypingTarget } from "./keyboard";
 import { ExportDialog, type ExportRequest } from "./ExportDialog";
 import type { AnimeMedia, NyaaResult, PlayFile, StreamStats, SubtitleTrack } from "./types";
 import { displayTitle, isMovie } from "./types";
-import { getStreamStats, playMagnet, stopPlayback } from "./playback";
+import { getStreamStats, playMagnet, stopPlayback, streamFileLoaded } from "./playback";
 import { saveFrameThumbnail } from "./torrentThumbnail";
 import { loadingProgress } from "./loadingProgress";
 import { bestRelease, isBatchRelease, getAnimeResolution, getPreferredGroup, releaseBadges, releaseGroup, releaseResolution, seederHealth, setAnimeResolution, setPreferredGroup, sortReleases } from "./releases";
@@ -568,6 +568,16 @@ function MpvPlayerView({
       timer = window.setInterval(poll, STATS_POLL_MS);
       return () => window.clearInterval(timer);
    }, [torrentId, selectedFile?.index]);
+
+   // mpv has opened the file: the reads so far are what a resume buffer
+   // must hold to open it again (PLAN.md "Continue-watching resume buffer").
+   useEffect(() => {
+      if (!videoEl || torrentId == null || !selectedFile) return;
+      const fileIdx = selectedFile.index;
+      const onLoaded = () => void streamFileLoaded(torrentId, fileIdx);
+      videoEl.addEventListener("loadedmetadata", onLoaded);
+      return () => videoEl.removeEventListener("loadedmetadata", onLoaded);
+   }, [videoEl, torrentId, selectedFile?.index]);
 
    useEffect(() => {
       return () => {

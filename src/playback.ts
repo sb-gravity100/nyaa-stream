@@ -45,6 +45,16 @@ export async function reportDecoderSupport(): Promise<void> {
   decoderSupportSent = true;
 }
 
+/** The player opened `fileIdx` (mpv's file-loaded) - ends the backend's
+ * open-read recording for the resume buffer. Best effort. */
+export async function streamFileLoaded(torrentId: string, fileIdx: number): Promise<void> {
+  if (!isTauriAvailable()) return;
+  console.debug("[stream_file_loaded] invoked", { torrentId, fileIdx });
+  await invoke("stream_file_loaded", { torrentId, fileIdx }).catch((err) =>
+    console.warn("[stream_file_loaded] failed", { err: String(err) }),
+  );
+}
+
 export async function stopPlayback(): Promise<void> {
   if (!isTauriAvailable()) return;
   console.debug("[stop_playback] invoked");

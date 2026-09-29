@@ -26,8 +26,10 @@ pub type TorrentId = String;
 
 mod direct_input;
 mod media;
+pub mod resume_buffer;
 mod subtitle_log;
 use direct_input::TorrentSources;
+use resume_buffer::{OpenReads, RecordingReader};
 use subtitle_log::SubtitleLogs;
 pub use media::H264Encoder;
 
@@ -105,6 +107,7 @@ pub struct TorrentEngine {
     hls_jobs: HlsJobs,
     probes: MediaProbes,
     subtitle_logs: SubtitleLogs,
+    open_reads: OpenReads,
 }
 
 /// What the frontend's WebView can decode natively through MSE, reported
@@ -1023,6 +1026,7 @@ struct StreamRouterState {
     hls_jobs: HlsJobs,
     probes: MediaProbes,
     subtitle_logs: SubtitleLogs,
+    open_reads: OpenReads,
 }
 
 /// Trimmed-down mirror of librqbit's `TorrentStats` - mirrors Stremio's own
@@ -1128,13 +1132,21 @@ impl TorrentEngine {
         let hls_jobs = HlsJobs::new(hls_cache_root, sources.clone());
         let probes = MediaProbes::new(sources);
         let subtitle_logs = SubtitleLogs::default();
+        let open_reads = OpenReads::default();
 
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
         let stream_addr = listener.local_addr()?;
         tracing::info!(%stream_addr, "streaming server listening");
 
         let router_state =
-            StreamRouterState { efs: efs.clone(), stream_addr, hls_jobs: hls_jobs.clone(), probes: probes.clone(), subtitle_logs: subtitle_logs.clone() };
+            StreamRouterState {
+            efs: efs.clone(),
+            stream_addr,
+            hls_jobs: hls_jobs.clone(),
+            probes: probes.clone(),
+            subtitle_logs: subtitle_logs.clone(),
+            open_reads: open_reads.clone(),
+        };
         let app = Router::new()
             .route("/stream/{torrent_id}/{file_idx}", get(stream_handler))
             .route("/hls/{torrent_id}/{file_idx}/playlist.m3u8", get(hls_playlist_handler))
@@ -1164,7 +1176,7 @@ impl TorrentEngine {
             }
         });
 
-        Ok(Self { efs, stream_addr, hls_jobs, probes, subtitle_logs })
+        Ok(Self { efs, stream_addr, hls_jobs, probes, subtitle_logs, open_reads })
     }
 
     /// Adds a torrent from a magnet link or .torrent URL and starts
@@ -1201,6 +1213,7 @@ impl TorrentEngine {
         self.hls_jobs.remove_torrent(&id).await;
         self.probes.remove_torrent(&id).await;
         self.subtitle_logs.remove_torrent(&id).await;
+        self.open_reads.remove_torrent(&id);
         self.efs.remove_engine(&id).await;
         self.efs.get_backend().remove_torrent(&id).await
     }
@@ -1223,6 +1236,17 @@ impl TorrentEngine {
         let engine = self.efs.get_engine(id).await.ok_or_else(|| anyhow::anyhow!("unknown torrent {id}"))?;
         tracing::debug!(torrent_id = %id, ?hint, "watch hint requested");
         engine.handle.set_watch_hint(hint).await
+    }
+
+    /// The player finished opening `file_idx` (mpv's `file-loaded`): stops
+    /// recording its open reads (see `resume_buffer`).
+    pub fn finish_open_reads(&self, id: &TorrentId, file_idx: usize) {
+        self.open_reads.finish(id, file_idx);
+    }
+
+    /// File-relative `[start, end)` ranges the player read to open the file.
+    pub fn open_read_ranges(&self, id: &TorrentId, file_idx: usize) -> Vec<(u64, u64)> {
+        self.open_reads.ranges(id, file_idx)
     }
 
     /// Waits (up to `METADATA_TIMEOUT`) for `id`'s metadata and returns its
@@ -1427,7 +1451,10 @@ async fn stream_handler(
         axum::http::StatusCode::NOT_FOUND
     })?;
     let byte_size = file_handle.size;
-    let body = KnownSize::sized(file_handle, byte_size);
+    // Foreground reads are what mpv opens the file with - recorded for the
+    // resume buffer until it reports file-loaded.
+    let log = (!background).then(|| state.open_reads.log_for(&torrent_id, file_idx));
+    let body = KnownSize::sized(RecordingReader::new(file_handle, log), byte_size);
     let range = range.map(|TypedHeader(range)| range);
 
     let content_type = engine
