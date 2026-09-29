@@ -67,7 +67,12 @@ function preflight(args) {
 
   if (run("git", ["status", "--porcelain"]).out) fail("working tree is not clean");
   const headTags = run("git", ["tag", "--points-at", "HEAD"]).out.split(/\s+/);
-  if (!headTags.includes(tag)) fail(`HEAD is not tagged ${tag} (tags at HEAD: ${headTags.join(", ") || "none"})`);
+  if (!headTags.includes(tag)) {
+    const msg = `HEAD is not tagged ${tag} (tags at HEAD: ${headTags.filter(Boolean).join(", ") || "none"})`;
+    // A dry run publishes nothing, so it can test the build before tagging.
+    if (args.dryRun) log(`warning: ${msg} - fine for a dry run, required to publish`);
+    else fail(msg);
+  }
   if (!run("gh", ["auth", "status"], { allowFail: true }).ok) fail("gh is not logged in (gh auth login)");
   if (!existsSync("vcpkg_installed")) fail("vcpkg_installed/ missing - run npm run setup");
   if (!existsSync("src-tauri/lib/libmpv-2.dll")) fail("src-tauri/lib/libmpv-2.dll missing - see src-tauri/lib/README.md");
