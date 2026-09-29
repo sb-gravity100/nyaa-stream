@@ -548,6 +548,52 @@ by an app-styled HTML menu whose items depend on what was right-clicked.
 
   The speed button keeps its existing right-click = reset speed.
 
+## Fast playback start (planned, v0.3.2 - patch: fix)
+
+**Problem (measured 2026-09-29, SubsPlease 1080p MKV, 256 KB pieces):**
+metadata took 1s and mpv issued `loadfile` ~15ms later, but piece 0 took
+**20s** to verify while 342 other pieces (~90 MB) arrived first, then pieces
+5-7 each stalled 5-10s - by the time the reader was 1.8 MB in, 96% of the
+file was done. The speed in the statistics was real, just spent on the wrong
+pieces. Causes, in the vendored `enginefs`:
+
+1. `disk_backed_file_baseline_priority` puts the whole playing file at
+   priority 1 from the first request, so libtorrent fills every peer's request
+   queue with rarest-first bulk pieces (`max outstanding piece requests
+   reached`). Priority 7 + deadlines only reorder *future* requests; the head
+   piece queues behind seconds of in-flight bulk work on every peer.
+2. The startup window is tiny: `INITIAL_FIRST_BYTE_WINDOW_PIECES = 3`, and
+   after the first byte `prioritize_from` gives only the current piece
+   priority 7 (read-ahead 4). mpv needs several MB before it plays, and every
+   piece became urgent only when the reader hit it, paying the queue delay
+   again each time.
+
+**Fix (vendored `enginefs`, each change noted in `VENDORED.md`):**
+
+- **A - startup baseline 0:** foreground streaming intents start the playing
+  file at baseline priority 0 (only the priority window is wanted) and raise
+  it to 1 once the startup buffer (the first ~8 MB from the read position) has
+  verified, or after a 15s fallback. Baseline 1 is still reached, so the
+  torrent never reports `is_finished` early - the reason upstream chose 1
+  (see the comment at `priorities.rs`). Seeks keep baseline 1 once raised.
+- **B - wider startup window:** the pre-first-byte window becomes ~4 MB
+  (16 pieces at 256 KB) at priority 7 with staggered deadlines, and the
+  post-first-byte read-ahead keeps the next ~4 MB at 7 instead of just the
+  current piece, so mpv's startup prefill downloads in parallel.
+- Log line fix: the "waiting for verified piece" diagnostic reports the window
+  for the effective intent (it printed the original intent's window).
+
+**Warm mpv:** mpv already persists after first use (`mpv_stop` only sends
+`stop`, dropping the file and its demuxer buffers). Changes:
+
+- Spawn the embedded mpv once at app launch (idle, below the webview) instead
+  of on the first play, so the first episode skips libmpv load + font install.
+- `mpv_stop` resets per-file state after `stop` - `ab-loop-a/b`, `speed`,
+  `sub-delay`, `audio-delay`, `pause` - so nothing leaks into the next file.
+
+**Later (not in v0.3.2):** prefetch the head (~8 MB, then dropped if unused)
+of the most likely source when an episode page opens - depends on A/B.
+
 ## Known gaps / not yet implemented
 
 - (HLS fallback player only - mpv reads the file's real duration.) The

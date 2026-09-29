@@ -277,6 +277,19 @@
       glass dock), controls also revealed by hovering the top edge;
       verbose statistics popup (torrent, streaming run, playback,
       thumbnail)
+- [ ] Fast playback start (v0.3.2, see PLAN.md "Fast playback start"): one
+      commit each -
+      - [ ] enginefs: startup baseline priority 0, raised to 1 once the
+            startup buffer verifies (or 15s fallback)
+      - [ ] enginefs: ~4 MB startup window at priority 7 + staggered
+            deadlines; ~4 MB read-ahead at 7 after the first byte
+      - [ ] enginefs: waiting-piece log reports the effective window
+      - [ ] `VENDORED.md` notes for the three enginefs changes
+      - [ ] Spawn embedded mpv at app launch instead of first play
+      - [ ] `mpv_stop` resets per-file mpv state (A-B loop, speed, delays)
+      - [ ] Verify live: time from click to first frame, logged before/after
+      - [ ] PLAN.md/FILE_INDEX.md sync, `npm run bump -- patch`, tag
+            `v0.3.2`
 - [ ] Context menus (v0.4.0, see PLAN.md "Context menus"): one commit each -
       - [ ] `tauri-plugin-clipboard-manager` (Rust, capability, JS)
       - [ ] `contextMenu.ts` store + `ContextMenu.tsx` component
