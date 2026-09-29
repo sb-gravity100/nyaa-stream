@@ -326,6 +326,7 @@
             game off, request_queue_time 1
       - [x] enginefs: serve pieces verified < 30s ago from libtorrent's own
             copy only (stale-bytes corruption)
+      - [ ] Home hero: grow to fit, clamp long titles to 2 lines
       - [ ] Verify live: time from click to first frame, logged before/after
       - [ ] PLAN.md/FILE_INDEX.md sync, `npm run bump -- patch`, tag
             `v0.3.2`, `npm run release -- --notes "..." --dry-run`, then
