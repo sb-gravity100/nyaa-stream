@@ -18,6 +18,12 @@ use tokio::sync::{mpsc, Mutex};
 #[derive(Default)]
 pub struct PlayerState {
     mpv: Mutex<Option<Arc<EmbeddedMpv>>>,
+    /// Player views currently attached (`mpv_start` minus `mpv_stop`). On an
+    /// episode change the new view's start can land before the old view's
+    /// stop; only the last stop may unload the file and make the webview
+    /// opaque again, or the video ends up hidden behind an opaque webview
+    /// (or the new file gets stopped).
+    attached: std::sync::atomic::AtomicUsize,
 }
 
 /// Whether libmpv can be loaded - the player falls back to HLS without it.
@@ -80,6 +86,8 @@ pub async fn mpv_start(app: AppHandle, window: WebviewWindow, state: State<'_, P
         tracing::info!(wid, "embedded mpv started");
     }
     window.set_background_color(Some(Color(0, 0, 0, 0))).map_err(|err| err.to_string())?;
+    let attached = state.attached.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
+    tracing::debug!(attached, "mpv_start completed");
     Ok(())
 }
 
@@ -103,6 +111,16 @@ pub async fn mpv_command(state: State<'_, PlayerState>, args: Vec<Value>) -> Res
 #[tauri::command]
 pub async fn mpv_stop(window: WebviewWindow, state: State<'_, PlayerState>) -> Result<(), String> {
     tracing::debug!("mpv_stop invoked");
+    let previous = state
+        .attached
+        .fetch_update(std::sync::atomic::Ordering::SeqCst, std::sync::atomic::Ordering::SeqCst, |n| Some(n.saturating_sub(1)))
+        .unwrap_or(0);
+    if previous > 1 {
+        // Another player view already took over (episode change): its
+        // loadfile replaces this file, and the webview must stay transparent.
+        tracing::debug!(still_attached = previous - 1, "mpv_stop skipped, a newer player is attached");
+        return Ok(());
+    }
     if let Some(mpv) = state.mpv.lock().await.clone() {
         if let Err(err) = mpv.command(&["stop".into()]).await {
             tracing::warn!(%err, "mpv stop failed");
