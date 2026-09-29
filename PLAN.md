@@ -488,8 +488,10 @@ nyaa_stream/
 
    **Torrent downloads now live under AppData/cache** (`dirs::cache_dir()`
    joined with `nyaa-stream/downloads`), not the user's actual Downloads
-   folder - this is app-owned scratch data cleaned up via `stop_playback`,
-   not something the user is meant to keep or browse to directly.
+   folder - app-owned data, not something the user is meant to keep or
+   browse to directly. (Correction 2026-09-29: `stop_playback` removes the
+   torrent from the session but never deletes its files - the folder had
+   grown to 7.1 GB. v0.4.0's download cache bounds it.)
 
    **Hide unlisted sources** (setting, on by default): the anime page's
    list, the player's episode list, Play/Resume and next-episode only use
@@ -822,6 +824,37 @@ don't clear the queue delay.
 
 **Later (not in v0.3.2):** prefetch the head (~8 MB, then dropped if unused)
 of the most likely source when an episode page opens - depends on A/B.
+
+## Download cache (planned, v0.4.0 - minor: new feature)
+
+Downloaded pieces are kept on purpose and reused, instead of piling up by
+accident. Re-opening a torrent whose files are still in `downloads/` already
+reuses them: libtorrent re-hashes the existing data on add (`checking_files`,
+`state=1` in the waiting-piece log) and every verified piece is instantly
+available - seeking back or re-watching never downloads them again.
+
+- **Index:** `downloads/.cache-index.json` - per info hash: its files on disk,
+  bytes used, `last_used`, and the (anime, episode) it was played for.
+  `last_used` is updated whenever a file of it starts streaming.
+- **Cap:** Settings → "Download cache" size, default **10 GB** (0 = delete a
+  torrent's files when playback stops). After `stop_playback`'s removal and
+  at app start, least-recently-used torrents are deleted (files + index
+  entry) until the total fits. Never the torrent currently playing.
+- **Continue watching:** an episode in the Continue watching row keeps its
+  torrent's files regardless of the cap (the cap may be exceeded by those);
+  once it leaves the row (dismissed, watched, replaced by a newer episode),
+  its files become ordinary cache entries and are evicted first.
+- **Clear cache** also empties `downloads/` (except the playing torrent).
+- **With the resume buffer (below):** both are kept. The resume buffer serves
+  the first seconds of a resume instantly even while libtorrent re-hashes a
+  large cached file, and survives the cache evicting it.
+- **Later, if measured slow:** fast resume - save libtorrent resume data on
+  stop and add with it, skipping the re-hash. Needs `libtorrent-sys`
+  vendored and patched (its wrapper can trigger `save_resume_data` but
+  can't return the bytes or add a torrent with them).
+- Commands: `download_cache_status` (size/entries, for Settings),
+  `set_download_cache_limit`; eviction logged per torrent (name, bytes,
+  reason).
 
 ## Continue-watching resume buffer (planned, v0.4.0 - minor: new feature)
 

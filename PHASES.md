@@ -323,6 +323,16 @@
       - [ ] PLAN.md/FILE_INDEX.md sync, `npm run bump -- patch`, tag
             `v0.3.2`, `npm run release -- --notes "..." --dry-run`, then
             publish (see PLAN.md "Release plan")
+- [ ] Download cache (v0.4.0, see PLAN.md "Download cache"): one commit each -
+      - [ ] `downloads/.cache-index.json`: files, bytes, last_used, episode
+      - [ ] LRU eviction to the cap after stop and at startup (never the
+            playing torrent)
+      - [ ] Continue-watching episodes kept past the cap until they leave
+            the row
+      - [ ] Settings "Download cache" size (default 10 GB, 0 = delete on
+            stop) + usage; Clear cache empties downloads
+      - [ ] Measure re-hash time on a mostly-downloaded 2 GB file; decide on
+            fast resume (vendored libtorrent-sys)
 - [ ] Continue-watching resume buffer (v0.4.0, see PLAN.md "Continue-watching
       resume buffer"): one commit each -
       - [ ] Stream handler records the byte ranges mpv reads until
