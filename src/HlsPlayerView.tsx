@@ -359,6 +359,7 @@ export function HlsPlayerView({
                selectedRelease.magnet,
                `${displayTitle(anime.title)} ${episodeKey}`,
                resumeAtRef.current != null ? "resume" : "first",
+               `${anime.id}:${episodeKey}`,
             );
             if (cancelled) return;
             // A movie is the torrent's largest video (the backend's

@@ -11,10 +11,12 @@ import type { PlaySession, StreamStats, SubtitleInfo } from "./types";
  * follows (Continue watching / Resume, or a source switch mid-episode). */
 export type WatchHint = "first" | "resume";
 
-export async function playMagnet(magnet: string, title: string, watch: WatchHint): Promise<PlaySession> {
+/** `episode` (`<animeId>:<episodeKey>`) ties the torrent's cached files to
+ * a Continue watching entry - see PLAN.md "Download cache". */
+export async function playMagnet(magnet: string, title: string, watch: WatchHint, episode: string): Promise<PlaySession> {
   if (!isTauriAvailable()) throw new Error("Playback requires the Tauri app, not the browser preview");
-  console.debug("[play_magnet] invoked", { title, watch });
-  const session = await invoke<PlaySession>("play_magnet", { magnet, title, watch });
+  console.debug("[play_magnet] invoked", { title, watch, episode });
+  const session = await invoke<PlaySession>("play_magnet", { magnet, title, watch, episode });
   console.info("[play_magnet] succeeded", { title, torrentId: session.torrentId, files: session.files.length });
   return session;
 }
