@@ -1,4 +1,4 @@
-//! On-disk caches under `<cache_dir>/nyaa-stream`: sizes for Settings, the
+//! Backup file I/O and on-disk caches under `<cache_dir>/nyaa-stream`: sizes for Settings, the
 //! clear buttons, and the HLS segment cache's startup/exit purge.
 
 use std::path::{Path, PathBuf};
@@ -107,4 +107,28 @@ pub async fn clear_cache(state: State<'_, Arc<AppState>>, kind: String) -> Resul
     .map_err(|err| err.to_string())??;
     tracing::info!(%kind, "cache cleared");
     Ok(())
+}
+
+fn backup_path() -> PathBuf {
+    dirs::document_dir().unwrap_or_else(std::env::temp_dir).join("nyaa-stream-backup.json")
+}
+
+/// Writes the frontend's backup JSON (library, progress, settings...) to
+/// `<Documents>/nyaa-stream-backup.json` and returns the path.
+#[tauri::command]
+pub async fn export_backup(json: String) -> Result<String, String> {
+    let path = backup_path();
+    tracing::debug!(path = %path.display(), bytes = json.len(), "export_backup invoked");
+    tokio::fs::write(&path, json).await.map_err(|err| format!("Couldn't write {}: {err}", path.display()))?;
+    tracing::info!(path = %path.display(), "backup written");
+    Ok(path.to_string_lossy().into_owned())
+}
+
+/// Reads the backup written by `export_backup` (also where a copied file
+/// from another machine should be placed).
+#[tauri::command]
+pub async fn import_backup() -> Result<String, String> {
+    let path = backup_path();
+    tracing::debug!(path = %path.display(), "import_backup invoked");
+    tokio::fs::read_to_string(&path).await.map_err(|err| format!("Couldn't read {}: {err}", path.display()))
 }

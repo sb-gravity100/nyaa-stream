@@ -1040,6 +1040,8 @@ pub fn run() {
             media_keys::set_media_keys,
             cache::get_cache_sizes,
             cache::clear_cache,
+            cache::export_backup,
+            cache::import_backup,
             player::mpv_available,
             player::set_mpv_path,
             player::mpv_start,
