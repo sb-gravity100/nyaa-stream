@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `73850e7` · 2026-09-29 · docs: plan sequential download for from-start playback
+- `PLAN.md`
+- `PHASES.md`
+
 ### `7eefcf4` · 2026-09-29 · docs: plan fast playback start for v0.3.2
 - `PLAN.md`
 - `PHASES.md`
