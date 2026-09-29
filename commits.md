@@ -2,6 +2,13 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `01479ba` · 2026-09-29 · feat(installer): branded MSI banner and welcome-dialog art
+- `scripts/make-installer-art.ps1`
+- `src-tauri/installer/banner.bmp`
+- `src-tauri/installer/dialog.bmp`
+- `src-tauri/tauri.conf.json`
+- `FILE_INDEX.md`
+
 ### `4446025` · 2026-09-29 · feat(release): add bump script keeping app version in sync
 - `scripts/bump-version.mjs`
 - `package.json`
