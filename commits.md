@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `7bbe309` · 2026-09-29 · docs: plan nyaa view-page screenshots as thumbnails
+- `PLAN.md`
+- `PHASES.md`
+
 ### `c496a57` · 2026-09-29 · docs: plan HD banner sources for v0.7.0
 - `PLAN.md`
 - `PHASES.md`
