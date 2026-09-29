@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
+import { getCurrentWindow, ProgressBarStatus } from "@tauri-apps/api/window";
 import { isFullscreen, setFullscreen, toggleFullscreen, useFullscreen } from "./fullscreen";
 import { MpvVideo, type Chapter } from "./mpvVideo";
 import { isTypingTarget } from "./keyboard";
@@ -1004,6 +1006,50 @@ function MpvPlayerView({
       showToast(opening ? "Skipped opening" : `Skipped ${INTRO_SKIP_SECONDS}s`);
       seekToEpisodeTime(target);
    }
+
+   // Hardware media keys while the player is open (see media_keys.rs).
+   const togglePauseRef = useRef(togglePause);
+   togglePauseRef.current = togglePause;
+   const onNextRef = useRef(onNext);
+   onNextRef.current = onNext;
+   useEffect(() => {
+      let unlisten: (() => void) | undefined;
+      let cancelled = false;
+      invoke("set_media_keys", { enabled: true }).catch((err) => console.warn("[player] media keys unavailable", { err: String(err) }));
+      listen<string>("media-key", (e) => {
+         console.debug("[player] media key", { key: e.payload });
+         if (e.payload === "play-pause") togglePauseRef.current();
+         else if (e.payload === "next") onNextRef.current?.();
+         else if (e.payload === "previous" && videoRef.current) seekToEpisodeTimeRef.current(0);
+      }).then((fn) => (cancelled ? fn() : (unlisten = fn)));
+      return () => {
+         cancelled = true;
+         unlisten?.();
+         invoke("set_media_keys", { enabled: false }).catch(() => {});
+      };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, []);
+   const seekToEpisodeTimeRef = useRef(seekToEpisodeTime);
+   seekToEpisodeTimeRef.current = seekToEpisodeTime;
+
+   // Windows taskbar progress: the episode's position, yellow while paused.
+   const lastTaskbarRef = useRef(0);
+   useEffect(() => {
+      const now = Date.now();
+      if (!duration || (now - lastTaskbarRef.current < 1000 && !paused)) return;
+      lastTaskbarRef.current = now;
+      void getCurrentWindow()
+         .setProgressBar({ status: paused ? ProgressBarStatus.Paused : ProgressBarStatus.Normal, progress: Math.round((position / duration) * 100) })
+         .catch(() => {});
+   }, [position, duration, paused]);
+   useEffect(
+      () => () => {
+         void getCurrentWindow()
+            .setProgressBar({ status: ProgressBarStatus.None })
+            .catch(() => {});
+      },
+      [],
+   );
 
    // Shift alone skips the intro. Armed on keydown and cleared by any other
    // key, so Shift+letter combos and typing never trigger it.

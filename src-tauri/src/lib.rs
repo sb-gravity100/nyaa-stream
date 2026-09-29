@@ -1,4 +1,5 @@
 mod cache;
+mod media_keys;
 mod metadata_fallback;
 mod player;
 
@@ -1009,6 +1010,7 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(media_keys::plugin())
         .manage(app_state.clone())
         .manage(player::PlayerState::default())
         .register_asynchronous_uri_scheme_protocol(THUMBNAIL_SCHEME, move |_ctx, request, responder| {
@@ -1035,6 +1037,7 @@ pub fn run() {
             copy_frame_to_clipboard,
             stop_playback,
             export_clip,
+            media_keys::set_media_keys,
             cache::get_cache_sizes,
             cache::clear_cache,
             player::mpv_available,
