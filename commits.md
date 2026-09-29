@@ -2,6 +2,11 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `c60fd83` · 2026-09-29 · fix: download a first-watch file sequentially from piece 0
+- `PHASES.md`
+- `vendor/enginefs/src/backend/libtorrent/disk_stream.rs`
+- `vendor/enginefs/src/backend/libtorrent/playback.rs`
+
 ### `488943f` · 2026-09-29 · docs: document watch hint delivery
 - `FILE_INDEX.md`
 - `PLAN.md`
