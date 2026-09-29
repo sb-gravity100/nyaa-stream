@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `934596f` · 2026-09-29 · docs: give the README a centered header with logo and badges
+- `README.md`
+
 ### `0f2ad46` · 2026-09-29 · docs: plan the native splash window and custom title bar for v0.4.0
 - `PLAN.md`
 - `PHASES.md`
