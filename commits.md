@@ -2,6 +2,11 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `af7d8f3` · 2026-09-29 · fix: flush mpv and resume at the playhead on a source switch
+- `PHASES.md`
+- `src/PlayerView.tsx`
+- `src/mpvVideo.ts`
+
 ### `80e71ff` · 2026-09-29 · fix: ignore end-file errors from a previous mpv entry
 - `PHASES.md`
 - `src/mpvVideo.ts`
