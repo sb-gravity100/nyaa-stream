@@ -5,6 +5,8 @@ import type { JSX } from "preact";
 import { DEFAULT_SUBTITLE_STYLE, resetSettings, updateSettings, useSettings, type PreferredResolution, type SubtitleStyle } from "./settings";
 import { CloseIcon } from "./icons";
 import { exportBackup, importBackup } from "./backup";
+import { checkForUpdate, installUpdate } from "./updater";
+import type { Update } from "@tauri-apps/plugin-updater";
 
 interface Props {
   onClose: () => void;
@@ -110,6 +112,62 @@ function StorageSection() {
         </div>
       ))}
       {message && <div class="setting-hint">{message}</div>}
+    </section>
+  );
+}
+
+/** Checks GitHub Releases for a newer signed build and installs it. */
+function UpdateSection() {
+  const [update, setUpdate] = useState<Update | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function run(action: () => Promise<string | null>) {
+    setBusy(true);
+    setMessage(null);
+    try {
+      setMessage(await action());
+    } catch (err) {
+      console.warn("[updater] failed", { err: String(err) });
+      setMessage(err instanceof Error ? err.message : String(err));
+    }
+    setBusy(false);
+  }
+
+  return (
+    <section class="settings-section">
+      <h3>Updates</h3>
+      <div class="setting-row">
+        <span class="setting-text">
+          <span class="setting-label">nyaa-stream v{__APP_VERSION__}</span>
+          <span class="setting-hint">{message ?? (update ? `v${update.version} is available` : "Checks GitHub Releases")}</span>
+        </span>
+        <span class="setting-control">
+          {update ? (
+            <button
+              class="button button-primary"
+              disabled={busy}
+              onClick={() => void run(async () => { await installUpdate(update, (p) => setMessage(p === null ? "Downloading…" : `Downloading ${p}%`)); return null; })}
+            >
+              Install and restart
+            </button>
+          ) : (
+            <button
+              class="button button-quiet"
+              disabled={busy}
+              onClick={() =>
+                void run(async () => {
+                  const found = await checkForUpdate();
+                  setUpdate(found);
+                  return found ? null : "You're up to date";
+                })
+              }
+            >
+              Check for updates
+            </button>
+          )}
+        </span>
+      </div>
     </section>
   );
 }
@@ -406,6 +464,8 @@ yaa-stream screenshots.">
               </button>
             </div>
           </section>
+
+          <UpdateSection />
 
           <BackupSection />
 

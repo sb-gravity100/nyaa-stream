@@ -25,6 +25,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "resources": ["lib/*"],
     "icon": [
       "icons/32x32.png",
@@ -39,6 +40,13 @@
         "bannerPath": "installer/banner.bmp",
         "dialogImagePath": "installer/dialog.bmp"
       }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDQ4ODJBRTE2OUE1ODQ5MUYKUldRZlNWaWFGcTZDU0F1RzkzU0ZhVFJqZXI5bkJWOXpoRGdldWxId21Ra0JQcVZtRTBUcnQ2YVYK",
+      "endpoints": ["https://github.com/OWNER/REPO/releases/latest/download/latest.json"],
+      "windows": { "installMode": "passive" }
     }
   }
 }

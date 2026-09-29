@@ -44,6 +44,8 @@ arboard = { version = "3", default-features = false, features = ["image-data"] }
 image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-dialog = "2"
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
 
 [target.'cfg(windows)'.dependencies]
 # Finding mpv's child window and pushing it below the webview (player.rs).
