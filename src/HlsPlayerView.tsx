@@ -286,12 +286,6 @@ export function HlsPlayerView({
          return false;
       }
    });
-   // Brief center-screen icon confirming play/pause/skip - `id` restarts
-   // the animation when the same action repeats.
-   const [flash, setFlash] = useState<{
-      kind: "play" | "pause" | "back" | "forward";
-      id: number;
-   } | null>(null);
    const [subtitleTracks, setSubtitleTracks] = useState<SubtitleTrack[]>([]);
    const [subtitleFonts, setSubtitleFonts] = useState<string[]>([]);
    // null = subtitles off.
@@ -816,7 +810,6 @@ export function HlsPlayerView({
       if (!video || !episodeDuration) return;
       cancelPendingKeyboardSeek();
       setNextCountdown(null);
-      showFlash(deltaSeconds < 0 ? "back" : "forward");
       seekToEpisodeTime(
          Math.min(
             Math.max(
@@ -861,14 +854,10 @@ export function HlsPlayerView({
       );
    }
 
-   function showFlash(kind: "play" | "pause" | "back" | "forward") {
-      setFlash({ kind, id: Date.now() });
-   }
 
    function togglePause() {
       const video = videoRef.current;
       if (!video) return;
-      showFlash(video.paused ? "play" : "pause");
       if (video.paused) {
          // play() rejects with AbortError if something pauses the video
          // before it resolves (e.g. closing mid-buffer) - expected.
@@ -1079,24 +1068,19 @@ export function HlsPlayerView({
             case "k":
                togglePause();
                break;
-            // Arrow skips leave the controls as they are - only the centre
-            // flash marks the jump.
+            // Arrow skips leave the controls as they are.
             case "arrowleft":
                e.preventDefault();
-               showFlash("back");
                seekBy(-SEEK_STEP_SECONDS);
                return;
             case "arrowright":
                e.preventDefault();
-               showFlash("forward");
                seekBy(SEEK_STEP_SECONDS);
                return;
             case "j":
-               showFlash("back");
                seekBy(-SEEK_STEP_SECONDS_LARGE);
                break;
             case "l":
-               showFlash("forward");
                seekBy(SEEK_STEP_SECONDS_LARGE);
                break;
             case "arrowup":
@@ -1426,19 +1410,6 @@ export function HlsPlayerView({
             </div>
          )}
 
-         {flash && (
-            <div
-               class="player-flash"
-               key={flash.id}
-               aria-hidden="true"
-               onAnimationEnd={() => setFlash(null)}
-            >
-               {flash.kind === "play" && <PlayIcon size={34} />}
-               {flash.kind === "pause" && <PauseIcon size={34} />}
-               {flash.kind === "back" && <SkipBackIcon size={34} />}
-               {flash.kind === "forward" && <SkipForwardIcon size={34} />}
-            </div>
-         )}
 
          {playlist.length > 1 && (
             <PlayerPlaylist
