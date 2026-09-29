@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `f86c1de` · 2026-09-29 · docs: plan buffering round 3 and decoder diagnostics
+- `PLAN.md`
+- `PHASES.md`
+
 ### `251e2fe` · 2026-09-29 · docs: plan the download cache for v0.4.0
 - `PLAN.md`
 - `PHASES.md`
