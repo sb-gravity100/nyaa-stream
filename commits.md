@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `5615357` · 2026-09-29 · docs: plan user-supplied TMDB token for v0.7.0
+- `PLAN.md`
+- `PHASES.md`
+
 ### `14f6a12` · 2026-09-29 · docs: plan TMDB episode stills and seek-bar thumbnail preview
 - `PLAN.md`
 - `PHASES.md`
