@@ -1,0 +1,66 @@
+name: release
+
+# Push a version tag (npm run bump, commit, git tag vX.Y.Z, git push --follow-tags)
+# to build the signed installer and publish it, its .sig and latest.json
+# (what the in-app updater reads) as a GitHub release.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ". -> target"
+
+      - name: Cache prebuilt native libs
+        id: native
+        uses: actions/cache@v4
+        with:
+          path: vcpkg_installed
+          key: native-deps-${{ hashFiles('scripts/fetch-native-deps.mjs') }}
+
+      - name: Fetch prebuilt native libs
+        if: steps.native.outputs.cache-hit != 'true'
+        run: npm run setup
+
+      - name: Fetch libmpv
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          asset=$(gh api repos/zhongfly/mpv-winbuild/releases/latest \
+            --jq '.assets[] | select(.name | test("^mpv-dev-x86_64-[0-9]")) | .name' | head -1)
+          gh release download --repo zhongfly/mpv-winbuild --pattern "$asset" --dir "$RUNNER_TEMP"
+          7z e "$RUNNER_TEMP/$asset" libmpv-2.dll -osrc-tauri/lib -y
+          ls -l src-tauri/lib
+
+      - run: npm ci
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+        with:
+          tagName: v__VERSION__
+          releaseName: nyaa-stream v__VERSION__
+          releaseBody: See commits.md for changes.
+          releaseDraft: false
+          prerelease: false
+          uploadUpdaterJson: true

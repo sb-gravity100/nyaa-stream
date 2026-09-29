@@ -4,6 +4,7 @@
 |---|---|---|
 | `Cargo.toml` | Workspace root, shared dependency versions | workspace, config |
 | `package.json` | Frontend deps + Tauri CLI scripts | frontend, config |
+| `.github/workflows/release.yml` | On a `v*` tag: windows runner fetches prebuilt native libs + libmpv, builds with `tauri-action` (signed with the `TAURI_SIGNING_PRIVATE_KEY` secret), publishes installer + `.sig` + `latest.json` as a GitHub release | ci, release |
 | `scripts/bump-version.mjs` | `npm run bump -- patch\|minor\|major\|x.y.z`: sets the app version in `package.json`, `tauri.conf.json` and `src-tauri/Cargo.toml` together; release = commit + `vX.Y.Z` git tag | config, release |
 | `.githooks/pre-commit` | Non-blocking reminder to bump the version when code changed since the latest tag (enable: `git config core.hooksPath .githooks`) | config, release |
 | `scripts/fetch-native-deps.mjs` | `npm run setup`: downloads + checksum-verifies + extracts the prebuilt native libs (`native-deps-v1` release asset) into `vcpkg_installed/`, replacing a local vcpkg build | build-config, setup |
