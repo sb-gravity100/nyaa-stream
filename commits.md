@@ -1,3 +1,9 @@
+### `f5ea62a` · 2026-09-30 · feat: keep Continue watching torrents past the download cache cap
+- `src-tauri/src/download_cache.rs`
+- `src-tauri/src/lib.rs`
+- `src/downloadCache.ts`
+- `src/main.tsx`
+
 ### `87da9dc` · 2026-09-30 · feat: LRU-evict the download cache after stop and at startup
 - `src-tauri/src/download_cache.rs`
 - `src-tauri/src/lib.rs`
