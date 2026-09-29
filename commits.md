@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `7c3cd69` · 2026-09-29 · docs: split sequential download plan into first and continue watch
+- `PLAN.md`
+- `PHASES.md`
+
 ### `73850e7` · 2026-09-29 · docs: plan sequential download for from-start playback
 - `PLAN.md`
 - `PHASES.md`
