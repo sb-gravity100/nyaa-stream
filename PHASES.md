@@ -304,7 +304,8 @@
             unknown to the stream server (Kaleido-subs case)
       - [ ] Verify live: time from click to first frame, logged before/after
       - [ ] PLAN.md/FILE_INDEX.md sync, `npm run bump -- patch`, tag
-            `v0.3.2` locally (not pushed/published - see PLAN.md "Release plan")
+            `v0.3.2`, `npm run release -- --notes "..." --dry-run`, then
+            publish (see PLAN.md "Release plan")
 - [ ] Continue-watching resume buffer (v0.4.0, see PLAN.md "Continue-watching
       resume buffer"): one commit each -
       - [ ] Stream handler records the byte ranges mpv reads until
