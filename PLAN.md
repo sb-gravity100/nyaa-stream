@@ -587,7 +587,7 @@ tag is only a warning, so the build can be tested before tagging), `--skip-build
 `workflow_dispatch` trigger, so a pushed tag can't also start a CI publish if
 the account is unlocked later.
 
-## Fast playback start (planned, v0.3.2 - patch: fix)
+## Fast playback start (v0.3.2 - patch: fix)
 
 **Problem (measured 2026-09-29, SubsPlease 1080p MKV, 256 KB pieces):**
 metadata took 1s and mpv issued `loadfile` ~15ms later, but piece 0 took
