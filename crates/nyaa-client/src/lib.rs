@@ -2,7 +2,9 @@ use scraper::{Html, Selector};
 use serde::{Deserialize, Serialize};
 
 mod cache;
+mod throttle;
 use cache::DiskCache;
+use throttle::Throttle;
 
 const NYAA_BASE_URL: &str = "https://nyaa.si";
 
@@ -94,6 +96,7 @@ pub struct NyaaClient {
     http: reqwest::Client,
     /// See `cache` - None for an uncached client (dev tools).
     cache: Option<DiskCache>,
+    throttle: std::sync::Arc<Throttle>,
 }
 
 impl Default for NyaaClient {
@@ -107,6 +110,7 @@ impl NyaaClient {
         Self {
             http: reqwest::Client::new(),
             cache: None,
+            throttle: std::sync::Arc::new(Throttle::new()),
         }
     }
 
@@ -116,6 +120,7 @@ impl NyaaClient {
         Self {
             http: reqwest::Client::new(),
             cache: Some(DiskCache::new(dir)),
+            throttle: std::sync::Arc::new(Throttle::new()),
         }
     }
 
@@ -187,7 +192,7 @@ impl NyaaClient {
 
         // A rate-limited (429) or failing page parses to zero rows - it must
         // be an error, not "no results", or it would be cached as such.
-        let body = match self.http.get(&url).send().await.and_then(|resp| resp.error_for_status()) {
+        let body = match self.throttle.get(&self.http, &url).await {
             Ok(resp) => match resp.text().await {
                 Ok(body) => body,
                 Err(err) => {
@@ -279,7 +284,7 @@ impl NyaaClient {
     async fn fetch_details_uncached(&self, view_url: &str) -> anyhow::Result<TorrentDetails> {
         tracing::debug!(view_url, "fetching nyaa.si torrent view page");
 
-        let body = match self.http.get(view_url).send().await.and_then(|resp| resp.error_for_status()) {
+        let body = match self.throttle.get(&self.http, view_url).await {
             Ok(resp) => match resp.text().await {
                 Ok(body) => body,
                 Err(err) => {
