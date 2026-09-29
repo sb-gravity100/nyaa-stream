@@ -39,9 +39,11 @@ impl EmbeddedMpv {
             // Keep more already-played video demuxed (default 50 MiB) so a
             // jump back stays instant and its range stays on the seek bar.
             "--demuxer-max-back-bytes=150MiB".to_string(),
-            // After a stall, wait for 3s of data (default 1s) before
-            // resuming: one slightly longer pause instead of stop-start.
-            "--cache-pause-wait=3".to_string(),
+            // Start (and resume after a stall or seek) only once ~10s of
+            // video is buffered, instead of playing the first decodable
+            // frame and stalling again right away.
+            "--cache-pause-initial=yes".to_string(),
+            "--cache-pause-wait=10".to_string(),
             // Don't load the user's own mpv.conf/scripts (an OSC,
             // keybindings) into the app's player.
             "--no-config".to_string(),
