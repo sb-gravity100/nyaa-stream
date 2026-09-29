@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `b981b6e` · 2026-09-29 · feat(player): C toggles subtitles, hold C + scroll steps through tracks
+- `src/PlayerView.tsx`
+- `src/SettingsPanel.tsx`
+
 ### `d3bc670` · 2026-09-29 · feat(player): X saves the current frame; subtitle delay moves to , and .
 - `src/PlayerView.tsx`
 - `src/SettingsPanel.tsx`
