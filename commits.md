@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `251e2fe` · 2026-09-29 · docs: plan the download cache for v0.4.0
+- `PLAN.md`
+- `PHASES.md`
+
 ### `82baaf1` · 2026-09-29 · docs: note buffering round 2 in VENDORED.md
 - `vendor/enginefs/VENDORED.md`
 
