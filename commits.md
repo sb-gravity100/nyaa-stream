@@ -2,6 +2,11 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `3e7293d` · 2026-09-29 · chore: release v0.3.1
+- `package.json`
+- `src-tauri/Cargo.toml`
+- `src-tauri/tauri.conf.json`
+
 ### `6f37211` · 2026-09-29 · docs: note hero slide in FILE_INDEX.md
 - `FILE_INDEX.md`
 
