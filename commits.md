@@ -2,6 +2,19 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `2bc44ed` · 2026-09-29 · docs: describe the release database and phased search
+- `FILE_INDEX.md`
+- `PLAN.md`
+
+### `15839be` · 2026-09-29 · feat: show pages paint from the local database and preferred fansubber before the full search
+- `src/App.tsx`
+- `src/SettingsPanel.tsx`
+
+### `dba15c7` · 2026-09-29 · feat: local-first show search, fansubber-only search and popular fansubbers commands
+- `src-tauri/src/lib.rs`
+- `crates/nyaa-client/Cargo.toml`
+- `crates/nyaa-client/examples/store_debug.rs`
+
 ### `28205cf` · 2026-09-29 · feat(nyaa-client): permanent release database keyed by nyaa release id
 - `crates/nyaa-client/Cargo.toml`
 - `crates/nyaa-client/src/store.rs`
