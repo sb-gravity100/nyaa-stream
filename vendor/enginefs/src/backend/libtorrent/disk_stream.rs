@@ -6,8 +6,9 @@ use std::task::Poll;
 use std::time::{Duration, Instant};
 
 use crate::backend::priorities::{
-    BLOCKED_REPLAN_INTERVAL_MS, MAX_STARTUP_PIECES, PlaybackIntent, container_metadata_start,
-    disk_backed_forward_window_pieces_for, disk_backed_urgent_pieces, playback_deadline_step_ms,
+    BLOCKED_REPLAN_INTERVAL_MS, MAX_STARTUP_PIECES, PlaybackIntent, SEEK_REANCHOR_DEBOUNCE_MS,
+    container_metadata_start, disk_backed_forward_window_pieces_for, disk_backed_urgent_pieces,
+    playback_deadline_step_ms,
 };
 use crate::metadata_pins::MetadataPinRegistry;
 use crate::piece_waiter::PieceWaiterRegistry;
@@ -74,6 +75,11 @@ pub(crate) struct LibtorrentDiskFileStream {
     /// latest seek) was reported to the coordinator - see
     /// `report_read_start`.
     read_start_reported: bool,
+    /// (nyaa-stream) The reported foreground read start (piece, when) until
+    /// bytes flow from it, and whether a block on it was reported - see
+    /// `report_seek_blocked`.
+    read_start: Option<(i32, Instant)>,
+    seek_block_reported: bool,
     /// (nyaa-stream) Piece whose disk reads are currently coming back
     /// all-zero, when that started, and whether zeros were finally accepted
     /// as genuine - see `poll_read`.
@@ -144,6 +150,8 @@ impl LibtorrentDiskFileStream {
             last_prioritized_piece: -1,
             consecutive_waits: 0,
             read_start_reported: false,
+            read_start: None,
+            seek_block_reported: false,
             zero_wait: None,
             last_blocked_replan: Instant::now(),
             file,
@@ -231,7 +239,39 @@ impl LibtorrentDiskFileStream {
             pos = self.current_pos,
             "reporting foreground read start"
         );
+        self.read_start = Some((piece, Instant::now()));
+        self.seek_block_reported = false;
         self.playback_permit.report_read_start(piece);
+    }
+
+    /// (nyaa-stream) Bytes flowed: the read start is no longer blocked.
+    fn clear_read_start(&mut self) {
+        self.read_start = None;
+    }
+
+    /// (nyaa-stream) A foreground read blocked `SEEK_REANCHOR_DEBOUNCE_MS` on
+    /// the piece it started at: the coordinator may re-anchor continue-watch
+    /// mode there (seek into undownloaded data). Reported once per start.
+    fn report_seek_blocked(&mut self, piece: i32) {
+        let Some((start_piece, since)) = self.read_start else {
+            return;
+        };
+        if self.seek_block_reported
+            || start_piece != piece
+            || since.elapsed() < Duration::from_millis(SEEK_REANCHOR_DEBOUNCE_MS)
+        {
+            return;
+        }
+        self.seek_block_reported = true;
+        tracing::debug!(
+            info_hash = %self.info_hash,
+            file_idx = self.file_idx,
+            stream_id = self.stream_id,
+            piece,
+            blocked_ms = since.elapsed().as_millis() as u64,
+            "foreground read blocked at its start piece"
+        );
+        self.playback_permit.report_seek_blocked(piece);
     }
 
     fn priority_intent(&self) -> PlaybackIntent {
@@ -474,6 +514,7 @@ impl LibtorrentDiskFileStream {
     ) -> std::task::Poll<std::io::Result<()>> {
         self.consecutive_waits = self.consecutive_waits.saturating_add(1);
         self.prioritize_from(piece);
+        self.report_seek_blocked(piece);
         if !self.is_background_reader() {
             self.escalate_blocked_piece(piece);
         }
@@ -661,6 +702,7 @@ impl LibtorrentDiskFileStream {
         buf.put_slice(&data[start..end]);
         self.current_pos = self.current_pos.saturating_add((end - start) as u64);
         self.consecutive_waits = 0;
+        self.clear_read_start();
         self.record_first_read(piece, "read-piece-alert");
         self.prioritize_from(piece.saturating_add(1));
         true
@@ -1012,6 +1054,7 @@ impl tokio::io::AsyncRead for LibtorrentDiskFileStream {
         buf.put_slice(&self.scratch[..read]);
         self.current_pos = self.current_pos.saturating_add(read as u64);
         self.consecutive_waits = 0;
+        self.clear_read_start();
         self.record_first_read(piece, "async-file");
         self.prioritize_from(piece.saturating_add(1));
 
@@ -1037,6 +1080,7 @@ impl tokio::io::AsyncSeek for LibtorrentDiskFileStream {
         self.current_pos = new_pos.min(self.file_size);
         self.last_prioritized_piece = -1;
         self.read_start_reported = false;
+        self.read_start = None;
         self.verified_piece = None;
         self.broker_piece = None;
         if let Some((_, task)) = self.piece_read.take() {
