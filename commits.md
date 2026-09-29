@@ -2,6 +2,14 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `e844730` · 2026-09-29 · feat(settings): preferred fansubber text input for release picking
+- `src/settings.ts`
+- `src/releases.ts`
+- `src/PlayerView.tsx`
+- `src/HlsPlayerView.tsx`
+- `src/SettingsPanel.tsx`
+- `FILE_INDEX.md`, `PHASES.md`
+
 ### `2e4f465` · 2026-09-29 · fix: search dropdown had two nested scrollbars
 - `src/App.css`
 
