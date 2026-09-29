@@ -2,6 +2,18 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `555c5c6` · 2026-09-29 · feat: pass a first/resume watch hint from play_magnet to the engine
+- `PHASES.md`
+- `crates/torrent-engine/src/lib.rs`
+- `src-tauri/src/lib.rs`
+- `src/HlsPlayerView.tsx`
+- `src/PlayerView.tsx`
+- `src/playback.ts`
+- `vendor/enginefs/src/backend/libtorrent/handle.rs`
+- `vendor/enginefs/src/backend/libtorrent/playback.rs`
+- `vendor/enginefs/src/backend/mod.rs`
+- `vendor/enginefs/src/backend/priorities.rs`
+
 ### `14ecb3e` · 2026-09-29 · fix: widen the startup window and read-ahead to ~4 MB at priority 7
 - `PHASES.md`
 - `vendor/enginefs/src/backend/libtorrent/disk_stream.rs`
