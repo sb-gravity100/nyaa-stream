@@ -1235,11 +1235,21 @@ function MpvPlayerView({
             case "m":
                toggleMute();
                break;
-            case ",":
+            case "-":
                changeSubtitleDelay(-SUBTITLE_DELAY_STEP);
                break;
-            case ".":
+            case "=":
+            case "+":
                changeSubtitleDelay(SUBTITLE_DELAY_STEP);
+               break;
+            // One frame back/forward (pauses, like mpv).
+            case ",":
+               cancelPendingKeyboardSeek();
+               videoRef.current?.frameStep(-1);
+               break;
+            case ".":
+               cancelPendingKeyboardSeek();
+               videoRef.current?.frameStep(1);
                break;
             case "x":
                void saveFrame();

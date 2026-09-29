@@ -306,6 +306,14 @@ export class MpvVideo extends EventTarget {
       );
    }
 
+   /** Steps one video frame forward or back; mpv pauses playback while
+    * stepping. */
+   frameStep(direction: 1 | -1): void {
+      void command([direction > 0 ? "frame-step" : "frame-back-step"]).catch((err) =>
+         console.warn("[mpv] frame step failed", { direction, err: String(err) }),
+      );
+   }
+
    async play(): Promise<void> {
       await command(["set_property", "pause", false]);
    }
