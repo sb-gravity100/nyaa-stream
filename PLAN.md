@@ -548,6 +548,16 @@ by an app-styled HTML menu whose items depend on what was right-clicked.
 
   The speed button keeps its existing right-click = reset speed.
 
+## Release plan (decided 2026-09-29)
+
+Milestones v0.3.2 → v0.4.0 (resume buffer) → v0.5.0 (context menus) →
+v0.6.0 (build thumbnails) → v0.7.0 (HD banners) → v0.8.0 (seek preview) →
+v0.9.0 (contact/logs) are each bumped (`npm run bump`) and tagged **locally
+only** - never pushed, since a pushed `v*` tag triggers
+`.github/workflows/release.yml`. Commits are pushed with plain `git push`
+(no tags). Only **v0.9.0** is pushed, built and published; installs update
+straight from 0.3.1 to 0.9.0.
+
 ## Fast playback start (planned, v0.3.2 - patch: fix)
 
 **Problem (measured 2026-09-29, SubsPlease 1080p MKV, 256 KB pieces):**
