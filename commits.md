@@ -1,3 +1,7 @@
+### `fe2a6d6` · 2026-09-29 · docs: run Linux build testing in cloud sessions
+- `PLAN.md`
+- `PHASES.md`
+
 ### `fda4a99` · 2026-09-29 · docs: plan Windows + Linux multiplatform debut as v1.0.0
 - `PLAN.md`
 - `PHASES.md`
