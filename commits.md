@@ -2,6 +2,11 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `d1be839` · 2026-09-29 · fix: spawn the embedded mpv at app launch
+- `PHASES.md`
+- `src-tauri/src/lib.rs`
+- `src-tauri/src/player.rs`
+
 ### `9ae82c6` · 2026-09-29 · docs: note the fast-start enginefs changes in VENDORED.md
 - `PHASES.md`
 - `vendor/enginefs/VENDORED.md`
