@@ -38,7 +38,7 @@ import {
   VolumeIcon,
 } from "./icons";
 
-const KEYBIND_FLASH_MS = 1200;
+const STATS_POLL_MS = 1000;
 // Mouse idle this long anywhere but the top/bottom control areas fades
 // the controls and hides the cursor. While the pointer rests over those
 // areas the controls stay up indefinitely.
