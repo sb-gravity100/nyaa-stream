@@ -680,10 +680,12 @@ first seconds before C's mode is known):**
 
 - Spawn the embedded mpv early (idle, below the webview) instead of on the
   first play, so the first episode skips libmpv load + font install.
-  **Not at launch** (regression found 2026-09-29): spawning it into the
-  window while WebView2 was still initializing there delayed the page's
-  first script from 0.5-2s to 3-34s (and hid the splash). It now starts
-  1.5s after the page's first load finishes (`on_page_load`, once).
+  It starts 1.5s after the page's first load finishes (`on_page_load`,
+  once). (It was first moved there on the suspicion that spawning at launch
+  delayed the page - wrong: the next launch was still 33s late. The real
+  cause was dev-only: Vite listened on IPv6 `::1` only while the webview's
+  IPv4 attempts to `localhost:1420` took ~2s each to fail; Vite and
+  `devUrl` now both use `127.0.0.1`.)
   Skipped when libmpv isn't found at launch (HLS fallback, or `mpv_start`
   spawns lazily after a Settings path override).
 - `mpv_stop` resets per-file state after `stop` - `ab-loop-a/b`, `speed`,
