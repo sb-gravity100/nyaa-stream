@@ -2,6 +2,11 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `7803545` · 2026-09-29 · feat(player): batch sources play their matched episode file without a file picker
+- `src/PlayerView.tsx`
+- `src/App.css`
+- `FILE_INDEX.md`
+
 ### `1bd0413` · 2026-09-29 · fix: first-season pages no longer list later seasons' episodes
 - `src/App.tsx`
 
