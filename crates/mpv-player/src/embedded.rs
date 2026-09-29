@@ -36,6 +36,9 @@ impl EmbeddedMpv {
             "--hwdec=auto-safe".to_string(),
             "--vo=gpu-next,gpu,".to_string(),
             "--background-color=#000000".to_string(),
+            // Keep more already-played video demuxed (default 50 MiB) so a
+            // jump back stays instant and its range stays on the seek bar.
+            "--demuxer-max-back-bytes=150MiB".to_string(),
             // Don't load the user's own mpv.conf/scripts (an OSC,
             // keybindings) into the app's player.
             "--no-config".to_string(),
