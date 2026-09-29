@@ -1,11 +1,11 @@
 name: release
 
-# Push a version tag (npm run bump, commit, git tag vX.Y.Z, git push --follow-tags)
-# to build the signed installer and publish it, its .sig and latest.json
-# (what the in-app updater reads) as a GitHub release.
+# Manual only (Actions > release > Run workflow on a vX.Y.Z tag): builds the
+# signed installer and publishes it, its .sig and latest.json (what the in-app
+# updater reads) as a GitHub release. Releases are normally published from a
+# PC with `npm run release` (scripts/release.mjs); the tag-push trigger was
+# removed so a pushed tag can't publish twice - see PLAN.md "Release plan".
 on:
-  push:
-    tags: ["v*"]
   workflow_dispatch:
 
 permissions:
