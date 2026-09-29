@@ -2,6 +2,14 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `3aabc6c` · 2026-09-29 · refactor: rename mpv-ipc crate to mpv-player
+- `crates/mpv-player/`
+- `src-tauri/Cargo.toml`
+- `src-tauri/src/lib.rs`
+- `src-tauri/src/player.rs`
+- `Cargo.lock`
+- `CLAUDE.md`, `FILE_INDEX.md`, `PHASES.md`, `PLAN.md`
+
 ### `bad40af` · 2026-09-29 · docs: sync PHASES and FILE_INDEX with new features
 - `FILE_INDEX.md`
 - `PHASES.md`
