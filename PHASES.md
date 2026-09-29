@@ -464,6 +464,8 @@
       - [ ] Media keys (MPRIS), subtitle fonts, data/log/cache paths per OS
       - [ ] AppImage + .deb bundling; updater `linux-x86_64` in `latest.json`
       - [ ] `scripts/release.mjs`: per-platform build, merged `latest.json`
+      - [ ] Cloud Linux session: prerequisites script, `cargo check`/`test`,
+            `npm run build`, bundle, Xvfb smoke run (v0.9.0)
       - [ ] Linux QA pass: playback, subs, resume, updater (v0.9.x, local tags)
       - [ ] CI matrix (windows + ubuntu) once GitHub Actions is available
       - [ ] PLAN.md/FILE_INDEX.md sync, `npm run bump -- major`, tag
