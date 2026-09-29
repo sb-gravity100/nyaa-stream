@@ -14,6 +14,12 @@ export const COMPLETED_FRACTION = 0.9;
 export const MIN_RESUME_SECONDS = 20;
 const MAX_ENTRIES = 500;
 
+export interface ProgressSource {
+  magnet: string;
+  fileIdx: number;
+  fileName: string;
+}
+
 export interface ProgressEntry {
   animeId: number;
   episodeKey: string;
@@ -23,6 +29,9 @@ export interface ProgressEntry {
   duration: number;
   completed: boolean;
   updatedAt: number;
+  /** The release/file this was watched from - Resume prefers it, so the
+   * resume buffer matches (PLAN.md "Continue-watching resume buffer"). */
+  source?: ProgressSource;
   /** Snapshot for the home page's Continue Watching row. */
   anime: Pick<AnimeMedia, "id" | "title" | "coverImage" | "bannerImage" | "episodes" | "duration" | "format" | "season" | "seasonYear" | "averageScore" | "description">;
 }
@@ -79,7 +88,7 @@ export function resumePosition(animeId: number, episodeKey: string): number | nu
   return entry.position;
 }
 
-export function saveProgress(anime: AnimeMedia, episodeKey: string, episode: number | null, position: number, duration: number): void {
+export function saveProgress(anime: AnimeMedia, episodeKey: string, episode: number | null, position: number, duration: number, source?: ProgressSource): void {
   if (!Number.isFinite(position) || !Number.isFinite(duration) || duration <= 0) return;
   const previous = store[key(anime.id, episodeKey)];
   const completed = position / duration >= COMPLETED_FRACTION || (previous?.completed ?? false);
@@ -91,6 +100,7 @@ export function saveProgress(anime: AnimeMedia, episodeKey: string, episode: num
     duration,
     completed,
     updatedAt: Date.now(),
+    source: source ?? previous?.source,
     anime: {
       id: anime.id,
       title: anime.title,
