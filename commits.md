@@ -1,3 +1,7 @@
+### `287cfb0` · 2026-09-30 · feat: keyframe byte offset lookup and verified file ranges
+- `crates/torrent-engine/src/media.rs`
+- `crates/torrent-engine/src/lib.rs`
+
 ### `8b0532b` · 2026-09-30 · feat: record the byte ranges mpv reads to open a file
 - `crates/torrent-engine/src/resume_buffer.rs`
 - `crates/torrent-engine/src/lib.rs`
