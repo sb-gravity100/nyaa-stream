@@ -106,6 +106,15 @@ solid-color skeleton blocks, not a spinner).
 
 ### Build prerequisites (new, added with the libtorrent backend)
 
+**No vcpkg needed to build:** `npm run setup` (`scripts/fetch-native-deps.mjs`)
+downloads the prebuilt static libtorrent/OpenSSL/FFmpeg tree (release asset
+`native-deps-v1`, SHA-256 checked) into `vcpkg_installed/`, which the
+`vcpkg` crate and `FFMPEG_DIR` read directly. vcpkg is only needed to
+*rebuild* that archive after changing `vcpkg.json` (then re-upload it as a
+new `native-deps-vN` release and bump the constants in the script). CMake
+and vcpkg bullets below describe that rebuild path; MSVC and LLVM
+(libclang) are still required to build.
+
 Building `torrent-engine` (and therefore the whole workspace) now additionally
 requires, beyond Rust/Node:
 - CMake
