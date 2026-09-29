@@ -1,179 +1,75 @@
-//! The real playback engine: a system `mpv` drawing into the app's own
-//! window (`--wid`) underneath a transparent webview, driven over JSON IPC
-//! by the frontend's HTML controls. Unlike `MpvPlayer` (one reply per
-//! request, events discarded), this keeps a reader task running so
-//! command replies (matched by `request_id`) and unsolicited events
-//! (`property-change`, `end-file`...) can interleave freely.
+//! The real playback engine: libmpv running inside the app process, drawing
+//! into the app's own window (`wid`) underneath a transparent webview and
+//! driven by the frontend's HTML controls through IPC-shaped JSON commands
+//! (see `libmpv::Mpv::command`).
 
-use std::collections::HashMap;
-use std::process::Stdio;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
-use serde_json::{json, Value};
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, WriteHalf};
-use tokio::process::Command;
-use tokio::sync::{mpsc, oneshot, Mutex};
+use serde_json::Value;
+use tokio::sync::mpsc;
 
-use crate::{connect_with_retry, ipc_path};
-
-#[cfg(windows)]
-type Pipe = tokio::net::windows::named_pipe::NamedPipeClient;
-#[cfg(unix)]
-type Pipe = tokio::net::UnixStream;
-
-type Pending = Arc<Mutex<HashMap<u64, oneshot::Sender<Result<Value, String>>>>>;
+use crate::libmpv::{apply_options, Mpv};
 
 pub struct EmbeddedMpv {
-    child: tokio::process::Child,
-    writer: Mutex<WriteHalf<Pipe>>,
-    pending: Pending,
-    next_request: AtomicU64,
+    mpv: Arc<Mpv>,
 }
 
 impl EmbeddedMpv {
-    /// Spawns `mpv` idle inside window `wid` (a native window handle), with
-    /// `extra_args` appended to the built-in options. Every event line mpv
-    /// emits is forwarded to `events` as raw JSON; the channel closing
-    /// means mpv exited or its pipe broke.
-    pub async fn spawn(wid: i64, extra_args: &[String], events: mpsc::UnboundedSender<Value>) -> anyhow::Result<Self> {
-        let socket_path = ipc_path();
-        tracing::debug!(wid, socket_path, "spawning embedded mpv");
+    /// Starts an idle player inside window `wid` (a native window handle),
+    /// with `extra_options` (`--name=value`) appended to the built-in ones.
+    /// Every mpv event is forwarded to `events` as JSON; the channel closing
+    /// means mpv shut down.
+    pub async fn spawn(wid: i64, extra_options: &[String], events: mpsc::UnboundedSender<Value>) -> anyhow::Result<Self> {
+        tracing::debug!(wid, "starting embedded libmpv");
+        let mut options = vec![
+            format!("--wid={wid}"),
+            "--idle=yes".to_string(),
+            "--keep-open=yes".to_string(),
+            "--force-window=yes".to_string(),
+            // The webview on top owns all input and draws its own UI.
+            "--no-osc".to_string(),
+            "--osd-level=0".to_string(),
+            "--no-input-default-bindings".to_string(),
+            "--input-vo-keyboard=no".to_string(),
+            "--no-input-cursor".to_string(),
+            "--cursor-autohide=no".to_string(),
+            "--hwdec=auto-safe".to_string(),
+            "--vo=gpu-next,gpu,".to_string(),
+            "--background-color=#000000".to_string(),
+            // Don't load the user's own mpv.conf/scripts (an OSC,
+            // keybindings) into the app's player.
+            "--no-config".to_string(),
+        ];
+        options.extend_from_slice(extra_options);
 
-        let mut command = Command::new(crate::mpv_program());
-        #[cfg(windows)]
-        command.creation_flags(0x0800_0000);
-        command
-            .arg(format!("--input-ipc-server={socket_path}"))
-            .arg(format!("--wid={wid}"))
-            .args([
-                "--idle=yes",
-                "--keep-open=yes",
-                "--force-window=yes",
-                "--no-terminal",
-                // The webview on top owns all input and draws its own UI.
-                "--no-osc",
-                "--osd-level=0",
-                "--no-input-default-bindings",
-                "--input-vo-keyboard=no",
-                "--no-input-cursor",
-                "--cursor-autohide=no",
-                "--hwdec=auto-safe",
-                "--vo=gpu-next,gpu,",
-                "--background-color=#000000",
-                // Don't load the user's own mpv.conf/scripts (an OSC,
-                // keybindings) into the app's player.
-                "--no-config",
-            ])
-            .args(extra_args)
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .kill_on_drop(true);
-
-        let child = command.spawn().map_err(|e| {
-            tracing::error!(%e, "failed to spawn embedded mpv");
-            anyhow::anyhow!("failed to spawn mpv (is it installed and on PATH?): {e}")
-        })?;
-        let pipe: Pipe = connect_with_retry(&socket_path).await.inspect_err(|err| {
-            tracing::error!(%err, "failed to connect to embedded mpv IPC");
-        })?;
-        tracing::info!("connected to embedded mpv IPC");
-
-        let (read, writer) = tokio::io::split(pipe);
-        let pending: Pending = Arc::default();
-        tokio::spawn(read_loop(BufReader::new(read), pending.clone(), events));
-
-        Ok(Self { child, writer: Mutex::new(writer), pending, next_request: AtomicU64::new(1) })
+        let mpv = tokio::task::spawn_blocking(move || -> anyhow::Result<Mpv> {
+            let mpv = Mpv::new()?;
+            apply_options(&mpv, &options)?;
+            mpv.initialize()?;
+            mpv.start_events(events);
+            Ok(mpv)
+        })
+        .await??;
+        tracing::info!(wid, "embedded libmpv started");
+        Ok(Self { mpv: Arc::new(mpv) })
     }
 
-    /// Sends one IPC command (e.g. `["loadfile", url]`) and waits for its
-    /// reply's `data`.
+    /// Runs one IPC-style command (e.g. `["loadfile", url]`) and returns its
+    /// reply's `data`. Off the async threads: some commands (screenshots)
+    /// block until mpv is done.
     pub async fn command(&self, args: &[Value]) -> anyhow::Result<Value> {
-        let request_id = self.next_request.fetch_add(1, Ordering::Relaxed);
-        let (tx, rx) = oneshot::channel();
-        self.pending.lock().await.insert(request_id, tx);
-
-        let mut payload = serde_json::to_vec(&json!({ "command": args, "request_id": request_id }))?;
-        payload.push(b'\n');
-        let written = async {
-            let mut writer = self.writer.lock().await;
-            writer.write_all(&payload).await?;
-            writer.flush().await
-        }
-        .await;
-        if let Err(err) = written {
-            self.pending.lock().await.remove(&request_id);
-            tracing::error!(%err, "embedded mpv IPC write failed");
-            anyhow::bail!("mpv IPC write failed: {err}");
-        }
-
-        match rx.await {
-            Ok(Ok(data)) => Ok(data),
-            Ok(Err(error)) => {
-                tracing::debug!(?args, error, "embedded mpv command failed");
-                anyhow::bail!("mpv command failed: {error}")
-            }
-            Err(_) => anyhow::bail!("mpv IPC connection closed"),
-        }
+        let mpv = self.mpv.clone();
+        let args = args.to_vec();
+        tokio::task::spawn_blocking(move || mpv.command(&args))
+            .await?
+            .inspect_err(|err| tracing::debug!(%err, "embedded mpv command failed"))
+            .map_err(|err| anyhow::anyhow!("mpv command failed: {err}"))
     }
 
-    /// The mpv process id - used to find the child window it creates
-    /// inside `wid`.
-    pub fn pid(&self) -> Option<u32> {
-        self.child.id()
+    /// Destroys the player (blocks briefly while mpv tears down).
+    pub async fn quit(self) {
+        tracing::debug!("quitting embedded libmpv");
+        let mpv = self.mpv;
+        let _ = tokio::task::spawn_blocking(move || drop(mpv)).await;
     }
-
-    /// Asks mpv to quit, then kills it if it hasn't exited within 2s.
-    pub async fn quit(mut self) {
-        tracing::debug!("quitting embedded mpv");
-        let _ = tokio::time::timeout(std::time::Duration::from_millis(500), self.command(&["quit".into()])).await;
-        if tokio::time::timeout(std::time::Duration::from_secs(2), self.child.wait()).await.is_err() {
-            tracing::warn!("embedded mpv didn't exit after quit, killing");
-            let _ = self.child.kill().await;
-        }
-        tracing::info!("embedded mpv exited");
-    }
-}
-
-async fn read_loop(
-    mut reader: BufReader<tokio::io::ReadHalf<Pipe>>,
-    pending: Pending,
-    events: mpsc::UnboundedSender<Value>,
-) {
-    let mut line = String::new();
-    loop {
-        line.clear();
-        match reader.read_line(&mut line).await {
-            Ok(0) => break,
-            Ok(_) => {}
-            Err(err) => {
-                tracing::warn!(%err, "embedded mpv IPC read failed");
-                break;
-            }
-        }
-        let Ok(message) = serde_json::from_str::<Value>(&line) else {
-            tracing::warn!(line = line.trim(), "unparseable mpv IPC line");
-            continue;
-        };
-        if message.get("event").is_some() {
-            if events.send(message).is_err() {
-                break;
-            }
-            continue;
-        }
-        let Some(request_id) = message.get("request_id").and_then(Value::as_u64) else {
-            continue;
-        };
-        if let Some(reply) = pending.lock().await.remove(&request_id) {
-            let result = match message.get("error").and_then(Value::as_str) {
-                Some("success") => Ok(message.get("data").cloned().unwrap_or(Value::Null)),
-                other => Err(other.unwrap_or("unknown error").to_string()),
-            };
-            let _ = reply.send(result);
-        }
-    }
-    tracing::info!("embedded mpv IPC closed");
-    // Fail every in-flight command instead of leaving them hanging.
-    pending.lock().await.clear();
 }
