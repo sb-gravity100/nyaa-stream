@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `1f58003` · 2026-09-29 · docs: plan playback buffering fixes from the live test
+- `PLAN.md`
+- `PHASES.md`
+
 ### `b711df6` · 2026-09-29 · docs: record the seek-bar indicator implementation
 - `PLAN.md`
 - `PHASES.md`
