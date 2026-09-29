@@ -507,6 +507,14 @@ function App() {
       bucket.releases.push(source);
       groups.set(key, bucket);
     };
+    // Episode numbers that season-1 (or unmarked) releases cover: a release
+    // explicitly marked season 2+ for one of those same numbers is a sequel's
+    // episode (Frieren's "S02E05"), not this entry's.
+    const seasonOneNumbers = new Set<number>();
+    for (const source of sources) {
+      const label = parseEpisode(source.title);
+      if (label.kind === "episode" && label.season === 1) seasonOneNumbers.add(label.number);
+    }
     for (const source of sources) {
       const parsed = parseEpisode(source.title);
       // The title-regex parser can't tell a batch apart from a genuinely
@@ -552,6 +560,20 @@ function App() {
       // AniList entries with their own pages - not episodes of a TV series
       // (e.g. Fate/strange Fake's "S00E01 Whispers of Dawn").
       if (label.kind === "episode" && label.season === 0 && (selectedAnime?.format === "TV" || selectedAnime?.format === "TV_SHORT")) {
+        continue;
+      }
+
+      // The first season's own page: releases explicitly marked season 2+ are
+      // later seasons of the franchise (currentAnimeSeason's filter below only
+      // runs for season 2+ entries, since an unmarked title defaults to 1). A
+      // sequel is only dropped when this entry's episode of the same number
+      // exists, so a part 2 that numbers on as "S02E13" still shows.
+      if (
+        currentAnimeSeason === 1 &&
+        label.kind !== "unknown" &&
+        label.season > 1 &&
+        (label.kind === "episode" ? seasonOneNumbers.has(label.number) : seasonOneNumbers.size > 0)
+      ) {
         continue;
       }
 
