@@ -28,6 +28,20 @@ pub struct AnimeMedia {
     /// file itself - see PLAN.md's Known gaps on why `ffprobe`-derived
     /// duration is unreliable for a freshly-downloading torrent.
     pub duration: Option<i32>,
+    /// AniList's airing status (`RELEASING`, `FINISHED`, ...). Missing in
+    /// snapshots saved before it was requested and in Kitsu fallback data.
+    #[serde(default)]
+    pub status: Option<String>,
+    /// The next episode still to air, for the media page's countdown.
+    #[serde(default, rename = "nextAiringEpisode")]
+    pub next_airing_episode: Option<NextAiring>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NextAiring {
+    #[serde(rename = "airingAt")]
+    pub airing_at: i64,
+    pub episode: i32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -146,6 +160,8 @@ query ($search: String, $perPage: Int) {
       season
       seasonYear
       duration
+      status
+      nextAiringEpisode { airingAt episode }
     }
   }
 }
@@ -164,6 +180,8 @@ query ($id: Int) {
     season
     seasonYear
     duration
+    status
+    nextAiringEpisode { airingAt episode }
   }
 }
 "#;

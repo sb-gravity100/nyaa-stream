@@ -3236,3 +3236,21 @@ html.mpv-active .player-view {
 .search-recent-remove:hover {
   color: inherit;
 }
+
+.video-mark-previous {
+  width: auto;
+  padding: 0 9px;
+  border-radius: 16px;
+  font-size: 0.7rem;
+  letter-spacing: -0.06em;
+  opacity: 0;
+}
+
+.video-row:hover .video-mark-previous,
+.video-mark-previous:focus-visible {
+  opacity: 1;
+}
+
+.video-dead {
+  color: #ff6b6b;
+}

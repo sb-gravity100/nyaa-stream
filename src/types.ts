@@ -21,6 +21,9 @@ export interface AnimeMedia {
   seasonYear: number | null;
   /** Typical per-episode runtime in minutes, per AniList. */
   duration: number | null;
+  /** AniList airing status; absent on older saved snapshots. */
+  status?: string | null;
+  nextAiringEpisode?: { airingAt: number; episode: number } | null;
 }
 
 export interface NyaaResult {

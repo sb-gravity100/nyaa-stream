@@ -87,5 +87,7 @@ pub fn to_media(anime: KitsuAnime) -> AnimeMedia {
         season,
         season_year,
         duration: anime.episode_length,
+        status: None,
+        next_airing_episode: None,
     }
 }
