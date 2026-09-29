@@ -2,6 +2,25 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `82baaf1` · 2026-09-29 · docs: note buffering round 2 in VENDORED.md
+- `vendor/enginefs/VENDORED.md`
+
+### `8f3ca90` · 2026-09-29 · docs: record buffering round 2 in PLAN.md and PHASES.md
+- `PLAN.md`
+- `PHASES.md`
+
+### `037ec06` · 2026-09-29 · fix: re-anchor in-order download 100ms after a blocked seek
+- `vendor/enginefs/src/backend/priorities.rs`
+
+### `bdeff55` · 2026-09-29 · fix: start and resume playback once 10s is buffered
+- `crates/mpv-player/src/embedded.rs`
+
+### `0f05a78` · 2026-09-29 · fix: prioritize index reads and grade a bitrate-sized read-ahead
+- `vendor/enginefs/src/backend/libtorrent/disk_stream.rs`
+
+### `e6cc73a` · 2026-09-29 · fix: prefetch the file tail and hold resumes until the real resume point
+- `vendor/enginefs/src/backend/libtorrent/playback.rs`
+
 ### `50dea5a` · 2026-09-29 · docs: compare buffering plan with Elementum
 - `PLAN.md`
 
