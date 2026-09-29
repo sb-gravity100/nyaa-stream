@@ -425,7 +425,9 @@ a {
   top: calc(100% + 8px);
   left: 0;
   width: 100%;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  max-height: min(70vh, 520px);
   border-radius: var(--radius-l);
   border: 1px solid var(--glass-rim);
   background-color: var(--glass-strong);
@@ -3101,4 +3103,9 @@ html.mpv-active .player-view {
   font: inherit;
   font-size: 11px;
   opacity: 0.7;
+}
+
+.search-more-sentinel {
+  height: 24px;
+  list-style: none;
 }
