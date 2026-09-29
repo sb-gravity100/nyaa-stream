@@ -395,7 +395,7 @@ export function SettingsPanel({ onClose }: Props) {
               <div><dt>C</dt><dd>Cycle subtitles</dd></div>
               <div><dt>Z / X</dt><dd>Subtitle delay −/+ 0.1s</dd></div>
               <div><dt>N</dt><dd>Next episode</dd></div>
-              <div><dt>Shift</dt><dd>Skip the opening (85s if the file marks none)</dd></div>
+              <div><dt>Shift</dt><dd>Skip the opening (90s if the file marks none)</dd></div>
               <div><dt>{"[ / ] / \\"}</dt><dd>Playback speed slower / faster / reset</dd></div>
               <div><dt>A</dt><dd>A-B loop: set A, set B, clear</dd></div>
               <div><dt>E</dt><dd>Export the looped section as MP4</dd></div>
