@@ -3198,3 +3198,41 @@ html.mpv-active .player-view {
   transform: translateX(-50%);
   border: 1px solid #ffb454;
 }
+
+.search-recent-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px 4px;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--faint);
+}
+
+.search-recent-item {
+  display: flex;
+  align-items: center;
+}
+
+.search-recent-item > a {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+
+.search-recent-remove {
+  margin-right: 10px;
+  border: 0;
+  background: transparent;
+  color: var(--faint);
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+.search-recent-remove:hover {
+  color: inherit;
+}
