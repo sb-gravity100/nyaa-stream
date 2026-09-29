@@ -332,9 +332,9 @@
             `stream-corrupt` (5s debounce, max 3 per 60s)
       - [x] What's new dialog after an in-app update (`changelog.ts`,
             `updatedFrom` marker set before install, `WhatsNew.tsx`)
-      - [ ] Splash screen: animated logo inline in index.html, faded out
+      - [x] Splash screen: animated logo inline in index.html, faded out
             after the first render
-      - [ ] Logo polish: new mark in BrandMark, splash, favicon, icon.svg;
+      - [x] Logo polish: new mark in BrandMark, splash, favicon, icon.svg;
             app icons regenerated
       - [ ] Verify live: time from click to first frame, logged before/after
       - [x] PLAN.md/FILE_INDEX.md sync, `npm run bump -- patch`, tag
