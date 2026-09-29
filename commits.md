@@ -1,3 +1,7 @@
+### `8fddaf3` · 2026-09-29 · docs: plan subtitle off as sub-visibility, from log findings
+- `PLAN.md`
+- `PHASES.md`
+
 ### `da8c1c6` · 2026-09-29 · docs: plan subtitle preloading for v0.4.0
 - `PLAN.md`
 - `PHASES.md`
