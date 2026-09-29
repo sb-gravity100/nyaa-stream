@@ -49,7 +49,7 @@ export interface Settings {
    * off-list episode numbers, Batch and Unknown rows (see
    * `listedSources` in MediaPage). */
   hideUnlistedSources: boolean;
-  /** Path to the mpv executable; empty = the one on PATH. */
+  /** Path to libmpv-2.dll (or its folder); empty = the bundled one. */
   mpvPath: string;
 }
 
