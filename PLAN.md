@@ -550,13 +550,14 @@ by an app-styled HTML menu whose items depend on what was right-clicked.
 
 ## Release plan (decided 2026-09-29)
 
-Milestones v0.3.2 → v0.4.0 (resume buffer) → v0.5.0 (context menus) →
-v0.6.0 (build thumbnails) → v0.7.0 (HD banners) → v0.8.0 (seek preview) →
-v0.9.0 (contact/logs) are each bumped (`npm run bump`) and tagged **locally
-only** - never pushed, since a pushed `v*` tag triggers
-`.github/workflows/release.yml`. Commits are pushed with plain `git push`
-(no tags). Only **v0.9.0** is pushed, built and published; installs update
-straight from 0.3.1 to 0.9.0.
+Two published releases: **v0.3.2** (the playback fixes) as soon as it passes a
+live test, then **v0.9.0**. The milestones in between - v0.4.0 (resume
+buffer) → v0.5.0 (context menus) → v0.6.0 (build thumbnails) → v0.7.0 (HD
+banners) → v0.8.0 (seek preview) - are each bumped (`npm run bump`) and
+tagged **locally only**, never pushed. Commits are pushed with plain
+`git push` (no tags); `npm run release` pushes only the tag it publishes.
+Installs update 0.3.1 → 0.3.2 → 0.9.0. (Changed 2026-09-29 from "only
+v0.9.0 is published", so the playback fix doesn't wait on the features.)
 
 **Local release script** (GitHub Actions is unavailable: the account is
 billing-locked, 2026-09-29). `npm run release -- --notes "<text>"`
