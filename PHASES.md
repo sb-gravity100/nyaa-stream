@@ -281,7 +281,7 @@
       commit each -
       - [x] enginefs: startup baseline priority 0, raised to 1 once the
             startup buffer verifies (or 15s fallback)
-      - [ ] enginefs: ~4 MB startup window at priority 7 + staggered
+      - [x] enginefs: ~4 MB startup window at priority 7 + staggered
             deadlines; ~4 MB read-ahead at 7 after the first byte
       - [ ] `play_magnet` `watch: first|resume` hint → engine, per file
       - [ ] enginefs: first watch - sequential download from piece 0

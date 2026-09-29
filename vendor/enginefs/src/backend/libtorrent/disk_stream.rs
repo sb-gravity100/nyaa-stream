@@ -6,13 +6,16 @@ use std::task::Poll;
 use std::time::{Duration, Instant};
 
 use crate::backend::priorities::{
-    BLOCKED_REPLAN_INTERVAL_MS, PlaybackIntent, container_metadata_start,
-    disk_backed_forward_window_pieces_for, playback_deadline_step_ms,
+    BLOCKED_REPLAN_INTERVAL_MS, MAX_STARTUP_PIECES, PlaybackIntent, container_metadata_start,
+    disk_backed_forward_window_pieces_for, disk_backed_urgent_pieces, playback_deadline_step_ms,
 };
 use crate::metadata_pins::MetadataPinRegistry;
 use crate::piece_waiter::PieceWaiterRegistry;
 
-const INITIAL_FIRST_BYTE_WINDOW_PIECES: i32 = 3;
+/// (nyaa-stream) Upstream: 3. The pre-first-byte window is now ~4 MB (the
+/// configured DirectInitial/HlsInitial window, byte-capped) - see
+/// `MAX_STARTUP_PIECES`.
+const INITIAL_FIRST_BYTE_WINDOW_PIECES: i32 = MAX_STARTUP_PIECES;
 type PieceReadTask = tokio::task::JoinHandle<std::io::Result<Arc<Vec<u8>>>>;
 
 fn forward_window_end(piece: i32, last_piece: i32, piece_count: i32) -> i32 {
@@ -350,6 +353,14 @@ impl LibtorrentDiskFileStream {
         // it first. The head's current piece remains priority 7; only read-ahead
         // yields. The metadata stream itself keeps full priority; background
         // reads stay at 1.
+        // (nyaa-stream) Otherwise the first ~4 MB of read-ahead
+        // (`disk_backed_urgent_pieces`) stays at 7, not just the current
+        // piece, before and after the first byte.
+        let urgent_pieces = if cues_pending && !is_metadata_stream {
+            1
+        } else {
+            disk_backed_urgent_pieces(self.piece_length)
+        };
         let read_ahead_priority = if matches!(priority_intent, PlaybackIntent::Background) {
             1
         } else if matches!(priority_intent, PlaybackIntent::InternalProbe) {
@@ -375,7 +386,7 @@ impl LibtorrentDiskFileStream {
                 };
                 super::playback::LibtorrentPiecePriority {
                     piece: p,
-                    priority: if distance == 0 {
+                    priority: if distance < urgent_pieces {
                         7
                     } else {
                         read_ahead_priority
@@ -396,6 +407,7 @@ impl LibtorrentDiskFileStream {
             sequential_download,
             forward_window,
             configured_forward_window,
+            urgent_pieces,
             cues_pending,
             deadline_jitter,
             "disk-backed stream priority window configured"
@@ -423,18 +435,24 @@ impl LibtorrentDiskFileStream {
             self.bitrate_bytes_per_sec,
             status.download_rate.max(0) as u64,
         );
+        let pinned_missing = self.pinned_metadata_missing();
+        // (nyaa-stream) Same ~4 MB urgent read-ahead as `prioritize_from`.
+        let urgent_pieces = if pinned_missing.is_empty() {
+            disk_backed_urgent_pieces(self.piece_length)
+        } else {
+            1
+        };
         let mut assignments = (piece..=window_end)
             .filter(|p| piece_is_missing(&presence, piece, *p))
             .map(|p| {
                 let distance = p - piece;
                 super::playback::LibtorrentPiecePriority {
                     piece: p,
-                    priority: if distance == 0 { 7 } else { 4 },
+                    priority: if distance < urgent_pieces { 7 } else { 4 },
                     deadline_ms: Some(distance * deadline_step),
                 }
             })
             .collect::<Vec<_>>();
-        let pinned_missing = self.pinned_metadata_missing();
         self.extend_with_pinned_metadata(&mut assignments, &pinned_missing);
         self.playback_permit.replace_priority_window(assignments);
 

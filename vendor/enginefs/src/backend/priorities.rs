@@ -12,7 +12,11 @@ pub const MAX_DOWNLOAD_RANGE_WINDOW_BYTES: u64 = 32 * 1024 * 1024;
 pub const SMALL_FILE_BYTES: u64 = 64 * 1024 * 1024;
 
 /// Maximum pieces to prioritize before first byte is delivered.
-pub const MAX_STARTUP_PIECES: i32 = 4;
+/// (nyaa-stream) 16 (4 MB at 256 KB pieces; MAX_STARTUP_WINDOW_BYTES caps
+/// larger pieces) instead of upstream's 4: mpv buffers several MB before it
+/// plays, and with a 4-piece window every further piece only became urgent
+/// when the reader reached it, paying the swarm's queue delay each time.
+pub const MAX_STARTUP_PIECES: i32 = 16;
 pub const MAX_SMALL_FILE_STARTUP_PIECES: i32 = 32;
 
 /// Minimum pieces to prioritize before first byte is delivered.
@@ -157,6 +161,14 @@ pub fn disk_backed_forward_window_pieces(intent: PlaybackIntent) -> i32 {
         PlaybackIntent::InternalProbe => 1,
         PlaybackIntent::Background => 1,
     }
+}
+
+/// (nyaa-stream) Pieces ahead of the read position a foreground stream keeps
+/// at priority 7 (with staggered deadlines): ~4 MB, both before the first
+/// byte and as read-ahead after it, so mpv's startup prefill downloads in
+/// parallel instead of one urgent piece at a time.
+pub fn disk_backed_urgent_pieces(piece_length: u64) -> i32 {
+    cap_pieces_by_bytes(MAX_STARTUP_PIECES, piece_length, MAX_STARTUP_WINDOW_BYTES).max(1)
 }
 
 pub fn disk_backed_forward_window_pieces_for(intent: PlaybackIntent, piece_length: u64) -> i32 {
@@ -776,6 +788,36 @@ mod tests {
         assert_eq!(
             disk_backed_file_baseline_priority(PlaybackIntent::DownloadFull),
             7
+        );
+    }
+
+    #[test]
+    fn startup_window_is_four_megabytes_at_priority_seven() {
+        let mut ctx = base_context(PlaybackIntent::DirectInitial);
+        ctx.current_piece = 0;
+        ctx.first_byte_sent = false;
+        ctx.piece_length = 256 * 1024;
+        let decision = PlaybackPriorityPolicy::decide(ctx);
+
+        assert_eq!(decision.hot_window_pieces, 16);
+        assert!(decision.assignments.iter().all(|item| item.piece_priority == 7));
+        // Staggered deadlines: the head first, the rest in order behind it.
+        assert!(
+            decision
+                .assignments
+                .windows(2)
+                .all(|pair| pair[0].deadline < pair[1].deadline)
+        );
+    }
+
+    #[test]
+    fn urgent_read_ahead_is_four_megabytes() {
+        assert_eq!(disk_backed_urgent_pieces(256 * 1024), 16);
+        assert_eq!(disk_backed_urgent_pieces(1024 * 1024), 4);
+        assert_eq!(disk_backed_urgent_pieces(16 * 1024 * 1024), 1);
+        assert_eq!(
+            disk_backed_forward_window_pieces_for(PlaybackIntent::DirectInitial, 256 * 1024),
+            16
         );
     }
 
