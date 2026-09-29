@@ -393,8 +393,8 @@
             `v0.9.0`, push the tag, build + publish the release (first
             published build since v0.3.1)
 - [ ] Local release tooling (see PLAN.md "Release plan"): one commit each -
-      - [ ] `scripts/release.mjs` + `npm run release` (preflight, signed
+      - [x] `scripts/release.mjs` + `npm run release` (preflight, signed
             build, `latest.json`, `gh release create`; `--dry-run`,
             `--skip-build`)
-      - [ ] `release.yml`: manual `workflow_dispatch` trigger only
+      - [x] `release.yml`: manual `workflow_dispatch` trigger only
       - [ ] CLAUDE.md versioning section + FILE_INDEX.md
