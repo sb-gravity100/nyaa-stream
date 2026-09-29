@@ -3,6 +3,7 @@ import Hls from "hls.js";
 import { invoke } from "@tauri-apps/api/core";
 import { isTypingTarget } from "./keyboard";
 import { isFullscreen, setFullscreen, toggleFullscreen, useFullscreen } from "./fullscreen";
+import { isPip, setPip, togglePip, usePip } from "./pip";
 import type { AnimeMedia, NyaaResult, PlayFile, StreamStats, SubtitleTrack } from "./types";
 import { displayTitle, isMovie } from "./types";
 import { getStreamStats, getSubtitleTracks, playMagnet, reportDecoderSupport, stopPlayback } from "./playback";
@@ -22,6 +23,7 @@ import {
   EpisodesIcon,
   ExitFullscreenIcon,
   FullscreenIcon,
+  PipIcon,
   SkipBackIcon,
   SkipForwardIcon,
   MuteIcon,
@@ -276,6 +278,9 @@ export function HlsPlayerView({
    );
    const closePlaylist = useCallback(() => setPlaylistOpen(false), []);
    const fullscreen = useFullscreen();
+   const pip = usePip();
+   // Leaving the player never leaves the window stuck as a mini window.
+   useEffect(() => () => void setPip(false), []);
    // What the <video> element itself has buffered, in episode time - drawn
    // on the seek bar above the transcode's ready ranges.
    const [bufferedRanges, setBufferedRanges] = useState<[number, number][]>([]);
@@ -1106,6 +1111,9 @@ export function HlsPlayerView({
             case "n":
                if (onNext) onNext();
                break;
+            case "p":
+               togglePip();
+               break;
             case "escape":
                if (menu) {
                   setMenu(null);
@@ -1116,7 +1124,8 @@ export function HlsPlayerView({
                   return;
                }
                // Escape leaves fullscreen first, then closes the player.
-               if (isFullscreen()) setFullscreen(false);
+               if (isPip()) void setPip(false);
+               else if (isFullscreen()) setFullscreen(false);
                else onClose();
                return;
             default:
@@ -1742,6 +1751,14 @@ export function HlsPlayerView({
                      <EpisodesIcon />
                   </button>
                )}
+               <button
+                  class={`player-icon-button${pip ? " active" : ""}`}
+                  onClick={togglePip}
+                  aria-label={pip ? "Exit picture-in-picture" : "Picture-in-picture"}
+                  title={`${pip ? "Exit picture-in-picture" : "Picture-in-picture"} (P)`}
+               >
+                  <PipIcon />
+               </button>
                <button
                   class="player-icon-button"
                   onClick={toggleFullscreen}

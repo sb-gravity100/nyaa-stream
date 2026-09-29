@@ -41,7 +41,12 @@ export const FullscreenIcon = (p: IconProps) => (
     <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
   </Svg>
 );
-export const CloseIcon = (p: IconProps) => (
+export const PipIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M4 6h16v12H4zM12 11h6v4h-6z" />
+  </Svg>
+);
+export const CloseIcon =(p: IconProps) => (
   <Svg {...p}>
     <path d="M6 6l12 12M18 6L6 18" />
   </Svg>

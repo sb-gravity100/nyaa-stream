@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow, ProgressBarStatus } from "@tauri-apps/api/window";
 import { isFullscreen, setFullscreen, toggleFullscreen, useFullscreen } from "./fullscreen";
+import { isPip, setPip, togglePip, usePip } from "./pip";
 import { MpvVideo, type Chapter } from "./mpvVideo";
 import { isTypingTarget } from "./keyboard";
 import { ExportDialog, type ExportRequest } from "./ExportDialog";
@@ -25,6 +26,7 @@ import {
   EpisodesIcon,
   ExitFullscreenIcon,
   FullscreenIcon,
+  PipIcon,
   MuteIcon,
   NextIcon,
   SkipBackIcon,
@@ -287,6 +289,9 @@ function MpvPlayerView({
    );
    const closePlaylist = useCallback(() => setPlaylistOpen(false), []);
    const fullscreen = useFullscreen();
+   const pip = usePip();
+   // Leaving the player never leaves the window stuck as a mini window.
+   useEffect(() => () => void setPip(false), []);
    // What mpv has demuxed ahead (instantly seekable), in episode time.
    const [bufferedRanges, setBufferedRanges] = useState<[number, number][]>([]);
    const [showRemaining, setShowRemaining] = useState(() => {
@@ -1315,6 +1320,9 @@ function MpvPlayerView({
             case "\\":
                changeSpeed(0);
                break;
+            case "p":
+               togglePip();
+               break;
             case "escape":
                if (menu) {
                   setMenu(null);
@@ -1325,7 +1333,8 @@ function MpvPlayerView({
                   return;
                }
                // Escape leaves fullscreen first, then closes the player.
-               if (isFullscreen()) setFullscreen(false);
+               if (isPip()) void setPip(false);
+               else if (isFullscreen()) setFullscreen(false);
                else onClose();
                return;
             default:
@@ -2003,6 +2012,14 @@ function MpvPlayerView({
                      <EpisodesIcon />
                   </button>
                )}
+               <button
+                  class={`player-icon-button${pip ? " active" : ""}`}
+                  onClick={togglePip}
+                  aria-label={pip ? "Exit picture-in-picture" : "Picture-in-picture"}
+                  title={`${pip ? "Exit picture-in-picture" : "Picture-in-picture"} (P)`}
+               >
+                  <PipIcon />
+               </button>
                <button
                   class="player-icon-button"
                   onClick={toggleFullscreen}

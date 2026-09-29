@@ -429,6 +429,7 @@ yaa-stream screenshots.">
               <div><dt>E</dt><dd>Export the looped section as MP4</dd></div>
               <div><dt>M</dt><dd>Mute</dd></div>
               <div><dt>F</dt><dd>Fullscreen (anywhere in the app)</dd></div>
+              <div><dt>P</dt><dd>Picture-in-picture (mini always-on-top window)</dd></div>
               <div><dt>Ctrl + C</dt><dd>Copy the current frame</dd></div>
             </dl>
           </section>
