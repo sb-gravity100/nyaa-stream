@@ -322,7 +322,7 @@
       - [x] Capture mpv warn/error log messages (rate limited)
       - [x] Settings: hardware decoding Auto / Off (mpv `hwdec`)
       - [x] Tail prefetch 1% of the file, clamped 4-16 MB
-      - [ ] Vendor libtorrent-sys: whole_pieces_threshold 2, strict end
+      - [x] Vendor libtorrent-sys: whole_pieces_threshold 2, strict end
             game off, request_queue_time 1
       - [ ] Verify live: time from click to first frame, logged before/after
       - [ ] PLAN.md/FILE_INDEX.md sync, `npm run bump -- patch`, tag
