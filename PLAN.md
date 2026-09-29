@@ -918,6 +918,10 @@ never on a fresh install or a normal launch.
   newer than `from` up to it (a skipped release, e.g. 0.3.1 → 0.9.0, shows
   all of them), then clear the marker. A marker whose `to` doesn't match
   (failed install) is cleared silently. Closes with a button or Escape.
+- **Bridge for 0.3.1 and older** (their updater writes no marker): every
+  launch records `nyaa-stream:lastVersion`; with no record yet but existing
+  `nyaa-stream:*` user data, the launch counts as an update from 0.3.1. A
+  fresh install has no data and shows nothing.
 
 **Later (not in v0.3.2):** prefetch the head (~8 MB, then dropped if unused)
 of the most likely source when an episode page opens - depends on A/B.
