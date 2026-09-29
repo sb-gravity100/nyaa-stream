@@ -2,6 +2,11 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `e72d44e` · 2026-09-29 · feat: recent searches in the search dropdown
+- `src/App.css`
+- `src/App.tsx`
+- `src/recentSearches.ts`
+
 ### `711714f` · 2026-09-29 · feat: release badges, seeder health, per-show quality and no-seeder warning
 - `src/App.css`
 - `src/PlayerView.tsx`
