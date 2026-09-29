@@ -2,6 +2,18 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `87cea5c` · 2026-09-29 · feat: rebuild mpv's buffer when corruption is detected
+- `src/mpvVideo.ts`
+- `PHASES.md`
+
+### `8277417` · 2026-09-29 · feat: turn mpv corruption log lines into stream-corrupt events
+- `crates/mpv-player/src/libmpv.rs`
+- `PHASES.md`
+
+### `3f832b8` · 2026-09-29 · docs: plan rebuilding the buffer on corruption
+- `PLAN.md`
+- `PHASES.md`
+
 ### `4a61101` · 2026-09-29 · docs: plan the hero long-title fix
 - `PLAN.md`
 - `PHASES.md`
