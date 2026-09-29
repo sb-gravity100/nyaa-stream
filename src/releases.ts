@@ -115,3 +115,73 @@ export function bestRelease(releases: NyaaResult[], prefs: ReleasePreferences = 
 export function sortReleases(releases: NyaaResult[], prefs: ReleasePreferences = {}): NyaaResult[] {
   return [...releases].sort((a, b) => score(b, prefs) - score(a, prefs));
 }
+
+// ---------------------------------------------------------------- badges
+
+export type BadgeKind = "info" | "good" | "warn";
+
+export interface ReleaseBadge {
+  label: string;
+  kind: BadgeKind;
+}
+
+const BATCH_PATTERN = /\b(batch|complete(?:\s+series)?|season\s*\d*\s*(?:complete|pack))\b|\b\d{2,3}[-~]\d{2,3}\b(?!\s*(?:p|bit|kbps|fps))/i;
+const DUAL_AUDIO_PATTERN = /\b(dual[\s._-]?audio|multi[\s._-]?audio|dubbed)\b/i;
+const TEN_BIT_PATTERN = /\b(10[\s._-]?bit|hi10p?)\b/i;
+const SOURCE_PATTERN = /\b(BD|Blu-?Ray|BDRip|WEB-?DL|WEB-?Rip|DVD)\b/i;
+
+/** Quick-scan facts about a release, read from its title - what makes one
+ * source a better pick than another beyond seeders. */
+export function releaseBadges(release: NyaaResult): ReleaseBadge[] {
+  const title = release.title;
+  const badges: ReleaseBadge[] = [];
+  if (BATCH_PATTERN.test(title)) badges.push({ label: "Batch", kind: "info" });
+  if (DUAL_AUDIO_PATTERN.test(title)) badges.push({ label: "Dual audio", kind: "good" });
+  const source = title.match(SOURCE_PATTERN);
+  if (source) badges.push({ label: source[1].replace(/-/g, "").toUpperCase().replace("BLURAY", "BD"), kind: "info" });
+  const codec = releaseCodec(release);
+  if (codec) badges.push({ label: codec === "hevc" ? "HEVC" : "AV1", kind: "info" });
+  if (TEN_BIT_PATTERN.test(title)) badges.push({ label: "10-bit", kind: "info" });
+  return badges;
+}
+
+export type SeederHealth = "dead" | "weak" | "ok" | "good";
+
+export function seederHealth(seeders: number): SeederHealth {
+  if (seeders <= 0) return "dead";
+  if (seeders < MIN_PREFERRED_SEEDERS) return "weak";
+  if (seeders < 10) return "ok";
+  return "good";
+}
+
+// ------------------------------------------------- per-anime resolution
+
+const RESOLUTION_STORAGE_KEY = "nyaa-stream:preferred-resolutions";
+
+function loadResolutions(): Record<string, PreferredResolution> {
+  try {
+    const raw = localStorage.getItem(RESOLUTION_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch (err) {
+    console.error("[releases] failed to read preferred resolutions", { err });
+    return {};
+  }
+}
+
+/** This show's own quality choice, overriding the global setting. */
+export function getAnimeResolution(animeId: number): PreferredResolution | null {
+  return loadResolutions()[String(animeId)] ?? null;
+}
+
+export function setAnimeResolution(animeId: number, resolution: PreferredResolution | null): void {
+  const all = loadResolutions();
+  if (resolution) all[String(animeId)] = resolution;
+  else delete all[String(animeId)];
+  try {
+    localStorage.setItem(RESOLUTION_STORAGE_KEY, JSON.stringify(all));
+    console.info("[releases] preferred resolution saved", { animeId, resolution });
+  } catch (err) {
+    console.error("[releases] failed to save preferred resolution", { err });
+  }
+}

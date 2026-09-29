@@ -11,7 +11,8 @@ import { displayTitle, isMovie } from "./types";
 import { getStreamStats, playMagnet, stopPlayback } from "./playback";
 import { saveFrameThumbnail } from "./torrentThumbnail";
 import { loadingProgress } from "./loadingProgress";
-import { bestRelease, getPreferredGroup, releaseGroup, releaseResolution, setPreferredGroup, sortReleases } from "./releases";
+import { bestRelease, getAnimeResolution, getPreferredGroup, releaseBadges, releaseGroup, releaseResolution, seederHealth, setAnimeResolution, setPreferredGroup, sortReleases } from "./releases";
+import type { PreferredResolution } from "./settings";
 import { parseEpisode } from "./episodeParser";
 import { Buffering } from "./Buffering";
 import { StatisticsMenu } from "./StatisticsMenu";
@@ -212,9 +213,11 @@ function MpvPlayerView({
    const preferredGroup = settings.rememberFansubGroup
       ? getPreferredGroup(anime.id)
       : null;
+   // This show's own quality choice (source menu) beats the global setting.
+   const [animeResolution, setAnimeResolutionState] = useState(() => getAnimeResolution(anime.id));
    const releasePrefs = {
       preferredGroup,
-      preferredResolution: settings.preferredResolution,
+      preferredResolution: animeResolution ?? settings.preferredResolution,
    };
    const [selectedRelease, setSelectedRelease] = useState<NyaaResult>(() =>
       bestRelease(releases, releasePrefs),
@@ -310,7 +313,7 @@ function MpvPlayerView({
    );
    const sortedReleases = useMemo(
       () => sortReleases(releases, releasePrefs),
-      [releases],
+      [releases, animeResolution],
    );
    const videoFiles = files.filter((f) => f.isVideo);
 
@@ -1368,6 +1371,17 @@ function MpvPlayerView({
             </div>
          )}
 
+         {!error && !hasPlayed && selectedRelease.seeders === 0 && (
+            <div class="player-message player-dead-warning" role="status">
+               <p>This release has no seeders - it may never start.</p>
+               {sortedReleases.length > 1 && (
+                  <button class="button button-quiet" onClick={() => setMenu("sources")}>
+                     Choose another source
+                  </button>
+               )}
+            </div>
+         )}
+
          {/* Large paused glyph - a state indicator, not a control (the
           controls themselves stay bottom-hover only). */}
          {paused && hasPlayed && !error && (
@@ -1546,6 +1560,25 @@ function MpvPlayerView({
                            </div>
                         </>
                      )}
+                     <div class="player-menu-row">
+                        <span>Quality for this show</span>
+                        <select
+                           class="player-menu-select"
+                           value={animeResolution ?? ""}
+                           onChange={(e) => {
+                              const value = (e.target as HTMLSelectElement).value as PreferredResolution | "";
+                              setAnimeResolution(anime.id, value || null);
+                              setAnimeResolutionState(value || null);
+                           }}
+                        >
+                           <option value="">Default ({settings.preferredResolution === "any" ? "most seeded" : `${settings.preferredResolution}p`})</option>
+                           <option value="any">Most seeded</option>
+                           <option value="2160">2160p</option>
+                           <option value="1080">1080p</option>
+                           <option value="720">720p</option>
+                           <option value="480">480p</option>
+                        </select>
+                     </div>
                      <div class="player-menu-title">Source</div>
                      <div class="player-menu-scroll">
                         {sortedReleases.map((r) => {
@@ -1562,9 +1595,16 @@ function MpvPlayerView({
                                  <span class="player-source-title">
                                     {r.title}
                                  </span>
+                                 <span class="release-badges">
+                                    {releaseBadges(r).map((b) => (
+                                       <span key={b.label} class={`release-badge release-badge-${b.kind}`}>
+                                          {b.label}
+                                       </span>
+                                    ))}
+                                 </span>
                                  <span class="player-menu-meta">
-                                    <span class="seeders">
-                                       {r.seeders} seeders
+                                    <span class={`seeders seeders-${seederHealth(r.seeders)}`}>
+                                       {r.seeders === 0 ? "no seeders" : `${r.seeders} seeders`}
                                     </span>{" "}
                                     · {r.size}
                                     {g && g === preferredGroup
