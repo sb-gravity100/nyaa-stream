@@ -1,4 +1,5 @@
-import { useEffect, useRef } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
+import { invoke } from "@tauri-apps/api/core";
 import type { JSX } from "preact";
 import { DEFAULT_SUBTITLE_STYLE, resetSettings, updateSettings, useSettings, type PreferredResolution, type SubtitleStyle } from "./settings";
 import { CloseIcon } from "./icons";
@@ -35,6 +36,79 @@ function Toggle({ checked, onChange, label, hint }: { checked: boolean; onChange
       </span>
       <input type="checkbox" class="switch" checked={checked} onChange={(e) => onChange((e.target as HTMLInputElement).checked)} />
     </label>
+  );
+}
+
+interface CacheSizes {
+  nyaa: number;
+  thumbnails: number;
+  hls: number;
+  torrents: number;
+}
+
+const CACHES: { kind: keyof CacheSizes; label: string; hint: string }[] = [
+  { kind: "nyaa", label: "Search cache", hint: "nyaa.si search results and torrent details" },
+  { kind: "thumbnails", label: "Thumbnails", hint: "Episode thumbnails and Kitsu metadata" },
+  { kind: "hls", label: "Transcoded video (HLS)", hint: "Temporary segments - also cleared on every start and exit" },
+  { kind: "torrents", label: "Downloaded torrent data", hint: "Partial downloads kept so playback resumes quickly" },
+];
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  if (bytes < 1024 ** 3) return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
+  return `${(bytes / 1024 ** 3).toFixed(2)} GB`;
+}
+
+/** Sizes of the on-disk caches with a clear button each. */
+function StorageSection() {
+  const [sizes, setSizes] = useState<CacheSizes | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+
+  async function refresh() {
+    try {
+      setSizes(await invoke<CacheSizes>("get_cache_sizes"));
+    } catch (err) {
+      console.warn("[settings] cache sizes unavailable", { err: String(err) });
+    }
+  }
+
+  useEffect(() => {
+    void refresh();
+  }, []);
+
+  async function clear(kind: keyof CacheSizes) {
+    setBusy(kind);
+    setMessage(null);
+    try {
+      await invoke("clear_cache", { kind });
+    } catch (err) {
+      setMessage(String(err));
+    }
+    await refresh();
+    setBusy(null);
+  }
+
+  if (!sizes) return null;
+  return (
+    <section class="settings-section">
+      <h3>Storage</h3>
+      {CACHES.map(({ kind, label, hint }) => (
+        <div class="setting-row" key={kind}>
+          <span class="setting-text">
+            <span class="setting-label">{label}</span>
+            <span class="setting-hint">{hint}</span>
+          </span>
+          <span class="setting-control">
+            <span class="setting-value">{formatBytes(sizes[kind])}</span>
+            <button class="button button-quiet" disabled={busy != null || sizes[kind] === 0} onClick={() => void clear(kind)}>
+              {busy === kind ? "Clearing…" : "Clear"}
+            </button>
+          </span>
+        </div>
+      ))}
+      {message && <div class="setting-hint">{message}</div>}
+    </section>
   );
 }
 
@@ -135,6 +209,15 @@ export function SettingsPanel({ onClose }: Props) {
               checked={settings.hideUnlistedSources}
               onChange={(v) => updateSettings({ hideUnlistedSources: v })}
             />
+            <Row label="mpv path" hint="Leave empty to use mpv from PATH. Applies the next time a player opens.">
+              <input
+                type="text"
+                class="setting-text-input"
+                placeholder="mpv.exe (or full path)"
+                value={settings.mpvPath}
+                onChange={(e) => updateSettings({ mpvPath: (e.target as HTMLInputElement).value.trim() })}
+              />
+            </Row>
             <Row label="Preferred quality" hint="Used when picking a release automatically">
               <select
                 value={settings.preferredResolution}
@@ -226,6 +309,8 @@ export function SettingsPanel({ onClose }: Props) {
             </div>
           </section>
 
+          <StorageSection />
+
           <section class="settings-section">
             <h3>Player shortcuts</h3>
             <dl class="shortcut-list">
@@ -235,6 +320,10 @@ export function SettingsPanel({ onClose }: Props) {
               <div><dt>C</dt><dd>Cycle subtitles</dd></div>
               <div><dt>Z / X</dt><dd>Subtitle delay −/+ 0.1s</dd></div>
               <div><dt>N</dt><dd>Next episode</dd></div>
+              <div><dt>Shift</dt><dd>Skip the opening</dd></div>
+              <div><dt>{"[ / ] / \\"}</dt><dd>Playback speed slower / faster / reset</dd></div>
+              <div><dt>A</dt><dd>A-B loop: set A, set B, clear</dd></div>
+              <div><dt>E</dt><dd>Export the looped section as MP4</dd></div>
               <div><dt>M</dt><dd>Mute</dd></div>
               <div><dt>F</dt><dd>Fullscreen (anywhere in the app)</dd></div>
               <div><dt>Ctrl + C</dt><dd>Copy the current frame</dd></div>
