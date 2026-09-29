@@ -2,6 +2,25 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `b711df6` · 2026-09-29 · docs: record the seek-bar indicator implementation
+- `PLAN.md`
+- `PHASES.md`
+
+### `dd89523` · 2026-09-29 · feat: show downloaded ranges on the mpv seek bar
+- `src/PlayerView.tsx`
+- `src/App.css`
+
+### `c36a697` · 2026-09-29 · feat: expose downloaded byte ranges in StreamStats
+- `crates/torrent-engine/src/lib.rs`
+- `src/types.ts`
+
+### `757a36c` · 2026-09-29 · feat: report per-file downloaded byte ranges in enginefs stats
+- `vendor/enginefs/src/backend/mod.rs`
+- `vendor/enginefs/src/backend/libtorrent/handle.rs`
+- `vendor/enginefs/src/backend/librqbit.rs`
+- `vendor/enginefs/src/lib.rs`
+- `vendor/enginefs/VENDORED.md`
+
 ### `8f64aa3` · 2026-09-29 · fix: keep 150 MiB of played video in mpv's back buffer
 - `crates/mpv-player/src/embedded.rs`
 - `PHASES.md`
