@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `bad40af` · 2026-09-29 · docs: sync PHASES and FILE_INDEX with new features
+- `FILE_INDEX.md`
+- `PHASES.md`
+
 ### `2f86de2` · 2026-09-29 · feat: library/progress/settings backup export and import
 - `src-tauri/src/cache.rs`
 - `src-tauri/src/lib.rs`
