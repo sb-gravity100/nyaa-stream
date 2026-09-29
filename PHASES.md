@@ -364,8 +364,10 @@
       - [ ] TMDB episode stills as the first episode-thumbnail fallback
             after Kitsu/AniList (split-cour offset correction)
       - [ ] Title logos on the home hero and media page
-      - [ ] Settings: API key overrides + About attribution (TMDB,
-            fanart.tv, Simkl)
+      - [ ] Settings: user-supplied TMDB read access token (Bearer, never
+            logged, not bundled); TMDB steps skipped without one
+      - [ ] About attribution: TMDB logo (`src/assets/tmdb-logo.svg`) +
+            notice, fanart.tv, Simkl; TMDB cache max 6 months
       - [ ] PLAN.md/FILE_INDEX.md sync, `npm run bump -- minor`, tag
             `v0.7.0`
 - [ ] Seek-bar thumbnail preview (v0.8.0, see PLAN.md "Seek-bar thumbnail
