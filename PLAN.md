@@ -888,6 +888,21 @@ chip and the title's first line up under the app bar (`overflow: hidden`).
   (`.home-hero-title.long`) so the carousel's height barely changes between
   slides.
 
+**Rebuild the buffer on corruption** (user request 2026-09-29): a safety net
+behind the fresh-piece fix - the bytes on disk are right later, so
+re-reading heals whatever got through.
+
+- **Detect** in the mpv log capture (`libmpv.rs`): the MKV/lavf demuxer's
+  `Corrupt file detected` / resync, or the video decoder's `error while
+  decoding` / `concealing ... errors`. Not `mmco` errors - A-B loop jumps
+  produce those harmlessly. Matching lines are also sent to the frontend as
+  an IPC-shaped `stream-corrupt` event (prefix, text).
+- **Rebuild** (`MpvVideo`): mpv `drop-buffers` (discards demuxed and decoded
+  data), then an exact seek to the current time through the normal seek
+  path, so mpv re-reads from the playhead.
+- **Guard rails:** at most one rebuild per 5s; after 3 rebuilds within 60s
+  it stops and logs an error rather than looping on a spot that stays bad.
+
 **Later (not in v0.3.2):** prefetch the head (~8 MB, then dropped if unused)
 of the most likely source when an episode page opens - depends on A/B.
 
