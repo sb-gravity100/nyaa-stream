@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `e7236c9` · 2026-09-29 · fix: forward mpv's playlist_entry_id on start-file and end-file
+- `PHASES.md`
+- `crates/mpv-player/src/libmpv.rs`
+
 ### `2a774cc` · 2026-09-29 · fix: reset per-file mpv state in mpv_stop
 - `PHASES.md`
 - `src-tauri/src/player.rs`
