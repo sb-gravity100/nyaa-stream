@@ -2624,40 +2624,6 @@ html.mpv-active .player-view {
   }
 }
 
-/* ---------- Player: center flash ---------- */
-
-.player-flash {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  z-index: 3;
-  display: grid;
-  place-items: center;
-  width: 76px;
-  height: 76px;
-  margin: -38px 0 0 -38px;
-  border-radius: 50%;
-  background: rgba(16, 18, 31, 0.6);
-  color: #fff;
-  pointer-events: none;
-  animation: player-flash 0.55s var(--ease) forwards;
-}
-
-@keyframes player-flash {
-  0% {
-    opacity: 0;
-    transform: scale(0.7);
-  }
-  25% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  100% {
-    opacity: 0;
-    transform: scale(1.25);
-  }
-}
-
 /* ---------- Player: side playlist ---------- */
 
 .player-playlist {

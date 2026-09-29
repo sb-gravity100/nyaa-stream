@@ -26,10 +26,10 @@ import {
   EpisodesIcon,
   ExitFullscreenIcon,
   FullscreenIcon,
-  SkipBackIcon,
-  SkipForwardIcon,
   MuteIcon,
   NextIcon,
+  SkipBackIcon,
+  SkipForwardIcon,
   PauseIcon,
   PlayIcon,
   SourcesIcon,
@@ -272,12 +272,6 @@ function MpvPlayerView({
          return false;
       }
    });
-   // Brief center-screen icon confirming play/pause/skip - `id` restarts
-   // the animation when the same action repeats.
-   const [flash, setFlash] = useState<{
-      kind: "play" | "pause" | "back" | "forward";
-      id: number;
-   } | null>(null);
    const [subtitleTracks, setSubtitleTracks] = useState<SubtitleTrack[]>([]);
    // null = subtitles off.
    const [activeSubtitleIndex, setActiveSubtitleIndex] = useState<
@@ -699,7 +693,6 @@ function MpvPlayerView({
       if (!video || !episodeDuration) return;
       cancelPendingKeyboardSeek();
       setNextCountdown(null);
-      showFlash(deltaSeconds < 0 ? "back" : "forward");
       seekToEpisodeTime(
          Math.min(
             Math.max(
@@ -745,14 +738,9 @@ function MpvPlayerView({
       );
    }
 
-   function showFlash(kind: "play" | "pause" | "back" | "forward") {
-      setFlash({ kind, id: Date.now() });
-   }
-
    function togglePause() {
       const video = videoRef.current;
       if (!video) return;
-      showFlash(video.paused ? "play" : "pause");
       if (video.paused) {
          video.play().catch((err) =>
             console.warn("[player] play failed", { err: String(err) }),
@@ -1078,7 +1066,6 @@ function MpvPlayerView({
       const opening = openingFrom(now);
       const target = opening ? opening.end : Math.min(now + INTRO_SKIP_SECONDS, episodeDuration);
       console.info("[player] skip intro", { from: now, to: target, marked: opening != null });
-      showFlash("forward");
       showToast(opening ? "Skipped opening" : `Skipped ${INTRO_SKIP_SECONDS}s`);
       seekToEpisodeTime(target);
    }
@@ -1222,24 +1209,19 @@ function MpvPlayerView({
             case "k":
                togglePause();
                break;
-            // Arrow skips leave the controls as they are - only the centre
-            // flash marks the jump.
+            // Arrow skips leave the controls as they are.
             case "arrowleft":
                e.preventDefault();
-               showFlash("back");
                seekBy(-SEEK_STEP_SECONDS);
                return;
             case "arrowright":
                e.preventDefault();
-               showFlash("forward");
                seekBy(SEEK_STEP_SECONDS);
                return;
             case "j":
-               showFlash("back");
                seekBy(-SEEK_STEP_SECONDS_LARGE);
                break;
             case "l":
-               showFlash("forward");
                seekBy(SEEK_STEP_SECONDS_LARGE);
                break;
             case "arrowup":
@@ -1513,20 +1495,6 @@ function MpvPlayerView({
          {toast && (
             <div class="player-toast" key={toast}>
                {toast}
-            </div>
-         )}
-
-         {flash && (
-            <div
-               class="player-flash"
-               key={flash.id}
-               aria-hidden="true"
-               onAnimationEnd={() => setFlash(null)}
-            >
-               {flash.kind === "play" && <PlayIcon size={34} />}
-               {flash.kind === "pause" && <PauseIcon size={34} />}
-               {flash.kind === "back" && <SkipBackIcon size={34} />}
-               {flash.kind === "forward" && <SkipForwardIcon size={34} />}
             </div>
          )}
 
