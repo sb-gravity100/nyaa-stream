@@ -2,6 +2,11 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `a921784` · 2026-09-29 · fix: grow the home hero to fit long titles
+- `src/App.css`
+- `src/HomePage.tsx`
+- `PHASES.md`
+
 ### `87cea5c` · 2026-09-29 · feat: rebuild mpv's buffer when corruption is detected
 - `src/mpvVideo.ts`
 - `PHASES.md`
