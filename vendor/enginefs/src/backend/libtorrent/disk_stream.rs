@@ -534,10 +534,14 @@ impl LibtorrentDiskFileStream {
             } else {
                 verified_bytes_estimate.div_ceil(self.piece_length) as usize
             };
+            // (nyaa-stream) The window `prioritize_from` actually uses: the
+            // effective intent (sequential after the first byte), not the
+            // stream's original one - upstream logged the latter's window.
+            let priority_intent = self.priority_intent();
             let configured_forward_window =
-                disk_backed_forward_window_pieces_for(self.playback_intent, self.piece_length);
+                disk_backed_forward_window_pieces_for(priority_intent, self.piece_length);
             let active_forward_window =
-                self.active_forward_window(self.playback_intent, configured_forward_window);
+                self.active_forward_window(priority_intent, configured_forward_window);
             let cluster_end = forward_window_end(piece, self.last_piece, active_forward_window);
             let active_presence = self.handle.piece_presence(piece, cluster_end);
             let ready_in_active_window = active_presence
@@ -556,6 +560,7 @@ impl LibtorrentDiskFileStream {
                 file_idx = self.file_idx,
                 file_path = %self.display_path,
                 intent = ?self.playback_intent,
+                priority_intent = ?priority_intent,
                 piece,
                 pos = self.current_pos,
                 request_offset_percent,
