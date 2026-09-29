@@ -923,6 +923,21 @@ never on a fresh install or a normal launch.
   `nyaa-stream:*` user data, the launch counts as an update from 0.3.1. A
   fresh install has no data and shows nothing.
 
+**Splash screen** (user request 2026-09-29, "startup was pretty slow"). The
+log of that launch: the Rust side was ready 0.5s in, but the page's first
+script ran 32s later - Vite's dev server serving unbundled modules after a
+fresh start (a release build loads one bundle from disk). A splash covers
+that gap, and the first moments of a release launch.
+
+- Inline in `index.html` (markup + CSS, no JS), so it paints before any
+  script: the BrandMark cat head on the app background, a looping animation
+  (head bob + ear twitch, a light sweep across the logo, the play triangle
+  pulsing, a sakura arc orbiting it, a few drifting petals, a breathing
+  glow) and the nyaastream wordmark. Always animates (no reduced-motion
+  switch, per the project's convention).
+- `main.tsx` fades it out (0.45s) two frames after the first render, then
+  removes it.
+
 **Later (not in v0.3.2):** prefetch the head (~8 MB, then dropped if unused)
 of the most likely source when an episode page opens - depends on A/B.
 
