@@ -12,10 +12,26 @@
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "nyaa-stream",
         "width": 1100,
         "height": 720,
-        "maximized": true
+        "maximized": true,
+        "visible": false
+      },
+      {
+        "label": "splash",
+        "title": "nyaa-stream",
+        "url": "splash.html",
+        "width": 360,
+        "height": 400,
+        "center": true,
+        "decorations": false,
+        "resizable": false,
+        "maximizable": false,
+        "minimizable": false,
+        "skipTaskbar": true,
+        "alwaysOnTop": true
       }
     ],
     "security": {

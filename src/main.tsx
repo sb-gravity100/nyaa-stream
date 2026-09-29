@@ -1,4 +1,5 @@
 import { render } from "preact";
+import { invoke } from "@tauri-apps/api/core";
 import "@fontsource/zen-kaku-gothic-new/400.css";
 import "@fontsource/zen-kaku-gothic-new/700.css";
 // Display face for headings, titles and UI labels (Latin only - Japanese
@@ -19,15 +20,11 @@ render(
   document.getElementById("root")!,
 );
 
-// The inline splash (index.html) covers loading; fade it out once the app
-// has painted its first frame.
-const splash = document.getElementById("splash");
-if (splash) {
-  requestAnimationFrame(() =>
-    requestAnimationFrame(() => {
-      console.debug("[splash] app painted, fading out");
-      splash.classList.add("splash-done");
-      window.setTimeout(() => splash.remove(), 500);
-    }),
-  );
-}
+// The native splash window covers loading; once the app has painted its
+// first frame, app_ready shows the main window and closes the splash.
+requestAnimationFrame(() =>
+  requestAnimationFrame(() => {
+    console.debug("[splash] app painted, calling app_ready");
+    invoke("app_ready").catch((err) => console.warn("[splash] app_ready failed", { err: String(err) }));
+  }),
+);
