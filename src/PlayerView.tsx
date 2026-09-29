@@ -1963,7 +1963,7 @@ function MpvPlayerView({
                      setMenu((m) => (m === "subtitles" ? null : "subtitles"));
                   }}
                   aria-label="Subtitles"
-                  title="Subtitles (C to cycle, Z/X delay)"
+                  title="Subtitles (C toggle, C + scroll switch track, -/+ delay)"
                >
                   <SubtitlesIcon />
                </button>
