@@ -83,7 +83,7 @@ impl MpvPlayer {
             // Without a real video/audio output consuming frames, mpv
             // otherwise decides almost immediately that there's
             // "nothing to do" and quits as if it hit EOF - verified
-            // live (see mpv-ipc's screenshot_test example): playback
+            // live (see mpv-player's screenshot_test example): playback
             // position stayed at 0 and the process exited within ~2s
             // without this flag, even against a normal, fully seekable
             // remote file.

@@ -3,7 +3,7 @@
 ## Phase 0 — Scaffolding (done)
 - [x] Tauri + Preact-TS project scaffolded
 - [x] Cargo workspace with `torrent-engine`, `nyaa-client`, `anilist-client`,
-      `mpv-ipc` crates
+      `mpv-player` crates
 - [x] `reference/stremio-core` cloned for architecture reference
 - [x] Tauri commands wired: `search_anime`, `search_torrents`,
       `play_magnet`, `set_pause`
@@ -202,7 +202,7 @@
       (`capture_torrent_thumbnail`, headless mpv + on-disk cache) for shows
       neither metadata source has art for
 - [x] Torrent-captured thumbnails seek to roughly the episode's midpoint
-      (mpv-ipc's `spawn_headless` gained a `start_seconds`/`--start` param)
+      (mpv-player's `spawn_headless` gained a `start_seconds`/`--start` param)
       instead of a fixed early point, using the same AniList duration
       estimate the HLS playlist uses - avoids grabbing an early cold-open/
       logo frame. Falls back to the old fixed-early-point behavior when no

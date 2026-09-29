@@ -108,7 +108,7 @@ full architecture; summary:
   streaming HTTP server with Range support
 - `crates/nyaa-client` — nyaa.si search via RSS
 - `crates/anilist-client` — AniList GraphQL metadata client
-- `crates/mpv-ipc` — system `mpv` over JSON IPC: `EmbeddedMpv` (playback)
+- `crates/mpv-player` — system `mpv` over JSON IPC: `EmbeddedMpv` (playback)
   and headless `MpvPlayer` (torrent-thumbnail capture); requires `mpv` on
   PATH
 - Real playback is the system mpv embedded in the app window (`--wid`,

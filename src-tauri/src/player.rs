@@ -8,7 +8,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use mpv_ipc::EmbeddedMpv;
+use mpv_player::EmbeddedMpv;
 use serde_json::Value;
 use tauri::webview::Color;
 use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow};
@@ -23,7 +23,7 @@ pub struct PlayerState {
 /// without it. The frontend asks once per run (and again when the path override changes).
 #[tauri::command]
 pub async fn mpv_available() -> bool {
-    let mut command = tokio::process::Command::new(mpv_ipc::mpv_program());
+    let mut command = tokio::process::Command::new(mpv_player::mpv_program());
     #[cfg(windows)]
     command.creation_flags(0x0800_0000);
     let found = command
@@ -44,7 +44,7 @@ pub async fn mpv_available() -> bool {
 pub fn set_mpv_path(path: Option<String>) {
     let path = path.map(|p| p.trim().to_string()).filter(|p| !p.is_empty());
     tracing::debug!(?path, "set_mpv_path invoked");
-    mpv_ipc::set_mpv_path(path.map(std::path::PathBuf::from));
+    mpv_player::set_mpv_path(path.map(std::path::PathBuf::from));
 }
 
 /// Starts mpv inside the window if it isn't running yet and makes the
@@ -125,7 +125,7 @@ pub async fn mpv_stop(window: WebviewWindow, state: State<'_, PlayerState>) -> R
 }
 
 /// Longest side of the last-frame thumbnail - matches the headless
-/// capture's width (mpv-ipc's `THUMBNAIL_WIDTH`), both feeding 16:9 cards.
+/// capture's width (mpv-player's `THUMBNAIL_WIDTH`), both feeding 16:9 cards.
 const THUMBNAIL_WIDTH: u32 = 640;
 
 /// The current video frame (no subtitles) as a JPEG `width` pixels wide -
