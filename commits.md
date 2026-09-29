@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `cd1b10e` · 2026-09-29 · fix: log the effective window in the waiting-piece diagnostic
+- `PHASES.md`
+- `vendor/enginefs/src/backend/libtorrent/disk_stream.rs`
+
 ### `27ed9a8` · 2026-09-29 · fix: re-anchor continue-watch mode at a seek into undownloaded data
 - `PHASES.md`
 - `vendor/enginefs/src/backend/libtorrent/disk_stream.rs`
