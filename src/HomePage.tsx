@@ -3,6 +3,7 @@ import { displayTitle, type AiringEntry, type AnimeMedia, type KitsuMetadata } f
 import { continueWatching, dismissContinueWatching, isEpisodeWatched, libraryStats, subscribeProgress, type ProgressEntry } from "./watchProgress";
 import { PlayIcon, SearchIcon } from "./icons";
 import { cachedTorrentThumbnail, subscribeFrameSaved } from "./torrentThumbnail";
+import { useEnhancedImage } from "./enhanceImage";
 
 interface Props {
   library: AnimeMedia[];
@@ -92,6 +93,7 @@ function Hero({
   onSelect: (index: number) => void;
   onHoverChange: (hovering: boolean) => void;
 }) {
+  const art = useEnhancedImage(featured?.art);
   if (!featured) {
     return (
       <section class="home-hero home-hero-empty">
@@ -111,7 +113,7 @@ function Hero({
   const title = displayTitle(anime.title);
   return (
     <section class="home-hero" key={anime.id} onMouseEnter={() => onHoverChange(true)} onMouseLeave={() => onHoverChange(false)} onFocusIn={() => onHoverChange(true)} onFocusOut={() => onHoverChange(false)}>
-      {featured.art && <img class="home-hero-art" src={featured.art} alt="" />}
+      {art && <img class="home-hero-art" src={art} alt="" />}
       <div class="home-hero-body">
         <div class="home-hero-reason">{featured.reason}</div>
         <h1 class="home-hero-title">{title}</h1>
