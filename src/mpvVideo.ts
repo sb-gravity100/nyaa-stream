@@ -28,7 +28,17 @@ interface MpvEvent {
    file_error?: string;
    /** mpv's playlist entry of a `start-file`/`end-file`. */
    playlist_entry_id?: number;
+   /** `stream-corrupt`: the mpv log line's module and text. */
+   prefix?: string;
+   text?: string;
 }
+
+/** Buffer rebuilds on corruption: at most one per REBUILD_MIN_GAP_MS, and
+ * none after REBUILD_LIMIT within REBUILD_WINDOW_MS (a spot that stays bad
+ * isn't retried forever). */
+const REBUILD_MIN_GAP_MS = 5_000;
+const REBUILD_WINDOW_MS = 60_000;
+const REBUILD_LIMIT = 3;
 
 /** Properties mirrored from mpv (observe ids are their index + 1). */
 const OBSERVED = [
@@ -85,6 +95,8 @@ export class MpvVideo extends EventTarget {
    private lastTimeUpdate = 0;
    /** Target of the seek mpv is working on - newer ones wait for it. */
    private seekTarget: number | null = null;
+   /** When recent corruption rebuilds ran (see `rebuildBuffer`). */
+   private rebuilds: number[] = [];
    private pendingSeek: number | null = null;
    private seekReleaseTimer: number | undefined;
    /** Positions dropped during the current seek (debug logging). */
@@ -127,6 +139,7 @@ export class MpvVideo extends EventTarget {
       for (const name of FILE_PROPERTIES) delete this.props[name];
       this.seekTarget = null;
       this.pendingSeek = null;
+      this.rebuilds = [];
       await command(["set_property", "start", start != null && start > 0 ? String(start) : "none"]);
       await command(["set_property", "pause", false]);
       // The previous close froze (muted) mpv - see `freeze`.
@@ -222,6 +235,38 @@ export class MpvVideo extends EventTarget {
          // waiting on the new position's pieces (seen on a 20:31 click).
          if (this.pendingSeek != null) this.releaseSeek();
       }, SEEK_RELEASE_MS);
+   }
+
+   /** Corrupt bytes or video reached mpv (its demuxer resynced or the
+    * decoder concealed errors): drop everything mpv has buffered and seek
+    * to the current time, so it re-reads from the playhead - the torrent
+    * serves those pieces correctly by now. Rate limited. */
+   private async rebuildBuffer(e: MpvEvent) {
+      const now = performance.now();
+      if (!this.loaded) return;
+      if (this.seekingTo != null) {
+         console.debug("[mpv] corruption during a seek, the seek re-reads anyway", { text: e.text });
+         return;
+      }
+      this.rebuilds = this.rebuilds.filter((at) => now - at < REBUILD_WINDOW_MS);
+      const last = this.rebuilds[this.rebuilds.length - 1];
+      if (last != null && now - last < REBUILD_MIN_GAP_MS) {
+         console.debug("[mpv] corruption right after a rebuild, skipped", { text: e.text });
+         return;
+      }
+      if (this.rebuilds.length >= REBUILD_LIMIT) {
+         console.error("[mpv] corruption keeps coming back, not rebuilding again", { rebuilds: this.rebuilds.length, prefix: e.prefix, text: e.text });
+         return;
+      }
+      this.rebuilds.push(now);
+      const at = this.currentTime;
+      console.warn("[mpv] corruption detected, rebuilding the buffer", { at, prefix: e.prefix, text: e.text });
+      try {
+         await command(["drop-buffers"]);
+      } catch (err) {
+         console.warn("[mpv] drop-buffers failed", { err: String(err) });
+      }
+      this.currentTime = at;
    }
 
    private releaseSeek() {
@@ -434,6 +479,9 @@ export class MpvVideo extends EventTarget {
                this.entryId = e.playlist_entry_id;
                console.debug("[mpv] start-file", { entryId: this.entryId });
             }
+            return;
+         case "stream-corrupt":
+            void this.rebuildBuffer(e);
             return;
          case "end-file":
             if (!this.isCurrentEntry(e.playlist_entry_id)) {
