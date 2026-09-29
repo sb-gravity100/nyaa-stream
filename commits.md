@@ -2,6 +2,12 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `0c067c1` · 2026-09-29 · chore: link dev builds with rust-lld
+- `.cargo/config.toml`
+- `scripts/release.mjs`
+- `PLAN.md`
+- `PHASES.md`
+
 ### `1530ecc` · 2026-09-29 · chore: trim dev-profile debug info
 - `Cargo.toml`
 
