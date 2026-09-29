@@ -252,7 +252,22 @@
 - [x] Settings panel (`SettingsPanel.tsx`/`settings.ts`): resume, autoplay
       next, sticky fansub group, preferred quality, subtitle default
       on/language, default subtitle style with live preview
-- [ ] Settings still missing: mpv/ffmpeg path override, download directory
+- [x] Settings: mpv path override (`set_mpv_path`), storage section (cache
+      sizes + clear per cache), library/progress/settings backup
+      export/import (Documents/nyaa-stream-backup.json)
+- [ ] Settings still missing: ffmpeg path override, download directory
+- [x] Player: playback speed (`[`/`]`/`\`), chapter marks on the seek bar,
+      skip opening (Shift; chapter-aware, else +85s), audio track + audio
+      delay in the subtitle menu, A-B loop (`A`) with MP4 clip export
+      (`E`; NVENC H.264 + AAC via `export_clip`), media keys (global
+      shortcuts while the player is open), Windows taskbar progress
+- [x] HLS segment cache purged on startup and exit
+- [x] Search/sources: lazy-loaded dropdown results, recent searches,
+      release badges (batch/dual audio/source/codec/10-bit), seeder health,
+      per-show quality override, no-seeders warning
+- [x] Home/library: hero cycles through candidates, library sort/filter,
+      watched-count badge + new-episode dot, dismiss from Continue
+      watching, airing countdown, mark-all-previous-watched
 - [ ] mpv player: restore the ambient dock tint and lifting bottom
       subtitles above the visible dock (both depended on reading/moving
       the `<video>` picture)
