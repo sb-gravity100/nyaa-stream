@@ -57,15 +57,17 @@ pub struct CacheSizes {
 
 /// Bytes each cache occupies, for Settings.
 #[tauri::command]
-pub async fn get_cache_sizes() -> Result<CacheSizes, String> {
+pub async fn get_cache_sizes(state: State<'_, Arc<AppState>>) -> Result<CacheSizes, String> {
     tracing::debug!("get_cache_sizes invoked");
-    tokio::task::spawn_blocking(|| {
+    let app = state.inner().clone();
+    tokio::task::spawn_blocking(move || {
         let root = root();
         CacheSizes {
             nyaa: dir_size(&root.join("nyaa_cache")),
             thumbnails: dir_size(&root.join("thumbnails")),
             hls: dir_size(&hls_dir()),
-            torrents: dir_size(&root.join("downloads")) + dir_size(&root.join("engine_cache")),
+            // Allocated bytes - the download cache's files are sparse.
+            torrents: app.download_cache.status().0 + dir_size(&root.join("engine_cache")),
         }
     })
     .await
@@ -81,14 +83,30 @@ pub async fn clear_cache(state: State<'_, Arc<AppState>>, kind: String) -> Resul
     let dirs: Vec<PathBuf> = match kind.as_str() {
         "nyaa" => vec![root.join("nyaa_cache")],
         "thumbnails" => vec![root.join("thumbnails")],
-        "hls" | "torrents" => {
+        "hls" => {
             if state.current_torrent.lock().await.is_some() {
                 return Err("Stop playback first - this cache is in use.".into());
             }
-            if kind == "hls" {
-                vec![hls_dir()]
+            vec![hls_dir()]
+        }
+        // Everything but the playing torrent (see download_cache::clear).
+        "torrents" => {
+            let playing = state.current_torrent.lock().await.clone();
+            let app = state.inner().clone();
+            let cleared = tokio::task::spawn_blocking({
+                let playing = playing.clone();
+                move || app.download_cache.clear(playing.as_deref())
+            })
+            .await
+            .map_err(|err| err.to_string())?;
+            if let Err(err) = cleared {
+                tracing::warn!(%err, "download cache partly cleared");
+                return Err(format!("Some downloads couldn't be deleted: {err}"));
+            }
+            if playing.is_some() {
+                Vec::new()
             } else {
-                vec![root.join("downloads"), root.join("engine_cache")]
+                vec![root.join("engine_cache")]
             }
         }
         other => return Err(format!("unknown cache {other}")),

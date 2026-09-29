@@ -899,6 +899,37 @@ async fn set_download_cache_keep(state: State<'_, Arc<AppState>>, episodes: Vec<
     .map_err(|err| err.to_string())
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DownloadCacheStatus {
+    used_bytes: u64,
+    limit_bytes: u64,
+    entries: usize,
+}
+
+/// Download cache usage and cap, for Settings.
+#[tauri::command]
+async fn download_cache_status(state: State<'_, Arc<AppState>>) -> Result<DownloadCacheStatus, String> {
+    tracing::debug!("download_cache_status invoked");
+    let app = state.inner().clone();
+    let (used_bytes, limit_bytes, entries) = tokio::task::spawn_blocking(move || app.download_cache.status()).await.map_err(|err| err.to_string())?;
+    Ok(DownloadCacheStatus { used_bytes, limit_bytes, entries })
+}
+
+/// Sets the download cache cap (bytes, 0 = delete on stop) and trims to it.
+#[tauri::command]
+async fn set_download_cache_limit(state: State<'_, Arc<AppState>>, limit_bytes: u64) -> Result<(), String> {
+    tracing::debug!(limit_bytes, "set_download_cache_limit invoked");
+    let playing = state.current_torrent.lock().await.clone();
+    let app = state.inner().clone();
+    tokio::task::spawn_blocking(move || {
+        app.download_cache.set_limit(limit_bytes);
+        app.download_cache.evict(playing.as_deref(), false, "limit changed");
+    })
+    .await
+    .map_err(|err| err.to_string())
+}
+
 /// How long libtorrent may keep a removed torrent's files open.
 const FILE_RELEASE_DELAY: Duration = Duration::from_secs(2);
 
@@ -1376,6 +1407,8 @@ pub fn run() {
             cache::get_cache_sizes,
             cache::clear_cache,
             set_download_cache_keep,
+            download_cache_status,
+            set_download_cache_limit,
             cache::export_backup,
             cache::import_backup,
             player::mpv_available,
