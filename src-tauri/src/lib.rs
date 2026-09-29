@@ -13,7 +13,7 @@ use kitsu_client::{KitsuClient, KitsuMetadata};
 use mpv_player::MpvPlayer;
 use nyaa_client::{Category, NyaaClient, NyaaResult, TorrentDetails};
 use serde::Serialize;
-use tauri::State;
+use tauri::{Manager, State};
 use tokio::sync::Mutex;
 use torrent_engine::{largest_video_file, DecoderSupport, StreamStats, SubtitleTrack, TorrentEngine, TorrentFile, TorrentId};
 
@@ -1192,6 +1192,32 @@ fn init_logging() {
     tracing::info!(dir = %log_dir().display(), "logging initialised");
 }
 
+/// Swaps the splash window for the main one. Idempotent: called by the
+/// frontend's `app_ready` and by the startup fallback timer.
+fn show_main_window(app: &tauri::AppHandle) {
+    if let Some(splash) = app.get_webview_window("splash") {
+        tracing::debug!("closing splash window");
+        if let Err(err) = splash.close() {
+            tracing::warn!(%err, "failed to close splash window");
+        }
+    }
+    match app.get_webview_window("main") {
+        Some(main) => {
+            tracing::info!("showing main window");
+            if let Err(err) = main.show().and_then(|_| main.set_focus()) {
+                tracing::error!(%err, "failed to show main window");
+            }
+        }
+        None => tracing::error!("main window missing in show_main_window"),
+    }
+}
+
+#[tauri::command]
+fn app_ready(app: tauri::AppHandle) {
+    tracing::info!("app_ready received");
+    show_main_window(&app);
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     init_logging();
@@ -1247,6 +1273,20 @@ pub fn run() {
         .plugin(media_keys::plugin())
         .manage(app_state.clone())
         .manage(player::PlayerState::default())
+        .setup(|app| {
+            // A broken page must not leave the app invisible: show the main
+            // window anyway if app_ready never arrives.
+            let handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                tokio::time::sleep(Duration::from_secs(20)).await;
+                let hidden = handle.get_webview_window("main").and_then(|w| w.is_visible().ok()) == Some(false);
+                if hidden {
+                    tracing::warn!("app_ready not received within 20s, showing main window anyway");
+                    show_main_window(&handle);
+                }
+            });
+            Ok(())
+        })
         // The embedded mpv is pre-spawned only after the page has loaded:
         // spawning it into the window at launch, while WebView2 was still
         // initializing there, delayed the page by up to ~34s (vs 0.5-2s).
@@ -1261,6 +1301,7 @@ pub fn run() {
             tauri::async_runtime::spawn_blocking(move || responder.respond(thumbnail_protocol(&state, &request)));
         })
         .invoke_handler(tauri::generate_handler![
+            app_ready,
             log_frontend,
             search_anime,
             get_anime_details,
