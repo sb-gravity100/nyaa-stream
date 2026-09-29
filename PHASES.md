@@ -455,6 +455,19 @@
       - [ ] PLAN.md/FILE_INDEX.md sync, `npm run bump -- minor`, tag
             `v0.8.0`, push the tag, build + publish the release (see PLAN.md
             "Release plan")
+- [ ] Multiplatform: Linux (v0.9.x betas, v1.0.0, see PLAN.md
+      "Multiplatform"): one commit each -
+      - [ ] Audit `cfg(windows)`/`wid`/`.dll` uses; list what needs a Linux twin
+      - [ ] `cargo check --workspace` + `npm run build` on Linux (v0.9.0)
+      - [ ] Runtime-load `libmpv.so.2`; embed mpv via X11 `wid` (XWayland)
+      - [ ] vcpkg `x64-linux` FFmpeg build; Build prerequisites for Linux
+      - [ ] Media keys (MPRIS), subtitle fonts, data/log/cache paths per OS
+      - [ ] AppImage + .deb bundling; updater `linux-x86_64` in `latest.json`
+      - [ ] `scripts/release.mjs`: per-platform build, merged `latest.json`
+      - [ ] Linux QA pass: playback, subs, resume, updater (v0.9.x, local tags)
+      - [ ] CI matrix (windows + ubuntu) once GitHub Actions is available
+      - [ ] PLAN.md/FILE_INDEX.md sync, `npm run bump -- major`, tag
+            `v1.0.0`, push the tag, build + publish both platforms
 - [ ] Local release tooling (see PLAN.md "Release plan"): one commit each -
       - [x] `scripts/release.mjs` + `npm run release` (preflight, signed
             build, `latest.json`, `gh release create`; `--dry-run`,

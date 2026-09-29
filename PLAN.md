@@ -552,16 +552,17 @@ by an app-styled HTML menu whose items depend on what was right-clicked.
 
 ## Release plan (decided 2026-09-29)
 
-Three published releases: **v0.3.2** (the playback fixes) as soon as it
+Four published releases: **v0.3.2** (the playback fixes) as soon as it
 passes a live test, **v0.4.0** (splash/title bar, download cache, resume
-buffer, contact and send logs), then **v0.8.0**. The milestones in between -
-v0.5.0 (context menus) → v0.6.0 (build thumbnails) → v0.7.0 (HD banners) -
-are each bumped (`npm run bump`) and tagged **locally only**, never pushed.
+buffer, contact and send logs), **v0.8.0**, then **v1.0.0** (the Windows +
+Linux debut). The milestones in between - v0.5.0 (context menus) → v0.6.0
+(build thumbnails) → v0.7.0 (HD banners), and the v0.9.x Linux betas - are
+each bumped (`npm run bump`) and tagged **locally only**, never pushed.
 Commits are pushed with plain `git push` (no tags); `npm run release` pushes
-only the tag it publishes. Installs update 0.3.1 → 0.3.2 → 0.4.0 → 0.8.0.
-(Changed 2026-09-29 from "only v0.9.0 is published", so the playback fix
-doesn't wait on the features; contact/logs moved from v0.9.0 to v0.4.0, and
-v0.9.0 dropped, so v0.4.0 is published and v0.8.0 is the last milestone.)
+only the tag it publishes. Installs update 0.3.1 → 0.3.2 → 0.4.0 → 0.8.0 →
+1.0.0. (Changed 2026-09-29 from "only v0.9.0 is published", so the playback
+fix doesn't wait on the features; contact/logs moved from v0.9.0 to v0.4.0;
+multiplatform added as v0.9.x → v1.0.0.)
 
 **Local release script** (GitHub Actions is unavailable: the account is
 billing-locked, 2026-09-29). `npm run release -- --notes "<text>"`
@@ -1288,6 +1289,41 @@ yaa-stream\logs`, the last 7 daily files) plus a
   public. Tokens are never logged in the first place (logging rules + TMDB
   token plan), so none can leak.
 - Logged: button presses, zip path and size, failures.
+
+## Multiplatform: Windows + Linux (planned, v0.9.x betas, v1.0.0 debut)
+
+v1.0.0 is the multiplatform debut: Windows (already supported) and Linux
+(x86_64). macOS is out of scope for 1.0.0 - mpv can't be embedded into a
+Tauri window there without a render-API rewrite; revisit after 1.0.0.
+Work starts after v0.8.0; v0.5.0-v0.8.0 stay Windows-only as planned.
+
+Windows-specific surface (a grep of `cfg(windows)`/`wid`/`.dll` finds it
+concentrated in `src-tauri/src/player.rs`, `crates/mpv-player/src/{libmpv,
+embedded}.rs`, plus bundling/updater config), so the port is mostly there:
+
+- **mpv embedding**: `wid` from the Tauri window handle on Windows; on Linux
+  the X11 window id (`wid`) under X11/XWayland. Native Wayland has no `wid`:
+  1.0.0 forces `GDK_BACKEND=x11` for the app (XWayland) - decide if a
+  render-API path is needed after testing. Keep the transparent *webview*
+  background layering; verify click input on WebKitGTK.
+- **libmpv loading**: runtime-load `libmpv.so.2` (system package, or bundled
+  in the AppImage) instead of `libmpv-2.dll`; `src-tauri/lib/` layout per OS.
+- **FFmpeg**: vcpkg triplet for Linux (`x64-linux`), still LGPL-only; the
+  build prerequisites in "Build prerequisites" get a Linux section.
+- **Media keys, fonts, paths**: gate Windows-only pieces behind
+  `cfg(windows)` with a Linux implementation (MPRIS for media keys via the
+  existing media-keys module), bundled subtitle fonts installed for mpv via
+  fontconfig dir, Downloads/logs/cache paths through `dirs`, not `%APPDATA%`.
+- **Packaging/updater**: AppImage (updater-capable) + .deb; `latest.json`
+  gains `linux-x86_64`; `scripts/release.mjs` builds per platform and merges
+  platform entries (Linux built on a Linux machine or CI - GitHub Actions is
+  billing-locked, so either fix billing or build on a Linux box/WSL2).
+- **Cross-platform CI**: `cargo check --workspace` on windows + ubuntu once
+  Actions is available.
+
+Milestones: **v0.9.0** = the app compiles and plays on Linux (dev build);
+**v0.9.x** = packaging, updater and Linux QA betas (local-only tags);
+**v1.0.0** = both platforms verified live, published.
 
 ## Dev build speed (tooling, no version bump)
 
