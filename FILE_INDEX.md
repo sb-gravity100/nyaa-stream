@@ -6,6 +6,7 @@
 | `package.json` | Frontend deps + Tauri CLI scripts | frontend, config |
 | `scripts/bump-version.mjs` | `npm run bump -- patch\|minor\|major\|x.y.z`: sets the app version in `package.json`, `tauri.conf.json` and `src-tauri/Cargo.toml` together; release = commit + `vX.Y.Z` git tag | config, release |
 | `.githooks/pre-commit` | Non-blocking reminder to bump the version when code changed since the latest tag (enable: `git config core.hooksPath .githooks`) | config, release |
+| `scripts/fetch-native-deps.mjs` | `npm run setup`: downloads + checksum-verifies + extracts the prebuilt native libs (`native-deps-v1` release asset) into `vcpkg_installed/`, replacing a local vcpkg build | build-config, setup |
 | `scripts/make-installer-art.ps1`, `src-tauri/installer/{banner,dialog}.bmp` | Renders the MSI (WiX) banner + welcome-dialog artwork from the app icon and brand colors (System.Drawing); wired in via `bundle.windows.wix` in `tauri.conf.json` | config, release, installer |
 | `README.md` | Public overview: features, stack, build prerequisites, release steps | docs |
 | `PLAN.md` | Stack, architecture, data flow, known gaps | docs |
