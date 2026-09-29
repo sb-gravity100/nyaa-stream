@@ -154,6 +154,14 @@ impl TorrentHandleTrait for LibtorrentTorrentHandle {
                     downloaded,
                     // Use C++ calculated progress which comes from file_progress()
                     progress: f.progress as f64,
+                    downloaded_ranges: crate::backend::file_downloaded_ranges(
+                        &piece_presence,
+                        f.first_piece,
+                        f.last_piece,
+                        piece_length,
+                        file_offset,
+                        f.size as u64,
+                    ),
                 }
             })
             .collect();

@@ -224,6 +224,47 @@ pub struct StatsFile {
     pub downloaded: u64,
     /// Progress 0.0 to 1.0 (from C++ file_progress)
     pub progress: f64,
+    /// Verified byte runs `[start, end)` relative to the file start, merged
+    /// (local change: the seek bar's "downloaded" layer). Empty when the
+    /// backend can't tell.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub downloaded_ranges: Vec<(u64, u64)>,
+}
+
+/// Merges the verified pieces `first..=last` of a file at `file_offset`
+/// (torrent-absolute) into file-relative `[start, end)` byte runs.
+pub fn file_downloaded_ranges(
+    piece_presence: &[u8],
+    first_piece: i32,
+    last_piece: i32,
+    piece_length: u64,
+    file_offset: u64,
+    file_size: u64,
+) -> Vec<(u64, u64)> {
+    let mut runs: Vec<(u64, u64)> = Vec::new();
+    if piece_length == 0 || file_size == 0 || last_piece < first_piece {
+        return runs;
+    }
+    let file_end = file_offset + file_size;
+    for piece in first_piece.max(0)..=last_piece {
+        let present = usize::try_from(piece)
+            .ok()
+            .and_then(|index| piece_presence.get(index))
+            .is_some_and(|present| *present != 0);
+        if !present {
+            continue;
+        }
+        let start = (piece as u64 * piece_length).max(file_offset) - file_offset;
+        let end = ((piece as u64 + 1) * piece_length).min(file_end) - file_offset;
+        if start >= end {
+            continue;
+        }
+        match runs.last_mut() {
+            Some(last) if last.1 == start => last.1 = end,
+            _ => runs.push((start, end)),
+        }
+    }
+    runs
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -487,4 +528,22 @@ pub struct EngineStats {
     /// Torrent metadata is available (false for a freshly added magnet that is
     /// still resolving its info dictionary).
     pub has_metadata: bool,
+}
+
+#[cfg(test)]
+mod downloaded_ranges_tests {
+    use super::file_downloaded_ranges;
+
+    #[test]
+    fn merges_adjacent_pieces_and_clips_to_the_file() {
+        // Pieces of 10 bytes; the file spans torrent bytes 15..45 (pieces 1-4).
+        let presence = [0u8, 1, 1, 0, 1];
+        assert_eq!(file_downloaded_ranges(&presence, 1, 4, 10, 15, 30), vec![(0, 15), (25, 30)]);
+    }
+
+    #[test]
+    fn empty_when_nothing_is_verified() {
+        assert!(file_downloaded_ranges(&[0, 0], 0, 1, 10, 0, 20).is_empty());
+        assert!(file_downloaded_ranges(&[1], 0, 0, 0, 0, 20).is_empty());
+    }
 }

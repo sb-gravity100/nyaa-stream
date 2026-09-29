@@ -83,3 +83,9 @@ Copied from https://github.com/stremio-native/stream-server at rev
   index" and mpv waited with no error (a Kaleido-subs torrent, verified
   live). `get_file_with_intent` now logs why `get_file_reader` failed
   instead of discarding the error.
+- `src/backend/mod.rs`, `src/backend/libtorrent/handle.rs`: `StatsFile`
+  gains `downloaded_ranges` - the file's verified pieces merged into
+  file-relative `[start, end)` byte runs (`file_downloaded_ranges`, from the
+  piece presence `stats()` already reads). The player's seek bar draws them
+  as a "downloaded" layer; mpv's own demuxer cache forgets ranges after a
+  seek, so it can't show what's on disk. Other backends leave it empty.

@@ -1670,6 +1670,7 @@ mod tests {
                     offset: idx as u64 * 100,
                     downloaded: 50,
                     progress: 0.5,
+                    downloaded_ranges: Vec::new(),
                 })
                 .collect();
             EngineStats {
