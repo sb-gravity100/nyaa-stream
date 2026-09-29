@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `bcabb4f` · 2026-09-29 · docs: sync FILE_INDEX.md with the fast playback start changes
+- `FILE_INDEX.md`
+
 ### `4ca51da` · 2026-09-29 · fix: stream anyway when file priorities miss their ack timeout
 - `PHASES.md`
 - `vendor/enginefs/VENDORED.md`
