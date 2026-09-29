@@ -2,6 +2,19 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `30b2714` · 2026-09-29 · feat(player): export dialog for A-B clips
+- `src/ExportDialog.tsx`
+- `src/PlayerView.tsx`
+- `src/App.css`
+- `FILE_INDEX.md`
+
+### `8332730` · 2026-09-29 · feat: export_clip takes a destination folder (dialog plugin, reveal permission)
+- `src-tauri/Cargo.toml`
+- `src-tauri/src/lib.rs`
+- `src-tauri/capabilities/default.json`
+- `src/settings.ts`
+- `package.json`, `package-lock.json`
+
 ### `3c3d255` · 2026-09-29 · fix(player): Shift skips past the whole opening, even from before it starts
 - `src/PlayerView.tsx`
 - `src/SettingsPanel.tsx`
