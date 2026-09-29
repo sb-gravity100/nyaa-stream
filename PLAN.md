@@ -1321,6 +1321,15 @@ embedded}.rs`, plus bundling/updater config), so the port is mostly there:
 - **Cross-platform CI**: `cargo check --workspace` on windows + ubuntu once
   Actions is available.
 
+**Linux testing runs in cloud sessions** (a Linux environment, since this
+PC is Windows and Actions is unavailable): install the Linux build
+prerequisites, `cargo check --workspace`, `npm run build`, `cargo test`, the
+AppImage/.deb bundle, and a headless run under Xvfb (X11 `wid` embedding,
+window/mpv startup, log inspection, mpv-player smoke examples). Push the
+branch from this PC first; merge results back and re-verify on Windows.
+Limits: no GPU/audio and unreliable real-torrent playback, so final
+playback/subtitle/seek QA and the updater still need a real Linux desktop.
+
 Milestones: **v0.9.0** = the app compiles and plays on Linux (dev build);
 **v0.9.x** = packaging, updater and Linux QA betas (local-only tags);
 **v1.0.0** = both platforms verified live, published.
