@@ -1,3 +1,10 @@
+### `5f52a7a` · 2026-09-30 · feat: frameless window with custom title bar
+- `src/TitleBar.tsx`
+- `src/main.tsx`
+- `src/App.css`
+- `src-tauri/tauri.conf.json`
+- `src-tauri/capabilities/default.json`
+
 ### `64d7618` · 2026-09-30 · feat: native splash window shown until app_ready
 - `public/splash.html`
 - `index.html`
