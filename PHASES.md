@@ -307,16 +307,18 @@
             fallback), tiny runs merged
       - [x] Seek bar: dim downloaded layer under mpv's buffer layer
       - [x] mpv `--demuxer-max-back-bytes=150MiB`
-      - [ ] enginefs: reads/seeks into the file tail are ContainerMetadata
+      - [x] enginefs: reads/seeks into the file tail are ContainerMetadata
             (priority 7, pinned)
-      - [ ] enginefs: prefetch the file tail (4 MB) at playback start
-      - [ ] enginefs: resume anchor on the first non-contiguous,
+      - [x] enginefs: prefetch the file tail (4 MB) at playback start
+      - [x] enginefs: resume anchor on the first non-contiguous,
             non-metadata forward jump
-      - [ ] enginefs: resume holds the baseline until the anchor's buffer
+      - [x] enginefs: resume holds the baseline until the anchor's buffer
             verifies (or 15s)
-      - [ ] enginefs: read-ahead window >= 30s of playback by bitrate, cap
+      - [x] enginefs: read-ahead window >= 30s of playback by bitrate, cap
             64 MB
-      - [x] mpv `--cache-pause-wait=3`
+      - [x] mpv `--cache-pause-initial=yes` + `--cache-pause-wait=10`
+            (start/resume once 10s is buffered)
+      - [x] Seek re-anchor debounce 300ms → 100ms
       - [ ] Verify live: time from click to first frame, logged before/after
       - [ ] PLAN.md/FILE_INDEX.md sync, `npm run bump -- patch`, tag
             `v0.3.2`, `npm run release -- --notes "..." --dry-run`, then

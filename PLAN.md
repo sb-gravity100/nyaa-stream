@@ -650,7 +650,7 @@ first seconds before C's mode is known):**
     the target: missing pieces before it drop to 0, sequential order
     restarts there. A seek landing inside already-downloaded data changes
     nothing. Debounced - the re-anchor applies once the reader has blocked
-    on the target piece for ~300ms, so scrubbing through the seek bar (the
+    on the target piece for ~100ms, so scrubbing through the seek bar (the
     log shows 4 seeks in 1s) doesn't thrash libtorrent's priorities; each
     re-anchor replaces the previous one, and dropped pieces come back to 1
     as in continue watch.
@@ -799,9 +799,15 @@ Fixes (vendored enginefs unless noted):
    Within the window, priorities are graded by distance like Elementum's
    (7 for the ~4 MB urgent band, then 6, 5, 4, 3 and 2 further out), so
    nearer pieces win when bandwidth is short.
-6. **mpv resumes with more buffered** (`embedded.rs`): `--cache-pause-wait=3`
-   (default 1s) so after a stall it waits for 3s of data, trading one
-   slightly longer pause for fewer stop-start cycles.
+6. **Play once ~10s is buffered** (`embedded.rs`, user request 2026-09-29):
+   `--cache-pause-initial=yes` + `--cache-pause-wait=10` - playback starts,
+   and resumes after a seek or stall, only when 10s of video is in mpv's
+   cache, instead of showing the first decodable frame and stalling again.
+   A stall therefore pauses ~10s once instead of stuttering.
+7. **Seeks re-prioritize at once:** a seek's first read already puts the
+   target at priority 7 / deadline 0 and grows to the 30s graded window
+   after the first byte (fix 5); in-order download re-anchors there after
+   100ms blocked (`SEEK_REANCHOR_DEBOUNCE_MS`, was 300ms).
 
 **Compared with Elementum** (`elgatito/elementum`, MIT, active; studied
 2026-09-29 - `lt2http` from the same org is unmaintained since 2021 and
