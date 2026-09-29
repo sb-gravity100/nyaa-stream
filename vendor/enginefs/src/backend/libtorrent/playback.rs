@@ -11,6 +11,7 @@ use tokio_util::sync::CancellationToken;
 
 use crate::backend::priorities::{
     MemoryPressure, PlaybackIntent, PlaybackPriorityPolicy, PriorityContext,
+    STARTUP_BASELINE_FALLBACK_MS, disk_backed_file_baseline_priority, startup_buffer_pieces,
 };
 
 use super::alerts::LibtorrentAlertHub;
@@ -64,6 +65,21 @@ impl LibtorrentPlaybackPermit {
 
     pub(crate) fn is_subordinate(&self) -> bool {
         self.subordinate
+    }
+
+    /// (nyaa-stream) Tells the coordinator where a foreground stream starts
+    /// reading (first poll after open or seek), so the startup buffer
+    /// follows the real read position - see `StartupHold`.
+    pub(crate) fn report_read_start(&self, piece: i32) {
+        if self.released || self.cancellation.is_cancelled() {
+            return;
+        }
+        let _ = self.command_tx.send(PlaybackCommand::ReadStarted {
+            info_hash: self.info_hash.clone(),
+            file_idx: self.file_idx,
+            generation: self.generation,
+            piece,
+        });
     }
 
     pub(crate) fn replace_priority_window(&self, assignments: Vec<LibtorrentPiecePriority>) {
@@ -195,6 +211,70 @@ impl ActivePriorityWindows {
     }
 }
 
+/// (nyaa-stream) Fix A - startup baseline 0. While a foreground stream
+/// starts, every piece of the playing file outside the priority windows is
+/// held at priority 0, so peers' request queues fill with the startup
+/// window instead of rarest-first bulk pieces. The file priority itself
+/// stays 1 (a 0 file priority would route downloaded pieces into
+/// libtorrent's part file, away from the disk reader). Raised to the
+/// selected baseline once the buffer (`startup_buffer_pieces` from the read
+/// position) verifies, or after `STARTUP_BASELINE_FALLBACK_MS`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct StartupHold {
+    file_first: i32,
+    file_last: i32,
+    buffer_first: i32,
+    buffer_last: i32,
+    buffer_pieces: i32,
+}
+
+impl StartupHold {
+    fn new(file_first: i32, file_last: i32, read_piece: i32, buffer_pieces: i32) -> Self {
+        let mut hold = Self {
+            file_first,
+            file_last,
+            buffer_first: file_first,
+            buffer_last: file_first,
+            buffer_pieces: buffer_pieces.max(1),
+        };
+        hold.retarget(read_piece);
+        hold
+    }
+
+    /// Moves the startup buffer to start at `read_piece` (clamped to the file).
+    fn retarget(&mut self, read_piece: i32) {
+        let first = read_piece.clamp(self.file_first, self.file_last.max(self.file_first));
+        self.buffer_first = first;
+        self.buffer_last = first
+            .saturating_add(self.buffer_pieces - 1)
+            .min(self.file_last);
+    }
+
+    fn buffer_contains(&self, piece: i32) -> bool {
+        piece >= self.buffer_first && piece <= self.buffer_last
+    }
+}
+
+/// (nyaa-stream) What a piece falls back to when it leaves every priority
+/// window: the selected file baseline, or 0 while a `StartupHold` is active.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct PieceBaseline {
+    priority: i32,
+    held: bool,
+}
+
+impl PieceBaseline {
+    fn for_piece(&self, _piece: i32) -> i32 {
+        if self.held { 0 } else { self.priority }
+    }
+}
+
+fn buffer_verified(handle: &libtorrent_sys::LibtorrentHandle, hold: &StartupHold) -> bool {
+    let presence = handle.piece_presence(hold.buffer_first, hold.buffer_last);
+    let expected = usize::try_from(hold.buffer_last - hold.buffer_first + 1).unwrap_or(0);
+    presence.len() == expected && presence.iter().all(|present| *present != 0)
+}
+
 struct LibtorrentMetadataPermit {
     info_hash: String,
     generation: u64,
@@ -251,6 +331,8 @@ struct TorrentPlaybackState {
     metadata_announced: bool,
     last_emergency_reannounce: Option<Instant>,
     priority_windows: ActivePriorityWindows,
+    /// (nyaa-stream) Fix A, see `StartupHold`. Per generation.
+    startup_hold: Option<StartupHold>,
 }
 
 impl TorrentPlaybackState {
@@ -275,6 +357,24 @@ impl TorrentPlaybackState {
             metadata_announced: false,
             last_emergency_reannounce: None,
             priority_windows: ActivePriorityWindows::default(),
+            startup_hold: None,
+        }
+    }
+
+    fn piece_baseline(&self) -> PieceBaseline {
+        PieceBaseline {
+            priority: self.selected_priority,
+            held: self.startup_hold.is_some(),
+        }
+    }
+
+    /// Ends the generation's startup hold without raising it piece by piece:
+    /// forgetting the acknowledged file priorities makes the next activation
+    /// rewrite them, and libtorrent's file-priority update resets every piece
+    /// priority from the file priorities.
+    fn drop_startup_hold(&mut self) {
+        if self.startup_hold.take().is_some() {
+            self.acknowledged_priorities = None;
         }
     }
 
@@ -335,6 +435,7 @@ impl TorrentPlaybackState {
             self.selected_priority = native_priority;
             self.selected_first_piece = None;
             self.priority_windows.clear_tracking();
+            self.drop_startup_hold();
         }
 
         if direct_permit {
@@ -371,6 +472,7 @@ impl TorrentPlaybackState {
         self.selected_priority = 0;
         self.selected_first_piece = None;
         self.priority_windows.clear_tracking();
+        self.drop_startup_hold();
         self.hls_last_activity = None;
         self.idle_deadline = None;
         self.phase = LibtorrentNetworkPhase::PausePending;
@@ -457,6 +559,14 @@ enum PlaybackCommand {
     },
     PieceInvalidated {
         info_hash: String,
+        piece: i32,
+    },
+    /// (nyaa-stream) A foreground stream's first read position, see
+    /// `LibtorrentPlaybackPermit::report_read_start`.
+    ReadStarted {
+        info_hash: String,
+        file_idx: usize,
+        generation: u64,
         piece: i32,
     },
 }
@@ -1011,6 +1121,13 @@ impl LibtorrentPlaybackCoordinator {
             return Ok(());
         }
 
+        // (nyaa-stream) Fix A: hold the rest of the file at 0 while the
+        // startup window downloads - see `StartupHold`.
+        if selection.changed && disk_backed_file_baseline_priority(start.intent) == 0 {
+            self.begin_startup_hold(info_hash, entry, layout, start, selection)
+                .await?;
+        }
+
         let first_piece = self
             .apply_hot_window(info_hash, entry, layout, start, selection.generation)
             .await?;
@@ -1104,6 +1221,177 @@ impl LibtorrentPlaybackCoordinator {
             );
         }
         Ok(())
+    }
+
+    /// (nyaa-stream) Starts the generation's `StartupHold`: every piece of
+    /// the file drops to 0 (the hot window applied right after raises its
+    /// own pieces) and a fallback timer is armed.
+    async fn begin_startup_hold(
+        self: &Arc<Self>,
+        info_hash: &str,
+        entry: &TorrentPlaybackEntry,
+        layout: &TorrentLayout,
+        start: &LibtorrentPlaybackStart,
+        selection: &Selection,
+    ) -> Result<()> {
+        let file = layout
+            .files
+            .get(start.file_idx)
+            .ok_or_else(|| anyhow!("File index {} out of range", start.file_idx))?;
+        if layout.piece_length == 0 {
+            return Ok(());
+        }
+        let start_offset = start.start_offset.min(file.size.max(0) as u64);
+        let read_piece = ((file.offset.max(0) as u64 + start_offset) / layout.piece_length) as i32;
+        let hold = StartupHold::new(
+            file.first_piece,
+            file.last_piece,
+            read_piece,
+            startup_buffer_pieces(layout.piece_length),
+        );
+        let session = self.session.read().await;
+        let mut handle = session
+            .find_torrent(info_hash)
+            .map_err(|error| anyhow!("Torrent not found: {error}"))?;
+        if buffer_verified(&handle, &hold) {
+            tracing::debug!(
+                info_hash = %info_hash,
+                file_idx = start.file_idx,
+                generation = selection.generation,
+                buffer_first = hold.buffer_first,
+                buffer_last = hold.buffer_last,
+                "startup buffer already verified, no startup baseline hold"
+            );
+            return Ok(());
+        }
+        {
+            let mut state = entry.state.lock().await;
+            if state.generation != selection.generation
+                || state.selected_file != Some(start.file_idx)
+            {
+                tracing::debug!(
+                    info_hash = %info_hash,
+                    file_idx = start.file_idx,
+                    generation = selection.generation,
+                    "startup baseline hold skipped for a superseded generation"
+                );
+                return Ok(());
+            }
+            state.startup_hold = Some(hold);
+        }
+        handle.set_piece_priorities((hold.file_first..=hold.file_last).map(|piece| (piece, 0)));
+        drop(session);
+        tracing::info!(
+            info_hash = %info_hash,
+            file_idx = start.file_idx,
+            generation = selection.generation,
+            intent = ?start.intent,
+            buffer_first = hold.buffer_first,
+            buffer_last = hold.buffer_last,
+            fallback_ms = STARTUP_BASELINE_FALLBACK_MS,
+            stage = "startup_baseline_held",
+            "libtorrent playback startup stage"
+        );
+        self.schedule_startup_baseline_fallback(
+            info_hash.to_string(),
+            start.file_idx,
+            selection.generation,
+            selection.cancellation.clone(),
+        );
+        Ok(())
+    }
+
+    /// (nyaa-stream) Ends the generation's `StartupHold`: pieces outside the
+    /// priority windows go back to the selected baseline. With
+    /// `require_buffer` it only happens once the startup buffer verified.
+    async fn raise_startup_baseline(
+        &self,
+        info_hash: &str,
+        entry: &TorrentPlaybackEntry,
+        generation: u64,
+        require_buffer: bool,
+        reason: &'static str,
+    ) -> Result<bool> {
+        let _operation = entry.operation.lock().await;
+        let session = self.session.read().await;
+        let mut handle = session
+            .find_torrent(info_hash)
+            .map_err(|error| anyhow!("Torrent not found: {error}"))?;
+        let (hold, priority, windowed, file_idx) = {
+            let mut state = entry.state.lock().await;
+            if state.generation != generation {
+                return Ok(false);
+            }
+            let Some(hold) = state.startup_hold else {
+                return Ok(false);
+            };
+            if require_buffer && !buffer_verified(&handle, &hold) {
+                return Ok(false);
+            }
+            state.startup_hold = None;
+            (
+                hold,
+                state.selected_priority,
+                state
+                    .priority_windows
+                    .effective
+                    .keys()
+                    .copied()
+                    .collect::<HashSet<_>>(),
+                state.selected_file,
+            )
+        };
+        handle.set_piece_priorities(
+            (hold.file_first..=hold.file_last)
+                .filter(|piece| !windowed.contains(piece))
+                .map(|piece| (piece, priority)),
+        );
+        tracing::info!(
+            info_hash = %info_hash,
+            file_idx = ?file_idx,
+            generation,
+            priority,
+            reason,
+            buffer_first = hold.buffer_first,
+            buffer_last = hold.buffer_last,
+            stage = "startup_baseline_raised",
+            "libtorrent playback startup stage"
+        );
+        Ok(true)
+    }
+
+    fn schedule_startup_baseline_fallback(
+        self: &Arc<Self>,
+        info_hash: String,
+        file_idx: usize,
+        generation: u64,
+        cancellation: CancellationToken,
+    ) {
+        let coordinator = Arc::downgrade(self);
+        tokio::spawn(async move {
+            tokio::select! {
+                _ = cancellation.cancelled() => return,
+                _ = tokio::time::sleep(Duration::from_millis(STARTUP_BASELINE_FALLBACK_MS)) => {}
+            }
+            let Some(coordinator) = coordinator.upgrade() else {
+                return;
+            };
+            let Some(entry) = coordinator.entries.lock().await.get(&info_hash).cloned() else {
+                return;
+            };
+            if let Err(error) = coordinator
+                .raise_startup_baseline(&info_hash, &entry, generation, false, "fallback-timeout")
+                .await
+            {
+                tracing::warn!(
+                    info_hash = %info_hash,
+                    file_idx,
+                    generation,
+                    %error,
+                    "Failed to raise the startup baseline after its fallback timeout"
+                );
+            }
+        });
     }
 
     async fn selection_is_current(
@@ -1334,16 +1622,16 @@ impl LibtorrentPlaybackCoordinator {
         stream_id: usize,
         assignments: Vec<LibtorrentPiecePriority>,
     ) -> Result<bool> {
-        let (baseline_priority, changes) = {
+        let (baseline, changes) = {
             let mut state = entry.state.lock().await;
             if state.generation != generation || state.selected_file != Some(file_idx) {
                 return Ok(false);
             }
-            let baseline_priority = state.selected_priority;
+            let baseline = state.piece_baseline();
             let changes = state.priority_windows.replace(stream_id, assignments);
-            (baseline_priority, changes)
+            (baseline, changes)
         };
-        self.apply_piece_priority_changes(info_hash, baseline_priority, &changes)
+        self.apply_piece_priority_changes(info_hash, baseline, &changes)
             .await?;
         Ok(true)
     }
@@ -1351,7 +1639,7 @@ impl LibtorrentPlaybackCoordinator {
     async fn apply_piece_priority_changes(
         &self,
         info_hash: &str,
-        baseline_priority: i32,
+        baseline: PieceBaseline,
         changes: &[PiecePriorityChange],
     ) -> Result<()> {
         if changes.is_empty() {
@@ -1375,7 +1663,7 @@ impl LibtorrentPlaybackCoordinator {
         }
         handle.set_piece_priorities(changes.iter().map(|change| match change {
             PiecePriorityChange::Apply(assignment) => (assignment.piece, assignment.priority),
-            PiecePriorityChange::Reset(piece) => (*piece, baseline_priority),
+            PiecePriorityChange::Reset(piece) => (*piece, baseline.for_piece(*piece)),
         }));
         for change in changes {
             if let PiecePriorityChange::Apply(LibtorrentPiecePriority {
@@ -1501,7 +1789,7 @@ impl LibtorrentPlaybackCoordinator {
             } => {
                 let entry = self.entry(&info_hash).await;
                 let _operation = entry.operation.lock().await;
-                let (baseline_priority, changes, remaining_permits) = {
+                let (baseline, changes, remaining_permits) = {
                     let mut state = entry.state.lock().await;
                     if let Some(count) = state.direct_permits.get_mut(&generation) {
                         *count = count.saturating_sub(1);
@@ -1521,12 +1809,12 @@ impl LibtorrentPlaybackCoordinator {
                     } else {
                         Vec::new()
                     };
-                    let baseline_priority = state.selected_priority;
+                    let baseline = state.piece_baseline();
                     state.schedule_idle_if_needed(Instant::now());
-                    (baseline_priority, changes, state.active_playback_permits())
+                    (baseline, changes, state.active_playback_permits())
                 };
                 if let Err(error) = self
-                    .apply_piece_priority_changes(&info_hash, baseline_priority, &changes)
+                    .apply_piece_priority_changes(&info_hash, baseline, &changes)
                     .await
                 {
                     tracing::warn!(
@@ -1598,9 +1886,13 @@ impl LibtorrentPlaybackCoordinator {
                         }
                     }
                 }
-                let selected = {
+                let (selected, hold_generation) = {
                     let mut state = entry.state.lock().await;
                     state.priority_windows.mark_piece_verified(piece);
+                    let hold_generation = state
+                        .startup_hold
+                        .is_some_and(|hold| hold.buffer_contains(piece))
+                        .then_some(state.generation);
                     if state.selected_first_piece == Some(piece) {
                         state.selected_first_piece = None;
                         tracing::info!(
@@ -1612,10 +1904,26 @@ impl LibtorrentPlaybackCoordinator {
                             "libtorrent playback startup stage"
                         );
                     }
-                    state
-                        .selected_file
-                        .map(|file_idx| (file_idx, state.generation, state.phase))
+                    (
+                        state
+                            .selected_file
+                            .map(|file_idx| (file_idx, state.generation, state.phase)),
+                        hold_generation,
+                    )
                 };
+                if let Some(generation) = hold_generation
+                    && let Err(error) = self
+                        .raise_startup_baseline(&info_hash, &entry, generation, true, "buffer-verified")
+                        .await
+                {
+                    tracing::warn!(
+                        info_hash = %info_hash,
+                        generation,
+                        piece,
+                        %error,
+                        "Failed to raise the startup baseline"
+                    );
+                }
                 if !self.seeding_enabled.load(Ordering::Relaxed)
                     && let Some((file_idx, generation, LibtorrentNetworkPhase::Active)) = selected
                     && let Some(layout) = entry.layout.get()
@@ -1649,6 +1957,58 @@ impl LibtorrentPlaybackCoordinator {
                         if state.generation == generation {
                             state.phase = LibtorrentNetworkPhase::Active;
                         }
+                    }
+                }
+            }
+            PlaybackCommand::ReadStarted {
+                info_hash,
+                file_idx,
+                generation,
+                piece,
+            } => {
+                let entry = self.entries.lock().await.get(&info_hash).cloned();
+                let Some(entry) = entry else {
+                    return;
+                };
+                let retargeted = {
+                    let mut state = entry.state.lock().await;
+                    let current =
+                        state.generation == generation && state.selected_file == Some(file_idx);
+                    match state.startup_hold.as_mut() {
+                        Some(hold) if current && !hold.buffer_contains(piece) => {
+                            hold.retarget(piece);
+                            Some(*hold)
+                        }
+                        _ => None,
+                    }
+                };
+                tracing::debug!(
+                    info_hash = %info_hash,
+                    file_idx,
+                    generation,
+                    piece,
+                    retargeted = retargeted.is_some(),
+                    "foreground stream read started"
+                );
+                if let Some(hold) = retargeted {
+                    tracing::debug!(
+                        info_hash = %info_hash,
+                        file_idx,
+                        buffer_first = hold.buffer_first,
+                        buffer_last = hold.buffer_last,
+                        "startup buffer moved to the read position"
+                    );
+                    if let Err(error) = self
+                        .raise_startup_baseline(&info_hash, &entry, generation, true, "buffer-verified")
+                        .await
+                    {
+                        tracing::warn!(
+                            info_hash = %info_hash,
+                            file_idx,
+                            generation,
+                            %error,
+                            "Failed to raise the startup baseline"
+                        );
                     }
                 }
             }
@@ -1971,6 +2331,38 @@ mod tests {
             priority,
             deadline_ms,
         }
+    }
+
+    #[test]
+    fn startup_hold_buffer_follows_the_read_position_within_the_file() {
+        let mut hold = StartupHold::new(100, 199, 100, 32);
+        assert_eq!((hold.buffer_first, hold.buffer_last), (100, 131));
+        hold.retarget(190);
+        assert_eq!((hold.buffer_first, hold.buffer_last), (190, 199));
+        assert!(hold.buffer_contains(199));
+        assert!(!hold.buffer_contains(189));
+        hold.retarget(5);
+        assert_eq!(hold.buffer_first, 100);
+    }
+
+    #[test]
+    fn held_baseline_resets_retired_pieces_to_zero() {
+        let mut state = TorrentPlaybackState::new();
+        state.select(1, 1, true, false, true, true);
+        assert_eq!(state.piece_baseline().for_piece(5), 1);
+        state.startup_hold = Some(StartupHold::new(0, 99, 0, 32));
+        assert_eq!(state.piece_baseline().for_piece(5), 0);
+    }
+
+    #[test]
+    fn a_new_generation_drops_the_hold_and_forces_a_priority_rewrite() {
+        let mut state = TorrentPlaybackState::new();
+        state.select(1, 1, true, false, true, true);
+        state.acknowledged_priorities = Some(vec![0, 1]);
+        state.startup_hold = Some(StartupHold::new(0, 99, 0, 32));
+        state.select(0, 1, true, false, true, true);
+        assert!(state.startup_hold.is_none());
+        assert!(state.acknowledged_priorities.is_none());
     }
 
     #[test]

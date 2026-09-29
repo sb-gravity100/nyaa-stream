@@ -6,8 +6,8 @@ use std::task::Poll;
 use std::time::{Duration, Instant};
 
 use crate::backend::priorities::{
-    BLOCKED_REPLAN_INTERVAL_MS, PlaybackIntent, disk_backed_forward_window_pieces_for,
-    playback_deadline_step_ms,
+    BLOCKED_REPLAN_INTERVAL_MS, PlaybackIntent, container_metadata_start,
+    disk_backed_forward_window_pieces_for, playback_deadline_step_ms,
 };
 use crate::metadata_pins::MetadataPinRegistry;
 use crate::piece_waiter::PieceWaiterRegistry;
@@ -67,6 +67,10 @@ pub(crate) struct LibtorrentDiskFileStream {
     last_wait_log: Instant,
     last_prioritized_piece: i32,
     consecutive_waits: u32,
+    /// (nyaa-stream) Whether this stream's read position (after open or the
+    /// latest seek) was reported to the coordinator - see
+    /// `report_read_start`.
+    read_start_reported: bool,
     /// (nyaa-stream) Piece whose disk reads are currently coming back
     /// all-zero, when that started, and whether zeros were finally accepted
     /// as genuine - see `poll_read`.
@@ -136,6 +140,7 @@ impl LibtorrentDiskFileStream {
                 .unwrap_or_else(Instant::now),
             last_prioritized_piece: -1,
             consecutive_waits: 0,
+            read_start_reported: false,
             zero_wait: None,
             last_blocked_replan: Instant::now(),
             file,
@@ -191,6 +196,39 @@ impl LibtorrentDiskFileStream {
             PlaybackIntent::DirectSeek | PlaybackIntent::HlsSeek => 1,
             _ => configured_forward_window,
         }
+    }
+
+    /// (nyaa-stream) Where a foreground playback read starts - the
+    /// coordinator moves the startup buffer there. Tail reads for the
+    /// container index (MKV Cues / MP4 moov) aren't playback positions.
+    fn report_read_start(&mut self, piece: i32) {
+        if self.read_start_reported {
+            return;
+        }
+        self.read_start_reported = true;
+        if self.is_background_reader() {
+            return;
+        }
+        if self.current_pos > 0 && self.current_pos >= container_metadata_start(self.file_size) {
+            tracing::debug!(
+                info_hash = %self.info_hash,
+                file_idx = self.file_idx,
+                stream_id = self.stream_id,
+                piece,
+                pos = self.current_pos,
+                "tail read (container index), not reported as a playback position"
+            );
+            return;
+        }
+        tracing::debug!(
+            info_hash = %self.info_hash,
+            file_idx = self.file_idx,
+            stream_id = self.stream_id,
+            piece,
+            pos = self.current_pos,
+            "reporting foreground read start"
+        );
+        self.playback_permit.report_read_start(piece);
     }
 
     fn priority_intent(&self) -> PlaybackIntent {
@@ -744,6 +782,7 @@ impl tokio::io::AsyncRead for LibtorrentDiskFileStream {
                 "read position is outside selected torrent file",
             )));
         }
+        self.report_read_start(piece);
 
         if self.verified_piece != Some(piece) && !self.handle.have_piece(piece) {
             self.request_piece_from_libtorrent(piece);
@@ -979,6 +1018,7 @@ impl tokio::io::AsyncSeek for LibtorrentDiskFileStream {
 
         self.current_pos = new_pos.min(self.file_size);
         self.last_prioritized_piece = -1;
+        self.read_start_reported = false;
         self.verified_piece = None;
         self.broker_piece = None;
         if let Some((_, task)) = self.piece_read.take() {
