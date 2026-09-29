@@ -2,9 +2,12 @@ use scraper::{Html, Selector};
 use serde::{Deserialize, Serialize};
 
 mod cache;
+mod fansubbers;
 mod throttle;
 use cache::DiskCache;
 use throttle::Throttle;
+
+pub use fansubbers::group_tag;
 
 const NYAA_BASE_URL: &str = "https://nyaa.si";
 
@@ -75,6 +78,14 @@ fn sanitize_query(query: &str) -> String {
     normalized.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
+/// The path a search runs under: the whole site, or one user's uploads.
+fn user_path(user: Option<&str>) -> String {
+    match user {
+        Some(user) => format!("/user/{}", urlencoding::encode(user)),
+        None => "/".to_string(),
+    }
+}
+
 /// Rows per page of nyaa.si's HTML search results (fixed by nyaa.si itself).
 /// Used to detect the last page: a page returning fewer rows than this
 /// means there's nothing more to fetch.
@@ -135,14 +146,29 @@ impl NyaaClient {
     /// support real pagination (confirmed via its own pagination controls),
     /// so this scrapes that instead.
     pub async fn search(&self, query: &str, category: Category) -> anyhow::Result<Vec<NyaaResult>> {
+        let results = self.search_scoped(None, query, category).await?;
+        self.record_groups(&results).await;
+        Ok(results)
+    }
+
+    /// Like `search`, but only inside one uploader's releases
+    /// (`/user/<user>?q=`).
+    pub async fn search_user(&self, user: &str, query: &str, category: Category) -> anyhow::Result<Vec<NyaaResult>> {
+        self.search_scoped(Some(user), query, category).await
+    }
+
+    async fn search_scoped(&self, user: Option<&str>, query: &str, category: Category) -> anyhow::Result<Vec<NyaaResult>> {
         let sanitized = sanitize_query(query);
         if sanitized != query {
             tracing::debug!(query, sanitized, "sanitized smart punctuation for nyaa.si search");
         }
         let Some(cache) = &self.cache else {
-            return self.search_uncached(&sanitized, category).await;
+            return self.search_uncached(user, &sanitized, category).await;
         };
-        let key = format!("{}|{sanitized}", category.code());
+        let key = match user {
+            Some(user) => format!("{}|user:{}|{sanitized}", category.code(), user.to_lowercase()),
+            None => format!("{}|{sanitized}", category.code()),
+        };
         let cached = cache.get::<Vec<NyaaResult>>("search", &key).await;
         if let Some(hit) = &cached {
             if hit.age < cache::SEARCH_FRESH_FOR {
@@ -150,7 +176,7 @@ impl NyaaClient {
                 return Ok(hit.value.clone());
             }
         }
-        match self.search_uncached(&sanitized, category).await {
+        match self.search_uncached(user, &sanitized, category).await {
             Ok(results) => {
                 cache.put("search", &key, &results).await;
                 Ok(results)
@@ -165,12 +191,12 @@ impl NyaaClient {
         }
     }
 
-    async fn search_uncached(&self, sanitized: &str, category: Category) -> anyhow::Result<Vec<NyaaResult>> {
+    async fn search_uncached(&self, user: Option<&str>, sanitized: &str, category: Category) -> anyhow::Result<Vec<NyaaResult>> {
         let sanitized = sanitized.to_string();
 
         let mut all_results = Vec::new();
         for page in 1..=MAX_SEARCH_PAGES {
-            let page_results = self.search_page(&sanitized, category, page).await?;
+            let page_results = self.search_page(user, &sanitized, category, page).await?;
             let page_count = page_results.len();
             all_results.extend(page_results);
             if page_count < RESULTS_PER_PAGE {
@@ -182,9 +208,10 @@ impl NyaaClient {
         Ok(all_results)
     }
 
-    async fn search_page(&self, sanitized_query: &str, category: Category, page: u32) -> anyhow::Result<Vec<NyaaResult>> {
+    async fn search_page(&self, user: Option<&str>, sanitized_query: &str, category: Category, page: u32) -> anyhow::Result<Vec<NyaaResult>> {
         let url = format!(
-            "{NYAA_BASE_URL}/?f=0&c={}&q={}&p={page}",
+            "{NYAA_BASE_URL}{}?f=0&c={}&q={}&p={page}",
+            user_path(user),
             category.code(),
             urlencoding::encode(sanitized_query)
         );
@@ -262,6 +289,80 @@ impl NyaaClient {
 
         tracing::debug!(query = sanitized_query, page, count = results.len(), "parsed nyaa.si search page");
         Ok(results)
+    }
+
+    /// Counts the group tags in `results` for `popular_fansubbers`.
+    async fn record_groups(&self, results: &[NyaaResult]) {
+        let Some(cache) = &self.cache else { return };
+        let mut counts = cache.get::<fansubbers::GroupCounts>("fansubbers", "counts").await.map(|hit| hit.value).unwrap_or_default();
+        counts.add(results);
+        cache.put("fansubbers", "counts", &counts).await;
+    }
+
+    /// Popular fansub group names: a built-in seed list plus the tags seen
+    /// most in real searches - for Settings' suggestions.
+    pub async fn popular_fansubbers(&self, limit: usize) -> Vec<String> {
+        let counts = match &self.cache {
+            Some(cache) => cache.get::<fansubbers::GroupCounts>("fansubbers", "counts").await.map(|hit| hit.value).unwrap_or_default(),
+            None => fansubbers::GroupCounts::default(),
+        };
+        counts.popular(limit)
+    }
+
+    /// The nyaa.si account behind a group tag, if known: cached, else probed
+    /// (`/user/<tag>` existing means the tag *is* the account name). `None`
+    /// means unknown - a tag whose uploads sit under another account name is
+    /// learned by `learn_fansubber`.
+    pub async fn resolve_fansubber(&self, tag: &str) -> Option<String> {
+        let key = tag.to_lowercase();
+        let cached = match &self.cache {
+            Some(cache) => cache.get::<Option<String>>("fansubber-user", &key).await,
+            None => None,
+        };
+        if let Some(hit) = &cached {
+            let fresh_for = if hit.value.is_some() { fansubbers::RESOLVED_FRESH_FOR } else { fansubbers::UNRESOLVED_FRESH_FOR };
+            if hit.age < fresh_for {
+                tracing::debug!(tag, user = ?hit.value, "fansubber account served from cache");
+                return hit.value.clone();
+            }
+        }
+        let url = format!("{NYAA_BASE_URL}{}", user_path(Some(tag)));
+        let user = match self.throttle.get(&self.http, &url).await {
+            Ok(_) => Some(tag.to_string()),
+            Err(err) => {
+                let status = err.downcast_ref::<reqwest::Error>().and_then(reqwest::Error::status);
+                if status != Some(reqwest::StatusCode::NOT_FOUND) {
+                    // Rate limited/offline: unknown for now, don't cache it.
+                    tracing::warn!(tag, %err, "couldn't probe fansubber account");
+                    return cached.and_then(|hit| hit.value);
+                }
+                None
+            }
+        };
+        tracing::info!(tag, ?user, "fansubber account resolved");
+        if let Some(cache) = &self.cache {
+            cache.put("fansubber-user", &key, &user).await;
+        }
+        user
+    }
+
+    /// Learns the account behind `tag` from one of its releases in
+    /// `results` (its view page names the real submitter), for groups whose
+    /// tag isn't their account name.
+    pub async fn learn_fansubber(&self, tag: &str, results: &[NyaaResult]) {
+        let Some(release) = results.iter().find(|r| group_tag(&r.title).is_some_and(|t| t.eq_ignore_ascii_case(tag))) else {
+            return;
+        };
+        match self.fetch_details(&release.view_url).await {
+            Ok(details) if details.submitter != "Anonymous" => {
+                tracing::info!(tag, user = details.submitter, "learned fansubber account from a release page");
+                if let Some(cache) = &self.cache {
+                    cache.put("fansubber-user", &tag.to_lowercase(), &Some(details.submitter)).await;
+                }
+            }
+            Ok(_) => {}
+            Err(err) => tracing::warn!(tag, %err, "couldn't learn fansubber account"),
+        }
     }
 
     /// Fetches and parses a torrent's view page to determine its real
