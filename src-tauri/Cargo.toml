@@ -34,7 +34,7 @@ torrent-engine = { path = "../crates/torrent-engine" }
 nyaa-client = { path = "../crates/nyaa-client" }
 anilist-client = { path = "../crates/anilist-client" }
 kitsu-client = { path = "../crates/kitsu-client" }
-mpv-ipc = { path = "../crates/mpv-ipc" }
+mpv-player = { path = "../crates/mpv-player" }
 # Native clipboard for the player's Ctrl+C frame copy: the WebView's async
 # clipboard API pops a browser-style permission prompt in WebView2.
 arboard = { version = "3", default-features = false, features = ["image-data"] }

@@ -45,7 +45,7 @@ solid-color skeleton blocks, not a spinner).
 
 - **Shell:** Tauri 2 (Rust backend + Preact/TypeScript frontend via Vite)
 - **Player:** system `mpv` (must be on PATH — not bundled) embedded in the
-  app window via `--wid` (`crates/mpv-ipc`'s `EmbeddedMpv`,
+  app window via `--wid` (`crates/mpv-player`'s `EmbeddedMpv`,
   `src-tauri/src/player.rs`), driven over JSON IPC by the HTML controls in
   `src/PlayerView.tsx` through `src/mpvVideo.ts`. Fallback without mpv:
   the HLS `<video>` + `hls.js` player (`src/HlsPlayerView.tsx`). mpv is
@@ -174,7 +174,7 @@ nyaa_stream/
     nyaa-client/              nyaa.si search client (paginated HTML scrape)
     anilist-client/          AniList GraphQL client
     kitsu-client/            Kitsu API client (backdrop + episode thumbnails)
-    mpv-ipc/                 embedded mpv (playback) + headless mpv (thumbnail capture) over JSON IPC
+    mpv-player/                 embedded mpv (playback) + headless mpv (thumbnail capture) over JSON IPC
   src/                       Preact + TypeScript frontend
   reference/stremio-core/    reference-only clone, gitignored
   reference/stremio-web/     reference-only clone, gitignored

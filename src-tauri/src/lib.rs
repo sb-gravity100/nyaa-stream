@@ -9,7 +9,7 @@ use std::time::Duration;
 
 use anilist_client::{AiringEntry, AniListClient, AnimeMedia, AnimeTitle};
 use kitsu_client::{KitsuClient, KitsuMetadata};
-use mpv_ipc::MpvPlayer;
+use mpv_player::MpvPlayer;
 use nyaa_client::{Category, NyaaClient, NyaaResult, TorrentDetails};
 use serde::Serialize;
 use tauri::State;
@@ -377,7 +377,7 @@ async fn cached_torrent_thumbnail(state: State<'_, Arc<AppState>>, cache_key: St
 /// mpv needing to seek at all) only pulls a small amount of data.
 const THUMBNAIL_SEEK_SECONDS: f64 = 8.0;
 /// Slack allowed when we *do* have a duration estimate and ask mpv to
-/// start already near the midpoint via `--start` (see mpv-ipc's
+/// start already near the midpoint via `--start` (see mpv-player's
 /// `spawn_headless` doc comment): without a Matroska Cues index on a
 /// still-downloading torrent, that seek can land on the nearest keyframe
 /// *before* the exact target rather than exactly on it, so the wait loop
@@ -965,7 +965,7 @@ async fn export_clip(
 pub fn run() {
     tracing_subscriber::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-            "nyaa_stream_lib=debug,anilist_client=debug,nyaa_client=debug,torrent_engine=debug,mpv_ipc=debug,frontend=debug,info"
+            "nyaa_stream_lib=debug,anilist_client=debug,nyaa_client=debug,torrent_engine=debug,mpv_player=debug,frontend=debug,info"
                 .into()
         }))
         .init();
