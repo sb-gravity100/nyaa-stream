@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `9ae82c6` · 2026-09-29 · docs: note the fast-start enginefs changes in VENDORED.md
+- `PHASES.md`
+- `vendor/enginefs/VENDORED.md`
+
 ### `cd1b10e` · 2026-09-29 · fix: log the effective window in the waiting-piece diagnostic
 - `PHASES.md`
 - `vendor/enginefs/src/backend/libtorrent/disk_stream.rs`
