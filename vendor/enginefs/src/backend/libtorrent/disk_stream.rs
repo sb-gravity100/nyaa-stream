@@ -18,6 +18,13 @@ use crate::piece_waiter::PieceWaiterRegistry;
 /// `MAX_STARTUP_PIECES`.
 const INITIAL_FIRST_BYTE_WINDOW_PIECES: i32 = MAX_STARTUP_PIECES;
 type PieceReadTask = tokio::task::JoinHandle<std::io::Result<Arc<Vec<u8>>>>;
+/// (nyaa-stream) A piece verified less than this long ago is served only from
+/// libtorrent's own copy (`read_piece`): libtorrent hashes from its buffers
+/// and may queue the disk write (up to 128 MB, ~12s at 10 MB/s), so this
+/// stream's separate OS handle could read the piece's *old* disk content -
+/// stale non-zero bytes the zero guard can't catch (mpv: "Corrupt file
+/// detected", live).
+const FRESH_PIECE_BROKER_WINDOW: Duration = Duration::from_secs(30);
 
 fn forward_window_end(piece: i32, last_piece: i32, piece_count: i32) -> i32 {
     last_piece.min(piece.saturating_add(piece_count.saturating_sub(1)))
@@ -130,6 +137,9 @@ pub(crate) struct LibtorrentDiskFileStream {
     /// all-zero, when that started, and whether zeros were finally accepted
     /// as genuine - see `poll_read`.
     zero_wait: Option<(i32, Instant, bool)>,
+    /// (nyaa-stream) Last piece routed to libtorrent's copy as fresh (logged
+    /// once per piece).
+    fresh_broker_piece: i32,
     last_blocked_replan: Instant,
     file: Option<tokio::fs::File>,
     file_cursor: u64,
@@ -201,6 +211,7 @@ impl LibtorrentDiskFileStream {
             read_start_is_playback: false,
             read_progressed: false,
             zero_wait: None,
+            fresh_broker_piece: -1,
             last_blocked_replan: Instant::now(),
             file,
             file_cursor: 0,
@@ -972,6 +983,56 @@ impl tokio::io::AsyncRead for LibtorrentDiskFileStream {
         }
         if self.serve_broker_piece(piece, buf) {
             return Poll::Ready(Ok(()));
+        }
+
+        // (nyaa-stream) A freshly verified piece comes only from libtorrent's
+        // copy - see `FRESH_PIECE_BROKER_WINDOW`. Falls back to the disk path
+        // (and its zero guard) only when that copy failed or can't serve.
+        let fresh = self
+            .piece_waiter
+            .finished_within(&self.info_hash, piece, FRESH_PIECE_BROKER_WINDOW);
+        let broker_failed = self
+            .piece_read_retry_at
+            .is_some_and(|(failed_piece, _)| failed_piece == piece);
+        let broker_holds_piece = self
+            .broker_piece
+            .as_ref()
+            .is_some_and(|(cached, _)| *cached == piece);
+        if fresh && !broker_failed && !broker_holds_piece {
+            if self.fresh_broker_piece != piece {
+                self.fresh_broker_piece = piece;
+                tracing::debug!(
+                    info_hash = %self.info_hash,
+                    file_idx = self.file_idx,
+                    stream_id = self.stream_id,
+                    piece,
+                    pos = self.current_pos,
+                    "fresh piece served from libtorrent's copy, not the disk"
+                );
+            }
+            self.request_piece_from_libtorrent(piece);
+            if let Err(error) = self.poll_piece_broker(cx, piece) {
+                return Poll::Ready(Err(error));
+            }
+            if self.serve_broker_piece(piece, buf) {
+                return Poll::Ready(Ok(()));
+            }
+            // The broker task wakes this reader when libtorrent answers.
+            if self
+                .piece_read
+                .as_ref()
+                .is_some_and(|(requested, _)| *requested == piece)
+            {
+                return Poll::Pending;
+            }
+        } else if fresh && broker_failed && self.fresh_broker_piece != -2 - piece {
+            self.fresh_broker_piece = -2 - piece;
+            tracing::warn!(
+                info_hash = %self.info_hash,
+                file_idx = self.file_idx,
+                piece,
+                "libtorrent's copy of a fresh piece failed, reading it from disk"
+            );
         }
 
         match self.poll_file_open(cx) {

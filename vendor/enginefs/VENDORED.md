@@ -100,3 +100,12 @@ Copied from https://github.com/stremio-native/stream-server at rev
   anchors only past that frontier (`is_resume_point`), and a resume keeps
   the startup hold until it anchors (`RESUME_ANCHOR_FALLBACK_EXTRA_MS`);
   `SEEK_REANCHOR_DEBOUNCE_MS` is 100ms.
+- `src/piece_waiter.rs`, `src/backend/libtorrent/disk_stream.rs`: a piece
+  verified less than 30s ago (`FRESH_PIECE_BROKER_WINDOW`, finish times kept
+  by `PieceWaiterRegistry::finished_within`) is served only from
+  libtorrent's own copy (`read_piece`), never this stream's OS file handle.
+  libtorrent hashes from its buffers and may queue the disk write, so the
+  handle could read the piece's old disk content - stale *non-zero* bytes
+  the zero guard can't catch (mpv's MKV demuxer: "Corrupt file detected",
+  within seconds of a seek, only on just-verified pieces). The disk path
+  (and zero guard) remains the fallback when libtorrent's copy fails.
