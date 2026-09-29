@@ -518,7 +518,7 @@ nyaa_stream/
    can't map are dropped. Other AniList calls (airing feed, relations
    offset) still just fail soft.
 
-## Context menus (planned, v0.4.0 - minor: new feature)
+## Context menus (planned, v0.5.0 - minor: new feature)
 
 WebView2's default right-click menu (Back/Reload/Print/Inspect) is replaced
 by an app-styled HTML menu whose items depend on what was right-clicked.
@@ -663,6 +663,49 @@ not leave the file unknown; if it still fails, surface the error at once.
 
 **Later (not in v0.3.2):** prefetch the head (~8 MB, then dropped if unused)
 of the most likely source when an episode page opens - depends on A/B.
+
+## Continue-watching resume buffer (planned, v0.4.0 - minor: new feature)
+
+Each episode in the home page's Continue watching row keeps a small on-disk
+buffer of *its* source, so Resume starts playing at once while the torrent
+reconnects, instead of waiting on the swarm (see "Fast playback start").
+Depends on v0.3.2's `watch: resume` continue-watch mode.
+
+- **What is kept, per entry (~16 MB + open data):** whole verified pieces
+  (already hash-checked, so they are trustworthy as-is) covering
+  1. the ranges mpv read to *open* the file - header, tracks, attachments,
+     MKV Cues / MP4 moov - recorded by the stream handler from the start of
+     the load until mpv's `file-loaded`;
+  2. ~16 MB from the keyframe at or before the saved position. The byte
+     offset comes from the container index via in-process FFmpeg
+     (`media.rs`, same ffmpeg-next probe as `MediaProbes`, index lookup
+     time → byte), not from a bitrate estimate.
+- **When:** on player close / episode change (`stop_playback`), before the
+  torrent and its download folder are removed, when the entry is still in
+  progress (not completed, past the resume threshold). Pieces missing
+  locally at that moment are skipped - the buffer is best-effort.
+- **Where:** `<cache_dir>/nyaa-stream/resume/<info_hash>-<file_idx>/` - a
+  `pieces.bin` + `index.json` (piece length, piece → offset in the bin, the
+  file's size/name, the position it was cut for, the magnet). One buffer per
+  (anime, episode); saving again replaces it.
+- **Which source resumes:** `ProgressEntry` gains `source` (magnet, file
+  index, file name). Resume prefers that release when it is still listed, so
+  the buffer matches the bytes; otherwise the normal pick applies and the
+  buffer is ignored (then deleted).
+- **Serving it:** the stream handler answers a range from the buffer's
+  pieces when they cover it, and opens the engine reader only where they
+  stop; the engine's continue-watch anchor is set to the buffer's end, so
+  in-order download starts right after what's already local. Nothing is
+  written back into libtorrent's storage (libtorrent-sys has no `add_piece`
+  binding; the torrent re-downloads those pieces normally).
+- **Removal:** the buffer is deleted when the episode leaves Continue
+  watching - dismissed from the row (`dismissContinueWatching`), marked
+  watched / completed, or replaced by a newer episode of the same anime
+  (the row keeps one entry per anime) - and by Settings → Clear cache.
+  A startup sweep deletes buffers with no matching progress entry. Hard cap
+  of 25 buffers / ~600 MB, oldest `updatedAt` first.
+- **Commands:** `save_resume_buffer` (runs inside `stop_playback`),
+  `drop_resume_buffer(anime_id, episode_key)`, `sweep_resume_buffers(keep)`.
 
 ## Known gaps / not yet implemented
 
