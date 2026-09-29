@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `16ec8da` · 2026-09-29 · feat(player): Shift skips to the end of the current chapter, not a fixed 85s
+- `src/PlayerView.tsx`
+- `src/SettingsPanel.tsx`
+
 ### `27e7a1e` · 2026-09-29 · fix: keep season packs, packs with extras and single episodes apart
 - `src/episodeParser.ts`
 - `src/App.tsx`
