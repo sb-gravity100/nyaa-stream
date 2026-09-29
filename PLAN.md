@@ -2,10 +2,10 @@
 
 Anime-focused Stremio-like desktop client. Not a full Stremio addon-ecosystem
 clone — a focused tool that searches nyaa.si for torrents, matches them
-against AniList metadata, and plays them with the system `mpv` embedded in
+against AniList metadata, and plays them with in-process libmpv embedded in
 the app window under a transparent webview that draws the controls (see
 "Embedded mpv playback" below). An HLS `<video>` player remains as the
-fallback when mpv isn't installed.
+fallback when libmpv-2.dll can't be loaded.
 
 ## Reference
 
@@ -44,12 +44,15 @@ solid-color skeleton blocks, not a spinner).
 ## Stack
 
 - **Shell:** Tauri 2 (Rust backend + Preact/TypeScript frontend via Vite)
-- **Player:** system `mpv` (must be on PATH — not bundled) embedded in the
-  app window via `--wid` (`crates/mpv-player`'s `EmbeddedMpv`,
-  `src-tauri/src/player.rs`), driven over JSON IPC by the HTML controls in
-  `src/PlayerView.tsx` through `src/mpvVideo.ts`. Fallback without mpv:
-  the HLS `<video>` + `hls.js` player (`src/HlsPlayerView.tsx`). mpv is
-  also used headlessly for thumbnail capture
+- **Player:** libmpv (`libmpv-2.dll`, a GPL build, bundled from
+  `src-tauri/lib/` and loaded at runtime with `libloading`, so a missing DLL
+  only disables it) running in-process, embedded in the app window via
+  `wid` (`crates/mpv-player`'s `EmbeddedMpv`, `src-tauri/src/player.rs`),
+  driven by the HTML controls in `src/PlayerView.tsx` through
+  `src/mpvVideo.ts` with mpv-IPC-shaped JSON commands/events. Fallback
+  without libmpv: the HLS `<video>` + `hls.js` player
+  (`src/HlsPlayerView.tsx`). libmpv is also used headlessly for thumbnail
+  capture
 - **Torrent engine:** `enginefs`'s libtorrent backend (vendored via git
   dependency from https://github.com/stremio-native/stream-server, pinned
   to a specific commit - see `crates/torrent-engine/Cargo.toml`), replacing
@@ -140,7 +143,7 @@ requires, beyond Rust/Node:
   resolved from an AniList id via Kitsu's crowdsourced mapping table
 - **Thumbnails:** backdrop/episode art falls back Kitsu → AniList
   `streamingEpisodes` → a torrent-captured frame (`capture_torrent_thumbnail`
-  spawns a headless mpv against the episode's stream, seeks it to roughly
+  starts a headless libmpv against the episode's stream, seeks it to roughly
   the episode's midpoint using the same AniList duration estimate the HLS
   playlist uses, grabs one frame, caches it to disk) when neither has
   coverage - falls back to a fixed early point when no duration estimate
@@ -174,7 +177,7 @@ nyaa_stream/
     nyaa-client/              nyaa.si search client (paginated HTML scrape)
     anilist-client/          AniList GraphQL client
     kitsu-client/            Kitsu API client (backdrop + episode thumbnails)
-    mpv-player/                 embedded mpv (playback) + headless mpv (thumbnail capture) over JSON IPC
+    mpv-player/                 in-process libmpv: embedded (playback) + headless (thumbnail capture)
   src/                       Preact + TypeScript frontend
   reference/stremio-core/    reference-only clone, gitignored
   reference/stremio-web/     reference-only clone, gitignored
@@ -431,10 +434,10 @@ nyaa_stream/
    both upstream issues in the vendored crate, worked around here.
 
    **Embedded mpv playback (the default player).** The approach
-   stremio-shell-ng uses: `mpv_start` spawns the system mpv with
-   `--wid=<app window>` (`--idle --force-window --no-config`, no OSC/input,
-   `--hwdec=auto-safe`), finds the child window mpv creates (by process
-   id) and pushes it to `HWND_BOTTOM` so the webview stays on top, then sets
+   stremio-shell-ng uses: `mpv_start` starts an in-process libmpv with
+   `wid=<app window>` (`--idle --force-window --no-config`, no OSC/input,
+   `--hwdec=auto-safe`), finds the child window mpv creates (window
+   class `mpv`) and pushes it to `HWND_BOTTOM` so the webview stays on top, then sets
    the *webview's* background to alpha 0 (`set_background_color`). The
    window itself is never `transparent: true` - that is what broke click
    input app-wide in the first embedding attempt; with only the webview
@@ -516,8 +519,9 @@ nyaa_stream/
   sources need `scale_cuda` for the GPU-side 8-bit conversion, which
   vcpkg's FFmpeg doesn't build (no cuda-llvm), so it would cost a custom
   overlay port for no user-visible gain.
-- mpv must be on PATH for playback (else the HLS fallback) and for
-  torrent-captured thumbnails - the only external binary, not bundled.
+- libmpv-2.dll (bundled, GPL build - the distributed app is therefore
+  effectively GPL) is needed for playback (else the HLS fallback) and for
+  torrent-captured thumbnails.
 - The one-time media probe (`probe_media`, ffmpeg-next) still reads
   `stream_handler` over loopback HTTP; HLS and subtitle runs read the
   torrent directly (`direct_input.rs`).
