@@ -971,6 +971,27 @@ yaa-stream\logs`, the last 7 daily files) plus a
   token plan), so none can leak.
 - Logged: button presses, zip path and size, failures.
 
+## Dev build speed (tooling, no version bump)
+
+Measured 2026-09-29: a dev build writes `nyaa_stream.pdb` (488 MB) and
+`nyaa_stream_lib.pdb` (343 MB); MSVC `link.exe` rewrites them after every
+Rust change. Three changes, each timed on an incremental rebuild (touch
+`src-tauri/src/lib.rs`, `cargo build -p nyaa-stream`) before/after:
+
+1. **Less dev debug info** (`Cargo.toml`): `[profile.dev] debug =
+   "line-tables-only"` (panics/backtraces keep file:line; no variable-level
+   debugging) and `[profile.dev.package."*"] debug = 0` for dependencies.
+   Release profile untouched.
+2. **rust-lld for dev links** (`.cargo/config.toml`, MSVC target): link with
+   the `rust-lld.exe` shipped in the toolchain instead of `link.exe`. Kept
+   only if it links the static FFmpeg/libtorrent libs and the app starts.
+3. **rust-analyzer's own target dir** (`.vscode/settings.json`,
+   `rust-analyzer.cargo.targetDir: true`, un-ignored in `.gitignore`), so
+   the editor's `cargo check` never blocks or invalidates `tauri dev`.
+
+Not done: sccache (clean builds only); a Windows Defender exclusion for
+`target\`, `~\.cargo`, `~\.rustup` is the user's call.
+
 ## Known gaps / not yet implemented
 
 - (HLS fallback player only - mpv reads the file's real duration.) The
