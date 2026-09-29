@@ -678,8 +678,12 @@ first seconds before C's mode is known):**
 **Warm mpv:** mpv already persists after first use (`mpv_stop` only sends
 `stop`, dropping the file and its demuxer buffers). Changes:
 
-- Spawn the embedded mpv once at app launch (idle, below the webview) instead
-  of on the first play, so the first episode skips libmpv load + font install.
+- Spawn the embedded mpv early (idle, below the webview) instead of on the
+  first play, so the first episode skips libmpv load + font install.
+  **Not at launch** (regression found 2026-09-29): spawning it into the
+  window while WebView2 was still initializing there delayed the page's
+  first script from 0.5-2s to 3-34s (and hid the splash). It now starts
+  1.5s after the page's first load finishes (`on_page_load`, once).
   Skipped when libmpv isn't found at launch (HLS fallback, or `mpv_start`
   spawns lazily after a Settings path override).
 - `mpv_stop` resets per-file state after `stop` - `ab-loop-a/b`, `speed`,
