@@ -877,6 +877,17 @@ corrupted until a seek.
   libtorrent's copy fails (timeout/error), the disk path is used as before
   (the zero guard still applies).
 
+**Hero clips long titles** (Fate/kaleid liner Licht Nameless Girl,
+2026-09-29): `.home-hero` has a fixed `height: 340px` and bottom-aligns its
+body, so a title that wraps to 3 lines at the 4.4rem cap pushes the reason
+chip and the title's first line up under the app bar (`overflow: hidden`).
+
+- **Fix:** `min-height: 340px` instead of `height`, so the hero grows to fit;
+  the title is clamped to 2 lines (`-webkit-line-clamp`, full name in
+  `title=`) and titles over ~40 chars drop to a smaller clamp
+  (`.home-hero-title.long`) so the carousel's height barely changes between
+  slides.
+
 **Later (not in v0.3.2):** prefetch the head (~8 MB, then dropped if unused)
 of the most likely source when an episode page opens - depends on A/B.
 
