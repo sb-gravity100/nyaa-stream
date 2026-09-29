@@ -2,6 +2,11 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `4d3c28b` · 2026-09-29 · ci: build and publish signed releases on version tags
+- `.github/workflows/release.yml`
+- `FILE_INDEX.md`
+- `Cargo.lock`
+
 ### `0295aac` · 2026-09-29 · chore: release v0.3.0
 - `package.json`
 - `src-tauri/tauri.conf.json`
