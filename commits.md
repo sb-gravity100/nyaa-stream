@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `488943f` · 2026-09-29 · docs: document watch hint delivery
+- `FILE_INDEX.md`
+- `PLAN.md`
+
 ### `555c5c6` · 2026-09-29 · feat: pass a first/resume watch hint from play_magnet to the engine
 - `PHASES.md`
 - `crates/torrent-engine/src/lib.rs`
