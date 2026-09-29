@@ -2,6 +2,12 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `37f4c3e` · 2026-09-29 · feat: settings storage section, mpv path field, new shortcuts listed
+- `src/App.css`
+- `src/PlayerView.tsx`
+- `src/SettingsPanel.tsx`
+- `src/settings.ts`
+
 ### `98c75d8` · 2026-09-29 · feat: cache size/clear commands, HLS purge on start/exit, mpv path override
 - `crates/mpv-ipc/src/embedded.rs`
 - `crates/mpv-ipc/src/lib.rs`
