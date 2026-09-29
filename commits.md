@@ -2,6 +2,9 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `9e510a1` · 2026-09-29 · docs: add README
+- `README.md`
+
 ### `093d71b` · 2026-09-29 · chore(updater): point endpoint at sb-gravity100/nyaa-stream
 - `src-tauri/tauri.conf.json`
 
