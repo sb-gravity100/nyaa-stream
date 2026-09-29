@@ -259,11 +259,11 @@ export function SettingsPanel({ onClose }: Props) {
               checked={settings.hideUnlistedSources}
               onChange={(v) => updateSettings({ hideUnlistedSources: v })}
             />
-            <Row label="mpv path" hint="Leave empty to use mpv from PATH. Applies the next time a player opens.">
+            <Row label="libmpv path" hint="Leave empty to use the bundled libmpv-2.dll. Point at a libmpv-2.dll (or its folder) to use another build. Applies the next time a player opens.">
               <input
                 type="text"
                 class="setting-text-input"
-                placeholder="mpv.exe (or full path)"
+                placeholder="libmpv-2.dll (or its folder)"
                 value={settings.mpvPath}
                 onChange={(e) => updateSettings({ mpvPath: (e.target as HTMLInputElement).value.trim() })}
               />

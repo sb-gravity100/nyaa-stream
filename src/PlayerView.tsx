@@ -444,7 +444,7 @@ function MpvPlayerView({
          })
          .catch((err) => {
             console.error("[player] mpv failed to start", { err: String(err) });
-            setError(`The player couldn't start: ${String(err)}. Is mpv installed and on PATH?`);
+            setError(`The player couldn't start: ${String(err)}. Is libmpv-2.dll available?`);
          });
       return () => {
          cancelled = true;
