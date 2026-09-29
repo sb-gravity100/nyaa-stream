@@ -91,6 +91,9 @@ function build() {
     ...process.env,
     TAURI_SIGNING_PRIVATE_KEY: readFileSync(KEY_PATH, "utf8").trim(),
     TAURI_SIGNING_PRIVATE_KEY_PASSWORD: "",
+    // Dev builds link with rust-lld (.cargo/config.toml); shipped builds stay
+    // on MSVC link.exe.
+    CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER: "link.exe",
   };
   run("npm", ["run", "tauri", "build"], { env, inherit: true });
   log("build finished");

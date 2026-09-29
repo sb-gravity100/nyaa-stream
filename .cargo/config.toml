@@ -19,3 +19,10 @@ rustflags = ["-C", "target-cpu=x86-64-v3"]
 
 [target.'cfg(all(target_arch = "x86_64", target_os = "linux"))']
 rustflags = ["-C", "target-cpu=x86-64-v3"]
+
+# Dev links with the toolchain's rust-lld instead of MSVC link.exe (much
+# faster on this large binary - PLAN.md "Dev build speed"). Release builds
+# (scripts/release.mjs) override this back to link.exe via
+# CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER.
+[target.x86_64-pc-windows-msvc]
+linker = "rust-lld"
