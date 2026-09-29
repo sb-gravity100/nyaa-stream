@@ -305,7 +305,23 @@
       - [ ] Verify live: time from click to first frame, logged before/after
       - [ ] PLAN.md/FILE_INDEX.md sync, `npm run bump -- patch`, tag
             `v0.3.2`
-- [ ] Context menus (v0.4.0, see PLAN.md "Context menus"): one commit each -
+- [ ] Continue-watching resume buffer (v0.4.0, see PLAN.md "Continue-watching
+      resume buffer"): one commit each -
+      - [ ] Stream handler records the byte ranges mpv reads until
+            `file-loaded`, per torrent file
+      - [ ] `media.rs`: time → byte offset from the container index
+      - [ ] `save_resume_buffer` in `stop_playback`: open ranges + ~16 MB
+            from the resume keyframe, whole verified pieces, before removal
+      - [ ] `ProgressEntry.source` (magnet, file index, name); Resume
+            prefers that source when still listed
+      - [ ] Stream handler serves ranges from the buffer, engine reader
+            (continue-watch anchored at the buffer's end) past it
+      - [ ] `drop_resume_buffer` on dismiss / watched / replaced entry,
+            Clear cache, startup sweep, 25 buffers / ~600 MB cap
+      - [ ] Verify live: Resume from Continue watching → first frame time
+      - [ ] PLAN.md/FILE_INDEX.md sync, `npm run bump -- minor`, tag
+            `v0.4.0`
+- [ ] Context menus (v0.5.0, see PLAN.md "Context menus"): one commit each -
       - [ ] `tauri-plugin-clipboard-manager` (Rust, capability, JS)
       - [ ] `contextMenu.ts` store + `ContextMenu.tsx` component
       - [ ] Global listener: block native menu (dev Shift+right-click
@@ -314,4 +330,4 @@
       - [ ] Episode rows + source/torrent rows
       - [ ] Player surface (flat, no Subtitles/Speed)
       - [ ] FILE_INDEX.md/PLAN.md sync, `npm run bump -- minor`, tag
-            `v0.4.0`
+            `v0.5.0`
