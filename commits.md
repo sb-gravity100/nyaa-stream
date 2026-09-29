@@ -2,6 +2,11 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `0295aac` · 2026-09-29 · chore: release v0.3.0
+- `package.json`
+- `src-tauri/tauri.conf.json`
+- `src-tauri/Cargo.toml`
+
 ### `9234c19` · 2026-09-29 · docs: rewrite README as a full user and developer guide
 - `README.md`
 
