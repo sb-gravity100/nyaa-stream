@@ -1,13 +1,48 @@
-# nyaa-stream
+<div align="center">
 
-An anime-focused, Stremio-inspired desktop streaming client for Windows.
+<img src="src-tauri/icons/icon.svg" alt="nyaa-stream logo" width="128" height="128">
+
+<h1>nyaa-stream</h1>
+
+<p><strong>Stream anime straight from nyaa.si - no waiting for the download.</strong></p>
+
+<p>An anime-focused, Stremio-inspired desktop client for Windows.<br>
+Pick a release and it starts playing while the torrent downloads.</p>
+
+<p>
+  <a href="https://github.com/sb-gravity100/nyaa-stream/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/sb-gravity100/nyaa-stream?style=for-the-badge&color=f07aa6&labelColor=171a2b&label=release"></a>
+  <a href="https://github.com/sb-gravity100/nyaa-stream/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/sb-gravity100/nyaa-stream/total?style=for-the-badge&color=f07aa6&labelColor=171a2b"></a>
+  <img alt="Windows x64" src="https://img.shields.io/badge/Windows-x64-f07aa6?style=for-the-badge&labelColor=171a2b&logo=windows&logoColor=white">
+</p>
+
+<p>
+  <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?style=flat-square&logo=tauri&logoColor=white">
+  <img alt="Rust" src="https://img.shields.io/badge/Rust-backend-CE422B?style=flat-square&logo=rust&logoColor=white">
+  <img alt="Preact" src="https://img.shields.io/badge/Preact-frontend-673AB8?style=flat-square&logo=preact&logoColor=white">
+  <img alt="libtorrent" src="https://img.shields.io/badge/libtorrent-streaming-3b3f5c?style=flat-square">
+  <img alt="mpv" src="https://img.shields.io/badge/mpv-player-691F69?style=flat-square&logo=mpv&logoColor=white">
+</p>
+
+<p>
+  <a href="https://github.com/sb-gravity100/nyaa-stream/releases/latest"><strong>Download</strong></a>
+  &nbsp;·&nbsp;
+  <a href="#features">Features</a>
+  &nbsp;·&nbsp;
+  <a href="#keyboard-shortcuts">Shortcuts</a>
+  &nbsp;·&nbsp;
+  <a href="#building-from-source">Build from source</a>
+  &nbsp;·&nbsp;
+  <a href="#troubleshooting">Troubleshooting</a>
+</p>
+
+</div>
 
 Search for a show, pick a release from [nyaa.si](https://nyaa.si), and it starts
 playing while the torrent downloads. You don't have to wait for the whole file.
 Metadata comes from AniList, with Kitsu as a fallback, and playback runs through
 an embedded [mpv](https://mpv.io/) player.
 
-> **Status:** early development (v0.2.x), Windows x64 only.
+> **Status:** early development (v0.3.x), Windows x64 only.
 
 ---
 
