@@ -29,3 +29,11 @@ opt-level = 3
 opt-level = 3
 [profile.dev.package.png]
 opt-level = 3
+
+# Shipped binary: strip symbols, thin LTO across crates, 4 codegen units
+# (panic stays unwind: tokio tasks rely on it).
+[profile.release]
+lto = "thin"
+codegen-units = 4
+strip = "symbols"
+opt-level = 3
