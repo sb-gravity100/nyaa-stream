@@ -2,6 +2,10 @@
 
 Commit log, newest first. Prepend a new entry after every commit.
 
+### `ca6ed50` · 2026-09-29 · docs: plan continue-watching resume buffer for v0.4.0
+- `PLAN.md`
+- `PHASES.md`
+
 ### `bc65313` · 2026-09-29 · docs: plan far seeks re-anchoring continue-watch mode
 - `PLAN.md`
 - `PHASES.md`
