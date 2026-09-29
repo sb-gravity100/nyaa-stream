@@ -556,7 +556,8 @@ Three published releases: **v0.3.2** (the playback fixes) as soon as it
 passes a live test, **v0.4.0** (splash/title bar, download cache, resume
 buffer, contact and send logs), then **v1.0.0** (the stable Windows release
 after v0.8.0). The milestones in between - v0.5.0 (context menus) → v0.6.0
-(build thumbnails) → v0.7.0 (HD banners) → v0.8.0 (seek preview) - are each
+(build thumbnails) → v0.7.0 (HD banners) → v0.8.0 (seek preview) → v0.9.0
+(navigation/home rehaul) → v0.9.1 (Discover) - are each
 bumped (`npm run bump`) and tagged **locally only**, never pushed. Commits
 are pushed with plain `git push` (no tags); `npm run release` pushes only
 the tag it publishes. Installs update 0.3.1 → 0.3.2 → 0.4.0 → 1.0.0 (v1.0.0 ships x86_64 and 32-bit
@@ -1320,6 +1321,46 @@ until then, but must not add 64-bit-only assumptions).
   available for x86.
 - Risks: 32-bit builds of vcpkg FFmpeg/libtorrent may need patches; memory
   exhaustion on long HLS runs; small user base vs. extra build/QA cost.
+
+## Navigation and home rehaul + Discover (planned, v0.9.0 rehaul, v0.9.1 Discover)
+
+Scope decided 2026-09-29: rework **navigation and the home page** only. The
+media page, player and settings keep their layouts (they inherit new
+navigation chrome and the existing theme, nothing more). Lands between
+v0.8.0 and v1.0.0; both are local-only tags, so v1.0.0 is the first
+published build with the new UI (see "Release plan").
+
+**v0.9.0 - navigation and home rehaul**
+- Persistent left rail (icons + labels, collapses on narrow windows) replacing
+  the current top-of-page navigation: Home, Discover, Library, Search,
+  Settings. Sits under the custom title bar from v0.4.0; hidden in the
+  player. Routes stay hash-based (`router.ts`); add `#/discover`,
+  `#/discover/browse`, `#/library`.
+- Home keeps the hero, Continue watching and New episodes, restyled to the
+  rail layout; the Library poster grid moves to its own Library page
+  (Home shows a short "Your library" row linking to it).
+- Search moves into the rail (also a global shortcut), results unchanged.
+- No new backend; frontend-only, verified in the app and the browser preview.
+
+**v0.9.1 - Discover** (`src/DiscoverPage.tsx`, new `anilist-client`
+queries, cached per session + short disk TTL; Kitsu fallback where the
+metadata fallback already exists)
+- **Seasonal and trending**: rows for Trending now, This season, Next
+  season (upcoming) and All-time popular; each row scrolls and opens the
+  media page.
+- **Browse with filters**: full page with genre, year, season, format,
+  status filters and sort (popularity, score, trending, newest), paginated
+  infinite scroll; filter state kept in the URL.
+- **Recommendations**: "Because you watched X" rows from AniList
+  recommendations for titles in the library/watch history; empty state
+  when there is no history.
+- **Airing schedule**: weekly calendar (local time) from AniList
+  `airingSchedules`, library/watching shows highlighted, day and "now"
+  jump; clicking opens the media page.
+- Context menus (v0.5.0) apply to Discover cards; adult content follows the
+  existing setting (default hidden).
+- Risks: AniList rate limit (90/min) - batch the rows into few queries and
+  cache; recommendations depend on the user's history size.
 
 ## Dev build speed (tooling, no version bump)
 
