@@ -400,6 +400,6 @@
       - [x] `release.yml`: manual `workflow_dispatch` trigger only
       - [x] CLAUDE.md versioning section + FILE_INDEX.md
 - [ ] Dev build speed (see PLAN.md "Dev build speed"): one commit each -
-      - [ ] Dev profile debug info: line-tables-only, dependencies 0
-      - [ ] rust-lld for dev links (verified + timed)
+      - [x] Dev profile debug info: line-tables-only, dependencies 0
+      - [x] rust-lld for dev links (verified + timed)
       - [ ] rust-analyzer separate target dir (`.vscode/settings.json`)

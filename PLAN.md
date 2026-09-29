@@ -989,6 +989,13 @@ Rust change. Three changes, each timed on an incremental rebuild (touch
    `rust-analyzer.cargo.targetDir: true`, un-ignored in `.gitignore`), so
    the editor's `cargo check` never blocks or invalidates `tauri dev`.
 
+Result (incremental rebuild after touching `src-tauri/src/lib.rs`):
+3m34s baseline → 2m16s with (1), PDBs 831 MB → 437 MB (the rest is debug
+info inside the static FFmpeg/libtorrent libs) → 1m36s with (2). The
+rust-lld build starts and runs normally. `scripts/release.mjs` sets
+`CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER=link.exe`, so shipped builds
+still link with MSVC.
+
 Not done: sccache (clean builds only); a Windows Defender exclusion for
 `target\`, `~\.cargo`, `~\.rustup` is the user's call.
 
