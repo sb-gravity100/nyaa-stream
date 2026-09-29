@@ -1,8 +1,12 @@
 //! Continue-watching resume buffer support (PLAN.md "Continue-watching
 //! resume buffer"): which byte ranges mpv reads to *open* a file, recorded
-//! by `stream_handler` until the player reports `file-loaded`.
+//! by `stream_handler` until the player reports `file-loaded`, and the
+//! on-disk buffer format (`data.bin` + `ranges.json`) - verified bytes of
+//! one torrent file at their real offsets.
 
 use std::collections::HashMap;
+use std::io::{Read, Seek, SeekFrom, Write};
+use std::path::Path;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
@@ -52,6 +56,93 @@ pub fn merge_ranges(mut ranges: Vec<(u64, u64)>) -> Vec<(u64, u64)> {
         }
     }
     merged
+}
+
+/// `[start, end)` runs covered by both `a` and `b` (each sorted, merged).
+pub fn intersect_ranges(a: &[(u64, u64)], b: &[(u64, u64)]) -> Vec<(u64, u64)> {
+    let mut out = Vec::new();
+    let (mut i, mut j) = (0, 0);
+    while i < a.len() && j < b.len() {
+        let start = a[i].0.max(b[j].0);
+        let end = a[i].1.min(b[j].1);
+        if start < end {
+            out.push((start, end));
+        }
+        if a[i].1 < b[j].1 {
+            i += 1;
+        } else {
+            j += 1;
+        }
+    }
+    out
+}
+
+const DATA_FILE: &str = "data.bin";
+const RANGES_FILE: &str = "ranges.json";
+
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RangesFile {
+    file_size: u64,
+    /// `[start, end)` file offsets, stored back to back in `data.bin`.
+    ranges: Vec<(u64, u64)>,
+}
+
+/// Copies `ranges` (verified runs) of the file at `source` into a buffer
+/// in `dir`. Returns the bytes written. Blocking.
+pub fn write_buffer(dir: &Path, source: &Path, file_size: u64, ranges: &[(u64, u64)]) -> std::io::Result<u64> {
+    std::fs::create_dir_all(dir)?;
+    let mut input = std::fs::File::open(source)?;
+    let mut output = std::io::BufWriter::new(std::fs::File::create(dir.join(DATA_FILE))?);
+    let mut written = 0;
+    for &(start, end) in ranges {
+        input.seek(SeekFrom::Start(start))?;
+        let copied = std::io::copy(&mut (&mut input).take(end - start), &mut output)?;
+        if copied != end - start {
+            return Err(std::io::Error::new(std::io::ErrorKind::UnexpectedEof, format!("source ended inside {start}..{end}")));
+        }
+        written += copied;
+    }
+    output.flush()?;
+    let index = RangesFile { file_size, ranges: ranges.to_vec() };
+    std::fs::write(dir.join(RANGES_FILE), serde_json::to_vec(&index).map_err(std::io::Error::other)?)?;
+    Ok(written)
+}
+
+/// A buffer loaded for serving: its runs, in memory.
+pub struct LoadedBuffer {
+    pub file_size: u64,
+    /// Sorted, non-overlapping `(start, bytes)`.
+    runs: Vec<(u64, Vec<u8>)>,
+}
+
+impl LoadedBuffer {
+    /// Reads the buffer in `dir`. Blocking.
+    pub fn load(dir: &Path) -> std::io::Result<Self> {
+        let index: RangesFile = serde_json::from_slice(&std::fs::read(dir.join(RANGES_FILE))?).map_err(std::io::Error::other)?;
+        let data = std::fs::read(dir.join(DATA_FILE))?;
+        let mut runs = Vec::with_capacity(index.ranges.len());
+        let mut offset = 0usize;
+        for (start, end) in index.ranges {
+            let len = usize::try_from(end - start).map_err(std::io::Error::other)?;
+            let bytes = data.get(offset..offset + len).ok_or_else(|| std::io::Error::new(std::io::ErrorKind::UnexpectedEof, "data.bin shorter than its ranges"))?;
+            runs.push((start, bytes.to_vec()));
+            offset += len;
+        }
+        Ok(Self { file_size: index.file_size, runs })
+    }
+
+    pub fn bytes(&self) -> u64 {
+        self.runs.iter().map(|(_, b)| b.len() as u64).sum()
+    }
+
+    /// The buffered bytes starting exactly at `position`, if covered.
+    pub fn slice_at(&self, position: u64) -> Option<&[u8]> {
+        let idx = self.runs.partition_point(|(start, _)| *start <= position).checked_sub(1)?;
+        let (start, bytes) = &self.runs[idx];
+        let offset = usize::try_from(position - start).ok()?;
+        (offset < bytes.len()).then(|| &bytes[offset..])
+    }
 }
 
 type Key = (TorrentId, usize);
@@ -162,6 +253,30 @@ mod tests {
     #[test]
     fn merges_overlapping_and_touching() {
         assert_eq!(merge_ranges(vec![(10, 20), (0, 5), (5, 8), (15, 30), (40, 41)]), vec![(0, 8), (10, 30), (40, 41)]);
+    }
+
+    #[test]
+    fn intersects() {
+        assert_eq!(intersect_ranges(&[(0, 10), (20, 30)], &[(5, 25)]), vec![(5, 10), (20, 25)]);
+        assert!(intersect_ranges(&[(0, 10)], &[(10, 20)]).is_empty());
+    }
+
+    #[test]
+    fn buffer_round_trip() {
+        let dir = std::env::temp_dir().join(format!("nyaa-rb-{}", std::process::id()));
+        let source = dir.join("source.bin");
+        std::fs::create_dir_all(&dir).unwrap();
+        let content: Vec<u8> = (0..=255u8).cycle().take(1000).collect();
+        std::fs::write(&source, &content).unwrap();
+        let buf_dir = dir.join("buf");
+        assert_eq!(write_buffer(&buf_dir, &source, 1000, &[(0, 10), (500, 600)]).unwrap(), 110);
+        let loaded = LoadedBuffer::load(&buf_dir).unwrap();
+        assert_eq!(loaded.bytes(), 110);
+        assert_eq!(loaded.slice_at(3).unwrap(), &content[3..10]);
+        assert_eq!(loaded.slice_at(550).unwrap(), &content[550..600]);
+        assert!(loaded.slice_at(10).is_none());
+        assert!(loaded.slice_at(499).is_none());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

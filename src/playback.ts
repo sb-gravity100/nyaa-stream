@@ -55,9 +55,20 @@ export async function streamFileLoaded(torrentId: string, fileIdx: number): Prom
   );
 }
 
-export async function stopPlayback(): Promise<void> {
+/** Sent with stop_playback for an episode still in progress: the backend
+ * saves its resume buffer first (PLAN.md "Continue-watching resume buffer"). */
+export interface ResumeRequest {
+  animeId: number;
+  episodeKey: string;
+  fileIdx: number;
+  /** Seconds, file time. */
+  position: number;
+  magnet: string;
+}
+
+export async function stopPlayback(resume?: ResumeRequest): Promise<void> {
   if (!isTauriAvailable()) return;
-  console.debug("[stop_playback] invoked");
-  await invoke("stop_playback");
+  console.debug("[stop_playback] invoked", { resume });
+  await invoke("stop_playback", { resume: resume ?? null });
   console.info("[stop_playback] succeeded");
 }

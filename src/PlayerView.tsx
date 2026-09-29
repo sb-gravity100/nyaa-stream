@@ -9,7 +9,7 @@ import { isTypingTarget } from "./keyboard";
 import { ExportDialog, type ExportRequest } from "./ExportDialog";
 import type { AnimeMedia, NyaaResult, PlayFile, StreamStats, SubtitleTrack } from "./types";
 import { displayTitle, isMovie } from "./types";
-import { getStreamStats, playMagnet, stopPlayback, streamFileLoaded } from "./playback";
+import { getStreamStats, playMagnet, stopPlayback, streamFileLoaded, type ResumeRequest } from "./playback";
 import { saveFrameThumbnail } from "./torrentThumbnail";
 import { loadingProgress } from "./loadingProgress";
 import { bestRelease, isBatchRelease, getAnimeResolution, getPreferredGroup, releaseBadges, releaseGroup, releaseResolution, seederHealth, setAnimeResolution, setPreferredGroup, sortReleases } from "./releases";
@@ -19,7 +19,7 @@ import { Buffering } from "./Buffering";
 import { StatisticsMenu } from "./StatisticsMenu";
 import { getSettings as getSettingsSnapshot, useSettings } from "./settings";
 import { applyMpvSubtitleStyle, mpvSubtitleSettings, defaultSubtitleIndex, isStyledTrack, subtitleTrackLabel } from "./subtitles";
-import { resumePosition, saveProgress } from "./watchProgress";
+import { COMPLETED_FRACTION, MIN_RESUME_SECONDS, resumePosition, saveProgress } from "./watchProgress";
 import { PlayerPlaylist, type PlaylistItem } from "./PlayerPlaylist";
 import {
   BackIcon,
@@ -245,6 +245,7 @@ function MpvPlayerView({
 }: Props) {
    const settings = useSettings();
    const videoRef = useRef<MpvVideo | null>(null);
+   const selectedFileIdxRef = useRef<number | null>(null);
    const rootRef = useRef<HTMLDivElement>(null);
    const [videoEl, setVideoEl] = useState<MpvVideo | null>(null);
    const preferredGroup = settings.rememberFansubGroup
@@ -270,6 +271,7 @@ function MpvPlayerView({
    const [torrentId, setTorrentId] = useState<string | null>(null);
    const [files, setFiles] = useState<PlayFile[]>([]);
    const [selectedFile, setSelectedFile] = useState<PlayFile | null>(null);
+   selectedFileIdxRef.current = selectedFile?.index ?? null;
    const [stats, setStats] = useState<StreamStats | null>(null);
    const [error, setError] = useState<string | null>(null);
    const [status, setStatus] = useState("Connecting to peers…");
@@ -584,7 +586,7 @@ function MpvPlayerView({
          window.clearTimeout(idleTimerRef.current);
          window.clearTimeout(keyboardSeekTimerRef.current);
          window.clearTimeout(toastTimerRef.current);
-         stopPlayback();
+         stopPlayback(resumeRequest());
       };
    }, []);
 
@@ -639,6 +641,18 @@ function MpvPlayerView({
       () => downloadedTimeRanges(stats?.downloadedByteRanges ?? [], stats?.totalBytes ?? 0, episodeDuration),
       [stats?.downloadedByteRanges, stats?.totalBytes, episodeDuration],
    );
+
+   /** Resume buffer request for stop_playback when the episode is still in
+    * progress (would show in Continue watching) - PLAN.md "Continue-watching
+    * resume buffer". Reads refs: runs from the unmount cleanup. */
+   function resumeRequest(): ResumeRequest | undefined {
+      const video = videoRef.current;
+      const fileIdx = selectedFileIdxRef.current;
+      if (!video || fileIdx == null || !video.duration) return undefined;
+      const position = video.currentTime;
+      if (position < MIN_RESUME_SECONDS || position / video.duration >= COMPLETED_FRACTION) return undefined;
+      return { animeId: anime.id, episodeKey, fileIdx, position, magnet: selectedReleaseRef.current.magnet };
+   }
 
    function persistProgress() {
       const video = videoRef.current;
