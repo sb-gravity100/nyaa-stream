@@ -121,6 +121,9 @@ export interface StreamStats {
   /** Every produced `[start, end)` stretch in seconds - seek restarts
    * leave several disjoint ones. */
   readyRanges: [number, number][];
+  /** The file's verified bytes as `[start, end)` runs (file-relative) - the
+   * mpv player's seek bar maps them to time for its "downloaded" layer. */
+  downloadedByteRanges: [number, number][];
   /** "direct" (stream copy) or e.g. "HEVC -> H.264 (h264_nvenc)" when the
    * streaming server is transcoding; null before the first segment. */
   videoMode: string | null;
