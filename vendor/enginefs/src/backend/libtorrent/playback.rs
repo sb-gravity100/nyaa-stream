@@ -28,6 +28,9 @@ const EMERGENCY_REANNOUNCE_DELAY: Duration = Duration::from_secs(2);
 const EMERGENCY_REANNOUNCE_COOLDOWN: Duration = Duration::from_secs(60);
 const METADATA_TIMEOUT: Duration = Duration::from_secs(30);
 const HLS_PRIORITY_STREAM_ID: usize = usize::MAX;
+/// (nyaa-stream) How often a verified piece may trigger the "has the rest of
+/// the file verified?" check that restores continue-watch's skipped pieces.
+const SKIPPED_RESTORE_CHECK_INTERVAL: Duration = Duration::from_secs(2);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LibtorrentNetworkPhase {
@@ -262,6 +265,46 @@ impl StartupHold {
 struct WatchState {
     file_idx: usize,
     hint: WatchHint,
+    /// Continue watch: the piece in-order download starts from (the resume
+    /// point), once the first seek after the header read revealed it.
+    anchor: Option<i32>,
+    /// Pieces before `anchor` held at 0 (`first..=last`) until the rest of
+    /// the file verified or the player seeks back into them.
+    skipped: Option<(i32, i32)>,
+}
+
+impl WatchState {
+    fn new(file_idx: usize, hint: WatchHint) -> Self {
+        Self {
+            file_idx,
+            hint,
+            anchor: None,
+            skipped: None,
+        }
+    }
+}
+
+/// (nyaa-stream) Fix C: piece priorities for a continue-watch anchor - pieces
+/// before `anchor` at 0 while `skipped`, the rest at `priority`. Pieces in
+/// an active priority window keep their window priority.
+fn anchored_piece_priorities(
+    file_first: i32,
+    file_last: i32,
+    anchor: i32,
+    skipped: bool,
+    priority: i32,
+    windowed: &HashSet<i32>,
+) -> Vec<(i32, i32)> {
+    (file_first..=file_last)
+        .filter(|piece| !windowed.contains(piece))
+        .map(|piece| {
+            if skipped && piece < anchor {
+                (piece, 0)
+            } else {
+                (piece, priority)
+            }
+        })
+        .collect()
 }
 
 /// (nyaa-stream) What a piece falls back to when it leaves every priority
@@ -270,11 +313,16 @@ struct WatchState {
 struct PieceBaseline {
     priority: i32,
     held: bool,
+    /// Continue watch's skipped range (`WatchState::skipped`).
+    skipped: Option<(i32, i32)>,
 }
 
 impl PieceBaseline {
-    fn for_piece(&self, _piece: i32) -> i32 {
-        if self.held { 0 } else { self.priority }
+    fn for_piece(&self, piece: i32) -> i32 {
+        let skipped = self
+            .skipped
+            .is_some_and(|(first, last)| piece >= first && piece <= last);
+        if self.held || skipped { 0 } else { self.priority }
     }
 }
 
@@ -346,6 +394,8 @@ struct TorrentPlaybackState {
     pending_watch: Option<WatchHint>,
     /// (nyaa-stream) Fix C, see `WatchState`.
     watch: Option<WatchState>,
+    /// (nyaa-stream) Last `SKIPPED_RESTORE_CHECK_INTERVAL` check.
+    last_skipped_restore_check: Option<Instant>,
 }
 
 impl TorrentPlaybackState {
@@ -373,17 +423,24 @@ impl TorrentPlaybackState {
             startup_hold: None,
             pending_watch: None,
             watch: None,
+            last_skipped_restore_check: None,
         }
     }
 
+    /// The selected file's watch state, if it has one.
+    fn selected_watch(&self) -> Option<WatchState> {
+        self.watch
+            .filter(|watch| self.selected_file == Some(watch.file_idx))
+    }
+
     /// (nyaa-stream) Fix C: whether the selected file downloads in order -
-    /// first watch (from piece 0). libtorrent ranks piece priority above
+    /// first watch (from piece 0) or continue watch once its resume point is
+    /// known (from the anchor). libtorrent ranks piece priority above
     /// sequential order, so the priority-7 windows and pinned container
     /// metadata still jump the queue.
     fn sequential_wanted(&self) -> bool {
-        self.watch.is_some_and(|watch| {
-            self.selected_file == Some(watch.file_idx) && watch.hint == WatchHint::First
-        })
+        self.selected_watch()
+            .is_some_and(|watch| watch.hint == WatchHint::First || watch.anchor.is_some())
     }
 
     /// Hands a pending `WatchHint` to `file_idx` when a foreground stream
@@ -398,7 +455,7 @@ impl TorrentPlaybackState {
             return None;
         }
         let hint = self.pending_watch.take()?;
-        let watch = WatchState { file_idx, hint };
+        let watch = WatchState::new(file_idx, hint);
         self.watch = Some(watch);
         Some(watch)
     }
@@ -407,6 +464,7 @@ impl TorrentPlaybackState {
         PieceBaseline {
             priority: self.selected_priority,
             held: self.startup_hold.is_some(),
+            skipped: self.selected_watch().and_then(|watch| watch.skipped),
         }
     }
 
@@ -1169,6 +1227,33 @@ impl LibtorrentPlaybackCoordinator {
                 ));
             }
             state.acknowledged_priorities = Some(desired);
+            // (nyaa-stream) The file-priority rewrite reset every piece
+            // priority; put continue watch's skipped pieces back at 0.
+            if let Some(watch) = state.selected_watch()
+                && let (Some(anchor), Some(_)) = (watch.anchor, watch.skipped)
+                && let Some(file) = layout.files.get(start.file_idx)
+            {
+                let pieces = anchored_piece_priorities(
+                    file.first_piece,
+                    file.last_piece,
+                    anchor,
+                    true,
+                    state.selected_priority,
+                    &HashSet::new(),
+                );
+                drop(state);
+                let session = self.session.read().await;
+                let mut handle = session
+                    .find_torrent(info_hash)
+                    .map_err(|error| anyhow!("Torrent not found: {error}"))?;
+                handle.set_piece_priorities(pieces);
+                tracing::debug!(
+                    info_hash = %info_hash,
+                    file_idx = start.file_idx,
+                    anchor,
+                    "continue-watch skipped pieces re-applied after a file-priority rewrite"
+                );
+            }
         }
 
         if complete {
@@ -1458,6 +1543,261 @@ impl LibtorrentPlaybackCoordinator {
             "libtorrent playback startup stage"
         );
         Ok(true)
+    }
+
+    /// (nyaa-stream) Fix C - continue watch: in-order download starts at
+    /// `piece`. Missing pieces before it drop to 0 (`WatchState::skipped`),
+    /// everything from it on is at the file baseline, sequential mode is on,
+    /// and a startup hold ends (replaced by this layout). Each call replaces
+    /// the previous anchor. Caller holds the operation lock.
+    async fn anchor_continue_watch_locked(
+        &self,
+        info_hash: &str,
+        entry: &TorrentPlaybackEntry,
+        generation: u64,
+        file_idx: usize,
+        piece: i32,
+        reason: &'static str,
+    ) -> Result<bool> {
+        let Some(layout) = entry.layout.get() else {
+            return Ok(false);
+        };
+        let file = layout
+            .files
+            .get(file_idx)
+            .ok_or_else(|| anyhow!("File index {file_idx} out of range"))?;
+        let anchor = piece.clamp(file.first_piece, file.last_piece);
+        let session = self.session.read().await;
+        let mut handle = session
+            .find_torrent(info_hash)
+            .map_err(|error| anyhow!("Torrent not found: {error}"))?;
+        let pieces = {
+            let mut state = entry.state.lock().await;
+            if state.generation != generation || state.selected_file != Some(file_idx) {
+                return Ok(false);
+            }
+            let Some(watch) = state.watch.as_mut().filter(|watch| watch.file_idx == file_idx)
+            else {
+                return Ok(false);
+            };
+            watch.anchor = Some(anchor);
+            watch.skipped = (anchor > file.first_piece).then_some((file.first_piece, anchor - 1));
+            let skipped = watch.skipped.is_some();
+            state.startup_hold = None;
+            let windowed = state
+                .priority_windows
+                .effective
+                .keys()
+                .copied()
+                .collect::<HashSet<_>>();
+            anchored_piece_priorities(
+                file.first_piece,
+                file.last_piece,
+                anchor,
+                skipped,
+                state.selected_priority,
+                &windowed,
+            )
+        };
+        handle.set_sequential_download(true);
+        handle.set_piece_priorities(pieces);
+        drop(session);
+        tracing::info!(
+            info_hash = %info_hash,
+            file_idx,
+            generation,
+            anchor,
+            reason,
+            stage = "continue_watch_anchored",
+            "libtorrent playback startup stage"
+        );
+        Ok(true)
+    }
+
+    /// (nyaa-stream) Fix C: continue watch's skipped pieces go back to the
+    /// file baseline (in-order download continues with them). Caller holds
+    /// the operation lock. With `require_rest_verified` only once every
+    /// piece from the anchor to the file end verified.
+    async fn restore_skipped_locked(
+        &self,
+        info_hash: &str,
+        entry: &TorrentPlaybackEntry,
+        generation: u64,
+        require_rest_verified: bool,
+        reason: &'static str,
+    ) -> Result<bool> {
+        let Some(layout) = entry.layout.get() else {
+            return Ok(false);
+        };
+        let session = self.session.read().await;
+        let mut handle = session
+            .find_torrent(info_hash)
+            .map_err(|error| anyhow!("Torrent not found: {error}"))?;
+        let (pieces, file_idx, skipped) = {
+            let mut state = entry.state.lock().await;
+            if state.generation != generation {
+                return Ok(false);
+            }
+            let Some(watch) = state.selected_watch() else {
+                return Ok(false);
+            };
+            let (Some(anchor), Some(skipped)) = (watch.anchor, watch.skipped) else {
+                return Ok(false);
+            };
+            let Some(file) = layout.files.get(watch.file_idx) else {
+                return Ok(false);
+            };
+            if require_rest_verified {
+                let presence = handle.piece_presence(anchor, file.last_piece);
+                let expected = usize::try_from(file.last_piece - anchor + 1).unwrap_or(0);
+                if presence.len() != expected || presence.iter().any(|present| *present == 0) {
+                    return Ok(false);
+                }
+            }
+            if let Some(watch) = state.watch.as_mut() {
+                watch.skipped = None;
+            }
+            let windowed = state
+                .priority_windows
+                .effective
+                .keys()
+                .copied()
+                .collect::<HashSet<_>>();
+            let priority = state.selected_priority;
+            (
+                (skipped.0..=skipped.1)
+                    .filter(|piece| !windowed.contains(piece))
+                    .map(|piece| (piece, priority))
+                    .collect::<Vec<_>>(),
+                watch.file_idx,
+                skipped,
+            )
+        };
+        handle.set_piece_priorities(pieces);
+        drop(session);
+        tracing::info!(
+            info_hash = %info_hash,
+            file_idx,
+            generation,
+            skipped_first = skipped.0,
+            skipped_last = skipped.1,
+            reason,
+            "continue-watch skipped pieces restored"
+        );
+        Ok(true)
+    }
+
+    /// (nyaa-stream) A foreground stream's first read position (see
+    /// `LibtorrentPlaybackPermit::report_read_start`): moves a startup hold's
+    /// buffer there, anchors continue watch at the first seek past the
+    /// header, and restores skipped pieces when the player seeks back into
+    /// ones that aren't downloaded.
+    async fn on_read_started(
+        &self,
+        info_hash: &str,
+        entry: &TorrentPlaybackEntry,
+        file_idx: usize,
+        generation: u64,
+        piece: i32,
+    ) -> Result<()> {
+        let _operation = entry.operation.lock().await;
+        let header_end = entry
+            .layout
+            .get()
+            .and_then(|layout| {
+                layout.files.get(file_idx).map(|file| {
+                    file.first_piece
+                        .saturating_add(startup_buffer_pieces(layout.piece_length))
+                })
+            })
+            .unwrap_or(i32::MAX);
+        enum Action {
+            None,
+            Retarget(StartupHold),
+            Anchor,
+            RestoreSkipped,
+        }
+        let action = {
+            let mut state = entry.state.lock().await;
+            if state.generation != generation || state.selected_file != Some(file_idx) {
+                Action::None
+            } else {
+                let watch = state.selected_watch();
+                let resume_unanchored = watch
+                    .is_some_and(|watch| watch.hint == WatchHint::Resume && watch.anchor.is_none());
+                let in_skipped = watch
+                    .and_then(|watch| watch.skipped)
+                    .is_some_and(|(first, last)| piece >= first && piece <= last);
+                if resume_unanchored && piece >= header_end {
+                    Action::Anchor
+                } else if in_skipped {
+                    Action::RestoreSkipped
+                } else {
+                    match state.startup_hold.as_mut() {
+                        Some(hold) if !hold.buffer_contains(piece) => {
+                            hold.retarget(piece);
+                            Action::Retarget(*hold)
+                        }
+                        _ => Action::None,
+                    }
+                }
+            }
+        };
+        match action {
+            Action::None => {
+                tracing::debug!(
+                    info_hash = %info_hash,
+                    file_idx,
+                    generation,
+                    piece,
+                    "foreground stream read started"
+                );
+            }
+            Action::Retarget(hold) => {
+                tracing::debug!(
+                    info_hash = %info_hash,
+                    file_idx,
+                    piece,
+                    buffer_first = hold.buffer_first,
+                    buffer_last = hold.buffer_last,
+                    "startup buffer moved to the read position"
+                );
+                self.raise_startup_baseline_locked(
+                    info_hash,
+                    entry,
+                    generation,
+                    true,
+                    "buffer-verified",
+                )
+                .await?;
+            }
+            Action::Anchor => {
+                self.anchor_continue_watch_locked(
+                    info_hash,
+                    entry,
+                    generation,
+                    file_idx,
+                    piece,
+                    "resume-point",
+                )
+                .await?;
+            }
+            Action::RestoreSkipped => {
+                let downloaded = {
+                    let session = self.session.read().await;
+                    session
+                        .find_torrent(info_hash)
+                        .map(|handle| handle.have_piece(piece))
+                        .unwrap_or(false)
+                };
+                // A read of already-downloaded data changes nothing.
+                if !downloaded {
+                    self.restore_skipped_locked(info_hash, entry, generation, false, "seek-back")
+                        .await?;
+                }
+            }
+        }
+        Ok(())
     }
 
     fn schedule_startup_baseline_fallback(
@@ -1998,13 +2338,29 @@ impl LibtorrentPlaybackCoordinator {
                         }
                     }
                 }
-                let (selected, hold_generation) = {
+                let (selected, hold_generation, restore_generation) = {
                     let mut state = entry.state.lock().await;
                     state.priority_windows.mark_piece_verified(piece);
                     let hold_generation = state
                         .startup_hold
                         .is_some_and(|hold| hold.buffer_contains(piece))
                         .then_some(state.generation);
+                    let now = Instant::now();
+                    let restore_generation = state
+                        .selected_watch()
+                        .is_some_and(|watch| {
+                            watch.skipped.is_some() && watch.anchor.is_some_and(|anchor| piece >= anchor)
+                        })
+                        .then(|| {
+                            let due = state.last_skipped_restore_check.is_none_or(|last| {
+                                now.duration_since(last) >= SKIPPED_RESTORE_CHECK_INTERVAL
+                            });
+                            due.then(|| {
+                                state.last_skipped_restore_check = Some(now);
+                                state.generation
+                            })
+                        })
+                        .flatten();
                     if state.selected_first_piece == Some(piece) {
                         state.selected_first_piece = None;
                         tracing::info!(
@@ -2021,6 +2377,7 @@ impl LibtorrentPlaybackCoordinator {
                             .selected_file
                             .map(|file_idx| (file_idx, state.generation, state.phase)),
                         hold_generation,
+                        restore_generation,
                     )
                 };
                 if let Some(generation) = hold_generation
@@ -2035,6 +2392,21 @@ impl LibtorrentPlaybackCoordinator {
                         %error,
                         "Failed to raise the startup baseline"
                     );
+                }
+                if let Some(generation) = restore_generation {
+                    let _operation = entry.operation.lock().await;
+                    if let Err(error) = self
+                        .restore_skipped_locked(&info_hash, &entry, generation, true, "rest-verified")
+                        .await
+                    {
+                        tracing::warn!(
+                            info_hash = %info_hash,
+                            generation,
+                            piece,
+                            %error,
+                            "Failed to restore continue-watch skipped pieces"
+                        );
+                    }
                 }
                 if !self.seeding_enabled.load(Ordering::Relaxed)
                     && let Some((file_idx, generation, LibtorrentNetworkPhase::Active)) = selected
@@ -2082,46 +2454,18 @@ impl LibtorrentPlaybackCoordinator {
                 let Some(entry) = entry else {
                     return;
                 };
-                let retargeted = {
-                    let mut state = entry.state.lock().await;
-                    let current =
-                        state.generation == generation && state.selected_file == Some(file_idx);
-                    match state.startup_hold.as_mut() {
-                        Some(hold) if current && !hold.buffer_contains(piece) => {
-                            hold.retarget(piece);
-                            Some(*hold)
-                        }
-                        _ => None,
-                    }
-                };
-                tracing::debug!(
-                    info_hash = %info_hash,
-                    file_idx,
-                    generation,
-                    piece,
-                    retargeted = retargeted.is_some(),
-                    "foreground stream read started"
-                );
-                if let Some(hold) = retargeted {
-                    tracing::debug!(
+                if let Err(error) = self
+                    .on_read_started(&info_hash, &entry, file_idx, generation, piece)
+                    .await
+                {
+                    tracing::warn!(
                         info_hash = %info_hash,
                         file_idx,
-                        buffer_first = hold.buffer_first,
-                        buffer_last = hold.buffer_last,
-                        "startup buffer moved to the read position"
+                        generation,
+                        piece,
+                        %error,
+                        "Failed to handle a foreground read start"
                     );
-                    if let Err(error) = self
-                        .raise_startup_baseline(&info_hash, &entry, generation, true, "buffer-verified")
-                        .await
-                    {
-                        tracing::warn!(
-                            info_hash = %info_hash,
-                            file_idx,
-                            generation,
-                            %error,
-                            "Failed to raise the startup baseline"
-                        );
-                    }
                 }
             }
             PlaybackCommand::PieceInvalidated { info_hash, piece } => {
@@ -2507,6 +2851,32 @@ mod tests {
         assert!(state.sequential_wanted());
         state.select(3, 1, true, false, true, true);
         assert!(!state.sequential_wanted(), "another file has no watch mode");
+    }
+
+    #[test]
+    fn continue_watch_downloads_in_order_only_once_anchored() {
+        let mut state = TorrentPlaybackState::new();
+        state.pending_watch = Some(WatchHint::Resume);
+        state.take_pending_watch(2, true);
+        state.select(2, 1, true, false, true, true);
+        assert!(!state.sequential_wanted(), "resume point not known yet");
+        if let Some(watch) = state.watch.as_mut() {
+            watch.anchor = Some(500);
+            watch.skipped = Some((0, 499));
+        }
+        assert!(state.sequential_wanted());
+        let baseline = state.piece_baseline();
+        assert_eq!(baseline.for_piece(10), 0, "skipped piece");
+        assert_eq!(baseline.for_piece(500), 1, "from the resume point on");
+    }
+
+    #[test]
+    fn anchored_layout_skips_earlier_pieces_but_not_windows() {
+        let windowed = HashSet::from([3]);
+        let pieces = anchored_piece_priorities(0, 7, 4, true, 1, &windowed);
+        assert_eq!(pieces, vec![(0, 0), (1, 0), (2, 0), (4, 1), (5, 1), (6, 1), (7, 1)]);
+        let restored = anchored_piece_priorities(0, 3, 2, false, 1, &HashSet::new());
+        assert!(restored.iter().all(|(_, priority)| *priority == 1));
     }
 
     #[test]

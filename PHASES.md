@@ -285,7 +285,7 @@
             deadlines; ~4 MB read-ahead at 7 after the first byte
       - [x] `play_magnet` `watch: first|resume` hint → engine, per file
       - [x] enginefs: first watch - sequential download from piece 0
-      - [ ] enginefs: continue watch - pieces before the resume point at 0,
+      - [x] enginefs: continue watch - pieces before the resume point at 0,
             sequential from it, earlier pieces back to 1 when the rest is
             done or on a seek back
       - [ ] enginefs: a seek into undownloaded data re-anchors
