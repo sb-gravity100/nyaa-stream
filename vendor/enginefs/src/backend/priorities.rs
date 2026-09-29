@@ -122,6 +122,18 @@ pub const STARTUP_BUFFER_BYTES: u64 = 8 * 1024 * 1024;
 /// (nyaa-stream) The startup baseline rises after this long even if the
 /// startup buffer hasn't verified yet (slow swarm, rare head pieces).
 pub const STARTUP_BASELINE_FALLBACK_MS: u64 = 15_000;
+/// (nyaa-stream) A foreground read blocked this long on the piece it started
+/// at (after open or a seek) re-anchors continue-watch mode there - long
+/// enough that scrubbing through the seek bar doesn't thrash priorities.
+pub const SEEK_REANCHOR_DEBOUNCE_MS: u64 = 300;
+
+/// (nyaa-stream) Whether a blocked seek target is covered by in-order
+/// download: it lies at most `urgent_pieces` past the first missing piece
+/// (`frontier`) of the downloaded run from the current anchor.
+pub fn seek_target_covered(target: i32, anchor: i32, frontier: i32, urgent_pieces: i32) -> bool {
+    target >= anchor && target <= frontier.saturating_add(urgent_pieces)
+}
+
 /// Baseline of a streamed file once its startup buffer has verified.
 pub const STREAMING_FILE_BASELINE_PRIORITY: i32 = 1;
 
@@ -832,6 +844,15 @@ mod tests {
             disk_backed_forward_window_pieces_for(PlaybackIntent::DirectInitial, 256 * 1024),
             16
         );
+    }
+
+    #[test]
+    fn seek_near_the_download_frontier_is_covered() {
+        // Downloaded run 100..=149 from anchor 100, 16 urgent pieces.
+        assert!(seek_target_covered(160, 100, 150, 16));
+        assert!(!seek_target_covered(400, 100, 150, 16));
+        // Before the anchor is never covered by in-order download.
+        assert!(!seek_target_covered(50, 100, 150, 16));
     }
 
     #[test]

@@ -288,7 +288,7 @@
       - [x] enginefs: continue watch - pieces before the resume point at 0,
             sequential from it, earlier pieces back to 1 when the rest is
             done or on a seek back
-      - [ ] enginefs: a seek into undownloaded data re-anchors
+      - [x] enginefs: a seek into undownloaded data re-anchors
             continue-watch mode at the target (debounced ~300ms blocked
             read); never for background/probe/preload reads
       - [ ] enginefs: waiting-piece log reports the effective window

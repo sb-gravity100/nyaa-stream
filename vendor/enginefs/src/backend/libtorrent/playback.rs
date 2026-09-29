@@ -12,7 +12,7 @@ use tokio_util::sync::CancellationToken;
 use crate::backend::priorities::{
     MemoryPressure, PlaybackIntent, PlaybackPriorityPolicy, PriorityContext,
     STARTUP_BASELINE_FALLBACK_MS, WatchHint, disk_backed_file_baseline_priority,
-    startup_buffer_pieces,
+    disk_backed_urgent_pieces, seek_target_covered, startup_buffer_pieces,
 };
 
 use super::alerts::LibtorrentAlertHub;
@@ -79,6 +79,21 @@ impl LibtorrentPlaybackPermit {
             return;
         }
         let _ = self.command_tx.send(PlaybackCommand::ReadStarted {
+            info_hash: self.info_hash.clone(),
+            file_idx: self.file_idx,
+            generation: self.generation,
+            piece,
+        });
+    }
+
+    /// (nyaa-stream) A foreground stream blocked on the piece it started at
+    /// for `SEEK_REANCHOR_DEBOUNCE_MS` - see
+    /// `LibtorrentPlaybackCoordinator::on_seek_blocked`.
+    pub(crate) fn report_seek_blocked(&self, piece: i32) {
+        if self.released || self.cancellation.is_cancelled() {
+            return;
+        }
+        let _ = self.command_tx.send(PlaybackCommand::SeekBlocked {
             info_hash: self.info_hash.clone(),
             file_idx: self.file_idx,
             generation: self.generation,
@@ -664,6 +679,13 @@ enum PlaybackCommand {
     /// (nyaa-stream) A foreground stream's first read position, see
     /// `LibtorrentPlaybackPermit::report_read_start`.
     ReadStarted {
+        info_hash: String,
+        file_idx: usize,
+        generation: u64,
+        piece: i32,
+    },
+    /// (nyaa-stream) See `LibtorrentPlaybackPermit::report_seek_blocked`.
+    SeekBlocked {
         info_hash: String,
         file_idx: usize,
         generation: u64,
@@ -1800,6 +1822,86 @@ impl LibtorrentPlaybackCoordinator {
         Ok(())
     }
 
+    /// (nyaa-stream) Fix C - a seek into undownloaded data is continue watch:
+    /// when a foreground read blocked (debounced, `SEEK_REANCHOR_DEBOUNCE_MS`)
+    /// on its start piece, and in-order download from the current anchor
+    /// won't reach it soon (`seek_target_covered`), continue-watch mode
+    /// re-anchors there - missing pieces before it drop to 0, sequential
+    /// order restarts at it. Only once the watch mode is established (first
+    /// watch, or continue watch after its resume point), so a resume's
+    /// header read never anchors here.
+    async fn on_seek_blocked(
+        &self,
+        info_hash: &str,
+        entry: &TorrentPlaybackEntry,
+        file_idx: usize,
+        generation: u64,
+        piece: i32,
+    ) -> Result<()> {
+        let _operation = entry.operation.lock().await;
+        let Some(layout) = entry.layout.get() else {
+            return Ok(());
+        };
+        let Some(file) = layout.files.get(file_idx) else {
+            return Ok(());
+        };
+        let origin = {
+            let state = entry.state.lock().await;
+            if state.generation != generation || state.selected_file != Some(file_idx) {
+                return Ok(());
+            }
+            match state.selected_watch() {
+                Some(watch) if watch.hint == WatchHint::First || watch.anchor.is_some() => {
+                    watch.anchor.unwrap_or(file.first_piece)
+                }
+                _ => {
+                    tracing::debug!(
+                        info_hash = %info_hash,
+                        file_idx,
+                        piece,
+                        "blocked read start ignored: no established watch mode"
+                    );
+                    return Ok(());
+                }
+            }
+        };
+        let (downloaded, frontier) = {
+            let session = self.session.read().await;
+            let handle = session
+                .find_torrent(info_hash)
+                .map_err(|error| anyhow!("Torrent not found: {error}"))?;
+            let downloaded = handle.have_piece(piece);
+            let frontier = if piece >= origin {
+                let presence = handle.piece_presence(origin, piece);
+                origin.saturating_add(
+                    presence
+                        .iter()
+                        .position(|present| *present == 0)
+                        .unwrap_or(presence.len()) as i32,
+                )
+            } else {
+                origin
+            };
+            (downloaded, frontier)
+        };
+        let urgent = disk_backed_urgent_pieces(layout.piece_length);
+        if downloaded || seek_target_covered(piece, origin, frontier, urgent) {
+            tracing::debug!(
+                info_hash = %info_hash,
+                file_idx,
+                piece,
+                origin,
+                frontier,
+                downloaded,
+                "blocked seek covered by in-order download, no re-anchor"
+            );
+            return Ok(());
+        }
+        self.anchor_continue_watch_locked(info_hash, entry, generation, file_idx, piece, "seek")
+            .await?;
+        Ok(())
+    }
+
     fn schedule_startup_baseline_fallback(
         self: &Arc<Self>,
         info_hash: String,
@@ -2465,6 +2567,30 @@ impl LibtorrentPlaybackCoordinator {
                         piece,
                         %error,
                         "Failed to handle a foreground read start"
+                    );
+                }
+            }
+            PlaybackCommand::SeekBlocked {
+                info_hash,
+                file_idx,
+                generation,
+                piece,
+            } => {
+                let entry = self.entries.lock().await.get(&info_hash).cloned();
+                let Some(entry) = entry else {
+                    return;
+                };
+                if let Err(error) = self
+                    .on_seek_blocked(&info_hash, &entry, file_idx, generation, piece)
+                    .await
+                {
+                    tracing::warn!(
+                        info_hash = %info_hash,
+                        file_idx,
+                        generation,
+                        piece,
+                        %error,
+                        "Failed to re-anchor continue watch at a blocked seek"
                     );
                 }
             }
