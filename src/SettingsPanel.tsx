@@ -6,6 +6,7 @@ import { DEFAULT_SUBTITLE_STYLE, resetSettings, updateSettings, useSettings, typ
 import { CloseIcon } from "./icons";
 import { exportBackup, importBackup } from "./backup";
 import { checkForUpdate, installUpdate } from "./updater";
+import { HelpSection } from "./HelpSection";
 import type { Update } from "@tauri-apps/plugin-updater";
 
 interface Props {
@@ -526,6 +527,7 @@ yaa-stream screenshots.">
           <BackupSection />
 
           <StorageSection />
+          <HelpSection />
 
           <section class="settings-section">
             <h3>Player shortcuts</h3>
