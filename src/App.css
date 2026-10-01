@@ -3599,6 +3599,22 @@ html.mpv-active .player-view {
   overflow-wrap: anywhere;
 }
 
+/* Settings -> Help modals (HelpSection.tsx), above the settings panel. */
+.help-backdrop {
+  z-index: 320;
+}
+
+.help-dialog .setting-hint {
+  margin: 0 0 12px;
+}
+
+.help-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
 .export-actions {
   display: flex;
   justify-content: flex-end;
