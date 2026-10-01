@@ -1074,8 +1074,26 @@ Depends on v0.3.2's `watch: resume` continue-watch mode.
   (the row keeps one entry per anime) - and by Settings → Clear cache.
   A startup sweep deletes buffers with no matching progress entry. Hard cap
   of 25 buffers / ~600 MB, oldest `updatedAt` first.
-- **Commands:** `save_resume_buffer` (runs inside `stop_playback`),
-  `drop_resume_buffer(anime_id, episode_key)`, `sweep_resume_buffers(keep)`.
+- **As built** (`src-tauri/src/resume.rs`,
+  `crates/torrent-engine/src/resume_buffer.rs`): no separate commands.
+  `stop_playback(resume)` takes `{animeId, episodeKey, fileIdx, position,
+  magnet}` from the player's unmount (only when position >= 20s and < 90%)
+  and saves first, while the torrent is still in the engine. Open reads are
+  recorded by `stream_handler` until the player calls `stream_file_loaded`
+  (mpv's `file-loaded`; capped at 64 MB). The bytes are the intersection of
+  the wanted ranges with the file's verified runs (`downloaded_ranges`),
+  copied from the file on disk into `data.bin` + `ranges.json`, with the
+  app's `entry.json` beside them. The keyframe offset comes from
+  `media::keyframe_byte_offset` on the *local file* (no HTTP, 10s timeout).
+  A wrong offset only makes the buffer less useful; it never serves wrong
+  bytes. `play_magnet` attaches any buffer of that info hash whose file
+  size still matches. The stream handler then serves through a
+  `BufferedReader` that opens the engine's file handle lazily, only when a
+  read leaves the buffer, and stops torrent reads at the next buffered run.
+  Removal rides the download cache's keep sync: `set_download_cache_keep`
+  also sweeps buffers whose episode isn't in the list, which covers
+  dismissed, watched, replaced and the startup sweep. Clear cache (the
+  torrent data row) deletes `resume/` too, and its size counts there.
 
 ## Build thumbnails button (planned, v0.6.0 - minor: new feature)
 

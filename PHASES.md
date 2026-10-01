@@ -361,16 +361,16 @@
             fast resume (vendored libtorrent-sys)
 - [ ] Continue-watching resume buffer (v0.4.0, see PLAN.md "Continue-watching
       resume buffer"): one commit each -
-      - [ ] Stream handler records the byte ranges mpv reads until
+      - [x] Stream handler records the byte ranges mpv reads until
             `file-loaded`, per torrent file
-      - [ ] `media.rs`: time → byte offset from the container index
-      - [ ] `save_resume_buffer` in `stop_playback`: open ranges + ~16 MB
+      - [x] `media.rs`: time → byte offset from the container index
+      - [x] `save_resume_buffer` in `stop_playback`: open ranges + ~16 MB
             from the resume keyframe, whole verified pieces, before removal
-      - [ ] `ProgressEntry.source` (magnet, file index, name); Resume
+      - [x] `ProgressEntry.source` (magnet, file index, name); Resume
             prefers that source when still listed
-      - [ ] Stream handler serves ranges from the buffer, engine reader
+      - [x] Stream handler serves ranges from the buffer, engine reader
             (continue-watch anchored at the buffer's end) past it
-      - [ ] `drop_resume_buffer` on dismiss / watched / replaced entry,
+      - [x] `drop_resume_buffer` on dismiss / watched / replaced entry,
             Clear cache, startup sweep, 25 buffers / ~600 MB cap
       - [ ] Verify live: Resume from Continue watching → first frame time
 - [ ] Subtitle preloading (v0.4.0, see PLAN.md "Subtitle preloading"): one
