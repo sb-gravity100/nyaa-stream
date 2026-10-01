@@ -67,7 +67,7 @@ pub async fn get_cache_sizes(state: State<'_, Arc<AppState>>) -> Result<CacheSiz
             thumbnails: dir_size(&root.join("thumbnails")),
             hls: dir_size(&hls_dir()),
             // Allocated bytes - the download cache's files are sparse.
-            torrents: app.download_cache.status().0 + dir_size(&root.join("engine_cache")),
+            torrents: app.download_cache.status().0 + dir_size(&root.join("engine_cache")) + dir_size(&crate::resume::root()),
         }
     })
     .await
@@ -103,11 +103,9 @@ pub async fn clear_cache(state: State<'_, Arc<AppState>>, kind: String) -> Resul
                 tracing::warn!(%err, "download cache partly cleared");
                 return Err(format!("Some downloads couldn't be deleted: {err}"));
             }
-            if playing.is_some() {
-                Vec::new()
-            } else {
-                vec![root.join("engine_cache")]
-            }
+            // Resume buffers go too; one attached to the playing torrent is
+            // already in memory.
+            vec![crate::resume::root()].into_iter().chain(playing.is_none().then(|| root.join("engine_cache"))).collect()
         }
         other => return Err(format!("unknown cache {other}")),
     };
