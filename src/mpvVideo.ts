@@ -85,6 +85,17 @@ function command(args: unknown[]): Promise<unknown> {
  * `currentTime` is interpolated between them so the seek bar moves every
  * frame.
  */
+/** mpv `slang` for a settings language code: matched as given and as its
+ * ISO 639-2 form, which many releases tag tracks with. */
+function subtitleLanguages(language: string): string {
+   const ISO_639_2: Record<string, string> = {
+      en: "eng", ja: "jpn", es: "spa", fr: "fre,fra", de: "ger,deu", pt: "por", it: "ita", ru: "rus",
+      ar: "ara", zh: "chi,zho", ko: "kor", id: "ind", pl: "pol", tr: "tur", vi: "vie", th: "tha",
+   };
+   const lang = language.toLowerCase();
+   return [lang, ISO_639_2[lang]].filter(Boolean).join(",");
+}
+
 export class MpvVideo extends EventTarget {
    private props: Partial<Record<Observed, unknown>> = {};
    private timeStamp = 0;
@@ -108,6 +119,10 @@ export class MpvVideo extends EventTarget {
    // new entry's id is known.
    private entryId: number | null = null;
    private staleUpTo = 0;
+   /** Re-asserts the subtitle track once after the first frame (see
+    * `checkSubtitlesShowing`). */
+   private subtitleCheckTimer: number | undefined;
+   private subtitleVisible = true;
    private maxSeenEntryId = 0;
    error: { message: string } | null = null;
 
@@ -127,9 +142,19 @@ export class MpvVideo extends EventTarget {
       console.info("[mpv] attached");
    }
 
-   /** Opens `url`, starting at `start` seconds when given. */
-   async load(url: string, start: number | null): Promise<void> {
-      console.info("[mpv] loading", { url, start });
+   /** Opens `url`, starting at `start` seconds when given. `subtitles`
+    * preloads a track in that language (`sid=auto` + `slang` before the
+    * load), so its packets are demuxed from the first byte instead of after
+    * the on-open pick - PLAN.md "Subtitle preloading". */
+   async load(url: string, start: number | null, subtitles?: { language: string; visible: boolean }): Promise<void> {
+      console.info("[mpv] loading", { url, start, subtitles });
+      window.clearTimeout(this.subtitleCheckTimer);
+      if (subtitles) {
+         this.subtitleVisible = subtitles.visible;
+         await command(["set_property", "slang", subtitleLanguages(subtitles.language)]);
+         await command(["set_property", "sid", "auto"]);
+         await command(["set_property", "sub-visibility", subtitles.visible]);
+      }
       this.loaded = false;
       this.started = false;
       this.error = null;
@@ -409,12 +434,53 @@ export class MpvVideo extends EventTarget {
       void command(["set_property", "pause", true]);
    }
 
-   /** Selects a subtitle track by mpv id, or turns subtitles off. */
-   setSubtitle(id: number | null): void {
+   /** Selects a subtitle track by mpv id, or hides subtitles (`null`).
+    * Hiding keeps `sid` on its track: changing `sid` makes mpv drop the
+    * track's packets and re-demux them from earlier in the file - torrent
+    * bytes that may not be here yet (the buffering spinner on every EN/off
+    * cycle). `sid` only changes for a different track. */
+   async setSubtitle(id: number | null): Promise<void> {
       console.debug("[mpv] subtitle track", { id });
-      void command(["set_property", "sid", id ?? "no"]).catch((err) =>
-         console.warn("[mpv] sid failed", { id, err: String(err) }),
-      );
+      try {
+         if (id == null) {
+            this.subtitleVisible = false;
+            await command(["set_property", "sub-visibility", false]);
+            return;
+         }
+         const current = await command(["get_property", "sid"]).catch(() => null);
+         if (current !== id) await command(["set_property", "sid", id]);
+         this.subtitleVisible = true;
+         await command(["set_property", "sub-visibility", true]);
+      } catch (err) {
+         console.warn("[mpv] subtitle selection failed", { id, err: String(err) });
+      }
+   }
+
+   /** Once after the first frame: if a visible track has shown no text for
+    * a while, re-select it (off/on) - what a manual toggle used to fix when
+    * the track started being demuxed late. */
+   private scheduleSubtitleCheck(): void {
+      const WINDOW_MS = 10_000;
+      const POLL_MS = 1_000;
+      const startedAt = performance.now();
+      const poll = async () => {
+         if (this.disposed || !this.subtitleVisible) return;
+         const text = await command(["get_property", "sub-text"]).catch(() => null);
+         if (typeof text === "string" && text.trim() !== "") {
+            console.debug("[mpv] subtitles showing");
+            return;
+         }
+         if (performance.now() - startedAt < WINDOW_MS) {
+            this.subtitleCheckTimer = window.setTimeout(() => void poll(), POLL_MS);
+            return;
+         }
+         const sid = await command(["get_property", "sid"]).catch(() => null);
+         if (typeof sid !== "number") return;
+         console.info("[mpv] no subtitle text after the first frame, re-asserting the track", { sid });
+         await command(["set_property", "sid", "no"]).catch(() => undefined);
+         await command(["set_property", "sid", sid]).catch((err) => console.warn("[mpv] sid re-assert failed", { err: String(err) }));
+      };
+      this.subtitleCheckTimer = window.setTimeout(() => void poll(), POLL_MS);
    }
 
    setProperty(name: string, value: unknown): Promise<unknown> {
@@ -464,7 +530,10 @@ export class MpvVideo extends EventTarget {
             return;
          case "playback-restart":
             // First frame after a load or a seek.
-            if (!this.started) console.info("[mpv] first frame");
+            if (!this.started) {
+               console.info("[mpv] first frame");
+               this.scheduleSubtitleCheck();
+            }
             this.started = true;
             if (this.seekTarget != null || this.pendingSeek != null)
                console.debug("[mpv] seek restarted", { target: this.seekTarget, pending: this.pendingSeek, masked: this.maskedPositions });
