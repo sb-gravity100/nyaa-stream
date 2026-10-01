@@ -1,3 +1,9 @@
+### `edef49a` · 2026-09-30 · feat: serve resumed streams from their resume buffer
+- `crates/torrent-engine/src/resume_buffer.rs`
+- `crates/torrent-engine/src/lib.rs`
+- `src-tauri/src/resume.rs`
+- `src-tauri/src/lib.rs`
+
 ### `f4873a8` · 2026-09-30 · feat: progress entries remember their source; Resume prefers it
 - `src/watchProgress.ts`
 - `src/PlayerView.tsx`
