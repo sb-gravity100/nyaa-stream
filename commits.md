@@ -1,3 +1,7 @@
+### `6a8a811` · 2026-09-30 · docs: plan the load profiler for v0.4.0
+- `PLAN.md`
+- `PHASES.md`
+
 ### `08e93b1` · 2026-09-30 · docs: Discord contact by username
 - `PLAN.md`
 - `PHASES.md`
