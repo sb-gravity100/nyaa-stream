@@ -375,9 +375,9 @@
       - [ ] Verify live: Resume from Continue watching → first frame time
 - [ ] Subtitle preloading (v0.4.0, see PLAN.md "Subtitle preloading"): one
       commit each -
-      - [ ] Off = `sub-visibility=no` with `sid` kept (no re-demux buffering
+      - [x] Off = `sub-visibility=no` with `sid` kept (no re-demux buffering
             when cycling EN / off)
-      - [ ] Preload: default `sid` set before `loadfile`; re-assert once after
+      - [x] Preload: default `sid` set before `loadfile`; re-assert once after
             first `playing` if `sub-text` is empty
       - [ ] If a different-track switch still stalls: enginefs subtitle-range
             metadata reads
@@ -385,10 +385,10 @@
             longer shows the buffering spinner
 - [ ] Contact and send logs (v0.4.0, see PLAN.md "Contact and send
       logs"): one commit each -
-      - [ ] `export_logs`: zip logs + `system.txt` into Downloads, reveal;
+      - [x] `export_logs`: zip logs + `system.txt` into Downloads, reveal;
             Windows profile path/username replaced in the zipped copies
-      - [ ] Settings Help section: Contact modal (repo + Discord profile)
-      - [ ] Send logs modal: contents notice, Discord / GitHub (prefilled
+      - [x] Settings Help section: Contact modal (repo + Discord profile)
+      - [x] Send logs modal: contents notice, Discord / GitHub (prefilled
             issue, public notice) buttons
       - [ ] Fill in the Discord user id
       - [ ] PLAN.md/FILE_INDEX.md sync, `npm run bump -- minor`, tag
