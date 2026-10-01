@@ -1,3 +1,7 @@
+### `08e93b1` · 2026-09-30 · docs: Discord contact by username
+- `PLAN.md`
+- `PHASES.md`
+
 ### `a7de70b` · 2026-09-30 · feat: show the Discord username with a copy button
 - `src/HelpSection.tsx`
 - `src/App.css`
