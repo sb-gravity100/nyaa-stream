@@ -1,3 +1,9 @@
+### `8a6e35a` · 2026-09-30 · feat: export_logs zips scrubbed logs and system info
+- `src-tauri/src/logs_export.rs`
+- `src-tauri/src/player.rs`
+- `src-tauri/src/lib.rs`
+- `src-tauri/Cargo.toml`
+
 ### `f51a487` · 2026-09-30 · fix: subtitle preload and visibility-based off (completes 541e0bb)
 - `src/mpvVideo.ts`
 - `src/PlayerView.tsx`
