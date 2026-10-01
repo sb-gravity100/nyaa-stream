@@ -1291,6 +1291,14 @@ before the demuxer has the track's early packets).
   ranges as metadata reads in enginefs (priority 7) - decide after (1)-(2).
 - Never changes the user's own on/off/track choice; no-op with subtitles
   off or no tracks.
+- **As built** (`src/mpvVideo.ts`): `load()` sets `slang` (the setting's
+  code plus its ISO 639-2 form, e.g. `en,eng`), `sid=auto` and
+  `sub-visibility` (= subtitles enabled) before `loadfile`.
+  `setSubtitle(null)` only hides. A track pick reads `sid` and sets it only
+  when it differs. The re-assert polls `sub-text` once a second for 10s
+  after the first frame. If no text showed and a track is selected and
+  visible, it sends `sid=no` then the track. With subtitles disabled, mpv
+  still auto-selects and demuxes a track, so turning them on is instant.
 
 ## Contact and send logs (planned, v0.4.0 - minor: new feature)
 
@@ -1323,6 +1331,14 @@ yaa-stream\logs`, the last 7 daily files) plus a
   public. Tokens are never logged in the first place (logging rules + TMDB
   token plan), so none can leak.
 - Logged: button presses, zip path and size, failures.
+- **As built** (`src-tauri/src/logs_export.rs`, `src/HelpSection.tsx`):
+  the zip is `nyaa-stream-logs-<UTC date>.zip`. `system.txt` holds the app
+  version, `cmd /C ver` (no console window), arch, mpv available, and the
+  libmpv version (`mpv-version` when the player has started this run,
+  otherwise "unknown"). The scrub is ASCII case-insensitive and also
+  applies to file names. Discord buttons are hidden while
+  `DISCORD_USER_ID` (in `HelpSection.tsx`) is empty. The GitHub issue body
+  carries only the version and "Windows".
 
 ## 32-bit Windows support (planned, v1.0.0 - minor: new target)
 
