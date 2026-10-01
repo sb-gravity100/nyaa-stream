@@ -1,3 +1,8 @@
+### `36f269e` · 2026-09-30 · feat: sweep resume buffers with Continue watching and Clear cache
+- `src-tauri/src/resume.rs`
+- `src-tauri/src/lib.rs`
+- `src-tauri/src/cache.rs`
+
 ### `edef49a` · 2026-09-30 · feat: serve resumed streams from their resume buffer
 - `crates/torrent-engine/src/resume_buffer.rs`
 - `crates/torrent-engine/src/lib.rs`
