@@ -149,3 +149,34 @@ fn enforce_caps() {
         }
     }
 }
+
+/// Attaches every saved buffer of `torrent_id` to the engine, so its
+/// stream serves them (see torrent_engine::resume_buffer). A buffer whose
+/// file no longer matches by size is stale and removed.
+pub async fn attach(engine: &TorrentEngine, torrent_id: &TorrentId, files: &[torrent_engine::TorrentFile]) {
+    let info_hash = torrent_id.to_ascii_lowercase();
+    let loaded = tokio::task::spawn_blocking(move || {
+        list()
+            .into_iter()
+            .filter(|(_, meta)| meta.info_hash == info_hash)
+            .filter_map(|(dir, meta)| match resume_buffer::LoadedBuffer::load(&dir) {
+                Ok(buffer) => Some((dir, meta, buffer)),
+                Err(err) => {
+                    tracing::warn!(dir = %dir.display(), %err, "resume buffer unreadable, removed");
+                    let _ = std::fs::remove_dir_all(&dir);
+                    None
+                }
+            })
+            .collect::<Vec<_>>()
+    })
+    .await
+    .unwrap_or_default();
+    for (dir, meta, buffer) in loaded {
+        match files.get(meta.file_idx) {
+            Some(file) if file.length == buffer.file_size => {
+                engine.attach_resume_buffer(torrent_id, meta.file_idx, std::sync::Arc::new(buffer));
+            }
+            _ => remove(&dir, &meta, "file mismatch"),
+        }
+    }
+}

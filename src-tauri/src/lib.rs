@@ -869,6 +869,7 @@ async fn play_magnet(
     })?;
     let default_file_idx = largest_video_file(&files).unwrap_or(0);
     state.download_cache.touch(&added.id, &title, &files, episode.as_deref());
+    resume::attach(&state.torrent_engine, &added.id, &files).await;
     if let Err(err) = state.torrent_engine.set_watch_hint(&added.id, watch_hint).await {
         tracing::warn!(%title, torrent_id = %added.id, %err, "play_magnet failed to set the watch hint");
     }

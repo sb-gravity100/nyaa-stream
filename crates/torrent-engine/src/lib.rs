@@ -29,7 +29,7 @@ mod media;
 pub mod resume_buffer;
 mod subtitle_log;
 use direct_input::TorrentSources;
-use resume_buffer::{OpenReads, RecordingReader};
+use resume_buffer::{BufferedReader, LoadedBuffer, OpenReads, RecordingReader, ResumeBuffers};
 use subtitle_log::SubtitleLogs;
 pub use media::H264Encoder;
 
@@ -117,6 +117,7 @@ pub struct TorrentEngine {
     probes: MediaProbes,
     subtitle_logs: SubtitleLogs,
     open_reads: OpenReads,
+    resume_buffers: ResumeBuffers,
 }
 
 /// What the frontend's WebView can decode natively through MSE, reported
@@ -1036,6 +1037,7 @@ struct StreamRouterState {
     probes: MediaProbes,
     subtitle_logs: SubtitleLogs,
     open_reads: OpenReads,
+    resume_buffers: ResumeBuffers,
 }
 
 /// Trimmed-down mirror of librqbit's `TorrentStats` - mirrors Stremio's own
@@ -1142,6 +1144,7 @@ impl TorrentEngine {
         let probes = MediaProbes::new(sources);
         let subtitle_logs = SubtitleLogs::default();
         let open_reads = OpenReads::default();
+        let resume_buffers = ResumeBuffers::default();
 
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
         let stream_addr = listener.local_addr()?;
@@ -1155,6 +1158,7 @@ impl TorrentEngine {
             probes: probes.clone(),
             subtitle_logs: subtitle_logs.clone(),
             open_reads: open_reads.clone(),
+            resume_buffers: resume_buffers.clone(),
         };
         let app = Router::new()
             .route("/stream/{torrent_id}/{file_idx}", get(stream_handler))
@@ -1185,7 +1189,7 @@ impl TorrentEngine {
             }
         });
 
-        Ok(Self { efs, stream_addr, hls_jobs, probes, subtitle_logs, open_reads })
+        Ok(Self { efs, stream_addr, hls_jobs, probes, subtitle_logs, open_reads, resume_buffers })
     }
 
     /// Adds a torrent from a magnet link or .torrent URL and starts
@@ -1223,6 +1227,7 @@ impl TorrentEngine {
         self.probes.remove_torrent(&id).await;
         self.subtitle_logs.remove_torrent(&id).await;
         self.open_reads.remove_torrent(&id);
+        self.resume_buffers.remove_torrent(&id);
         self.efs.remove_engine(&id).await;
         self.efs.get_backend().remove_torrent(&id).await
     }
@@ -1251,6 +1256,12 @@ impl TorrentEngine {
     /// recording its open reads (see `resume_buffer`).
     pub fn finish_open_reads(&self, id: &TorrentId, file_idx: usize) {
         self.open_reads.finish(id, file_idx);
+    }
+
+    /// Serves `file_idx` of `id` from `buffer` where it covers a read (see
+    /// `resume_buffer::BufferedReader`) until the torrent is removed.
+    pub fn attach_resume_buffer(&self, id: &TorrentId, file_idx: usize, buffer: Arc<LoadedBuffer>) {
+        self.resume_buffers.attach(id, file_idx, buffer);
     }
 
     /// File-relative `[start, end)` ranges the player read to open the file.
@@ -1456,7 +1467,8 @@ async fn stream_handler(
     Path((torrent_id, file_idx)): Path<(TorrentId, usize)>,
     Query(query): Query<StreamQuery>,
     range: Option<TypedHeader<Range>>,
-) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+) -> Result<axum::response::Response, axum::http::StatusCode> {
+    use axum::response::IntoResponse;
     let background = query.intent.as_deref() == Some("background");
     tracing::debug!(torrent_id = %torrent_id, file_idx, background, "stream request received");
     let engine = state.efs.get_engine(&torrent_id).await.ok_or_else(|| {
@@ -1474,20 +1486,7 @@ async fn stream_handler(
         state.efs.refresh_hls_playback(&torrent_id, file_idx, "raw-stream").await;
     }
 
-    // priority 128: a normal foreground direct-playback read (not the
-    // internal-probe/background sentinels `Engine::get_file` treats 255/0
-    // as - see `enginefs::engine::Engine::get_file`'s doc comment).
-    let file_handle = engine.get_file(file_idx, 0, if background { 0 } else { 128 }).await.ok_or_else(|| {
-        tracing::warn!(torrent_id = %torrent_id, file_idx, "stream request for unknown file index");
-        axum::http::StatusCode::NOT_FOUND
-    })?;
-    let byte_size = file_handle.size;
-    // Foreground reads are what mpv opens the file with - recorded for the
-    // resume buffer until it reports file-loaded.
-    let log = (!background).then(|| state.open_reads.log_for(&torrent_id, file_idx));
-    let body = KnownSize::sized(RecordingReader::new(file_handle, log), byte_size);
     let range = range.map(|TypedHeader(range)| range);
-
     let content_type = engine
         .handle
         .get_files()
@@ -1496,8 +1495,34 @@ async fn stream_handler(
         .nth(file_idx)
         .map(|file| mime_for_filename(&file.name))
         .unwrap_or("application/octet-stream");
+    let headers = [(axum::http::header::CONTENT_TYPE, content_type)];
+    // Foreground reads are what mpv opens the file with - recorded for the
+    // resume buffer until it reports file-loaded.
+    let log = (!background).then(|| state.open_reads.log_for(&torrent_id, file_idx));
+    let priority = if background { 0 } else { 128 };
 
-    Ok(([(axum::http::header::CONTENT_TYPE, content_type)], Ranged::new(range, body)))
+    // A Continue-watching resume: its buffer answers what it covers, and
+    // the torrent file is only opened (lazily) where it stops - so playback
+    // starts while libtorrent is still re-hashing or reconnecting.
+    if let Some(buffer) = state.resume_buffers.get(&torrent_id, file_idx).filter(|_| !background) {
+        tracing::debug!(torrent_id = %torrent_id, file_idx, "stream served through the resume buffer");
+        let byte_size = buffer.file_size;
+        let engine = engine.clone();
+        let open: resume_buffer::OpenFuture<_> = Box::pin(async move { engine.get_file(file_idx, 0, priority).await });
+        let body = KnownSize::sized(RecordingReader::new(BufferedReader::new(buffer, open), log), byte_size);
+        return Ok((headers, Ranged::new(range, body)).into_response());
+    }
+
+    // priority 128: a normal foreground direct-playback read (not the
+    // internal-probe/background sentinels `Engine::get_file` treats 255/0
+    // as - see `enginefs::engine::Engine::get_file`'s doc comment).
+    let file_handle = engine.get_file(file_idx, 0, priority).await.ok_or_else(|| {
+        tracing::warn!(torrent_id = %torrent_id, file_idx, "stream request for unknown file index");
+        axum::http::StatusCode::NOT_FOUND
+    })?;
+    let byte_size = file_handle.size;
+    let body = KnownSize::sized(RecordingReader::new(file_handle, log), byte_size);
+    Ok((headers, Ranged::new(range, body)).into_response())
 }
 
 #[derive(Deserialize)]

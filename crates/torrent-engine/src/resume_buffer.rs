@@ -5,6 +5,7 @@
 //! one torrent file at their real offsets.
 
 use std::collections::HashMap;
+use std::future::Future;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::Path;
 use std::pin::Pin;
@@ -136,6 +137,12 @@ impl LoadedBuffer {
         self.runs.iter().map(|(_, b)| b.len() as u64).sum()
     }
 
+    /// Start of the first run after `position` (where a torrent read that
+    /// began in a gap should stop), if any.
+    fn next_run_after(&self, position: u64) -> Option<u64> {
+        self.runs.iter().map(|(start, _)| *start).find(|start| *start > position)
+    }
+
     /// The buffered bytes starting exactly at `position`, if covered.
     pub fn slice_at(&self, position: u64) -> Option<&[u8]> {
         let idx = self.runs.partition_point(|(start, _)| *start <= position).checked_sub(1)?;
@@ -246,6 +253,138 @@ impl<R: AsyncSeek + Unpin> AsyncSeek for RecordingReader<R> {
     }
 }
 
+/// Resume buffers attached to torrents being played (see
+/// `TorrentEngine::attach_resume_buffer`).
+#[derive(Clone, Default)]
+pub struct ResumeBuffers {
+    buffers: Arc<Mutex<HashMap<Key, Arc<LoadedBuffer>>>>,
+}
+
+impl ResumeBuffers {
+    pub fn attach(&self, torrent_id: &TorrentId, file_idx: usize, buffer: Arc<LoadedBuffer>) {
+        tracing::info!(torrent_id = %torrent_id, file_idx, bytes = buffer.bytes(), "resume buffer attached");
+        self.buffers.lock().unwrap_or_else(|e| e.into_inner()).insert((torrent_id.to_ascii_lowercase(), file_idx), buffer);
+    }
+
+    pub fn get(&self, torrent_id: &TorrentId, file_idx: usize) -> Option<Arc<LoadedBuffer>> {
+        self.buffers.lock().unwrap_or_else(|e| e.into_inner()).get(&(torrent_id.to_ascii_lowercase(), file_idx)).cloned()
+    }
+
+    pub fn remove_torrent(&self, torrent_id: &TorrentId) {
+        let id = torrent_id.to_ascii_lowercase();
+        self.buffers.lock().unwrap_or_else(|e| e.into_inner()).retain(|(t, _), _| *t != id);
+    }
+}
+
+pub(crate) type OpenFuture<F> = Pin<Box<dyn Future<Output = Option<F>> + Send>>;
+
+enum Inner<F> {
+    /// Not polled until a read leaves the buffer - an async block does
+    /// nothing until then, so a resume served from the buffer never waits
+    /// on the torrent (re-hash, reconnect).
+    Opening(OpenFuture<F>),
+    Ready { reader: F, position: Option<u64>, seeking: bool },
+    Failed,
+}
+
+/// Serves a file from its resume buffer where it covers the read position,
+/// and from the torrent (`open`ed lazily) where it doesn't. Only verified
+/// bytes are ever buffered, so both sources agree byte for byte.
+pub(crate) struct BufferedReader<F> {
+    buffer: Arc<LoadedBuffer>,
+    inner: Inner<F>,
+    position: u64,
+}
+
+impl<F> BufferedReader<F> {
+    pub(crate) fn new(buffer: Arc<LoadedBuffer>, open: OpenFuture<F>) -> Self {
+        Self { buffer, inner: Inner::Opening(open), position: 0 }
+    }
+}
+
+impl<F: AsyncRead + AsyncSeek + Unpin> AsyncRead for BufferedReader<F> {
+    fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<std::io::Result<()>> {
+        let this = &mut *self;
+        if this.position >= this.buffer.file_size {
+            return Poll::Ready(Ok(()));
+        }
+        if let Some(slice) = this.buffer.slice_at(this.position) {
+            let n = slice.len().min(buf.remaining());
+            buf.put_slice(&slice[..n]);
+            this.position += n as u64;
+            return Poll::Ready(Ok(()));
+        }
+        loop {
+            match &mut this.inner {
+                Inner::Opening(open) => match open.as_mut().poll(cx) {
+                    Poll::Pending => return Poll::Pending,
+                    Poll::Ready(Some(reader)) => {
+                        tracing::debug!(position = this.position, "resume buffer ran out, opening the torrent stream");
+                        this.inner = Inner::Ready { reader, position: None, seeking: false };
+                    }
+                    Poll::Ready(None) => {
+                        tracing::warn!("torrent stream unavailable behind the resume buffer");
+                        this.inner = Inner::Failed;
+                    }
+                },
+                Inner::Failed => return Poll::Ready(Err(std::io::Error::other("torrent stream unavailable"))),
+                Inner::Ready { reader, position, seeking } => {
+                    if *position != Some(this.position) {
+                        if !*seeking {
+                            Pin::new(&mut *reader).start_seek(SeekFrom::Start(this.position))?;
+                            *seeking = true;
+                        }
+                        match Pin::new(&mut *reader).poll_complete(cx) {
+                            Poll::Pending => return Poll::Pending,
+                            Poll::Ready(result) => {
+                                *seeking = false;
+                                *position = Some(result?);
+                                continue;
+                            }
+                        }
+                    }
+                    // Stop at the next buffered run - no need to wait on the
+                    // torrent for bytes already here.
+                    let limit = this.buffer.next_run_after(this.position).map_or(u64::MAX, |next| next - this.position);
+                    let limit = usize::try_from(limit).unwrap_or(usize::MAX).min(buf.remaining());
+                    let mut sub = buf.take(limit);
+                    match Pin::new(&mut *reader).poll_read(cx, &mut sub) {
+                        Poll::Pending => return Poll::Pending,
+                        Poll::Ready(Err(err)) => return Poll::Ready(Err(err)),
+                        Poll::Ready(Ok(())) => {
+                            let n = sub.filled().len();
+                            // SAFETY: `sub` filled these `n` bytes of the
+                            // unfilled region of `buf`.
+                            unsafe { buf.assume_init(n) };
+                            buf.advance(n);
+                            this.position += n as u64;
+                            *position = Some(this.position);
+                            return Poll::Ready(Ok(()));
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+impl<F: Unpin> AsyncSeek for BufferedReader<F> {
+    fn start_seek(mut self: Pin<&mut Self>, position: SeekFrom) -> std::io::Result<()> {
+        let size = self.buffer.file_size;
+        let target = match position {
+            SeekFrom::Start(p) => Some(p),
+            SeekFrom::End(delta) => size.checked_add_signed(delta),
+            SeekFrom::Current(delta) => self.position.checked_add_signed(delta),
+        };
+        self.position = target.ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidInput, "seek before start"))?;
+        Ok(())
+    }
+
+    fn poll_complete(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<std::io::Result<u64>> {
+        Poll::Ready(Ok(self.position))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -276,6 +415,35 @@ mod tests {
         assert_eq!(loaded.slice_at(550).unwrap(), &content[550..600]);
         assert!(loaded.slice_at(10).is_none());
         assert!(loaded.slice_at(499).is_none());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn buffered_reader_serves_buffer_then_torrent() {
+        use tokio::io::{AsyncReadExt, AsyncSeekExt};
+        let dir = std::env::temp_dir().join(format!("nyaa-rb-read-{}", std::process::id()));
+        let source = dir.join("source.bin");
+        std::fs::create_dir_all(&dir).unwrap();
+        let content: Vec<u8> = (0..=255u8).cycle().take(1000).collect();
+        std::fs::write(&source, &content).unwrap();
+        write_buffer(&dir.join("buf"), &source, 1000, &[(0, 100), (500, 600)]).unwrap();
+        let buffer = Arc::new(LoadedBuffer::load(&dir.join("buf")).unwrap());
+
+        // Fully buffered read: the torrent is never opened.
+        let never: OpenFuture<std::io::Cursor<Vec<u8>>> = Box::pin(async { panic!("torrent opened") });
+        let mut reader = BufferedReader::new(buffer.clone(), never);
+        let mut out = vec![0; 50];
+        reader.seek(SeekFrom::Start(520)).await.unwrap();
+        reader.read_exact(&mut out).await.unwrap();
+        assert_eq!(out, content[520..570]);
+
+        // Across buffer and gaps: identical to the source.
+        let torrent = std::io::Cursor::new(content.clone());
+        let mut reader = BufferedReader::new(buffer, Box::pin(async move { Some(torrent) }));
+        reader.seek(SeekFrom::Start(50)).await.unwrap();
+        let mut out = Vec::new();
+        reader.read_to_end(&mut out).await.unwrap();
+        assert_eq!(out, content[50..]);
         let _ = std::fs::remove_dir_all(&dir);
     }
 
