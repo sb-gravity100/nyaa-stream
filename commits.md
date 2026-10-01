@@ -1,3 +1,7 @@
+### `a7de70b` · 2026-09-30 · feat: show the Discord username with a copy button
+- `src/HelpSection.tsx`
+- `src/App.css`
+
 ### `90f80d3` · 2026-09-30 · docs: subtitle preloading and send logs as built
 - `PHASES.md`
 - `PLAN.md`
