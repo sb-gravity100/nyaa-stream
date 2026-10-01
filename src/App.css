@@ -3608,6 +3608,14 @@ html.mpv-active .player-view {
   margin: 0 0 12px;
 }
 
+.help-discord {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
 .help-links {
   display: flex;
   flex-wrap: wrap;
