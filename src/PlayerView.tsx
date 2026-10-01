@@ -558,7 +558,8 @@ function MpvPlayerView({
       if (!video || !selectedFile) return;
       const startAt = resumeAtRef.current;
       console.info("[player] loading file", { file: selectedFile.name, startAt });
-      video.load(selectedFile.streamUrl, startAt).catch((err) => {
+      const subs = getSettingsSnapshot();
+      video.load(selectedFile.streamUrl, startAt, { language: subs.subtitleLanguage, visible: subs.subtitlesEnabled }).catch((err) => {
          console.error("[player] loadfile failed", { err: String(err) });
          setError(`Couldn't open this file: ${String(err)}`);
       });
@@ -618,7 +619,7 @@ function MpvPlayerView({
 
    useEffect(() => {
       if (!videoEl || !subtitlesPickedRef.current) return;
-      videoEl.setSubtitle(activeSubtitleIndex);
+      void videoEl.setSubtitle(activeSubtitleIndex);
    }, [videoEl, activeSubtitleIndex, subtitleTracks.length > 0]);
 
    useEffect(() => {
