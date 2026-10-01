@@ -390,7 +390,8 @@
       - [x] Settings Help section: Contact modal (repo + Discord profile)
       - [x] Send logs modal: contents notice, Discord / GitHub (prefilled
             issue, public notice) buttons
-      - [ ] Fill in the Discord user id
+      - [x] Discord contact: username `__sb______` shown with a Copy button
+            (a profile link needs the numeric user id)
       - [ ] PLAN.md/FILE_INDEX.md sync, `npm run bump -- minor`, tag
             `v0.4.0`, push the tag, build + publish the release (see PLAN.md
             "Release plan")
