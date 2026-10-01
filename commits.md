@@ -1,3 +1,7 @@
+### `f51a487` · 2026-09-30 · fix: subtitle preload and visibility-based off (completes 541e0bb)
+- `src/mpvVideo.ts`
+- `src/PlayerView.tsx`
+
 ### `541e0bb` · 2026-09-30 · fix: preload subtitles and hide them without dropping the track
 - `src/mpvVideo.ts`
 - `src/PlayerView.tsx`
