@@ -159,6 +159,13 @@ pub async fn mpv_command(state: State<'_, PlayerState>, args: Vec<Value>) -> Res
     mpv.command(&args).await.map_err(|err| err.to_string())
 }
 
+/// libmpv's version, when the player has been started this run.
+pub async fn mpv_version(state: &PlayerState) -> Option<String> {
+    let mpv = state.mpv.lock().await.clone()?;
+    let version = mpv.command(&["get_property".into(), "mpv-version".into()]).await.ok()?;
+    version.as_str().map(str::to_string)
+}
+
 /// Unloads the file and makes the webview opaque again. mpv itself stays
 /// idle so the next episode starts without a respawn.
 #[tauri::command]
