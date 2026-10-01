@@ -1307,16 +1307,15 @@ automatically - no webhook or other secret ships in the public app.
 
 - **Contact** opens a modal with two links: the repo
   (`https://github.com/sb-gravity100/nyaa-stream`) and the author's Discord
-  profile (`https://discord.com/users/<DISCORD_USER_ID>` - placeholder until
-  the id is provided). Links open in the system browser (opener plugin).
+  username (`__sb______`) with a Copy button - a profile link would need
+  the numeric user id. Links open in the system browser (opener plugin).
 - **Send logs** (`export_logs` command) zips the log folder
   (`%LOCALAPPDATA%
 yaa-stream\logs`, the last 7 daily files) plus a
   `system.txt` (app version, Windows version, mpv available, libmpv
   version) into `nyaa-stream-logs-<date>.zip` in Downloads, reveals it in
   Explorer, then offers two ways to send it:
-  - **Discord** - opens the author's Discord profile; the user drags the
-    zip into a DM.
+  - **Discord** - copy the author's username, then drag the zip into a DM.
   - **GitHub** - opens a new issue on the repo prefilled (title, app version,
     OS, "describe what happened"); the user attaches the zip. The modal notes
     that GitHub issues are public.
@@ -1336,8 +1335,8 @@ yaa-stream\logs`, the last 7 daily files) plus a
   version, `cmd /C ver` (no console window), arch, mpv available, and the
   libmpv version (`mpv-version` when the player has started this run,
   otherwise "unknown"). The scrub is ASCII case-insensitive and also
-  applies to file names. Discord buttons are hidden while
-  `DISCORD_USER_ID` (in `HelpSection.tsx`) is empty. The GitHub issue body
+  applies to file names. Discord is the username with a Copy
+  button in both modals (`DISCORD_USERNAME` in `HelpSection.tsx`). The GitHub issue body
   carries only the version and "Windows".
 
 ## 32-bit Windows support (planned, v1.0.0 - minor: new target)
