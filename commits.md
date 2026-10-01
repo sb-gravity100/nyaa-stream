@@ -1,3 +1,8 @@
+### `0936f77` · 2026-09-30 · feat: Settings Help section with Contact and Send logs
+- `src/HelpSection.tsx`
+- `src/SettingsPanel.tsx`
+- `src/App.css`
+
 ### `8a6e35a` · 2026-09-30 · feat: export_logs zips scrubbed logs and system info
 - `src-tauri/src/logs_export.rs`
 - `src-tauri/src/player.rs`
