@@ -3,7 +3,7 @@ mod download_cache;
 mod media_keys;
 mod metadata_fallback;
 mod player;
-mod resume;
+pub(crate) mod resume;
 mod title_match;
 
 use std::path::PathBuf;
@@ -887,13 +887,15 @@ async fn play_magnet(
 }
 
 /// The Continue watching row's episodes (`<animeId>:<episodeKey>`), whose
-/// torrents the download cache keeps past its cap; sent on every change.
+/// torrents the download cache keeps past its cap and whose resume buffers
+/// are kept (all others are removed); sent at launch and on every change.
 #[tauri::command]
 async fn set_download_cache_keep(state: State<'_, Arc<AppState>>, episodes: Vec<String>) -> Result<(), String> {
     tracing::debug!(count = episodes.len(), "set_download_cache_keep invoked");
     let playing = state.current_torrent.lock().await.clone();
     let app = state.inner().clone();
     tokio::task::spawn_blocking(move || {
+        resume::sweep(&episodes);
         app.download_cache.set_keep(episodes);
         app.download_cache.evict(playing.as_deref(), false, "left Continue watching");
     })

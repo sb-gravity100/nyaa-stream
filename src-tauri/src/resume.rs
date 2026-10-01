@@ -180,3 +180,15 @@ pub async fn attach(engine: &TorrentEngine, torrent_id: &TorrentId, files: &[tor
         }
     }
 }
+
+/// Removes buffers of episodes not in `keep` (`<animeId>:<episodeKey>`,
+/// the Continue watching row): dismissed, watched, or replaced by a newer
+/// episode. Also the startup sweep - the frontend sends the row at launch.
+pub fn sweep(keep: &[String]) {
+    for (dir, meta) in list() {
+        if !keep.contains(&meta.episode()) {
+            remove(&dir, &meta, "left Continue watching");
+        }
+    }
+}
+
