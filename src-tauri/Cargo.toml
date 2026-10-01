@@ -24,6 +24,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["full"] }
 dirs = "5"
+zip = { version = "4", default-features = false, features = ["deflate"] }
 base64 = { workspace = true }
 # Classifying AniList failures (metadata_fallback.rs).
 reqwest = { workspace = true }

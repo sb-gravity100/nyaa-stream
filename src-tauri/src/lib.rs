@@ -1,5 +1,6 @@
 mod cache;
 mod download_cache;
+mod logs_export;
 mod media_keys;
 mod metadata_fallback;
 mod player;
@@ -1434,6 +1435,7 @@ pub fn run() {
             cache::get_cache_sizes,
             cache::clear_cache,
             set_download_cache_keep,
+            logs_export::export_logs,
             download_cache_status,
             set_download_cache_limit,
             cache::export_backup,
