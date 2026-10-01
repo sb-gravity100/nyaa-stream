@@ -1,3 +1,8 @@
+### `90f80d3` · 2026-09-30 · docs: subtitle preloading and send logs as built
+- `PHASES.md`
+- `PLAN.md`
+- `FILE_INDEX.md`
+
 ### `0936f77` · 2026-09-30 · feat: Settings Help section with Contact and Send logs
 - `src/HelpSection.tsx`
 - `src/SettingsPanel.tsx`
