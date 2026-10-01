@@ -187,6 +187,7 @@ export class MpvVideo extends EventTarget {
    async detach(): Promise<void> {
       if (this.disposed && this.unlisten.length === 0) return;
       this.disposed = true;
+      window.clearTimeout(this.subtitleCheckTimer);
       for (const unlisten of this.unlisten) unlisten();
       this.unlisten = [];
       console.debug("[mpv] detaching");
