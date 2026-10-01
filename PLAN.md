@@ -1339,6 +1339,49 @@ yaa-stream\logs`, the last 7 daily files) plus a
   button in both modals (`DISCORD_USERNAME` in `HelpSection.tsx`). The GitHub issue body
   carries only the version and "Windows".
 
+## Load profiler (planned, v0.4.0 - patch: diagnostics)
+
+Playback start and seeks/resumes sometimes take long, and the logs don't
+say why: the evidence is scattered across `play_magnet`, the metadata wait,
+enginefs's "waiting for verified piece" and the mpv events, with no
+timeline tying them together. A per-load trace answers "where did the time
+go" in one log line. It also gives the numbers for the fast-resume
+(re-hash) decision in "Download cache".
+
+- **Traces:** one per load, of two kinds. `start` runs from the player
+  opening to mpv's first frame. `seek` runs from a seek or Resume to mpv's
+  `playback-restart`. The frontend opens one with `trace_begin(kind)` and
+  gets an id back. Stages are marked from the frontend (`trace_mark`) and
+  from the backend, as monotonic ms since begin.
+- **Start stages:**
+  - `player_open` (mount), then `play_magnet`, split in the backend into
+    `torrent_add`, `metadata` (the `files()` wait) and `checking` (time the
+    torrent spent in libtorrent's `checking_files` state, i.e. the
+    re-hash, polled every 250ms while `play_magnet` runs).
+  - `resume_buffer` (attached, bytes), `loadfile`, `first_request` (the
+    first foreground `stream_handler` request), `file_loaded` (mpv), then
+    `first_frame`.
+- **Seek stages:** `seek_issued`, `first_request` at the new offset, and
+  `first_frame`.
+- **Torrent wait accounting:** while a trace is open, the stream readers
+  (`RecordingReader` / `BufferedReader`) time each read that went Pending
+  on the engine (Pending -> Ready). The trace sums them: count, total ms,
+  longest, plus bytes served from the resume buffer vs. the torrent. Peers
+  and download rate are snapshotted at the end.
+- **Output (logs only):**
+  - A debug line per stage (`[trace] start#3 metadata +2310ms`).
+  - One info summary when the trace completes, e.g.
+    `load trace kind=start total_ms=8210 torrent_add=40 metadata=2310
+    checking=3100 open=900 first_frame=... torrent_wait_ms=4200 waits=12
+    longest_wait_ms=2100 buffer_bytes=... peers=... rate=...`.
+  - A trace whose player closes first is logged with `outcome=abandoned`.
+  - The summaries land in Send logs zips automatically.
+- **Cost:** no new threads. The checking poll runs only during
+  `play_magnet`, and the wait timing is an `Instant` per Pending read.
+- **Then:** live summaries for a cold start, a cached re-open, a Continue
+  watching resume and a seek into undownloaded data. They decide fast
+  resume (libtorrent resume data) and point at the next fix.
+
 ## 32-bit Windows support (planned, v1.0.0 - minor: new target)
 
 Assumes "32-bit" = Windows x86 (`i686-pc-windows-msvc`); tell me if Linux

@@ -383,6 +383,17 @@
             metadata reads
       - [ ] Verify live: subs visible on first play without toggling; EN / off cycling no
             longer shows the buffering spinner
+- [ ] Load profiler (v0.4.0, see PLAN.md "Load profiler"): one commit each -
+      - [ ] `load_trace.rs`: trace registry, `trace_begin` / `trace_mark`,
+            stage debug lines, completion/abandon summary
+      - [ ] Backend stages in `play_magnet`: torrent_add, metadata, checking
+            (250ms state poll), resume_buffer
+      - [ ] Stream readers time engine Pending reads; per-file counters
+            snapshotted into the trace (+ buffer vs torrent bytes)
+      - [ ] Frontend marks: player open, loadfile, file-loaded, first frame;
+            seek / Resume traces from `mpvVideo`
+      - [ ] Verify live: cold start, cached re-open, resume, seek into
+            undownloaded data; decide fast resume from the numbers
 - [ ] Contact and send logs (v0.4.0, see PLAN.md "Contact and send
       logs"): one commit each -
       - [x] `export_logs`: zip logs + `system.txt` into Downloads, reveal;
