@@ -1,3 +1,7 @@
+### `541e0bb` · 2026-09-30 · fix: preload subtitles and hide them without dropping the track
+- `src/mpvVideo.ts`
+- `src/PlayerView.tsx`
+
 ### `56223f5` · 2026-09-30 · docs: resume buffer as built, tasks done
 - `PHASES.md`
 - `PLAN.md`
