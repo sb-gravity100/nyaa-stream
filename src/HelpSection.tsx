@@ -7,13 +7,37 @@ import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
 // Send logs writes a zip to Downloads and the user sends it by hand.
 
 const REPO_URL = "https://github.com/sb-gravity100/nyaa-stream";
-/** The author's Discord user id - TODO: fill in (PHASES.md v0.4.0). */
-const DISCORD_USER_ID = "";
-const DISCORD_URL = DISCORD_USER_ID ? `https://discord.com/users/${DISCORD_USER_ID}` : "";
+/** The author's Discord username - shown with a copy button (a profile
+ * link would need the numeric user id). */
+const DISCORD_USERNAME = "__sb______";
 
 function open(url: string) {
   console.info("[help] opening link", { url });
   openUrl(url).catch((err) => console.warn("[help] couldn't open link", { url, err: String(err) }));
+}
+
+/** "Discord: <name>" with a button that copies the name. */
+function DiscordName({ hint }: { hint: string }) {
+  const [copied, setCopied] = useState(false);
+  async function copy() {
+    console.info("[help] copying the Discord username");
+    try {
+      await navigator.clipboard.writeText(DISCORD_USERNAME);
+      setCopied(true);
+    } catch (err) {
+      console.warn("[help] clipboard write failed", { err: String(err) });
+    }
+  }
+  return (
+    <div class="help-discord">
+      <span>
+        Discord: <strong>{DISCORD_USERNAME}</strong> <span class="setting-hint">{hint}</span>
+      </span>
+      <button class="button button-quiet" onClick={() => void copy()}>
+        {copied ? "Copied" : "Copy"}
+      </button>
+    </div>
+  );
 }
 
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: preact.ComponentChildren }) {
@@ -52,12 +76,8 @@ function ContactModal({ onClose }: { onClose: () => void }) {
         <button class="button button-quiet" onClick={() => open(REPO_URL)}>
           GitHub repository
         </button>
-        {DISCORD_URL && (
-          <button class="button button-quiet" onClick={() => open(DISCORD_URL)}>
-            Discord
-          </button>
-        )}
       </div>
+      <DiscordName hint="add me as a friend to message" />
     </Modal>
   );
 }
@@ -96,12 +116,8 @@ function SendLogsModal({ onClose }: { onClose: () => void }) {
       {path ? (
         <>
           <p class="setting-hint">Saved to {path}. Send it with one of these:</p>
+          <DiscordName hint="drag the zip into a DM" />
           <div class="help-links">
-            {DISCORD_URL && (
-              <button class="button button-quiet" onClick={() => open(DISCORD_URL)}>
-                Discord (drag the zip into a DM)
-              </button>
-            )}
             <button class="button button-quiet" onClick={() => void openIssue()}>
               GitHub issue (attach the zip)
             </button>
