@@ -1,3 +1,8 @@
+### `56223f5` · 2026-09-30 · docs: resume buffer as built, tasks done
+- `PHASES.md`
+- `PLAN.md`
+- `FILE_INDEX.md`
+
 ### `36f269e` · 2026-09-30 · feat: sweep resume buffers with Continue watching and Clear cache
 - `src-tauri/src/resume.rs`
 - `src-tauri/src/lib.rs`
