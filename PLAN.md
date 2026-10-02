@@ -1384,6 +1384,25 @@ go" in one log line. It also gives the numbers for the fast-resume
 - **Then:** live summaries for a cold start, a cached re-open, a Continue
   watching resume and a seek into undownloaded data. They decide fast
   resume (libtorrent resume data) and point at the next fix.
+- **As built** (`src-tauri/src/load_trace.rs`,
+  `crates/torrent-engine/src/read_stats.rs`, `src/loadTrace.ts`):
+  - Commands are `trace_begin(kind, torrentId?)`, `trace_mark` and the
+    async `trace_end`; `play_magnet` takes `trace`.
+  - In the summary, `name=ms` is a span and `name@ms` is an offset from
+    the start. The fields are `first_request_ms`, `requests`,
+    `torrent_wait_ms`, `waits`, `longest_wait_ms`, `torrent_bytes`,
+    `buffer_bytes`, `peers` and `rate_mbps`.
+  - The `checking` state comes from a new vendored
+    `EngineStats::state` (libtorrent's state code). The probe gives up
+    after 10s if no checking was seen.
+  - Wait and request events sit in a per-torrent ring of 1024; byte
+    counters are diffed against a baseline taken when the trace learns its
+    torrent.
+  - The start trace ends on mpv's `canplay` (playback-restart, the first
+    frame) and is abandoned on a source switch, a failure or a close.
+  - A seek trace opens on a new `seeking` event from
+    `MpvVideo.flushSeek` (only once the start trace has ended), marks
+    `retarget` for coalesced seeks, and ends on `seeked`.
 
 ## 32-bit Windows support (planned, v1.0.0 - minor: new target)
 
