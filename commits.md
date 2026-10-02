@@ -1,3 +1,10 @@
+### `b37c74f` · 2026-10-03 · docs: tl backend gains DHT, uTP, seeding, HTTPS trackers
+- `PLAN.md`
+- `FILE_INDEX.md`
+
+### `e42f4d2` · 2026-10-03 · feat(enginefs): tl backend uses tl's DHT state, seeding and upload throttle
+- `vendor/enginefs/src/backend/tl_backend.rs`
+
 ### `5672b89` · 2026-10-03 · docs: tl buffer signals (PLAN, FILE_INDEX, VENDORED)
 - `PLAN.md`
 - `FILE_INDEX.md`
