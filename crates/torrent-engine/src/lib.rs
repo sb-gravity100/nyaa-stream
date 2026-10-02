@@ -1280,6 +1280,31 @@ impl TorrentEngine {
         Ok(VerifiedFile { path: PathBuf::from(path), name: file.name.clone(), size: file.length, verified: file.downloaded_ranges.clone() })
     }
 
+    /// Reads `ranges` of `file_idx` through the engine's own reader (as a
+    /// background read: no playback lease, lowest priority). Only for
+    /// verified ranges - an unverified one would wait on the swarm, bounded
+    /// by a timeout. The engine serves a just-verified piece from
+    /// libtorrent's copy, which the file on disk may not have yet.
+    pub async fn read_ranges(&self, id: &TorrentId, file_idx: usize, ranges: &[(u64, u64)]) -> anyhow::Result<Vec<(u64, Vec<u8>)>> {
+        use tokio::io::{AsyncReadExt, AsyncSeekExt};
+        const TIMEOUT: Duration = Duration::from_secs(30);
+        let engine = self.efs.get_engine(id).await.ok_or_else(|| anyhow::anyhow!("unknown torrent {id}"))?;
+        let read = async {
+            let mut handle = engine.get_file(file_idx, 0, 0).await.ok_or_else(|| anyhow::anyhow!("no file {file_idx} in {id}"))?;
+            let mut runs = Vec::with_capacity(ranges.len());
+            for &(start, end) in ranges {
+                handle.seek(std::io::SeekFrom::Start(start)).await?;
+                let mut bytes = vec![0; usize::try_from(end - start)?];
+                handle.read_exact(&mut bytes).await?;
+                runs.push((start, bytes));
+            }
+            anyhow::Ok(runs)
+        };
+        let runs = tokio::time::timeout(TIMEOUT, read).await.map_err(|_| anyhow::anyhow!("reading {id}/{file_idx} timed out after {TIMEOUT:?}"))??;
+        tracing::debug!(torrent_id = %id, file_idx, ranges = ranges.len(), "verified ranges read through the engine");
+        Ok(runs)
+    }
+
     /// Byte offset of the keyframe at or before `seconds` in the file at
     /// `path` (see `media::keyframe_byte_offset`), bounded by a timeout.
     pub async fn keyframe_byte_offset(path: PathBuf, seconds: f64) -> anyhow::Result<Option<u64>> {

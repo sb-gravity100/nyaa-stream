@@ -1082,7 +1082,10 @@ Depends on v0.3.2's `watch: resume` continue-watch mode.
   recorded by `stream_handler` until the player calls `stream_file_loaded`
   (mpv's `file-loaded`; capped at 64 MB). The bytes are the intersection of
   the wanted ranges with the file's verified runs (`downloaded_ranges`),
-  copied from the file on disk into `data.bin` + `ranges.json`, with the
+  read through the engine's own reader (`read_ranges`, a background read).
+  Not from the file on disk: a just-verified piece may not be written there
+  yet, see vendor/enginefs VENDORED.md `FRESH_PIECE_BROKER_WINDOW`. They
+  are stored in `data.bin` + `ranges.json`, with the
   app's `entry.json` beside them. The keyframe offset comes from
   `media::keyframe_byte_offset` on the *local file* (no HTTP, 10s timeout).
   A wrong offset only makes the buffer less useful; it never serves wrong

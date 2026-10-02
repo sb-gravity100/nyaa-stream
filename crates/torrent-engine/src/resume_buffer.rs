@@ -6,7 +6,7 @@
 
 use std::collections::HashMap;
 use std::future::Future;
-use std::io::{Read, Seek, SeekFrom, Write};
+use std::io::{SeekFrom, Write};
 use std::path::Path;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
@@ -89,23 +89,23 @@ struct RangesFile {
     ranges: Vec<(u64, u64)>,
 }
 
-/// Copies `ranges` (verified runs) of the file at `source` into a buffer
-/// in `dir`. Returns the bytes written. Blocking.
-pub fn write_buffer(dir: &Path, source: &Path, file_size: u64, ranges: &[(u64, u64)]) -> std::io::Result<u64> {
+/// Writes `runs` (file offset, verified bytes) as a buffer in `dir`.
+/// Returns the bytes written. Blocking. The bytes must come from the
+/// engine's reader (`TorrentEngine::read_ranges`), not the file on disk: a
+/// just-verified piece may not be written there yet (vendor/enginefs
+/// VENDORED.md, `FRESH_PIECE_BROKER_WINDOW`).
+pub fn write_buffer(dir: &Path, file_size: u64, runs: &[(u64, Vec<u8>)]) -> std::io::Result<u64> {
     std::fs::create_dir_all(dir)?;
-    let mut input = std::fs::File::open(source)?;
     let mut output = std::io::BufWriter::new(std::fs::File::create(dir.join(DATA_FILE))?);
     let mut written = 0;
-    for &(start, end) in ranges {
-        input.seek(SeekFrom::Start(start))?;
-        let copied = std::io::copy(&mut (&mut input).take(end - start), &mut output)?;
-        if copied != end - start {
-            return Err(std::io::Error::new(std::io::ErrorKind::UnexpectedEof, format!("source ended inside {start}..{end}")));
-        }
-        written += copied;
+    let mut ranges = Vec::with_capacity(runs.len());
+    for (start, bytes) in runs {
+        output.write_all(bytes)?;
+        written += bytes.len() as u64;
+        ranges.push((*start, start + bytes.len() as u64));
     }
     output.flush()?;
-    let index = RangesFile { file_size, ranges: ranges.to_vec() };
+    let index = RangesFile { file_size, ranges };
     std::fs::write(dir.join(RANGES_FILE), serde_json::to_vec(&index).map_err(std::io::Error::other)?)?;
     Ok(written)
 }
@@ -389,6 +389,10 @@ impl<F: Unpin> AsyncSeek for BufferedReader<F> {
 mod tests {
     use super::*;
 
+    fn runs_of(content: &[u8], ranges: &[(u64, u64)]) -> Vec<(u64, Vec<u8>)> {
+        ranges.iter().map(|&(s, e)| (s, content[s as usize..e as usize].to_vec())).collect()
+    }
+
     #[test]
     fn merges_overlapping_and_touching() {
         assert_eq!(merge_ranges(vec![(10, 20), (0, 5), (5, 8), (15, 30), (40, 41)]), vec![(0, 8), (10, 30), (40, 41)]);
@@ -403,12 +407,9 @@ mod tests {
     #[test]
     fn buffer_round_trip() {
         let dir = std::env::temp_dir().join(format!("nyaa-rb-{}", std::process::id()));
-        let source = dir.join("source.bin");
-        std::fs::create_dir_all(&dir).unwrap();
         let content: Vec<u8> = (0..=255u8).cycle().take(1000).collect();
-        std::fs::write(&source, &content).unwrap();
         let buf_dir = dir.join("buf");
-        assert_eq!(write_buffer(&buf_dir, &source, 1000, &[(0, 10), (500, 600)]).unwrap(), 110);
+        assert_eq!(write_buffer(&buf_dir, 1000, &runs_of(&content, &[(0, 10), (500, 600)])).unwrap(), 110);
         let loaded = LoadedBuffer::load(&buf_dir).unwrap();
         assert_eq!(loaded.bytes(), 110);
         assert_eq!(loaded.slice_at(3).unwrap(), &content[3..10]);
@@ -422,11 +423,8 @@ mod tests {
     async fn buffered_reader_serves_buffer_then_torrent() {
         use tokio::io::{AsyncReadExt, AsyncSeekExt};
         let dir = std::env::temp_dir().join(format!("nyaa-rb-read-{}", std::process::id()));
-        let source = dir.join("source.bin");
-        std::fs::create_dir_all(&dir).unwrap();
         let content: Vec<u8> = (0..=255u8).cycle().take(1000).collect();
-        std::fs::write(&source, &content).unwrap();
-        write_buffer(&dir.join("buf"), &source, 1000, &[(0, 100), (500, 600)]).unwrap();
+        write_buffer(&dir.join("buf"), 1000, &runs_of(&content, &[(0, 100), (500, 600)])).unwrap();
         let buffer = Arc::new(LoadedBuffer::load(&dir.join("buf")).unwrap());
 
         // Fully buffered read: the torrent is never opened.
