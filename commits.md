@@ -1,3 +1,8 @@
+### `997b931` · 2026-09-30 · docs: load profiler as built, tasks done
+- `PHASES.md`
+- `PLAN.md`
+- `FILE_INDEX.md`
+
 ### `d2e1f62` · 2026-09-30 · feat: frontend load traces for playback start and seeks
 - `src/loadTrace.ts`
 - `src/playback.ts`
