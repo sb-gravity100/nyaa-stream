@@ -1502,6 +1502,40 @@ still link with MSVC.
 Not done: sccache (clean builds only); a Windows Defender exclusion for
 `target\`, `~\.cargo`, `~\.rustup` is the user's call.
 
+## tl backend (experimental, build-time switch, no version bump)
+
+Alternative torrent engine: sb_torrent's `tl` (C library + Rust crates in
+the sibling checkout `../sb_torrent`), plugged in as an `enginefs` backend
+(`vendor/enginefs/src/backend/tl_backend.rs`). Default builds still use
+libtorrent; `npm run dev:tl` (cargo features `--no-default-features
+--features tl`, forwarded `nyaa-stream` -> `torrent-engine` -> `enginefs`)
+uses tl.
+
+Why: tl is built around the stalls documented above (startup queue delay,
+pieces stuck on one slow peer, slow seeks, zero/stale bytes):
+
+- a reader's position is the playback cursor; a read outside the
+  read-ahead window is a seek that preempts queued background requests at
+  once (no 100 ms re-anchor debounce);
+- urgent blocks go only to peers at least 1/4 as fast as the fastest one,
+  duplicated only when another peer would clearly deliver first;
+- reads return only verified bytes, through tl's own storage handle (no
+  second OS handle racing a cache), so no zero guard or broker is needed;
+- a foreground reader gets the file tail early (MKV Cues / MP4 moov) and
+  the rest of its file in order afterwards; other files of a batch are not
+  downloaded unless preloaded or kept.
+
+Measured in sb_torrent's own benches (local throttled swarm, not real
+swarms yet): paced 700 KB/s playback with 10 random seeks per run - 1-3
+stalls (0.14-0.62 s total) and ~1 s seek start-up; a mid-file 8 MiB seek
+range completes in 1.50 s vs libtorrent's 2.24 s on the same swarm.
+
+Gaps vs the libtorrent backend: no DHT (magnets rely on their trackers and
+PEX), no uTP, no uploading/seeding, no HTTPS trackers; `stats()` peer
+search fields are approximations. Data from the libtorrent backend in the
+same download directory is reused (tl re-hashes it once, then keeps a
+resume sidecar in `<download_dir>/.tl`).
+
 ## Known gaps / not yet implemented
 
 - (HLS fallback player only - mpv reads the file's real duration.) The
