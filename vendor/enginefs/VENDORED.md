@@ -109,3 +109,6 @@ Copied from https://github.com/stremio-native/stream-server at rev
   the zero guard can't catch (mpv's MKV demuxer: "Corrupt file detected",
   within seconds of a seek, only on just-verified pieces). The disk path
   (and zero guard) remains the fallback when libtorrent's copy fails.
+- `src/backend/mod.rs` (`EngineStats::state`), `libtorrent/helpers.rs`: exposes
+  libtorrent's torrent state so nyaa-stream's load profiler can time the
+  `checking_files` re-hash.
