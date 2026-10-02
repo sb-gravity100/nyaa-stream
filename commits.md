@@ -1,3 +1,23 @@
+### `d729ed2` · 2026-10-03 · docs: tl buffer signals (PLAN, FILE_INDEX, VENDORED)
+- `PLAN.md`
+- `FILE_INDEX.md`
+- `vendor/enginefs/VENDORED.md`
+
+### `d729ed2` · 2026-10-03 · test: engine_smoke playback phase prints buffer levels
+- `crates/torrent-engine/examples/engine_smoke.rs`
+
+### `59f0f2b` · 2026-10-03 · feat: buffering progress from the backend's real buffer when available
+- `src/types.ts`
+- `src/loadingProgress.ts`
+
+### `61970c0` · 2026-10-03 · feat: StreamStats.buffer and per-backend mpv cache-pause-wait
+- `crates/torrent-engine/src/lib.rs`
+- `src-tauri/src/player.rs`
+
+### `612dbd7` · 2026-10-03 · feat(enginefs): buffer_status in TorrentHandle, implemented by the tl backend
+- `vendor/enginefs/src/backend/mod.rs`
+- `vendor/enginefs/src/backend/tl_backend.rs`
+
 ### `7f82268` · 2026-10-03 · docs: engine_smoke and tl vs libtorrent measurements
 - `FILE_INDEX.md`
 - `PLAN.md`
