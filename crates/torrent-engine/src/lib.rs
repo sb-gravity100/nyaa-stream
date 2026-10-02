@@ -1044,6 +1044,15 @@ struct StreamRouterState {
     read_stats: ReadStats,
 }
 
+/// mpv's start/resume threshold (`--cache-pause-wait`, seconds) for this
+/// build's backend. tl only serves verified data and reports when its ready
+/// threshold is buffered ahead of the reader, so mpv needn't hold back for
+/// 10 s of its own cache; libtorrent keeps the conservative 10 s.
+#[cfg(all(feature = "tl", not(feature = "libtorrent")))]
+pub const MPV_CACHE_PAUSE_WAIT_SECS: u32 = (enginefs::backend::tl_backend::READY_MS / 1000) as u32;
+#[cfg(not(all(feature = "tl", not(feature = "libtorrent"))))]
+pub const MPV_CACHE_PAUSE_WAIT_SECS: u32 = 10;
+
 /// Trimmed-down mirror of librqbit's `TorrentStats` - mirrors Stremio's own
 /// streaming-server statistics endpoint (`GET /:infoHash/stats.json`,
 /// see `reference/stremio-core`'s `models::streaming_server`), which the
@@ -1099,6 +1108,10 @@ pub struct StreamStats {
     pub sources: usize,
     /// The current HLS run, if any (see `HlsRunInfo`).
     pub run: Option<HlsRunInfo>,
+    /// Verified data ahead of the player's newest read of this file, when
+    /// the backend tracks it (tl; `None` with libtorrent). PLAN.md "tl
+    /// backend": the buffering UI shows real readiness from it.
+    pub buffer: Option<enginefs::backend::BufferStatus>,
 }
 
 /// The live HLS run of a file, for the statistics popup.
@@ -1488,6 +1501,7 @@ impl TorrentEngine {
             swarm_size: stats.swarm_size,
             sources: stats.sources.len(),
             run: self.hls_jobs.run_info(id, file_idx).await,
+            buffer: engine.handle.buffer_status(file_idx).await,
         })
     }
 }
