@@ -1,3 +1,9 @@
+### `d2e1f62` · 2026-09-30 · feat: frontend load traces for playback start and seeks
+- `src/loadTrace.ts`
+- `src/playback.ts`
+- `src/mpvVideo.ts`
+- `src/PlayerView.tsx`
+
 ### `85c835e` · 2026-09-30 · feat: stream read accounting in load trace summaries
 - `crates/torrent-engine/src/read_stats.rs`
 - `crates/torrent-engine/src/resume_buffer.rs`
