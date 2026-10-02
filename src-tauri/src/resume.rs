@@ -101,6 +101,9 @@ pub async fn save(engine: &TorrentEngine, torrent_id: &TorrentId, request: Resum
         return Ok(());
     }
 
+    // Through the engine, not the file on disk (see `read_ranges`).
+    let runs = engine.read_ranges(torrent_id, request.file_idx, &ranges).await?;
+
     let info_hash = torrent_id.to_ascii_lowercase();
     let root = root();
     let dir = root.join(dir_name(&info_hash, request.file_idx));
@@ -118,7 +121,7 @@ pub async fn save(engine: &TorrentEngine, torrent_id: &TorrentId, request: Resum
     };
     let meta = tokio::task::spawn_blocking(move || -> anyhow::Result<EntryMeta> {
         let _ = std::fs::remove_dir_all(&tmp);
-        let bytes = resume_buffer::write_buffer(&tmp, &file.path, file.size, &ranges)?;
+        let bytes = resume_buffer::write_buffer(&tmp, file.size, &runs)?;
         let meta = EntryMeta { bytes, ..meta };
         std::fs::write(tmp.join(ENTRY_FILE), serde_json::to_vec_pretty(&meta)?)?;
         // One buffer per episode: an older one (other source) goes.
