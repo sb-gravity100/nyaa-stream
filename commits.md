@@ -1,4 +1,4 @@
-### `d729ed2` · 2026-10-03 · docs: tl buffer signals (PLAN, FILE_INDEX, VENDORED)
+### `5672b89` · 2026-10-03 · docs: tl buffer signals (PLAN, FILE_INDEX, VENDORED)
 - `PLAN.md`
 - `FILE_INDEX.md`
 - `vendor/enginefs/VENDORED.md`
