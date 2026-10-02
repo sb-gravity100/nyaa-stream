@@ -1,5 +1,6 @@
 mod cache;
 mod download_cache;
+mod load_trace;
 mod logs_export;
 mod media_keys;
 mod metadata_fallback;
@@ -1375,6 +1376,7 @@ pub fn run() {
         .plugin(media_keys::plugin())
         .manage(app_state.clone())
         .manage(player::PlayerState::default())
+        .manage(load_trace::LoadTraces::default())
         .setup(|app| {
             // A broken page must not leave the app invisible: show the main
             // window anyway if app_ready never arrives.
@@ -1436,6 +1438,9 @@ pub fn run() {
             cache::clear_cache,
             set_download_cache_keep,
             logs_export::export_logs,
+            load_trace::trace_begin,
+            load_trace::trace_mark,
+            load_trace::trace_end,
             download_cache_status,
             set_download_cache_limit,
             cache::export_backup,
