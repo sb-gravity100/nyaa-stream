@@ -210,12 +210,14 @@ impl TlHandle {
         self.inner.torrent.files().unwrap_or_default()
     }
 
-    /// Torrent-relative path ("Show/Episode 01.mkv").
+    /// Torrent-relative path with native separators, as the libtorrent
+    /// backend reports it (`Show\Episode 01.mkv` on Windows).
     fn relative(&self, f: &tl::FileInfo) -> String {
         Path::new(&f.path)
             .strip_prefix(&self.inner.save_dir)
-            .map(|p| p.to_string_lossy().replace('\\', "/"))
+            .map(|p| p.to_string_lossy().into_owned())
             .unwrap_or_else(|_| f.path.clone())
+            .replace(['/', '\\'], std::path::MAIN_SEPARATOR_STR)
     }
 
     fn background_stream(&self, file_idx: usize) -> Result<tl::Stream> {
