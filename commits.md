@@ -1,3 +1,20 @@
+### `38143f7` · 2026-10-02 · docs: tl backend (PLAN, FILE_INDEX, VENDORED)
+- `PLAN.md`
+- `FILE_INDEX.md`
+- `vendor/enginefs/VENDORED.md`
+
+### `df84a29` · 2026-10-02 · feat: build-time engine switch (libtorrent default, tl optional)
+- `crates/torrent-engine/Cargo.toml`
+- `crates/torrent-engine/src/lib.rs`
+- `src-tauri/Cargo.toml`
+- `package.json`
+
+### `f19325d` · 2026-10-02 · feat(enginefs): tl backend behind the tl feature
+- `vendor/enginefs/src/backend/tl_backend.rs`
+- `vendor/enginefs/src/backend/mod.rs`
+- `vendor/enginefs/src/lib.rs`
+- `vendor/enginefs/Cargo.toml`
+
 ### `997b931` · 2026-09-30 · docs: load profiler as built, tasks done
 - `PHASES.md`
 - `PLAN.md`
