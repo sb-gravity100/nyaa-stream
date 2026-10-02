@@ -156,7 +156,8 @@ fn enforce_caps() {
 /// Attaches every saved buffer of `torrent_id` to the engine, so its
 /// stream serves them (see torrent_engine::resume_buffer). A buffer whose
 /// file no longer matches by size is stale and removed.
-pub async fn attach(engine: &TorrentEngine, torrent_id: &TorrentId, files: &[torrent_engine::TorrentFile]) {
+/// Returns the bytes attached (for the load profiler).
+pub async fn attach(engine: &TorrentEngine, torrent_id: &TorrentId, files: &[torrent_engine::TorrentFile]) -> u64 {
     let info_hash = torrent_id.to_ascii_lowercase();
     let loaded = tokio::task::spawn_blocking(move || {
         list()
@@ -174,14 +175,17 @@ pub async fn attach(engine: &TorrentEngine, torrent_id: &TorrentId, files: &[tor
     })
     .await
     .unwrap_or_default();
+    let mut attached = 0;
     for (dir, meta, buffer) in loaded {
         match files.get(meta.file_idx) {
             Some(file) if file.length == buffer.file_size => {
+                attached += buffer.bytes();
                 engine.attach_resume_buffer(torrent_id, meta.file_idx, std::sync::Arc::new(buffer));
             }
             _ => remove(&dir, &meta, "file mismatch"),
         }
     }
+    attached
 }
 
 /// Removes buffers of episodes not in `keep` (`<animeId>:<episodeKey>`,

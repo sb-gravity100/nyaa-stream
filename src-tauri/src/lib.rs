@@ -813,13 +813,22 @@ struct PlaySession {
 /// playlist URL (the fallback player's, used when mpv isn't installed).
 #[tauri::command]
 async fn play_magnet(
+    app: tauri::AppHandle,
     state: State<'_, Arc<AppState>>,
+    traces: State<'_, load_trace::LoadTraces>,
     magnet: String,
     title: String,
     watch: Option<String>,
     episode: Option<String>,
+    trace: Option<u64>,
 ) -> Result<PlaySession, String> {
-    tracing::debug!(%title, ?watch, ?episode, "play_magnet invoked");
+    tracing::debug!(%title, ?watch, ?episode, ?trace, "play_magnet invoked");
+    // Load profiler stages (see load_trace).
+    let mark = |stage: &str, duration: Option<Duration>, detail: Option<String>| {
+        if let Some(id) = trace {
+            traces.mark(id, stage, duration, detail);
+        }
+    };
     // How the file starts (see torrent_engine::WatchHint): "first" (no
     // saved progress) or "resume" (a start time follows).
     let watch_hint = match watch.as_deref() {
@@ -846,10 +855,12 @@ async fn play_magnet(
     let added_id = match (wanted, current) {
         (Some(wanted), Some(current)) if current.eq_ignore_ascii_case(&wanted) => {
             tracing::info!(%title, torrent_id = %current, "play_magnet reusing the current torrent");
+            mark("torrent_reused", None, None);
             current
         }
         _ => {
             cleanup_playback(&state).await;
+            let started = std::time::Instant::now();
             let added = match state.torrent_engine.add(&magnet).await {
                 Ok(added) => added,
                 Err(err) => {
@@ -858,6 +869,10 @@ async fn play_magnet(
                 }
             };
             *state.current_torrent.lock().await = Some(added.id.clone());
+            mark("torrent_add", Some(started.elapsed()), None);
+            if let Some(id) = trace {
+                spawn_checking_probe(app.clone(), state.inner().clone(), added.id.clone(), id);
+            }
             added.id
         }
     };
@@ -865,13 +880,21 @@ async fn play_magnet(
     // The HLS URL is only for the fallback player: raw container bytes
     // aren't reliably playable in a browser <video> element (see
     // torrent-engine's hls_playlist_handler), while mpv reads them fine.
+    let started = std::time::Instant::now();
     let files = state.torrent_engine.files(&added.id).await.map_err(|err| {
         tracing::error!(%title, torrent_id = %added.id, %err, "play_magnet failed to get file list");
         err.to_string()
     })?;
+    mark("metadata", Some(started.elapsed()), None);
     let default_file_idx = largest_video_file(&files).unwrap_or(0);
     state.download_cache.touch(&added.id, &title, &files, episode.as_deref());
-    resume::attach(&state.torrent_engine, &added.id, &files).await;
+    let buffered = resume::attach(&state.torrent_engine, &added.id, &files).await;
+    if buffered > 0 {
+        mark("resume_buffer", None, Some(format!("{buffered}B")));
+    }
+    if let Some(id) = trace {
+        traces.set_torrent(id, &added.id);
+    }
     if let Err(err) = state.torrent_engine.set_watch_hint(&added.id, watch_hint).await {
         tracing::warn!(%title, torrent_id = %added.id, %err, "play_magnet failed to set the watch hint");
     }
@@ -934,6 +957,40 @@ async fn set_download_cache_limit(state: State<'_, Arc<AppState>>, limit_bytes: 
     })
     .await
     .map_err(|err| err.to_string())
+}
+
+/// Load profiler: times how long a just-added torrent spends re-hashing
+/// cached files (libtorrent `checking_files` / `checking_resume_data`),
+/// polled every 250ms, and marks it on trace `trace` as `checking`.
+fn spawn_checking_probe(app: tauri::AppHandle, state: Arc<AppState>, torrent_id: TorrentId, trace: u64) {
+    const POLL: Duration = Duration::from_millis(250);
+    /// No checking seen by then: none happened.
+    const NO_CHECK_AFTER: Duration = Duration::from_secs(10);
+    const GIVE_UP_AFTER: Duration = Duration::from_secs(300);
+    tokio::spawn(async move {
+        let probe_started = std::time::Instant::now();
+        let mut checking_since: Option<std::time::Instant> = None;
+        loop {
+            let checking = matches!(state.torrent_engine.torrent_state(&torrent_id).await, Some(1 | 7));
+            match (checking, checking_since) {
+                (true, None) => {
+                    tracing::debug!(torrent_id = %torrent_id, "[trace] torrent is checking its files");
+                    checking_since = Some(std::time::Instant::now());
+                }
+                (false, Some(since)) => {
+                    tauri::Manager::state::<load_trace::LoadTraces>(&app).mark(trace, "checking", Some(since.elapsed()), None);
+                    return;
+                }
+                (false, None) if probe_started.elapsed() > NO_CHECK_AFTER => return,
+                _ => {}
+            }
+            if probe_started.elapsed() > GIVE_UP_AFTER {
+                tracing::debug!(torrent_id = %torrent_id, "[trace] checking probe gave up");
+                return;
+            }
+            tokio::time::sleep(POLL).await;
+        }
+    });
 }
 
 /// How long libtorrent may keep a removed torrent's files open.

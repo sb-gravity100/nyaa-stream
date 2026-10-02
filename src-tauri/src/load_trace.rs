@@ -27,6 +27,8 @@ struct Trace {
     stages: Vec<Stage>,
     /// Extra `key=value` fields for the summary (waits, peers...).
     fields: Vec<(String, String)>,
+    /// The torrent being loaded, once known (for the end-of-trace snapshot).
+    torrent: Option<String>,
 }
 
 #[derive(Default)]
@@ -40,7 +42,7 @@ impl LoadTraces {
         let id = self.next_id.fetch_add(1, Ordering::Relaxed) + 1;
         let mut traces = self.traces.lock().unwrap_or_else(|e| e.into_inner());
         traces.retain(|_, t| t.began.elapsed() < STALE_AFTER);
-        traces.insert(id, Trace { kind: kind.to_string(), began: Instant::now(), stages: Vec::new(), fields: Vec::new() });
+        traces.insert(id, Trace { kind: kind.to_string(), began: Instant::now(), stages: Vec::new(), fields: Vec::new(), torrent: None });
         tracing::debug!(trace = id, kind, "[trace] begin");
         id
     }
@@ -56,6 +58,16 @@ impl LoadTraces {
         let duration_ms = duration.map(|d| d.as_millis() as u64);
         tracing::debug!(trace = id, kind = %trace.kind, stage, at_ms, ?duration_ms, ?detail, "[trace] stage");
         trace.stages.push(Stage { name: stage.to_string(), at_ms, duration_ms, detail });
+    }
+
+    pub fn set_torrent(&self, id: u64, torrent_id: &str) {
+        if let Some(trace) = self.traces.lock().unwrap_or_else(|e| e.into_inner()).get_mut(&id) {
+            trace.torrent = Some(torrent_id.to_string());
+        }
+    }
+
+    pub fn torrent(&self, id: u64) -> Option<String> {
+        self.traces.lock().unwrap_or_else(|e| e.into_inner()).get(&id).and_then(|t| t.torrent.clone())
     }
 
     /// Adds a `key=value` field to the trace's summary.
