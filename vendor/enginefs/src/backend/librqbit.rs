@@ -259,6 +259,7 @@ impl TorrentHandle for LibrqbitHandle {
             swarm_size: peers,
             is_finished: total_size > 0 && downloaded >= total_size,
             has_metadata: total_size > 0,
+            state: 0,
         }
     }
 

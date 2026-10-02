@@ -528,6 +528,12 @@ pub struct EngineStats {
     /// Torrent metadata is available (false for a freshly added magnet that is
     /// still resolving its info dictionary).
     pub has_metadata: bool,
+    /// libtorrent's `torrent_status::state` (1 = checking_files, 2 =
+    /// downloading_metadata, 3 = downloading, 4 = finished, 5 = seeding,
+    /// 7 = checking_resume_data); 0 when unknown. nyaa-stream's load
+    /// profiler times the re-hash with it.
+    #[serde(default)]
+    pub state: i32,
 }
 
 #[cfg(test)]

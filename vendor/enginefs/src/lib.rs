@@ -1708,6 +1708,7 @@ mod tests {
                 swarm_size: 0,
                 is_finished: false,
                 has_metadata: self.file_count > 0,
+                state: 0,
             }
         }
 
