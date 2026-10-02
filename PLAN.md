@@ -1530,6 +1530,19 @@ swarms yet): paced 700 KB/s playback with 10 random seeks per run - 1-3
 stalls (0.14-0.62 s total) and ~1 s seek start-up; a mid-file 8 MiB seek
 range completes in 1.50 s vs libtorrent's 2.24 s on the same swarm.
 
+Through this app's own streaming server (`crates/torrent-engine/examples/engine_smoke.rs`:
+magnet with peer hints -> metadata -> Range GETs for head 1 MiB, tail 2 MiB,
+middle 4 MiB and three random 2 MiB seeks; local swarm of 8 seeders at
+512 KiB/s each, debug builds, two runs each):
+
+| backend | metadata | head | middle | seeks | total | byte mismatches |
+|---|---|---|---|---|---|---|
+| tl | 0.36 s | 1.4-1.6 s | 0.8-1.3 s | 1.3-3.2 s | 8.7-9.8 s | 0 |
+| libtorrent | 1.6-1.8 s | 11.6-15.3 s | 16.5-19.2 s | 3.4-12.5 s | 50.6-65.2 s | 1 (head, first run) |
+
+Synthetic swarm, so it is no substitute for real ones; the libtorrent
+coordinator's leases and watch hints are not exercised by bare GETs.
+
 Gaps vs the libtorrent backend: no DHT (magnets rely on their trackers and
 PEX), no uTP, no uploading/seeding, no HTTPS trackers; `stats()` peer
 search fields are approximations. Data from the libtorrent backend in the
