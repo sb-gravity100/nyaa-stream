@@ -18,8 +18,8 @@
 //!
 //! Magnet metadata is cached as `<download_dir>/.tl/<infohash>.torrent`;
 //! tl's own resume sidecar sits next to it, so a reopened episode starts
-//! from the data already on disk. Not implemented by tl yet: DHT, uTP,
-//! uploading, HTTPS trackers.
+//! from the data already on disk. tl brings its own DHT (state kept in
+//! `<download_dir>/.tl/dht.dat`), uTP, seeding and HTTPS trackers.
 
 use crate::backend::{
     BackendFileInfo, BackendMemoryDiagnostics, BufferStatus, EngineStats, FileStreamTrait, Growler, PeerSearch,
@@ -50,8 +50,20 @@ pub struct TlBackend {
 impl TlBackend {
     pub fn new(download_dir: PathBuf) -> Result<Self> {
         std::fs::create_dir_all(download_dir.join(".tl")).context("creating the tl state directory")?;
-        let session = tl::Session::new(&tl::Config::default()).map_err(|e| anyhow!("tl session: {e}"))?;
-        tracing::info!(download_dir = %download_dir.display(), "tl backend started");
+        let cfg = tl::Config {
+            // node id + known nodes survive restarts: lookups start warm
+            dht_state_path: Some(download_dir.join(".tl").join("dht.dat")),
+            // tests against local swarms (engine_smoke) must not pull in
+            // real peers for a well-known infohash
+            dht: std::env::var_os("NYAA_TL_NO_DHT").is_none(),
+            ..Default::default()
+        };
+        let session = tl::Session::new(&cfg).map_err(|e| anyhow!("tl session: {e}"))?;
+        tracing::info!(
+            download_dir = %download_dir.display(),
+            port = session.listen_port(),
+            "tl backend started"
+        );
         Ok(Self { session, download_dir, torrents: Mutex::new(HashMap::new()) })
     }
 
@@ -157,6 +169,7 @@ impl TorrentBackend for TlBackend {
             .map_err(|e| anyhow!("tl idle stream: {e}"))?;
         let handle = TlHandle {
             inner: Arc::new(HandleInner {
+                session: self.session.clone(),
                 torrent,
                 info_hash: info_hash.clone(),
                 save_dir: self.download_dir.clone(),
@@ -185,6 +198,11 @@ impl TorrentBackend for TlBackend {
     async fn memory_diagnostics(&self) -> BackendMemoryDiagnostics {
         BackendMemoryDiagnostics::default()
     }
+
+    fn set_seeding_enabled(&self, enabled: bool) {
+        tracing::info!(enabled, "tl: seeding");
+        self.session.set_upload(enabled, None);
+    }
 }
 
 struct HandleState {
@@ -198,6 +216,7 @@ struct HandleState {
 }
 
 struct HandleInner {
+    session: tl::Session,
     torrent: tl::Torrent,
     info_hash: String,
     save_dir: PathBuf,
@@ -281,7 +300,7 @@ impl TorrentHandle for TlHandle {
             files,
             sources: vec![],
             opts: StatsOptions {
-                dht: false,
+                dht: true,
                 tracker: true,
                 path: self.inner.save_dir.to_string_lossy().into_owned(),
                 growler: Growler { flood: 0, pulse: None },
@@ -293,9 +312,9 @@ impl TorrentHandle for TlHandle {
                 r#virtual: false,
             },
             download_speed: st.download_rate as f64,
-            upload_speed: 0.0,
+            upload_speed: st.upload_rate as f64,
             downloaded: st.downloaded_bytes,
-            uploaded: 0,
+            uploaded: st.uploaded_bytes,
             unchoked: peers,
             peers,
             queued: 0,
@@ -329,6 +348,13 @@ impl TorrentHandle for TlHandle {
                 tracing::warn!(info_hash = %self.inner.info_hash, tracker = %t, %e, "tl: tracker rejected");
             }
         }
+        Ok(())
+    }
+
+    async fn set_upload_throttled(&self, throttled: bool) -> Result<()> {
+        // tl's upload policy is session-wide: a trickle while throttled
+        tracing::debug!(info_hash = %self.inner.info_hash, throttled, "tl: upload throttle");
+        self.inner.session.set_upload(true, throttled.then_some(16 * 1024));
         Ok(())
     }
 
