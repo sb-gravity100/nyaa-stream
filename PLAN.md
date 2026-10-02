@@ -1554,9 +1554,15 @@ is verified ahead. Measured with engine_smoke's playback phase (local swarm,
 700 KB/s reader from a fresh offset): stalled -> ready at 1.4 s, full (30 s
 ahead) at 4.1 s.
 
-Gaps vs the libtorrent backend: no DHT (magnets rely on their trackers and
-PEX), no uTP, no uploading/seeding, no HTTPS trackers; `stats()` peer
-search fields are approximations. Data from the libtorrent backend in the
+tl now has the swarm features the libtorrent backend relied on:
+- **DHT:** IPv4 only. Its state is kept in `<download_dir>/.tl/dht.dat`. `NYAA_TL_NO_DHT=1` turns it off for local-swarm tests.
+- **uTP.**
+- **Seeding with a choker:** `set_seeding_enabled` and `set_upload_throttled` map onto tl's session upload policy; throttled means 16 KiB/s.
+- **HTTPS trackers:** these use WinHTTP.
+
+Remaining gaps:
+- No IPv6 DHT.
+- `stats()` peer-search fields are approximations. Data from the libtorrent backend in the
 same download directory is reused (tl re-hashes it once, then keeps a
 resume sidecar in `<download_dir>/.tl`).
 
