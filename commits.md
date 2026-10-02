@@ -1,3 +1,10 @@
+### `85c835e` · 2026-09-30 · feat: stream read accounting in load trace summaries
+- `crates/torrent-engine/src/read_stats.rs`
+- `crates/torrent-engine/src/resume_buffer.rs`
+- `crates/torrent-engine/src/lib.rs`
+- `src-tauri/src/load_trace.rs`
+- `src-tauri/src/lib.rs`
+
 ### `2186326` · 2026-09-30 · feat: trace play_magnet stages (add, metadata, checking, resume buffer)
 - `src-tauri/src/lib.rs`
 - `src-tauri/src/load_trace.rs`
