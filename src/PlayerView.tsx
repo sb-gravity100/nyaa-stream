@@ -10,6 +10,7 @@ import { ExportDialog, type ExportRequest } from "./ExportDialog";
 import type { AnimeMedia, NyaaResult, PlayFile, StreamStats, SubtitleTrack } from "./types";
 import { displayTitle, isMovie } from "./types";
 import { getStreamStats, playMagnet, stopPlayback, streamFileLoaded, type ResumeRequest } from "./playback";
+import { traceBegin, traceEnd, traceMark, type LoadTrace } from "./loadTrace";
 import { saveFrameThumbnail } from "./torrentThumbnail";
 import { loadingProgress } from "./loadingProgress";
 import { bestRelease, isBatchRelease, getAnimeResolution, getPreferredGroup, releaseBadges, releaseGroup, releaseResolution, seederHealth, setAnimeResolution, setPreferredGroup, sortReleases } from "./releases";
@@ -252,6 +253,11 @@ function MpvPlayerView({
 }: Props) {
    const settings = useSettings();
    const videoRef = useRef<MpvVideo | null>(null);
+   // Load profiler traces (PLAN.md "Load profiler"): the current start
+   // (player open / source -> first frame) and seek (-> playback restart).
+   const startTraceRef = useRef<LoadTrace | null>(null);
+   const seekTraceRef = useRef<LoadTrace | null>(null);
+   const torrentIdRef = useRef<string | null>(null);
    const selectedFileRef = useRef<PlayFile | null>(null);
    const rootRef = useRef<HTMLDivElement>(null);
    const [videoEl, setVideoEl] = useState<MpvVideo | null>(null);
@@ -280,6 +286,7 @@ function MpvPlayerView({
       else lastBatchMagnet.delete(anime.id);
    }, [selectedRelease.magnet]);
    const [torrentId, setTorrentId] = useState<string | null>(null);
+   torrentIdRef.current = torrentId;
    const [files, setFiles] = useState<PlayFile[]>([]);
    const [selectedFile, setSelectedFile] = useState<PlayFile | null>(null);
    selectedFileRef.current = selectedFile;
@@ -416,6 +423,8 @@ function MpvPlayerView({
       setError(null);
       setReady(false);
       setStatus("Connecting to peers…");
+      const trace = traceBegin("start");
+      startTraceRef.current = trace;
       (async () => {
          try {
             const session = await playMagnet(
@@ -423,8 +432,10 @@ function MpvPlayerView({
                `${displayTitle(anime.title)} ${episodeKey}`,
                resumeAtRef.current != null ? "resume" : "first",
                `${anime.id}:${episodeKey}`,
+               await trace.id,
             );
             if (cancelled) return;
+            traceMark(trace, "play_magnet");
             // A movie is the torrent's largest video (the backend's
             // default) - never an extra that happens to parse as "01".
             const picked = isMovie(anime)
@@ -445,10 +456,12 @@ function MpvPlayerView({
                setError(
                   `Couldn't start this source: ${err instanceof Error ? err.message : String(err)}`,
                );
+            traceEnd(trace, "abandoned");
          }
       })();
       return () => {
          cancelled = true;
+         traceEnd(trace, "abandoned");
       };
    }, [selectedRelease, anime.id, episodeKey, episode]);
 
@@ -505,12 +518,31 @@ function MpvPlayerView({
       on("loadedmetadata", () => setDuration(video.duration));
       on("timeupdate", () => setPosition(video.currentTime));
       on("progress", updateBuffered);
-      on("seeked", updateBuffered);
+      on("seeked", () => {
+         updateBuffered();
+         traceEnd(seekTraceRef.current, "ok");
+      });
+      // A user seek (not the start's own resume) opens a seek trace; a
+      // newer target while one is in flight only marks it.
+      on("seeking", () => {
+         const start = startTraceRef.current;
+         if (start && !start.ended) return;
+         const seek = seekTraceRef.current;
+         if (seek && !seek.ended) {
+            traceMark(seek, "retarget");
+            return;
+         }
+         seekTraceRef.current = traceBegin("seek", torrentIdRef.current ?? undefined);
+      });
       on("play", () => setPaused(false));
       on("pause", () => setPaused(true));
       on("ended", () => handleEndedRef.current());
       on("volumechange", () => setMuted(video.muted));
-      on("canplay", () => setReady(true));
+      on("canplay", () => {
+         // mpv's playback-restart: the first frame.
+         traceEnd(startTraceRef.current, "ok");
+         setReady(true);
+      });
       on("waiting", () => {
          setReady(false);
          setSeekingTo(video.seekingTo);
@@ -558,6 +590,7 @@ function MpvPlayerView({
       if (!video || !selectedFile) return;
       const startAt = resumeAtRef.current;
       console.info("[player] loading file", { file: selectedFile.name, startAt });
+      traceMark(startTraceRef.current, "loadfile", startAt != null ? `start=${Math.round(startAt)}s` : undefined);
       const subs = getSettingsSnapshot();
       video.load(selectedFile.streamUrl, startAt, { language: subs.subtitleLanguage, visible: subs.subtitlesEnabled }).catch((err) => {
          console.error("[player] loadfile failed", { err: String(err) });
@@ -588,7 +621,10 @@ function MpvPlayerView({
    useEffect(() => {
       if (!videoEl || torrentId == null || !selectedFile) return;
       const fileIdx = selectedFile.index;
-      const onLoaded = () => void streamFileLoaded(torrentId, fileIdx);
+      const onLoaded = () => {
+         traceMark(startTraceRef.current, "file_loaded");
+         void streamFileLoaded(torrentId, fileIdx);
+      };
       videoEl.addEventListener("loadedmetadata", onLoaded);
       return () => videoEl.removeEventListener("loadedmetadata", onLoaded);
    }, [videoEl, torrentId, selectedFile?.index]);
@@ -598,6 +634,8 @@ function MpvPlayerView({
          window.clearTimeout(idleTimerRef.current);
          window.clearTimeout(keyboardSeekTimerRef.current);
          window.clearTimeout(toastTimerRef.current);
+         traceEnd(startTraceRef.current, "abandoned");
+         traceEnd(seekTraceRef.current, "abandoned");
          stopPlayback(resumeRequest());
       };
    }, []);

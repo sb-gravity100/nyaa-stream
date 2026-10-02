@@ -246,6 +246,7 @@ export class MpvVideo extends EventTarget {
       this.pendingSeek = null;
       this.seekTarget = seconds;
       console.debug("[mpv] seek", { seconds });
+      this.emit("seeking");
       // Like <video>: a seek waits (possibly long, on undownloaded pieces)
       // until playback-restart fires "playing".
       this.emit("waiting");
