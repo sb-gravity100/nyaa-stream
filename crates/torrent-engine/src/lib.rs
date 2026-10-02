@@ -1280,6 +1280,13 @@ impl TorrentEngine {
         Ok(VerifiedFile { path: PathBuf::from(path), name: file.name.clone(), size: file.length, verified: file.downloaded_ranges.clone() })
     }
 
+    /// libtorrent's state code for `id` (1 = checking_files, 7 =
+    /// checking_resume_data, 3 = downloading...), `None` if unknown.
+    pub async fn torrent_state(&self, id: &TorrentId) -> Option<i32> {
+        let engine = self.efs.get_engine(id).await?;
+        Some(engine.get_statistics().await.state)
+    }
+
     /// Reads `ranges` of `file_idx` through the engine's own reader (as a
     /// background read: no playback lease, lowest priority). Only for
     /// verified ranges - an unverified one would wait on the swarm, bounded
