@@ -1543,6 +1543,17 @@ middle 4 MiB and three random 2 MiB seeks; local swarm of 8 seeders at
 Synthetic swarm, so it is no substitute for real ones; the libtorrent
 coordinator's leases and watch hints are not exercised by bare GETs.
 
+Buffer signals (tl only): `TorrentHandle::buffer_status` reports the
+verified playback time ahead of the newest foreground reader of a file
+(level stalled / low / ready / full, ETA to ready). `get_stream_stats`
+carries it as `StreamStats.buffer`, `src/loadingProgress.ts` shows real
+readiness from it instead of the peers/bytes/speed estimate, and mpv's
+`--cache-pause-wait` follows tl's ready threshold (3 s instead of 10 s;
+`torrent_engine::MPV_CACHE_PAUSE_WAIT_SECS`) since tl reports when that much
+is verified ahead. Measured with engine_smoke's playback phase (local swarm,
+700 KB/s reader from a fresh offset): stalled -> ready at 1.4 s, full (30 s
+ahead) at 4.1 s.
+
 Gaps vs the libtorrent backend: no DHT (magnets rely on their trackers and
 PEX), no uTP, no uploading/seeding, no HTTPS trackers; `stats()` peer
 search fields are approximations. Data from the libtorrent backend in the
