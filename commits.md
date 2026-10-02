@@ -1,3 +1,7 @@
+### `c12464f` · 2026-09-30 · feat: load trace registry with stage logging and summaries
+- `src-tauri/src/load_trace.rs`
+- `src-tauri/src/lib.rs`
+
 ### `6a8a811` · 2026-09-30 · docs: plan the load profiler for v0.4.0
 - `PLAN.md`
 - `PHASES.md`
