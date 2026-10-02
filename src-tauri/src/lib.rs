@@ -893,7 +893,7 @@ async fn play_magnet(
         mark("resume_buffer", None, Some(format!("{buffered}B")));
     }
     if let Some(id) = trace {
-        traces.set_torrent(id, &added.id);
+        traces.set_torrent(id, &added.id, state.torrent_engine.read_snapshot(&added.id));
     }
     if let Err(err) = state.torrent_engine.set_watch_hint(&added.id, watch_hint).await {
         tracing::warn!(%title, torrent_id = %added.id, %err, "play_magnet failed to set the watch hint");

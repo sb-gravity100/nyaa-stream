@@ -26,10 +26,12 @@ pub type TorrentId = String;
 
 mod direct_input;
 mod media;
+pub mod read_stats;
 pub mod resume_buffer;
 mod subtitle_log;
 use direct_input::TorrentSources;
 use resume_buffer::{BufferedReader, LoadedBuffer, OpenReads, RecordingReader, ResumeBuffers};
+use read_stats::{ReadSnapshot, ReadStats, ReadSummary};
 use subtitle_log::SubtitleLogs;
 pub use media::H264Encoder;
 
@@ -118,6 +120,7 @@ pub struct TorrentEngine {
     subtitle_logs: SubtitleLogs,
     open_reads: OpenReads,
     resume_buffers: ResumeBuffers,
+    read_stats: ReadStats,
 }
 
 /// What the frontend's WebView can decode natively through MSE, reported
@@ -1038,6 +1041,7 @@ struct StreamRouterState {
     subtitle_logs: SubtitleLogs,
     open_reads: OpenReads,
     resume_buffers: ResumeBuffers,
+    read_stats: ReadStats,
 }
 
 /// Trimmed-down mirror of librqbit's `TorrentStats` - mirrors Stremio's own
@@ -1145,6 +1149,7 @@ impl TorrentEngine {
         let subtitle_logs = SubtitleLogs::default();
         let open_reads = OpenReads::default();
         let resume_buffers = ResumeBuffers::default();
+        let read_stats = ReadStats::default();
 
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
         let stream_addr = listener.local_addr()?;
@@ -1159,6 +1164,7 @@ impl TorrentEngine {
             subtitle_logs: subtitle_logs.clone(),
             open_reads: open_reads.clone(),
             resume_buffers: resume_buffers.clone(),
+            read_stats: read_stats.clone(),
         };
         let app = Router::new()
             .route("/stream/{torrent_id}/{file_idx}", get(stream_handler))
@@ -1189,7 +1195,7 @@ impl TorrentEngine {
             }
         });
 
-        Ok(Self { efs, stream_addr, hls_jobs, probes, subtitle_logs, open_reads, resume_buffers })
+        Ok(Self { efs, stream_addr, hls_jobs, probes, subtitle_logs, open_reads, resume_buffers, read_stats })
     }
 
     /// Adds a torrent from a magnet link or .torrent URL and starts
@@ -1228,6 +1234,7 @@ impl TorrentEngine {
         self.subtitle_logs.remove_torrent(&id).await;
         self.open_reads.remove_torrent(&id);
         self.resume_buffers.remove_torrent(&id);
+        self.read_stats.remove_torrent(&id);
         self.efs.remove_engine(&id).await;
         self.efs.get_backend().remove_torrent(&id).await
     }
@@ -1278,6 +1285,16 @@ impl TorrentEngine {
         let stats = engine.get_statistics().await;
         let file = stats.files.get(file_idx).ok_or_else(|| anyhow::anyhow!("no file {file_idx} in {id}"))?;
         Ok(VerifiedFile { path: PathBuf::from(path), name: file.name.clone(), size: file.length, verified: file.downloaded_ranges.clone() })
+    }
+
+    /// Load profiler: `id`'s stream byte counters now (a trace's baseline).
+    pub fn read_snapshot(&self, id: &TorrentId) -> ReadSnapshot {
+        self.read_stats.snapshot(id)
+    }
+
+    /// Load profiler: what `id`'s streams did since `since` / `base`.
+    pub fn read_summary(&self, id: &TorrentId, since: std::time::Instant, base: ReadSnapshot) -> ReadSummary {
+        self.read_stats.summary_since(id, since, base)
     }
 
     /// libtorrent's state code for `id` (1 = checking_files, 7 =
@@ -1531,6 +1548,10 @@ async fn stream_handler(
     // Foreground reads are what mpv opens the file with - recorded for the
     // resume buffer until it reports file-loaded.
     let log = (!background).then(|| state.open_reads.log_for(&torrent_id, file_idx));
+    let reads = (!background).then(|| state.read_stats.for_torrent(&torrent_id));
+    if let Some(reads) = &reads {
+        reads.request();
+    }
     let priority = if background { 0 } else { 128 };
 
     // A Continue-watching resume: its buffer answers what it covers, and
@@ -1541,7 +1562,7 @@ async fn stream_handler(
         let byte_size = buffer.file_size;
         let engine = engine.clone();
         let open: resume_buffer::OpenFuture<_> = Box::pin(async move { engine.get_file(file_idx, 0, priority).await });
-        let body = KnownSize::sized(RecordingReader::new(BufferedReader::new(buffer, open), log), byte_size);
+        let body = KnownSize::sized(RecordingReader::new(BufferedReader::new(buffer, open, reads.clone()), log, reads), byte_size);
         return Ok((headers, Ranged::new(range, body)).into_response());
     }
 
@@ -1553,7 +1574,7 @@ async fn stream_handler(
         axum::http::StatusCode::NOT_FOUND
     })?;
     let byte_size = file_handle.size;
-    let body = KnownSize::sized(RecordingReader::new(file_handle, log), byte_size);
+    let body = KnownSize::sized(RecordingReader::new(file_handle, log, reads), byte_size);
     Ok((headers, Ranged::new(range, body)).into_response())
 }
 
