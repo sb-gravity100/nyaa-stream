@@ -22,7 +22,7 @@
 //! uploading, HTTPS trackers.
 
 use crate::backend::{
-    BackendFileInfo, BackendMemoryDiagnostics, EngineStats, FileStreamTrait, Growler, PeerSearch,
+    BackendFileInfo, BackendMemoryDiagnostics, BufferStatus, EngineStats, FileStreamTrait, Growler, PeerSearch,
     PieceReadiness, StatsFile, StatsOptions, SwarmCap, TorrentBackend, TorrentHandle, TorrentSource,
 };
 use crate::backend::priorities::PlaybackIntent;
@@ -38,6 +38,8 @@ use tokio::sync::Mutex;
 const METADATA_TIMEOUT: Duration = Duration::from_secs(120);
 /// Readers report no data after this long (`direct_input` reopens on error).
 const READ_TIMEOUT: Duration = Duration::from_secs(60);
+/// tl's ready threshold: playback time verified ahead before starting.
+pub const READY_MS: u64 = 3000;
 
 pub struct TlBackend {
     session: tl::Session,
@@ -158,7 +160,7 @@ impl TorrentBackend for TlBackend {
                 torrent,
                 info_hash: info_hash.clone(),
                 save_dir: self.download_dir.clone(),
-                state: Mutex::new(HandleState { _idle: idle, preload: None, keep: HashMap::new() }),
+                state: Mutex::new(HandleState { _idle: idle, preload: None, keep: HashMap::new(), readers: HashMap::new() }),
             }),
         };
         self.torrents.lock().await.insert(info_hash, handle.clone());
@@ -191,6 +193,8 @@ struct HandleState {
     _idle: tl::Stream,
     preload: Option<(usize, tl::Stream)>,
     keep: HashMap<usize, tl::Stream>,
+    /// Newest foreground reader per file (weak: doesn't keep it open).
+    readers: HashMap<usize, tl::BufferProbe>,
 }
 
 struct HandleInner {
@@ -346,6 +350,27 @@ impl TorrentHandle for TlHandle {
         true
     }
 
+    async fn buffer_status(&self, file_idx: usize) -> Option<BufferStatus> {
+        let probe = self.inner.state.lock().await.readers.get(&file_idx).cloned()?;
+        let b = probe.buffer()?;
+        Some(BufferStatus {
+            level: match b.level {
+                tl::BufferLevel::Stalled => "stalled",
+                tl::BufferLevel::Low => "low",
+                tl::BufferLevel::Ready => "ready",
+                tl::BufferLevel::Full => "full",
+            }
+            .to_string(),
+            pos: b.pos,
+            ahead_bytes: b.ahead_bytes,
+            ahead_ms: b.ahead.as_millis() as u64,
+            ready_ms: READY_MS,
+            eta_ready_ms: b.eta_ready.map(|d| d.as_millis() as u64),
+            rate: b.rate as u64,
+            rate_known: b.rate_known,
+        })
+    }
+
     async fn is_file_complete(&self, file_idx: usize) -> bool {
         let len = self.files().get(file_idx).map(|f| f.size);
         matches!((len, self.file_ranges(file_idx).as_slice()), (Some(l), [(0, end)]) if *end == l)
@@ -385,6 +410,11 @@ impl TorrentHandle for TlHandle {
             .open_stream(file_idx as u32, &opts)
             .map_err(|e| anyhow!("tl reader for file {file_idx}: {e}"))?;
         stream.seek(std::io::SeekFrom::Start(start_offset))?;
+        stream.set_buffer_targets(Some(Duration::from_millis(READY_MS)), None);
+        let reader = tl::AsyncStream::from(stream);
+        if foreground {
+            self.inner.state.lock().await.readers.insert(file_idx, reader.buffer_probe());
+        }
         tracing::info!(
             info_hash = %self.inner.info_hash,
             file_idx,
@@ -394,7 +424,7 @@ impl TorrentHandle for TlHandle {
             ?bitrate,
             "tl: reader opened"
         );
-        Ok(Box::new(tl::AsyncStream::from(stream)))
+        Ok(Box::new(reader))
     }
 
     async fn get_files(&self) -> Vec<BackendFileInfo> {
