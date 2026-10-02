@@ -12,11 +12,12 @@ import type { PlaySession, StreamStats, SubtitleInfo } from "./types";
 export type WatchHint = "first" | "resume";
 
 /** `episode` (`<animeId>:<episodeKey>`) ties the torrent's cached files to
- * a Continue watching entry - see PLAN.md "Download cache". */
-export async function playMagnet(magnet: string, title: string, watch: WatchHint, episode: string): Promise<PlaySession> {
+ * a Continue watching entry - see PLAN.md "Download cache". `trace` is the
+ * load profiler's start trace (see loadTrace.ts). */
+export async function playMagnet(magnet: string, title: string, watch: WatchHint, episode: string, trace: number | null = null): Promise<PlaySession> {
   if (!isTauriAvailable()) throw new Error("Playback requires the Tauri app, not the browser preview");
-  console.debug("[play_magnet] invoked", { title, watch, episode });
-  const session = await invoke<PlaySession>("play_magnet", { magnet, title, watch, episode });
+  console.debug("[play_magnet] invoked", { title, watch, episode, trace });
+  const session = await invoke<PlaySession>("play_magnet", { magnet, title, watch, episode, trace });
   console.info("[play_magnet] succeeded", { title, torrentId: session.torrentId, files: session.files.length });
   return session;
 }
