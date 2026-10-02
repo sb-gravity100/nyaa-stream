@@ -10,7 +10,7 @@ use axum::Router;
 use axum_extra::headers::Range;
 use axum_extra::TypedHeader;
 use axum_range::{KnownSize, Ranged};
-use enginefs::backend::{BackendConfig, TorrentBackend, TorrentHandle, TorrentSource};
+use enginefs::backend::{TorrentBackend, TorrentHandle, TorrentSource};
 pub use enginefs::backend::priorities::WatchHint;
 use enginefs::EngineFS;
 use serde::{Deserialize, Serialize};
@@ -1140,8 +1140,16 @@ impl TorrentEngine {
             .map(|parent| parent.join("engine_cache"))
             .unwrap_or_else(|| download_dir.join("engine_cache"));
 
-        let config = BackendConfig::default();
-        let backend = enginefs::backend::libtorrent::LibtorrentBackend::new_disk_backed(download_dir.clone(), config)?;
+        #[cfg(feature = "libtorrent")]
+        let backend = {
+            let config = enginefs::backend::BackendConfig::default();
+            enginefs::backend::libtorrent::LibtorrentBackend::new_disk_backed(download_dir.clone(), config)?
+        };
+        #[cfg(all(feature = "tl", not(feature = "libtorrent")))]
+        let backend = {
+            tracing::info!("starting enginefs with the tl backend");
+            enginefs::backend::tl_backend::TlBackend::new(download_dir.clone())?
+        };
         let efs: Arc<EngineFS> = Arc::new(EngineFS::new_with_backend(backend, HashMap::new(), cache_dir, download_dir));
         let sources = TorrentSources::new(efs.clone());
         let hls_jobs = HlsJobs::new(hls_cache_root, sources.clone());
