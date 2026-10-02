@@ -1,3 +1,9 @@
+### `2186326` · 2026-09-30 · feat: trace play_magnet stages (add, metadata, checking, resume buffer)
+- `src-tauri/src/lib.rs`
+- `src-tauri/src/load_trace.rs`
+- `src-tauri/src/resume.rs`
+- `crates/torrent-engine/src/lib.rs`
+
 ### `4a1afa7` · 2026-09-30 · feat(enginefs): expose libtorrent torrent state in EngineStats
 - `vendor/enginefs/VENDORED.md`
 - `vendor/enginefs/src/backend/librqbit.rs`
