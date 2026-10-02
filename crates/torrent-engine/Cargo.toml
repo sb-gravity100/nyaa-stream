@@ -7,7 +7,7 @@ edition.workspace = true
 # Pinned to the exact commit validated locally (built + `cargo check`ed
 # against our own vcpkg.json/triplet at the project root) - see PLAN.md's
 # streaming-server section for why this replaced our own librqbit session.
-enginefs = { git = "https://github.com/stremio-native/stream-server", rev = "f585ab6eda9b1411034548c131bb0dc30c6f5f9e" }
+enginefs = { git = "https://github.com/stremio-native/stream-server", rev = "f585ab6eda9b1411034548c131bb0dc30c6f5f9e", default-features = false }
 tokio = { workspace = true }
 tokio-util = { version = "0.7", features = ["io"] }
 axum = "0.8"
@@ -25,3 +25,11 @@ serde_json = { workspace = true }
 # in .cargo/config.toml).
 ez-ffmpeg = { version = "0.19", features = ["static"] }
 ffmpeg-next = { version = "8.1", features = ["static"] }
+
+[features]
+# Torrent engine behind enginefs: libtorrent (default) or sb_torrent's tl
+# (a sibling checkout at ../sb_torrent; see PLAN.md's streaming-server
+# section). If both are enabled, libtorrent wins.
+default = ["libtorrent"]
+libtorrent = ["enginefs/libtorrent"]
+tl = ["enginefs/tl"]
