@@ -5,6 +5,8 @@ edition = "2024"
 
 [dependencies]
 librqbit = { version = "8.1.1", optional = true }
+# (nyaa-stream) sb_torrent's tl engine, a sibling checkout - see backend/tl_backend.rs
+tl = { path = "../../../sb_torrent/bindings/rust/tl", features = ["tokio"], optional = true }
 # Same pinned git revision as the upstream workspace this crate was
 # vendored from (see vendor/enginefs/VENDORED.md) - keeps the libtorrent
 # C++ build identical and cached.
@@ -42,3 +44,4 @@ parking_lot = "0.12.5"
 default = ["libtorrent"]
 librqbit = ["dep:librqbit"]
 libtorrent = ["dep:libtorrent-sys"]
+tl = ["dep:tl"]

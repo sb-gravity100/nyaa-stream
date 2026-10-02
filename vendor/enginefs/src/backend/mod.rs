@@ -10,6 +10,9 @@ pub mod librqbit;
 #[cfg(feature = "libtorrent")]
 pub mod libtorrent;
 
+#[cfg(feature = "tl")]
+pub mod tl_backend;
+
 pub mod metadata;
 pub mod priorities;
 
