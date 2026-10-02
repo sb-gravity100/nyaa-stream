@@ -89,6 +89,48 @@ async fn main() -> anyhow::Result<()> {
         );
         anyhow::ensure!(body.len() as u64 == n, "short body: {} of {n}", body.len());
     }
+    // Playback-like reader: one GET consumed at ~700 KB/s from a fresh
+    // offset, while polling the stats the buffering UI reads.
+    let play_off = len / 3;
+    let play_url = url.clone();
+    let player = tokio::spawn(async move {
+        let rest = play_url.strip_prefix("http://").unwrap();
+        let (host, path) = rest.split_once('/').unwrap();
+        let mut sock = tokio::net::TcpStream::connect(host).await?;
+        let req = format!("GET /{path} HTTP/1.1\r\nHost: {host}\r\nRange: bytes={play_off}-\r\nConnection: close\r\n\r\n");
+        sock.write_all(req.as_bytes()).await?;
+        let mut buf = vec![0u8; 64 << 10];
+        let (mut got, start) = (0u64, Instant::now());
+        while got < 12 << 20 {
+            let n = sock.read(&mut buf).await?;
+            if n == 0 {
+                break;
+            }
+            got += n as u64;
+            let due = std::time::Duration::from_millis(got * 1000 / 700_000);
+            if let Some(wait) = due.checked_sub(start.elapsed()) {
+                tokio::time::sleep(wait).await;
+            }
+        }
+        anyhow::Ok(got)
+    });
+    let tp = Instant::now();
+    let mut last = String::new();
+    while !player.is_finished() {
+        let stats = engine.stats(&added.id, idx).await?;
+        let now = match &stats.buffer {
+            Some(b) => format!("{} ({} ms ahead, eta {:?})", b.level, b.ahead_ms, b.eta_ready_ms),
+            None => "none".to_string(),
+        };
+        let level = now.split(' ').next().unwrap_or("").to_string();
+        if level != last {
+            println!("  buffer @ {:>5.2}s: {now}", tp.elapsed().as_secs_f64());
+            last = level;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    }
+    let played = player.await??;
+    println!("  played {:.1} MiB in {:.1}s", played as f64 / 1048576.0, tp.elapsed().as_secs_f64());
     println!("RESULT mismatches={mismatches} total={:.1}s", t0.elapsed().as_secs_f64());
     anyhow::ensure!(mismatches == 0, "byte mismatches");
     Ok(())
