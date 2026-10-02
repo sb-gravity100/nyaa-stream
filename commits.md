@@ -1,3 +1,10 @@
+### `4a1afa7` · 2026-09-30 · feat(enginefs): expose libtorrent torrent state in EngineStats
+- `vendor/enginefs/VENDORED.md`
+- `vendor/enginefs/src/backend/librqbit.rs`
+- `vendor/enginefs/src/backend/libtorrent/helpers.rs`
+- `vendor/enginefs/src/backend/mod.rs`
+- `vendor/enginefs/src/lib.rs`
+
 ### `2efa6bf` · 2026-09-30 · fix: read resume buffer bytes through the engine, not the disk file
 - `crates/torrent-engine/src/resume_buffer.rs`
 - `crates/torrent-engine/src/lib.rs`
