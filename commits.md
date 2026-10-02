@@ -1,3 +1,9 @@
+### `2efa6bf` · 2026-09-30 · fix: read resume buffer bytes through the engine, not the disk file
+- `crates/torrent-engine/src/resume_buffer.rs`
+- `crates/torrent-engine/src/lib.rs`
+- `src-tauri/src/resume.rs`
+- `PLAN.md`
+
 ### `c12464f` · 2026-09-30 · feat: load trace registry with stage logging and summaries
 - `src-tauri/src/load_trace.rs`
 - `src-tauri/src/lib.rs`
