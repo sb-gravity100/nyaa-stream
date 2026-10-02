@@ -14,6 +14,9 @@ Copied from https://github.com/stremio-native/stream-server at rev
   `manages_playback_lifecycle()` is `true`). `Cargo.toml` gains the `tl`
   feature, `src/lib.rs` an `EngineFS` alias for it (libtorrent wins if
   both features are on), `src/backend/mod.rs` the module.
+- `src/backend/mod.rs`: `TorrentHandle::buffer_status` (default `None`)
+  and `BufferStatus`, implemented by the tl backend from its newest
+  foreground reader per file.
 - `src/backend/libtorrent/disk_stream.rs`: a disk read that returns an
   all-zero chunk is re-served from libtorrent's own `read_piece` (the
   "broker") instead of being passed on. Upstream only guarded the very
