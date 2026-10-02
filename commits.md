@@ -1,3 +1,13 @@
+### `7f82268` · 2026-10-03 · docs: engine_smoke and tl vs libtorrent measurements
+- `FILE_INDEX.md`
+- `PLAN.md`
+
+### `fa6cf98` · 2026-10-03 · test: engine_smoke example for the Range-GET streaming path
+- `crates/torrent-engine/examples/engine_smoke.rs`
+
+### `c6112de` · 2026-10-03 · fix(enginefs): tl backend file names use native separators like libtorrent
+- `vendor/enginefs/src/backend/tl_backend.rs`
+
 ### `38143f7` · 2026-10-02 · docs: tl backend (PLAN, FILE_INDEX, VENDORED)
 - `PLAN.md`
 - `FILE_INDEX.md`
