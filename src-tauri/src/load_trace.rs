@@ -8,6 +8,9 @@ use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use tauri::State;
+use torrent_engine::read_stats::ReadSnapshot;
+
+use crate::AppState;
 
 /// A trace nobody finished (a crashed view) is dropped after this long.
 const STALE_AFTER: Duration = Duration::from_secs(600);
@@ -27,8 +30,9 @@ struct Trace {
     stages: Vec<Stage>,
     /// Extra `key=value` fields for the summary (waits, peers...).
     fields: Vec<(String, String)>,
-    /// The torrent being loaded, once known (for the end-of-trace snapshot).
-    torrent: Option<String>,
+    /// The torrent being loaded, once known, with its stream byte counters
+    /// then (the end-of-trace summary's baseline).
+    torrent: Option<(String, ReadSnapshot)>,
 }
 
 #[derive(Default)]
@@ -60,14 +64,17 @@ impl LoadTraces {
         trace.stages.push(Stage { name: stage.to_string(), at_ms, duration_ms, detail });
     }
 
-    pub fn set_torrent(&self, id: u64, torrent_id: &str) {
+    pub fn set_torrent(&self, id: u64, torrent_id: &str, base: ReadSnapshot) {
         if let Some(trace) = self.traces.lock().unwrap_or_else(|e| e.into_inner()).get_mut(&id) {
-            trace.torrent = Some(torrent_id.to_string());
+            trace.torrent = Some((torrent_id.to_string(), base));
         }
     }
 
-    pub fn torrent(&self, id: u64) -> Option<String> {
-        self.traces.lock().unwrap_or_else(|e| e.into_inner()).get(&id).and_then(|t| t.torrent.clone())
+    /// The trace's torrent, start and read baseline, once known.
+    fn torrent(&self, id: u64) -> Option<(String, Instant, ReadSnapshot)> {
+        let traces = self.traces.lock().unwrap_or_else(|e| e.into_inner());
+        let trace = traces.get(&id)?;
+        trace.torrent.clone().map(|(torrent, base)| (torrent, trace.began, base))
     }
 
     /// Adds a `key=value` field to the trace's summary.
@@ -108,10 +115,15 @@ fn summarize(trace: &Trace, outcome: &str) -> String {
     parts.join(" ")
 }
 
-/// Opens a trace (`start` or `seek`) and returns its id.
+/// Opens a trace (`start` or `seek`) and returns its id. A seek passes its
+/// torrent; a start learns it in `play_magnet`.
 #[tauri::command]
-pub fn trace_begin(traces: State<'_, LoadTraces>, kind: String) -> u64 {
-    traces.begin(&kind)
+pub fn trace_begin(traces: State<'_, LoadTraces>, app_state: State<'_, std::sync::Arc<AppState>>, kind: String, torrent_id: Option<String>) -> u64 {
+    let id = traces.begin(&kind);
+    if let Some(torrent_id) = torrent_id {
+        traces.set_torrent(id, &torrent_id, app_state.torrent_engine.read_snapshot(&torrent_id));
+    }
+    id
 }
 
 #[tauri::command]
@@ -119,10 +131,30 @@ pub fn trace_mark(traces: State<'_, LoadTraces>, id: u64, stage: String, detail:
     traces.mark(id, &stage, None, detail);
 }
 
-/// `outcome`: `ok`, or `abandoned` when the player closed first.
+/// `outcome`: `ok`, or `abandoned` when the player closed first. Adds the
+/// torrent's stream reads since the trace began (requests, engine waits,
+/// buffer vs torrent bytes) and its peers / download rate now.
 #[tauri::command]
-pub fn trace_end(traces: State<'_, LoadTraces>, id: u64, outcome: String) {
+pub async fn trace_end(traces: State<'_, LoadTraces>, app_state: State<'_, std::sync::Arc<AppState>>, id: u64, outcome: String) -> Result<(), String> {
+    if let Some((torrent_id, began, base)) = traces.torrent(id) {
+        let engine = &app_state.torrent_engine;
+        let reads = engine.read_summary(&torrent_id, began, base);
+        if let Some(first) = reads.first_request {
+            traces.field(id, "first_request_ms", first.saturating_duration_since(began).as_millis());
+        }
+        traces.field(id, "requests", reads.requests);
+        traces.field(id, "torrent_wait_ms", reads.wait_total.as_millis());
+        traces.field(id, "waits", reads.waits);
+        traces.field(id, "longest_wait_ms", reads.longest_wait.as_millis());
+        traces.field(id, "torrent_bytes", reads.bytes.saturating_sub(reads.buffer_bytes));
+        traces.field(id, "buffer_bytes", reads.buffer_bytes);
+        if let Ok(stats) = engine.stats(&torrent_id, 0).await {
+            traces.field(id, "peers", stats.connected_peers);
+            traces.field(id, "rate_mbps", format!("{:.2}", stats.download_speed_mbps));
+        }
+    }
     traces.end(id, &outcome);
+    Ok(())
 }
 
 #[cfg(test)]

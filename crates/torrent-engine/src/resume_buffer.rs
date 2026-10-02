@@ -11,9 +11,11 @@ use std::path::Path;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
+use std::time::Instant;
 
 use tokio::io::{AsyncRead, AsyncSeek, ReadBuf};
 
+use crate::read_stats::TorrentReads;
 use crate::TorrentId;
 
 /// Stop recording a file's open reads past this much (a player that never
@@ -215,11 +217,15 @@ pub(crate) struct RecordingReader<R> {
     inner: R,
     position: u64,
     log: Option<OpenLogHandle>,
+    /// Load-profiler accounting (foreground streams only).
+    reads: Option<Arc<TorrentReads>>,
+    /// When the current read first went Pending.
+    pending_since: Option<Instant>,
 }
 
 impl<R> RecordingReader<R> {
-    pub(crate) fn new(inner: R, log: Option<OpenLogHandle>) -> Self {
-        Self { inner, position: 0, log }
+    pub(crate) fn new(inner: R, log: Option<OpenLogHandle>, reads: Option<Arc<TorrentReads>>) -> Self {
+        Self { inner, position: 0, log, reads, pending_since: None }
     }
 }
 
@@ -227,12 +233,27 @@ impl<R: AsyncRead + Unpin> AsyncRead for RecordingReader<R> {
     fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<std::io::Result<()>> {
         let before = buf.filled().len();
         let result = Pin::new(&mut self.inner).poll_read(cx, buf);
-        if let Poll::Ready(Ok(())) = result {
-            let n = (buf.filled().len() - before) as u64;
-            let start = self.position;
-            self.position += n;
-            if let Some(log) = &self.log {
-                log.add(start, start + n);
+        match &result {
+            Poll::Pending => {
+                if self.pending_since.is_none() {
+                    self.pending_since = Some(Instant::now());
+                }
+            }
+            Poll::Ready(outcome) => {
+                if let (Some(since), Some(reads)) = (self.pending_since.take(), &self.reads) {
+                    reads.waited(since.elapsed());
+                }
+                if outcome.is_ok() {
+                    let n = (buf.filled().len() - before) as u64;
+                    let start = self.position;
+                    self.position += n;
+                    if let Some(log) = &self.log {
+                        log.add(start, start + n);
+                    }
+                    if let Some(reads) = &self.reads {
+                        reads.read(n);
+                    }
+                }
             }
         }
         result
@@ -294,11 +315,13 @@ pub(crate) struct BufferedReader<F> {
     buffer: Arc<LoadedBuffer>,
     inner: Inner<F>,
     position: u64,
+    /// Load-profiler accounting of bytes served from the buffer.
+    reads: Option<Arc<TorrentReads>>,
 }
 
 impl<F> BufferedReader<F> {
-    pub(crate) fn new(buffer: Arc<LoadedBuffer>, open: OpenFuture<F>) -> Self {
-        Self { buffer, inner: Inner::Opening(open), position: 0 }
+    pub(crate) fn new(buffer: Arc<LoadedBuffer>, open: OpenFuture<F>, reads: Option<Arc<TorrentReads>>) -> Self {
+        Self { buffer, inner: Inner::Opening(open), position: 0, reads }
     }
 }
 
@@ -312,6 +335,9 @@ impl<F: AsyncRead + AsyncSeek + Unpin> AsyncRead for BufferedReader<F> {
             let n = slice.len().min(buf.remaining());
             buf.put_slice(&slice[..n]);
             this.position += n as u64;
+            if let Some(reads) = &this.reads {
+                reads.from_buffer(n as u64);
+            }
             return Poll::Ready(Ok(()));
         }
         loop {
@@ -429,7 +455,7 @@ mod tests {
 
         // Fully buffered read: the torrent is never opened.
         let never: OpenFuture<std::io::Cursor<Vec<u8>>> = Box::pin(async { panic!("torrent opened") });
-        let mut reader = BufferedReader::new(buffer.clone(), never);
+        let mut reader = BufferedReader::new(buffer.clone(), never, None);
         let mut out = vec![0; 50];
         reader.seek(SeekFrom::Start(520)).await.unwrap();
         reader.read_exact(&mut out).await.unwrap();
@@ -437,7 +463,7 @@ mod tests {
 
         // Across buffer and gaps: identical to the source.
         let torrent = std::io::Cursor::new(content.clone());
-        let mut reader = BufferedReader::new(buffer, Box::pin(async move { Some(torrent) }));
+        let mut reader = BufferedReader::new(buffer, Box::pin(async move { Some(torrent) }), None);
         reader.seek(SeekFrom::Start(50)).await.unwrap();
         let mut out = Vec::new();
         reader.read_to_end(&mut out).await.unwrap();
