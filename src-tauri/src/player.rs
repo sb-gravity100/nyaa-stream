@@ -95,13 +95,18 @@ async fn ensure_mpv(app: &AppHandle, window: &WebviewWindow, state: &PlayerState
     if slot.is_none() {
         let wid = window_handle(&window)?;
         let (events_tx, mut events_rx) = mpsc::unbounded_channel::<Value>();
-        let extra_args = match install_fonts().await {
+        let mut extra_args = match install_fonts().await {
             Ok(dir) => vec![format!("--sub-fonts-dir={}", dir.display())],
             Err(err) => {
                 tracing::warn!(%err, "couldn't install bundled subtitle fonts for mpv");
                 Vec::new()
             }
         };
+        // Overrides embedded.rs's built-in 10 s when the torrent backend
+        // tracks its own buffer (see torrent_engine::MPV_CACHE_PAUSE_WAIT_SECS).
+        let pause_wait = torrent_engine::MPV_CACHE_PAUSE_WAIT_SECS;
+        tracing::debug!(pause_wait, "mpv cache-pause-wait");
+        extra_args.push(format!("--cache-pause-wait={pause_wait}"));
         let mpv = EmbeddedMpv::spawn(wid, &extra_args, events_tx).await.map_err(|err| err.to_string())?;
         tokio::spawn(push_mpv_window_to_bottom(wid));
         let mpv = Arc::new(mpv);
