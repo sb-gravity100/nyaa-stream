@@ -94,8 +94,8 @@ struct RangesFile {
 /// Writes `runs` (file offset, verified bytes) as a buffer in `dir`.
 /// Returns the bytes written. Blocking. The bytes must come from the
 /// engine's reader (`TorrentEngine::read_ranges`), not the file on disk: a
-/// just-verified piece may not be written there yet (vendor/enginefs
-/// VENDORED.md, `FRESH_PIECE_BROKER_WINDOW`).
+/// just-verified piece may not be written there yet (sbtl's disk worker
+/// can hold verified pieces in memory before writing them).
 pub fn write_buffer(dir: &Path, file_size: u64, runs: &[(u64, Vec<u8>)]) -> std::io::Result<u64> {
     std::fs::create_dir_all(dir)?;
     let mut output = std::io::BufWriter::new(std::fs::File::create(dir.join(DATA_FILE))?);

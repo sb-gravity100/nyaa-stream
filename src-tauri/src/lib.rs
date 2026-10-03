@@ -818,29 +818,16 @@ async fn play_magnet(
     traces: State<'_, load_trace::LoadTraces>,
     magnet: String,
     title: String,
-    watch: Option<String>,
     episode: Option<String>,
     trace: Option<u64>,
 ) -> Result<PlaySession, String> {
-    tracing::debug!(%title, ?watch, ?episode, ?trace, "play_magnet invoked");
+    tracing::debug!(%title, ?episode, ?trace, "play_magnet invoked");
     // Load profiler stages (see load_trace).
     let mark = |stage: &str, duration: Option<Duration>, detail: Option<String>| {
         if let Some(id) = trace {
             traces.mark(id, stage, duration, detail);
         }
     };
-    // How the file starts (see torrent_engine::WatchHint): "first" (no
-    // saved progress) or "resume" (a start time follows).
-    let watch_hint = match watch.as_deref() {
-        Some("first") => Some(torrent_engine::WatchHint::First),
-        Some("resume") => Some(torrent_engine::WatchHint::Resume),
-        None => None,
-        Some(other) => {
-            tracing::warn!(%title, watch = other, "play_magnet: unknown watch hint ignored");
-            None
-        }
-    };
-
     // Cancels a deferred removal from the previous player view (see
     // `stop_playback`).
     state.stop_generation.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
@@ -894,9 +881,6 @@ async fn play_magnet(
     }
     if let Some(id) = trace {
         traces.set_torrent(id, &added.id, state.torrent_engine.read_snapshot(&added.id));
-    }
-    if let Err(err) = state.torrent_engine.set_watch_hint(&added.id, watch_hint).await {
-        tracing::warn!(%title, torrent_id = %added.id, %err, "play_magnet failed to set the watch hint");
     }
     let files: Vec<PlayFile> = files
         .into_iter()
@@ -960,7 +944,7 @@ async fn set_download_cache_limit(state: State<'_, Arc<AppState>>, limit_bytes: 
 }
 
 /// Load profiler: times how long a just-added torrent spends re-hashing
-/// cached files (state 1 / 7 in libtorrent's numbering, which sbtl keeps),
+/// cached files (`TorrentState::Checking`),
 /// polled every 250ms, and marks it on trace `trace` as `checking`.
 fn spawn_checking_probe(app: tauri::AppHandle, state: Arc<AppState>, torrent_id: TorrentId, trace: u64) {
     const POLL: Duration = Duration::from_millis(250);
@@ -971,7 +955,7 @@ fn spawn_checking_probe(app: tauri::AppHandle, state: Arc<AppState>, torrent_id:
         let probe_started = std::time::Instant::now();
         let mut checking_since: Option<std::time::Instant> = None;
         loop {
-            let checking = matches!(state.torrent_engine.torrent_state(&torrent_id).await, Some(1 | 7));
+            let checking = state.torrent_engine.torrent_state(&torrent_id) == Some(torrent_engine::TorrentState::Checking);
             match (checking, checking_since) {
                 (true, None) => {
                     tracing::debug!(torrent_id = %torrent_id, "[trace] torrent is checking its files");

@@ -1,11 +1,11 @@
 //! Direct torrent reads for in-process FFmpeg inputs: FFmpeg's AVIO read/
-//! seek callbacks served straight from `enginefs`'s file stream, instead of
+//! seek callbacks served straight from `sbtl_engine` readers, instead of
 //! FFmpeg's HTTP client reading `stream_handler` over loopback.
 //!
 //! Why: no HTTP framing/copying per read, and the case the HTTP path could
-//! only paper over with FFmpeg's `-reconnect` - `enginefs`'s playback
-//! coordinator ending a body early (permit cancellation / lease expiry) -
-//! is handled here by reopening the stream at the current byte offset.
+//! only paper over with FFmpeg's `-reconnect` - a reader failing mid-file
+//! (sbtl's read timeout on a piece no peer delivers) - is handled here by
+//! reopening the stream at the current byte offset.
 //! Every read is also cancellable: `MediaJob::abort` fires the reader's
 //! token first, so a read parked on a not-yet-downloaded piece can't hold up
 //! a seek restart (ez-ffmpeg's abort waits for its worker threads).
@@ -14,14 +14,17 @@
 //! thread that opens the input), never on an async worker, so blocking on
 //! the runtime there is fine.
 
+#[cfg(test)]
 use std::io::SeekFrom;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use enginefs::EngineFS;
 use ez_ffmpeg::Input;
 use ffmpeg_next::ffi;
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt};
+use sbtl_engine::{Engine, ReadKind};
+#[cfg(test)]
+use tokio::io::AsyncSeekExt;
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncSeek};
 use tokio_util::sync::CancellationToken;
 
 use crate::TorrentId;
@@ -42,7 +45,7 @@ impl<T: AsyncRead + AsyncSeek + Send + Unpin> ReadSeek for T {}
 
 #[derive(Clone)]
 enum Backend {
-    Engine(Arc<EngineFS>),
+    Engine(Arc<Engine>),
     /// A local file standing in for the torrent (tests).
     #[cfg(test)]
     File(std::path::PathBuf),
@@ -57,8 +60,8 @@ pub(crate) struct TorrentSources {
 
 impl TorrentSources {
     /// Must be called inside the runtime the readers will block on.
-    pub(crate) fn new(efs: Arc<EngineFS>) -> Self {
-        Self { backend: Backend::Engine(efs), runtime: tokio::runtime::Handle::current() }
+    pub(crate) fn new(engine: Arc<Engine>) -> Self {
+        Self { backend: Backend::Engine(engine), runtime: tokio::runtime::Handle::current() }
     }
 
     #[cfg(test)]
@@ -67,8 +70,8 @@ impl TorrentSources {
     }
 
     /// A reader for one file. `background` readers never compete with
-    /// playback: no playback-lease refresh and `enginefs`'s Background
-    /// intent (the same distinction `stream_handler`'s `?intent=background`
+    /// playback: no playback-lease refresh and a `ReadKind::Background`
+    /// reader (the same distinction `stream_handler`'s `?intent=background`
     /// makes).
     pub(crate) fn reader(&self, torrent_id: &TorrentId, file_idx: usize, background: bool) -> TorrentReader {
         TorrentReader {
@@ -130,8 +133,8 @@ impl TorrentReader {
             (self.sources.backend.clone(), self.torrent_id.clone(), self.file_idx, self.pos, self.background);
         tracing::debug!(torrent_id = %torrent_id, file_idx, pos, background, "opening direct torrent read");
         let opened = self.block_on(async move {
-            let efs = match backend {
-                Backend::Engine(efs) => efs,
+            let engine = match backend {
+                Backend::Engine(engine) => engine,
                 #[cfg(test)]
                 Backend::File(path) => {
                     let mut file = tokio::fs::File::open(&path).await.map_err(|err| err.to_string())?;
@@ -140,18 +143,14 @@ impl TorrentReader {
                     return Ok((Box::new(file) as Box<dyn ReadSeek>, size));
                 }
             };
-            let engine = efs.get_engine(&torrent_id).await.ok_or_else(|| "unknown torrent".to_string())?;
+            let torrent = engine.get(&torrent_id).ok_or_else(|| "unknown torrent".to_string())?;
             if !background {
-                efs.refresh_hls_playback(&torrent_id, file_idx, "direct-read").await;
+                engine.touch_playback(&torrent_id, file_idx, "direct-read");
             }
-            // Same priorities stream_handler uses: 128 = foreground read,
-            // 0 = Background intent.
-            let mut handle = engine.get_file(file_idx, pos, if background { 0 } else { 128 }).await.ok_or_else(|| "unknown file index".to_string())?;
-            let size = handle.size;
-            if pos > 0 && pos < size {
-                handle.seek(SeekFrom::Start(pos)).await.map_err(|err| format!("seek to {pos}: {err}"))?;
-            }
-            Ok::<_, String>((Box::new(handle) as Box<dyn ReadSeek>, size))
+            let kind = if background { ReadKind::Background } else { ReadKind::Foreground };
+            let reader = torrent.open(file_idx, pos, kind).map_err(|err| err.to_string())?;
+            let size = reader.size;
+            Ok::<_, String>((Box::new(reader) as Box<dyn ReadSeek>, size))
         });
         match opened {
             None => Err(Failure::Cancelled),
@@ -249,11 +248,10 @@ impl TorrentReader {
         let target_u = target as u64;
         if target_u != self.pos {
             // Reopened at the new position by the next read rather than
-            // seeked in place: enginefs's disk stream aborts its in-flight
-            // piece read on seek, which can leave its underlying tokio File
-            // busy, so the next read failed with "other file operation is
-            // pending" (verified live). Each stream only ever reads forward
-            // from where it was opened - what an HTTP Range request does.
+            // seeked in place (a fresh sbtl reader at the target is a seek to
+            // sbtl too). Each stream only ever reads forward from where it
+            // was opened - what an HTTP Range request does. (Seeking in
+            // place broke enginefs's old libtorrent disk stream.)
             if self.stream.take().is_some() {
                 tracing::debug!(torrent_id = %self.torrent_id, file_idx = self.file_idx, from = self.pos, to = target, "direct torrent seek, reopening stream");
             }

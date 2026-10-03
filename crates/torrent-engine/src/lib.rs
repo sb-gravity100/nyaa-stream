@@ -10,16 +10,14 @@ use axum::Router;
 use axum_extra::headers::Range;
 use axum_extra::TypedHeader;
 use axum_range::{KnownSize, Ranged};
-use enginefs::backend::{TorrentBackend, TorrentHandle, TorrentSource};
-pub use enginefs::backend::priorities::WatchHint;
-use enginefs::EngineFS;
+use sbtl_engine::{Engine, ReadKind, Source};
+pub use sbtl_engine::{BufferStatus, TorrentState};
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex as AsyncMutex;
 
-/// `enginefs`'s `BackendEngineFS` keys every torrent by its info-hash
-/// string rather than a numeric session id (librqbit's model, which this
-/// crate used before moving to `enginefs` - see
-/// PLAN.md's streaming-server section for why). Kept as a type alias
+/// The torrent engine keys every torrent by its info-hash string (a numeric
+/// session id was librqbit's model, which this crate used long ago - see
+/// PLAN.md's streaming-server section). Kept as a type alias
 /// rather than a bare `String` at call sites so the meaning is documented
 /// where it's used.
 pub type TorrentId = String;
@@ -113,7 +111,7 @@ pub fn largest_video_file(files: &[TorrentFile]) -> Option<usize> {
 }
 
 pub struct TorrentEngine {
-    efs: Arc<EngineFS>,
+    torrents: Arc<Engine>,
     stream_addr: SocketAddr,
     hls_jobs: HlsJobs,
     probes: MediaProbes,
@@ -1034,7 +1032,7 @@ pub struct AddedTorrent {
 
 #[derive(Clone)]
 struct StreamRouterState {
-    efs: Arc<EngineFS>,
+    torrents: Arc<Engine>,
     stream_addr: SocketAddr,
     hls_jobs: HlsJobs,
     probes: MediaProbes,
@@ -1047,7 +1045,7 @@ struct StreamRouterState {
 /// mpv's start/resume threshold (`--cache-pause-wait`, seconds). sbtl only
 /// serves verified data and reports when its ready threshold is buffered
 /// ahead of the reader, so mpv needn't hold back for 10 s of its own cache.
-pub const MPV_CACHE_PAUSE_WAIT_SECS: u32 = (enginefs::backend::sbtl_backend::READY_MS / 1000) as u32;
+pub const MPV_CACHE_PAUSE_WAIT_SECS: u32 = (sbtl_engine::READY_MS / 1000) as u32;
 
 /// Trimmed-down mirror of librqbit's `TorrentStats` - mirrors Stremio's own
 /// streaming-server statistics endpoint (`GET /:infoHash/stats.json`,
@@ -1107,7 +1105,7 @@ pub struct StreamStats {
     /// Verified data ahead of the player's newest read of this file, when
     /// sbtl has seen a foreground reader of it (`None` before). PLAN.md "sbtl
     /// backend": the buffering UI shows real readiness from it.
-    pub buffer: Option<enginefs::backend::BufferStatus>,
+    pub buffer: Option<BufferStatus>,
 }
 
 /// The live HLS run of a file, for the statistics popup.
@@ -1126,34 +1124,25 @@ pub struct HlsRunInfo {
 }
 
 impl TorrentEngine {
-    /// Starts an `enginefs` engine over the sbtl backend, rooted at
+    /// Starts the sbtl engine (`sbtl_engine`), rooted at
     /// `download_dir` and a local HTTP server that serves torrent file
     /// bytes with Range support, mirroring Stremio's local streaming
     /// server. Disk-backed, so partial downloads survive an app restart -
     /// see PLAN.md's streaming-server section.
     pub async fn start(download_dir: PathBuf) -> anyhow::Result<Self> {
-        tracing::debug!(?download_dir, "starting enginefs sbtl backend");
+        tracing::debug!(?download_dir, "starting the sbtl engine");
         // Sibling of `download_dir` (itself `<cache_dir>/nyaa-stream/downloads`)
         // rather than nested under it, so a blanket wipe of one doesn't
         // have to know about the other's existence. Computed before
-        // `download_dir` moves into `SbtlBackend::new` below.
+        // `download_dir` moves into `Engine::start` below.
         let hls_cache_root = download_dir
             .parent()
             .map(|parent| parent.join("hls_cache"))
             .unwrap_or_else(|| download_dir.join("hls_cache"));
         // Warm the encoder probe so the first transcode doesn't pay for it.
         tokio::spawn(detect_h264_encoder());
-        let cache_dir = download_dir
-            .parent()
-            .map(|parent| parent.join("engine_cache"))
-            .unwrap_or_else(|| download_dir.join("engine_cache"));
-
-        let backend = {
-            tracing::info!("starting enginefs with the sbtl backend");
-            enginefs::backend::sbtl_backend::SbtlBackend::new(download_dir.clone())?
-        };
-        let efs: Arc<EngineFS> = Arc::new(EngineFS::new_with_backend(backend, HashMap::new(), cache_dir, download_dir));
-        let sources = TorrentSources::new(efs.clone());
+        let torrents = Engine::start(download_dir)?;
+        let sources = TorrentSources::new(torrents.clone());
         let hls_jobs = HlsJobs::new(hls_cache_root, sources.clone());
         let probes = MediaProbes::new(sources);
         let subtitle_logs = SubtitleLogs::default();
@@ -1167,7 +1156,7 @@ impl TorrentEngine {
 
         let router_state =
             StreamRouterState {
-            efs: efs.clone(),
+            torrents: torrents.clone(),
             stream_addr,
             hls_jobs: hls_jobs.clone(),
             probes: probes.clone(),
@@ -1205,7 +1194,7 @@ impl TorrentEngine {
             }
         });
 
-        Ok(Self { efs, stream_addr, hls_jobs, probes, subtitle_logs, open_reads, resume_buffers, read_stats })
+        Ok(Self { torrents, stream_addr, hls_jobs, probes, subtitle_logs, open_reads, resume_buffers, read_stats })
     }
 
     /// Adds a torrent from a magnet link or .torrent URL and starts
@@ -1214,11 +1203,11 @@ impl TorrentEngine {
     /// is needed here.
     pub async fn add(&self, magnet_or_url: &str) -> anyhow::Result<AddedTorrent> {
         tracing::debug!("adding torrent");
-        let engine = self.efs.add_torrent(TorrentSource::Url(magnet_or_url.to_string()), None).await.map_err(|err| {
+        let torrent = self.torrents.add(Source::Url(magnet_or_url.to_string())).await.map_err(|err| {
             tracing::error!(%err, "failed to add torrent");
             err
         })?;
-        let id = engine.info_hash.clone();
+        let id = torrent.info_hash().to_string();
         tracing::info!(torrent_id = %id, "torrent added");
         Ok(AddedTorrent { id })
     }
@@ -1229,7 +1218,7 @@ impl TorrentEngine {
     /// episode - unlike a torrent the user actually chose to watch, there's
     /// no reason to keep seeding or keep the partial file around afterward.
     ///
-    /// Note: the sbtl backend's `remove_torrent` keeps the downloaded files
+    /// Note: the engine's `remove` keeps the downloaded files
     /// (so a re-opened episode resumes from disk) - only our own HLS cache
     /// is guaranteed cleaned up here.
     pub async fn remove(&self, id: TorrentId) -> anyhow::Result<()> {
@@ -1240,28 +1229,17 @@ impl TorrentEngine {
         self.open_reads.remove_torrent(&id);
         self.resume_buffers.remove_torrent(&id);
         self.read_stats.remove_torrent(&id);
-        self.efs.remove_engine(&id).await;
-        self.efs.get_backend().remove_torrent(&id).await
+        self.torrents.remove(&id);
+        Ok(())
     }
 
     /// Fetches `file_idx` (e.g. the next episode of a batch) at the lowest
     /// priority alongside the file being played; `None` stops. Only spare
     /// bandwidth goes to it - the playing file keeps its own priorities.
     pub async fn preload_file(&self, id: &TorrentId, file_idx: Option<usize>) -> anyhow::Result<()> {
-        let engine = self.efs.get_engine(id).await.ok_or_else(|| anyhow::anyhow!("unknown torrent {id}"))?;
+        let torrent = self.torrents.get(id).ok_or_else(|| anyhow::anyhow!("unknown torrent {id}"))?;
         tracing::debug!(torrent_id = %id, ?file_idx, "preload file requested");
-        engine.handle.set_preload_file(file_idx).await
-    }
-
-    /// How the next file the player opens in `id` starts (`First`: from
-    /// 0:00, sequential download from the head; `Resume`: the first seek
-    /// after the header read is the resume point) - see PLAN.md "Fast
-    /// playback start". Taken by the next foreground stream of a file that
-    /// isn't already streaming.
-    pub async fn set_watch_hint(&self, id: &TorrentId, hint: Option<WatchHint>) -> anyhow::Result<()> {
-        let engine = self.efs.get_engine(id).await.ok_or_else(|| anyhow::anyhow!("unknown torrent {id}"))?;
-        tracing::debug!(torrent_id = %id, ?hint, "watch hint requested");
-        engine.handle.set_watch_hint(hint).await
+        torrent.set_preload_file(file_idx)
     }
 
     /// The player finished opening `file_idx` (mpv's `file-loaded`): stops
@@ -1285,11 +1263,11 @@ impl TorrentEngine {
     /// size, and its verified `[start, end)` byte runs (whole pieces clipped
     /// to the file - hash-checked, so safe to serve as-is).
     pub async fn verified_file(&self, id: &TorrentId, file_idx: usize) -> anyhow::Result<VerifiedFile> {
-        let engine = self.efs.get_engine(id).await.ok_or_else(|| anyhow::anyhow!("unknown torrent {id}"))?;
-        let path = engine.handle.get_file_path(file_idx).await.ok_or_else(|| anyhow::anyhow!("no file on disk for {id}/{file_idx}"))?;
-        let stats = engine.get_statistics().await;
+        let torrent = self.torrents.get(id).ok_or_else(|| anyhow::anyhow!("unknown torrent {id}"))?;
+        let path = torrent.file_path(file_idx).ok_or_else(|| anyhow::anyhow!("no file on disk for {id}/{file_idx}"))?;
+        let stats = torrent.stats();
         let file = stats.files.get(file_idx).ok_or_else(|| anyhow::anyhow!("no file {file_idx} in {id}"))?;
-        Ok(VerifiedFile { path: PathBuf::from(path), name: file.name.clone(), size: file.length, verified: file.downloaded_ranges.clone() })
+        Ok(VerifiedFile { path, name: file.name.clone(), size: file.length, verified: file.ranges.clone() })
     }
 
     /// Load profiler: `id`'s stream byte counters now (a trace's baseline).
@@ -1302,12 +1280,10 @@ impl TorrentEngine {
         self.read_stats.summary_since(id, since, base)
     }
 
-    /// `id`'s state in libtorrent's numbering, which the sbtl backend keeps
-    /// (1 = checking files, 2 = fetching metadata, 3 = downloading,
-    /// 4 = finished), `None` if unknown.
-    pub async fn torrent_state(&self, id: &TorrentId) -> Option<i32> {
-        let engine = self.efs.get_engine(id).await?;
-        Some(engine.get_statistics().await.state)
+    /// `id`'s state (checking data on disk, fetching metadata,
+    /// downloading, finished), `None` if unknown.
+    pub fn torrent_state(&self, id: &TorrentId) -> Option<TorrentState> {
+        Some(self.torrents.get(id)?.stats().state)
     }
 
     /// Reads `ranges` of `file_idx` through the engine's own reader (as a
@@ -1318,9 +1294,9 @@ impl TorrentEngine {
     pub async fn read_ranges(&self, id: &TorrentId, file_idx: usize, ranges: &[(u64, u64)]) -> anyhow::Result<Vec<(u64, Vec<u8>)>> {
         use tokio::io::{AsyncReadExt, AsyncSeekExt};
         const TIMEOUT: Duration = Duration::from_secs(30);
-        let engine = self.efs.get_engine(id).await.ok_or_else(|| anyhow::anyhow!("unknown torrent {id}"))?;
+        let torrent = self.torrents.get(id).ok_or_else(|| anyhow::anyhow!("unknown torrent {id}"))?;
         let read = async {
-            let mut handle = engine.get_file(file_idx, 0, 0).await.ok_or_else(|| anyhow::anyhow!("no file {file_idx} in {id}"))?;
+            let mut handle = torrent.open(file_idx, 0, ReadKind::Background)?;
             let mut runs = Vec::with_capacity(ranges.len());
             for &(start, end) in ranges {
                 handle.seek(std::io::SeekFrom::Start(start)).await?;
@@ -1350,10 +1326,10 @@ impl TorrentEngine {
     /// file list. A magnet link carries no file list, so nothing about
     /// which file to stream can be decided before this resolves.
     pub async fn files(&self, id: &TorrentId) -> anyhow::Result<Vec<TorrentFile>> {
-        let engine = self.efs.get_engine(id).await.ok_or_else(|| anyhow::anyhow!("unknown torrent {id}"))?;
+        let torrent = self.torrents.get(id).ok_or_else(|| anyhow::anyhow!("unknown torrent {id}"))?;
         let started = tokio::time::Instant::now();
         loop {
-            let files = engine.handle.get_files().await;
+            let files = torrent.files();
             if !files.is_empty() {
                 let files: Vec<TorrentFile> = files
                     .into_iter()
@@ -1439,38 +1415,30 @@ impl TorrentEngine {
     /// torrent, polled by the frontend to show buffering feedback while
     /// mpv waits for enough data to start decoding.
     pub async fn stats(&self, id: &TorrentId, file_idx: usize) -> anyhow::Result<StreamStats> {
-        let engine = self.efs.get_engine(id).await.ok_or_else(|| anyhow::anyhow!("unknown torrent {id}"))?;
-        let stats = engine.get_statistics().await;
+        let torrent = self.torrents.get(id).ok_or_else(|| anyhow::anyhow!("unknown torrent {id}"))?;
+        let stats = torrent.stats();
 
         // The streamed file's own progress, not the whole torrent's - for
         // a batch those differ by an order of magnitude. Falls back to the
         // torrent total if the index is somehow out of range.
-        let downloaded_byte_ranges = stats.files.get(file_idx).map(|file| file.downloaded_ranges.clone()).unwrap_or_default();
+        let downloaded_byte_ranges = stats.files.get(file_idx).map(|file| file.ranges.clone()).unwrap_or_default();
         let (total_bytes, downloaded_bytes) = match stats.files.get(file_idx) {
             Some(file) => (file.length, file.downloaded),
             None => (stats.files.iter().map(|f| f.length).sum(), stats.files.iter().map(|f| f.downloaded).sum()),
         };
         let progress_percent = if total_bytes > 0 { downloaded_bytes as f64 / total_bytes as f64 * 100.0 } else { 0.0 };
-        // `enginefs::backend::EngineStats::download_speed` is bytes/sec,
-        // unlike librqbit's `Speed::mbps` (MiB/s) this field previously
-        // mirrored - converted here so `StreamStats`'s documented unit
-        // (MiB/s, consumed by the frontend) doesn't silently change.
-        let download_speed_mbps = stats.download_speed / (1024.0 * 1024.0);
+        // The engine reports bytes/sec; `StreamStats` documents MiB/s
+        // (consumed by the frontend).
+        let download_speed_mbps = stats.download_rate / (1024.0 * 1024.0);
         let ready_ranges = self.hls_jobs.ready_ranges(id, file_idx);
-        let state = if !stats.has_metadata {
-            "initializing"
-        } else if stats.swarm_paused {
-            "paused"
-        } else {
-            "live"
-        };
+        let state = if !stats.has_metadata { "initializing" } else { "live" };
 
         Ok(StreamStats {
             state: state.to_string(),
             progress_percent,
             download_speed_mbps,
             connected_peers: stats.peers as u32,
-            finished: stats.is_finished,
+            finished: stats.finished,
             downloaded_bytes,
             total_bytes,
             ready_seconds: ready_ranges.first().filter(|(start, _)| *start == 0.0).map_or(0.0, |(_, end)| *end),
@@ -1479,14 +1447,14 @@ impl TorrentEngine {
             video_mode: self.hls_jobs.video_mode(id, file_idx).await,
             torrent_name: stats.name.clone(),
             file_name: stats.files.get(file_idx).map(|f| f.name.clone()).unwrap_or_default(),
-            upload_speed_mbps: stats.upload_speed / (1024.0 * 1024.0),
+            upload_speed_mbps: stats.upload_rate / (1024.0 * 1024.0),
             uploaded_bytes: stats.uploaded,
-            unchoked_peers: stats.unchoked,
-            queued_peers: stats.queued,
-            swarm_size: stats.swarm_size,
-            sources: stats.sources.len(),
+            unchoked_peers: stats.peers,
+            queued_peers: 0,
+            swarm_size: stats.peers_known,
+            sources: 0,
             run: self.hls_jobs.run_info(id, file_idx).await,
-            buffer: engine.handle.buffer_status(file_idx).await,
+            buffer: torrent.buffer(file_idx),
         })
     }
 }
@@ -1513,9 +1481,8 @@ fn mime_for_filename(name: &str) -> &'static str {
 struct StreamQuery {
     /// `background` marks a reader that must never compete with playback
     /// for bandwidth (the full-file subtitle pass, see
-    /// `spawn_background_subtitle_pass`): no playback-lease refresh, and
-    /// `enginefs`'s Background intent (an sbtl stream with no read-ahead
-    /// beyond its window).
+    /// `spawn_background_subtitle_pass`): no playback-lease refresh, and a
+    /// `ReadKind::Background` reader (no read-ahead beyond its window).
     intent: Option<String>,
 }
 
@@ -1528,25 +1495,23 @@ async fn stream_handler(
     use axum::response::IntoResponse;
     let background = query.intent.as_deref() == Some("background");
     tracing::debug!(torrent_id = %torrent_id, file_idx, background, "stream request received");
-    let engine = state.efs.get_engine(&torrent_id).await.ok_or_else(|| {
+    let torrent = state.torrents.get(&torrent_id).ok_or_else(|| {
         tracing::warn!(torrent_id = %torrent_id, file_idx, "stream request for unknown torrent");
         axum::http::StatusCode::NOT_FOUND
     })?;
 
-    // Refreshes this file's playback lease, which keeps enginefs from
+    // Refreshes this file's playback lease, which keeps the engine from
     // removing the torrent as inactive - a cheap early return on the
     // common case of a repeat request for the file already being watched.
     // Called on every request rather than once when the stream starts,
     // since the lease expires (sbtl's own readers decide what downloads).
     if !background {
-        state.efs.refresh_hls_playback(&torrent_id, file_idx, "raw-stream").await;
+        state.torrents.touch_playback(&torrent_id, file_idx, "raw-stream");
     }
 
     let range = range.map(|TypedHeader(range)| range);
-    let content_type = engine
-        .handle
-        .get_files()
-        .await
+    let content_type = torrent
+        .files()
         .into_iter()
         .nth(file_idx)
         .map(|file| mime_for_filename(&file.name))
@@ -1559,7 +1524,7 @@ async fn stream_handler(
     if let Some(reads) = &reads {
         reads.request();
     }
-    let priority = if background { 0 } else { 128 };
+    let kind = if background { ReadKind::Background } else { ReadKind::Foreground };
 
     // A Continue-watching resume: its buffer answers what it covers, and
     // the torrent file is only opened (lazily) where it stops - so playback
@@ -1567,17 +1532,14 @@ async fn stream_handler(
     if let Some(buffer) = state.resume_buffers.get(&torrent_id, file_idx).filter(|_| !background) {
         tracing::debug!(torrent_id = %torrent_id, file_idx, "stream served through the resume buffer");
         let byte_size = buffer.file_size;
-        let engine = engine.clone();
-        let open: resume_buffer::OpenFuture<_> = Box::pin(async move { engine.get_file(file_idx, 0, priority).await });
+        let torrent = torrent.clone();
+        let open: resume_buffer::OpenFuture<_> = Box::pin(async move { torrent.open(file_idx, 0, kind).ok() });
         let body = KnownSize::sized(RecordingReader::new(BufferedReader::new(buffer, open, reads.clone()), log, reads), byte_size);
         return Ok((headers, Ranged::new(range, body)).into_response());
     }
 
-    // priority 128: a normal foreground direct-playback read (not the
-    // internal-probe/background sentinels `Engine::get_file` treats 255/0
-    // as - see `enginefs::engine::Engine::get_file`'s doc comment).
-    let file_handle = engine.get_file(file_idx, 0, priority).await.ok_or_else(|| {
-        tracing::warn!(torrent_id = %torrent_id, file_idx, "stream request for unknown file index");
+    let file_handle = torrent.open(file_idx, 0, kind).map_err(|err| {
+        tracing::warn!(torrent_id = %torrent_id, file_idx, %err, "stream request for an unopenable file");
         axum::http::StatusCode::NOT_FOUND
     })?;
     let byte_size = file_handle.size;
@@ -1664,7 +1626,7 @@ async fn hls_segment_handler(
 ) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
     tracing::debug!(torrent_id = %torrent_id, file_idx, segment_index, "hls segment request received");
 
-    // Keeps this file's playback lease alive (enginefs removes torrents
+    // Keeps this file's playback lease alive (the engine removes torrents
     // whose lease expired as inactive) - hls.js polls this
     // endpoint roughly every `SEGMENT_DURATION_SECONDS`, which is what
     // actually keeps the torrent alive while playing; the
@@ -1672,7 +1634,7 @@ async fn hls_segment_handler(
     // starts (see `spawn_hls_transcode`) isn't enough on its own since
     // that request is made once per continuous ffmpeg process, not once
     // per segment poll.
-    state.efs.refresh_hls_playback(&torrent_id, file_idx, "hls-segment").await;
+    state.torrents.touch_playback(&torrent_id, file_idx, "hls-segment");
 
     serve_hls_file(&state, &torrent_id, file_idx, HlsFile::Segment(segment_index)).await
 }
@@ -1691,7 +1653,7 @@ async fn hls_init_handler(
     Query(query): Query<InitQuery>,
 ) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
     tracing::debug!(torrent_id = %torrent_id, file_idx, start = ?query.start, "hls init request received");
-    state.efs.refresh_hls_playback(&torrent_id, file_idx, "hls-segment").await;
+    state.torrents.touch_playback(&torrent_id, file_idx, "hls-segment");
     serve_hls_file(&state, &torrent_id, file_idx, HlsFile::Init { start_hint: query.start.unwrap_or(0) }).await
 }
 
