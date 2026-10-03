@@ -133,11 +133,13 @@ full architecture; summary:
 
 - Tauri 2 desktop app: Rust backend (`src-tauri/` + `crates/*`) + Preact/TS
   frontend (`src/`)
-- `crates/torrent-engine` — torrent client (vendored `enginefs` over the
-  sbtl engine, the only one - libtorrent and librqbit were removed) + local
-  axum streaming HTTP server with Range support
+- `crates/sbtl-engine` — the torrent engine over sbtl (torrents, readers,
+  stats, trackers, idle removal); replaced the vendored `enginefs`, and
+  libtorrent/librqbit are gone
+- `crates/torrent-engine` — local axum streaming HTTP server with Range
+  support + HLS, over `sbtl-engine`
 - sbtl (https://github.com/sb-gravity100/sbtl, sibling checkout
-  `../sb_torrent`) is pinned by git tag in `vendor/enginefs/Cargo.toml`;
+  `../sb_torrent`) is pinned by git tag in `crates/sbtl-engine/Cargo.toml`;
   never pin an untagged commit or commit a local `[patch]` - use
   `npm run dev:sbtl-local`. Update workflow: PLAN.md "sbtl versions and
   updates"

@@ -17,18 +17,12 @@ aggregation patterns), `src/types/resource/meta_item.rs` (confirms
 `Video.series_info` is always `{season, episode}` — validates defaulting
 unlabeled releases to season 1 rather than leaving season unknown).
 
-`reference/stream-server/` — clone of https://github.com/stremio-native/stream-server,
-kept for reference (gitignored) - but unlike the other two `reference/`
-clones, this one is also the source of a real build dependency: the
-`enginefs` crate torrent-engine depends on is a pinned git dependency
-pointing at this same repo (not this local clone - see
-`crates/torrent-engine/Cargo.toml`), and this project's own
-`vcpkg.json`/`triplets/x64-windows-v3-static-md-release.cmake` were copied
-from this clone's own build config. Useful for understanding `enginefs`
-internals beyond its public API (e.g. `enginefs/src/backend/libtorrent/
-playback.rs`'s `LibtorrentPlaybackCoordinator`, which owns real hot-file
-piece-priority scheduling) since its own doc comments are the only
-documentation for a lot of this.
+`reference/stream-server/` — clone of https://github.com/stremio-native/stream-server
+(gitignored, reference only; not on the dev machine any more). Its
+`enginefs` crate was nyaa's torrent layer until v0.4.0 (vendored, see
+"sbtl_engine"); `vcpkg.json`/`triplets/` were first copied from its build
+config, and `crates/sbtl-engine`'s `trackers.rs`/`tracker_prober.rs` are
+ported from it (MIT). No build dependency remains.
 
 `reference/stremio-web/` — shallow clone of https://github.com/Stremio/stremio-web
 (there is no separate `stremio-desktop` repo — the desktop app is this same
@@ -54,18 +48,17 @@ solid-color skeleton blocks, not a spinner).
   (`src/HlsPlayerView.tsx`). libmpv is also used headlessly for thumbnail
   capture
 - **Torrent engine:** sbtl (https://github.com/sb-gravity100/sbtl, a C
-  library with Rust bindings, built for nyaa-stream) behind `enginefs`'s
-  `TorrentBackend` trait (`vendor/enginefs/src/backend/sbtl_backend.rs`;
-  `enginefs` is a git dependency on
-  https://github.com/stremio-native/stream-server, pinned to a commit and
-  `[patch]`ed to the vendored copy). sbtl's readers drive the download: a
+  library with Rust bindings, built for nyaa-stream) through
+  `crates/sbtl-engine` (see "sbtl_engine"), which replaced the vendored
+  `enginefs` from stream-server. sbtl's readers drive the download: a
   reader's position is the playback cursor, so seeks preempt queued work
   and no playback coordinator is needed - see "sbtl backend". **The only
   engine since 2026-10-04:** history - nyaa first ran its own librqbit
   session, then `enginefs`'s libtorrent backend (chosen for real per-file
   hot-piece priority; `enginefs`'s librqbit backend was mostly stubs), then
-  sbtl, which seeks faster. The libtorrent and librqbit backends,
-  `vendor/libtorrent-sys` and the engine build features were removed;
+  sbtl, which seeks faster - first as an enginefs backend, then through
+  its own `sbtl_engine`. libtorrent, librqbit, `vendor/libtorrent-sys`,
+  `vendor/enginefs` and the engine build features were removed;
   sections below that describe libtorrent behaviour (e.g. "Fast playback
   start") are history.
   Torrents are keyed by info-hash `String` (`torrent_engine::TorrentId`) -
@@ -75,8 +68,8 @@ solid-color skeleton blocks, not a spinner).
   torrent's `remove()` keeps its files (the download cache decides when
   they go).
 - **Streaming server:** our own `axum` HTTP server (it talks to the torrent
-  engine only through `enginefs`'s `Engine`/`TorrentHandle` API, never to
-  sbtl directly) with two layers: raw Range-capable file bytes (`axum-range`),
+  engine only through `sbtl_engine`'s `Engine`/`Torrent`/`Reader` API,
+  never to sbtl directly) with two layers: raw Range-capable file bytes (`axum-range`),
   and an HLS layer on top of that (FFmpeg-produced segments, one
   continuous run per file) that real playback actually uses, since raw
   torrent bytes aren't reliably playable in a browser `<video>`. FFmpeg
@@ -94,9 +87,8 @@ solid-color skeleton blocks, not a spinner).
   and spawns one `ffmpeg` process per segment, which is the design this
   project already tried and moved away from (see `torrent-engine/src/lib.rs`'s
   `HlsJobs` doc comment for the documented audio-discontinuity/muxer-error
-  history). The two layers are decoupled by design - `enginefs`'s HLS
-  module could be swapped in later without touching the torrent engine, or
-  vice versa.
+  history). The two layers are decoupled by design: the HLS layer reads
+  the torrent engine only through readers.
 
 ### Build prerequisites
 
@@ -145,7 +137,7 @@ Building the workspace requires, beyond Rust/Node:
 - **Batch playback:** a batch source plays only its matched episode file (each
   torrent keeps an idle sbtl stream open, so files nobody reads don't
   download). While it plays, the next episode's file is registered as a
-  *preload file* (`preload_next_file` → vendored `set_preload_file`, a
+  *preload file* (`preload_next_file` → `sbtl_engine`'s `set_preload_file`, a
   reader-less sbtl stream behind everything else) so it only takes spare
   bandwidth; the next episode keeps using the same batch and torrent
   (`lastBatchMagnet`, `play_magnet` reuse, 4s deferred `stop_playback`).
@@ -189,10 +181,11 @@ nyaa_stream/
   vcpkg.json                 vcpkg manifest (static LGPL FFmpeg, for torrent-engine)
   triplets/                  custom vcpkg triplet (x64-windows-v3-static-md-release)
   .cargo/config.toml         vcpkg env vars + target-cpu=x86-64-v3 rustflags
-  vendor/enginefs/           vendored enginefs (MIT) + the sbtl backend, see its VENDORED.md
+
   src-tauri/                 Tauri app crate (commands, window, app state)
   crates/
-    torrent-engine/          enginefs (sbtl backend) wrapper + local streaming/HLS HTTP server
+    sbtl-engine/             torrent engine over sbtl: torrents, readers, stats, trackers, idle removal
+    torrent-engine/          local streaming/HLS HTTP server over sbtl-engine
     nyaa-client/              nyaa.si search client (paginated HTML scrape)
     anilist-client/          AniList GraphQL client
     kitsu-client/            Kitsu API client (backdrop + episode thumbnails)
@@ -200,8 +193,8 @@ nyaa_stream/
   src/                       Preact + TypeScript frontend
   reference/stremio-core/    reference-only clone, gitignored
   reference/stremio-web/     reference-only clone, gitignored
-  reference/stream-server/   reference-only clone, gitignored - source of the vendored
-                              `enginefs` git dependency + vcpkg.json/triplets/ above
+  reference/stream-server/   reference-only clone, gitignored - where enginefs and
+                              vcpkg.json/triplets/ came from
 ```
 
 ## Data flow (search → browse → play)
@@ -293,7 +286,7 @@ nyaa_stream/
    the user on the episode list) hands `PlayerView.tsx` the full list of
    that episode's releases; it auto-picks the one with the most seeders
    (`releases.ts`'s `bestRelease`) and calls `play_magnet`, which adds it
-   to the `enginefs` engine (sbtl backend) and returns an HLS playlist URL
+   to the torrent engine (`sbtl_engine`) and returns an HLS playlist URL
    from the local streaming server. A magnet's metadata arrives from peers
    asynchronously; the sbtl backend's `add_torrent` waits for it (up to
    120 s, cached in `downloads/.sbtl/<hash>.torrent` afterwards) before
@@ -428,12 +421,10 @@ nyaa_stream/
    playable in 4.1s, 10-minute seek in 1.2s. `StreamStats.videoMode`
    drives the player's "Converting to H.264" chip.
 
-   **enginefs is vendored** (`vendor/enginefs`, MIT, `[patch]` in the
-   workspace manifest - see its `VENDORED.md`): it holds the sbtl backend.
-   (Its libtorrent disk reader once handed out zero bytes for pieces
-   libtorrent had verified but not yet written, corrupting demux; sbtl
-   reads only verified bytes through its own storage, so that guard went
-   with libtorrent.) Video never waits on
+   (enginefs's libtorrent disk reader once handed out zero bytes for
+   pieces libtorrent had verified but not yet written, corrupting demux;
+   sbtl reads only verified bytes through its own storage, so that guard
+   went with libtorrent.) Video never waits on
    the probe: a run that starts before it finishes gets a subtitle-only
    ffmpeg attached (`HlsJobs::attach_subtitles`). A separate full-file
    subtitle pass (`sub_<index>_bg.ass`) reads `stream_handler` with
@@ -442,10 +433,9 @@ nyaa_stream/
    without pulling priority from the playhead. hls.js `initPTS` is a raw
    33-bit PTS and is unwrapped before use (B-frame DTS just below zero
    wraps to ~95443s). A transcode whose ffmpeg exited is restarted on the
-   next request, and every ffmpeg/ffprobe read uses `-reconnect` flags:
-   enginefs' disk reader ends the HTTP body early when a piece isn't ready
-   (and has been seen returning zero bytes for a not-yet-flushed piece) -
-   both upstream issues in the vendored crate, worked around here.
+   next request, and every ffmpeg/ffprobe read uses `-reconnect` flags
+   (an sbtl reader fails after its 60 s read timeout when no peer delivers
+   a piece).
 
    **Embedded mpv playback (the default player).** The approach
    stremio-shell-ng uses: `mpv_start` starts an in-process libmpv with
@@ -1082,7 +1072,7 @@ Depends on v0.3.2's `watch: resume` continue-watch mode.
   the wanted ranges with the file's verified runs (`downloaded_ranges`),
   read through the engine's own reader (`read_ranges`, a background read).
   Not from the file on disk: a just-verified piece may not be written there
-  yet, see vendor/enginefs VENDORED.md `FRESH_PIECE_BROKER_WINDOW`. They
+  yet (sbtl's disk worker can hold verified pieces in memory). They
   are stored in `data.bin` + `ranges.json`, with the
   app's `entry.json` beside them. The keyframe offset comes from
   `media::keyframe_byte_offset` on the *local file* (no HTTP, 10s timeout).
@@ -1418,8 +1408,8 @@ until then, but must not add 64-bit-only assumptions).
   `wid` embedding is unchanged.
 - **Memory limits**: a 32-bit process has ~2 GB (up to 4 GB large-address
   aware) of address space, so the 64-bit tuning must be scaled: mpv
-  `--demuxer-max-bytes`/`max-back-bytes` (150 MiB), the enginefs read-ahead
-  cap (64 MB), the resume buffers and sbtl's cache use per-arch caps;
+  `--demuxer-max-bytes`/`max-back-bytes` (150 MiB), sbtl's read-ahead
+  window, the resume buffers and sbtl's cache use per-arch caps;
   mmap of multi-GB files is avoided (files are read in ranges, and file
   sizes/offsets are `u64` end to end - audit `usize` casts).
 - **Packaging/updater**: separate NSIS/MSI per arch (`--target
@@ -1506,8 +1496,9 @@ Not done: sccache (clean builds only); a Windows Defender exclusion for
 The torrent engine: sbtl, a streaming-first BitTorrent library
 (C + Rust crates) written for nyaa-stream, published at
 https://github.com/sb-gravity100/sbtl and pinned by tag (`v0.1.0`) in
-`vendor/enginefs/Cargo.toml`, plugged in as an `enginefs` backend
-(`vendor/enginefs/src/backend/sbtl_backend.rs`). It started as a
+`crates/sbtl-engine/Cargo.toml` and used through `sbtl_engine` (see
+"sbtl_engine"; until then it was an `enginefs` backend,
+`vendor/enginefs/src/backend/sbtl_backend.rs`). It started as a
 build-time alternative to libtorrent; since 2026-10-04 it is the only
 engine (libtorrent and librqbit were removed - see the Stack section) and
 the build has no engine features.
@@ -1576,7 +1567,7 @@ Remaining gaps:
 
 nyaa-stream pins a released sbtl: `sbtl = { git =
 "https://github.com/sb-gravity100/sbtl", tag = "vX.Y.Z" }` in
-`vendor/enginefs/Cargo.toml` (cargo finds the crate in the repo's
+`crates/sbtl-engine/Cargo.toml` (cargo finds the crate in the repo's
 `bindings/rust/sbtl`; `sbtl-sys`'s build.rs compiles the C sources from the
 same checkout). nyaa's `Cargo.lock` is gitignored, so the tag is the pin:
 a pushed sbtl tag is never moved or re-created.
@@ -1602,7 +1593,7 @@ a pushed sbtl tag is never moved or re-created.
 |---|---|---|
 | v0.1.0 | `250d871` | first tag: rename tl -> sbtl, public repo; one owner per torrent (duplicate-add use-after-free fix), on-disk file ranges, per-torrent upload limit |
 
-## sbtl_engine (planned, v0.4.0 - replaces the vendored enginefs)
+## sbtl_engine (v0.4.0 - replaced the vendored enginefs)
 
 With sbtl the only engine, `vendor/enginefs` (~6k lines from
 stream-server) is mostly unused: nyaa calls about a dozen entry points,
@@ -1627,14 +1618,15 @@ the `[patch]` and the `enginefs` git dependency go.
 - `Engine::get(hash)`, `Engine::remove(hash)`,
   `Engine::touch_playback(hash, file_idx)` (the lease that replaces
   `refresh_hls_playback`).
-- `Torrent`: `info_hash`, `name`, `files()` (cached), `stats()` ->
+- `Torrent`: `info_hash`, `name`, `files()`, `stats()` ->
   `TorrentStats` (state as an enum `Checking / Metadata / Downloading /
   Finished` instead of libtorrent codes; rates, bytes, peers, per-file
   on-disk ranges), `open(file_idx, offset, ReadKind)` -> `Reader`
   (`AsyncRead + AsyncSeek`; `Foreground` = sequential + tail prefetch +
   SEQ_AHEAD + buffer probe, `Background` / `Probe` = window only),
-  `buffer(file_idx)`, `set_preload_file`, `keep_downloading`,
-  `clear_file`, `file_path`, `throttle_upload`.
+  `buffer(file_idx)`, `set_preload_file`, `file_path`. (Planned
+  `keep_downloading`, `clear_file` and `throttle_upload` were left out:
+  nothing in nyaa calls them; seeding stays sbtl's default, on.)
 - **Lifecycle** (what enginefs's loop did that still matters under sbtl):
   every 15 s, leases older than 15 s expire; a torrent with no open
   `Reader`, no lease and no access for 5 min is removed (files kept).
@@ -1655,6 +1647,13 @@ watch hint (a no-op under sbtl: `play_magnet`'s `watch` argument and
 `cargo check --workspace`, `engine_smoke` on a local swarm against the
 numbers in "sbtl backend", then the v0.4.0 sbtl live test (it runs on
 sbtl_engine, so it covers this change).
+
+**As built** (2026-10-04): `crates/sbtl-engine` (`lib.rs` Engine +
+lifecycle, `torrent.rs` Torrent/Reader/stats, `magnet.rs`, ported
+`trackers.rs`/`tracker_prober.rs` + `LICENSE-enginefs`); torrent-engine's
+`TorrentEngine` holds `torrents: Arc<Engine>`; `torrent_state` returns
+`TorrentState`; `vendor/enginefs`, the `[patch]` and the stream-server git
+dependency are gone. Unit tests: magnet parsing, idle rule, lease expiry.
 
 ## Known gaps / not yet implemented
 
@@ -1688,10 +1687,9 @@ sbtl_engine, so it covers this change).
 - The one-time media probe (`probe_media`, ffmpeg-next) still reads
   `stream_handler` over loopback HTTP; HLS and subtitle runs read the
   torrent directly (`direct_input.rs`).
-- enginefs' playback coordinator can end a file stream early (permit
-  cancellation/lease expiry); `direct_input` reopens at the same byte
-  offset (the HTTP probe relies on ffmpeg `-reconnect`), not fixed
-  upstream.
+- An sbtl reader fails after 60 s without data (no peer delivers a
+  piece); `direct_input` reopens at the same byte offset (the HTTP probe
+  relies on ffmpeg `-reconnect`).
 - Torrent-captured thumbnails use the torrent's largest video file. The seek point targets roughly
   the episode's midpoint when a duration estimate is available (a fixed
   early point otherwise), but without a Matroska Cues index on a
