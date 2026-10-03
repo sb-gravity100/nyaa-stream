@@ -1,3 +1,7 @@
+### `fda1e2c` · 2026-10-04 · docs: v0.4.0 live test results, libtorrent vs sbtl_engine (PLAN, PHASES)
+- `PLAN.md`
+- `PHASES.md`
+
 ### `8532f1d` · 2026-10-04 · fix(resume): a save no longer deletes its own buffer
 - `src-tauri/src/resume.rs`
 
