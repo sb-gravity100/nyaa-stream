@@ -1665,6 +1665,26 @@ runs: 4.2 s / 7.6 s, 3.2 s / 9.6 s, on a cold swarm). Both show brief
 stalled dips before ready. No regression; the earlier 1.4 s / 4.1 s in
 "sbtl backend" was a single run.
 
+**Live test** (2026-10-04, dev builds, load profiler; play -> mpv
+`file-loaded`; Fate/strange Fake, Kaleido-subs, same downloads dir):
+
+| | libtorrent (`031d9c0`) | sbtl_engine (main) |
+|---|---|---|
+| cold start | 27.2 s, 13.4 s | 11.0 s, 10.8 s, 22.3 s (5.3 s of it metadata) |
+| seek into undownloaded data | 2.4-10.6 s; 2 of 10 abandoned (7.7 s, 25.6 s) | mostly 1.5-3.6 s, outliers 5-11 s and one 17.9 s; 0 of ~118 abandoned |
+| reopen of downloaded data | - | 0.14-1.06 s |
+| resume (Ep 4, cached, 7:15) | 22.9 s (2.5 s re-check) | not repeated |
+
+Poorly seeded (Mushoku Tensei Ep 10, 4 peers): start at 14:31 in 6.4 s,
+seeks 2.1-9.1 s, none abandoned. A 1-peer release never delivered
+metadata (120 s, twice) and Fate Ep 9 stalled at 0.04-0.64 Mbit/s with
+9-20 peers (two abandoned starts) - no libtorrent run of either to
+compare. mpv's MKV parse errors only appeared when a load was abandoned.
+Found and fixed meanwhile: resume buffers never survived a save (a
+`resume.rs` bug, in both builds - `8532f1d`). Not yet covered: a
+libtorrent-era partial download (Ep 3/7) reopened on sbtl, and a
+resume served from a resume buffer.
+
 ## Known gaps / not yet implemented
 
 - (HLS fallback player only - mpv reads the file's real duration.) The

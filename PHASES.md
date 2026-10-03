@@ -406,7 +406,7 @@
             sbtl resume/metadata files
       - [x] `release.mjs` refuses a build without a tagged sbtl;
             `npm run dev:sbtl-local`
-      - [ ] Baseline live test on the last libtorrent commit (main at
+      - [x] Baseline live test on the last libtorrent commit (main at
             `031d9c0`): cold start, cached re-open, resume, seek into
             undownloaded data; record the numbers in PLAN.md
       - [x] Merge `sbtl-backend` into main (`--no-ff`, `1f95811`)
@@ -421,9 +421,12 @@
             dependency; docs (PLAN, FILE_INDEX, CLAUDE, README)
       - [x] engine_smoke on a local swarm: numbers vs "sbtl backend"
             (no regression, see PLAN.md "sbtl_engine" As built)
-      - [ ] Same live test on sbtl, plus: a libtorrent-era partial download
-            resumes after one re-check, a poorly seeded torrent,
-            `engine_smoke` seek numbers against the baseline
+      - [x] Same live test on sbtl, a poorly seeded torrent, `engine_smoke`
+            (PLAN.md "sbtl_engine" Live test)
+      - [x] Fix: resume buffers never survived a save (`list()` included the
+            save's own `.tmp`)
+      - [ ] Live: a libtorrent-era partial download (Fate Ep 3/7) reopens on
+            sbtl after one re-check; a resume served from a resume buffer
       - [ ] Run `npm run dev:sbtl-local` once (confirms the patch path
             resolves from cargo's working directory under `tauri dev`)
 - [ ] Contact and send logs (v0.4.0, see PLAN.md "Contact and send
