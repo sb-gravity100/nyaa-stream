@@ -1,3 +1,6 @@
+### `4875f10` · 2026-10-04 · docs: sbtl is the only engine, sbtl update workflow, v0.4.0 release plan (PLAN)
+- `PLAN.md`
+
 ### `491c50c` · 2026-10-04 · feat(release): refuse to build without a tagged sbtl; dev:sbtl-local
 - `scripts/release.mjs`
 - `package.json`
