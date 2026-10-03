@@ -1502,16 +1502,18 @@ still link with MSVC.
 Not done: sccache (clean builds only); a Windows Defender exclusion for
 `target\`, `~\.cargo`, `~\.rustup` is the user's call.
 
-## tl backend (experimental, build-time switch, no version bump)
+## sbtl backend (experimental, build-time switch, no version bump)
 
-Alternative torrent engine: sb_torrent's `tl` (C library + Rust crates in
-the sibling checkout `../sb_torrent`), plugged in as an `enginefs` backend
-(`vendor/enginefs/src/backend/tl_backend.rs`). Default builds still use
-libtorrent; `npm run dev:tl` (cargo features `--no-default-features
---features tl`, forwarded `nyaa-stream` -> `torrent-engine` -> `enginefs`)
-uses tl.
+Alternative torrent engine: sbtl, a streaming-first BitTorrent library
+(C + Rust crates) written for nyaa-stream, published at
+https://github.com/sb-gravity100/sbtl and pinned by tag (`v0.1.0`) in
+`vendor/enginefs/Cargo.toml`, plugged in as an `enginefs` backend
+(`vendor/enginefs/src/backend/sbtl_backend.rs`). Default builds still use
+libtorrent; `npm run dev:sbtl` (cargo features `--no-default-features
+--features sbtl`, forwarded `nyaa-stream` -> `torrent-engine` -> `enginefs`)
+uses sbtl.
 
-Why: tl is built around the stalls documented above (startup queue delay,
+Why: sbtl is built around the stalls documented above (startup queue delay,
 pieces stuck on one slow peer, slow seeks, zero/stale bytes):
 
 - a reader's position is the playback cursor; a read outside the
@@ -1519,13 +1521,13 @@ pieces stuck on one slow peer, slow seeks, zero/stale bytes):
   once (no 100 ms re-anchor debounce);
 - urgent blocks go only to peers at least 1/4 as fast as the fastest one,
   duplicated only when another peer would clearly deliver first;
-- reads return only verified bytes, through tl's own storage handle (no
+- reads return only verified bytes, through sbtl's own storage handle (no
   second OS handle racing a cache), so no zero guard or broker is needed;
 - a foreground reader gets the file tail early (MKV Cues / MP4 moov) and
   the rest of its file in order afterwards; other files of a batch are not
   downloaded unless preloaded or kept.
 
-Measured in sb_torrent's own benches (local throttled swarm, not real
+Measured in  own benches (local throttled swarm, not real
 swarms yet): paced 700 KB/s playback with 10 random seeks per run - 1-3
 stalls (0.14-0.62 s total) and ~1 s seek start-up; a mid-file 8 MiB seek
 range completes in 1.50 s vs libtorrent's 2.24 s on the same swarm.
@@ -1537,36 +1539,36 @@ middle 4 MiB and three random 2 MiB seeks; local swarm of 8 seeders at
 
 | backend | metadata | head | middle | seeks | total | byte mismatches |
 |---|---|---|---|---|---|---|
-| tl | 0.36 s | 1.4-1.6 s | 0.8-1.3 s | 1.3-3.2 s | 8.7-9.8 s | 0 |
+| sbtl | 0.36 s | 1.4-1.6 s | 0.8-1.3 s | 1.3-3.2 s | 8.7-9.8 s | 0 |
 | libtorrent | 1.6-1.8 s | 11.6-15.3 s | 16.5-19.2 s | 3.4-12.5 s | 50.6-65.2 s | 1 (head, first run) |
 
 Synthetic swarm, so it is no substitute for real ones; the libtorrent
 coordinator's leases and watch hints are not exercised by bare GETs.
 
-Buffer signals (tl only): `TorrentHandle::buffer_status` reports the
+Buffer signals (sbtl only): `TorrentHandle::buffer_status` reports the
 verified playback time ahead of the newest foreground reader of a file
 (level stalled / low / ready / full, ETA to ready). `get_stream_stats`
 carries it as `StreamStats.buffer`, `src/loadingProgress.ts` shows real
 readiness from it instead of the peers/bytes/speed estimate, and mpv's
-`--cache-pause-wait` follows tl's ready threshold (3 s instead of 10 s;
-`torrent_engine::MPV_CACHE_PAUSE_WAIT_SECS`) since tl reports when that much
+`--cache-pause-wait` follows sbtl's ready threshold (3 s instead of 10 s;
+`torrent_engine::MPV_CACHE_PAUSE_WAIT_SECS`) since sbtl reports when that much
 is verified ahead. Measured with engine_smoke's playback phase (local swarm,
 700 KB/s reader from a fresh offset): stalled -> ready at 1.4 s, full (30 s
 ahead) at 4.1 s.
 
-tl now has the swarm features the libtorrent backend relied on:
-- **DHT:** IPv4 only. Its state is kept in `<download_dir>/.tl/dht.dat`. `NYAA_TL_NO_DHT=1` turns it off for local-swarm tests.
+sbtl now has the swarm features the libtorrent backend relied on:
+- **DHT:** IPv4 only. Its state is kept in `<download_dir>/.sbtl/dht.dat`. `NYAA_SBTL_NO_DHT=1` turns it off for local-swarm tests.
 - **uTP.**
-- **Seeding with a choker:** `set_seeding_enabled` maps onto tl's session-wide seeding switch. `set_upload_throttled` sets a per-torrent upload limit of 16 KiB/s and never turns seeding back on.
+- **Seeding with a choker:** `set_seeding_enabled` maps onto sbtl's session-wide seeding switch. `set_upload_throttled` sets a per-torrent upload limit of 16 KiB/s and never turns seeding back on.
 - **Adding torrents:** a magnet already added, or one still waiting for its metadata, joins the existing torrent: a per-infohash lock covers the metadata wait. A cached `.torrent` keeps the magnet's `tr=` trackers.
-- **Downloaded ranges and file completeness** count only data already written to disk. tl's disk worker can hold verified pieces in memory before writing them, and resume buffers and probes read the files directly.
+- **Downloaded ranges and file completeness** count only data already written to disk. sbtl's disk worker can hold verified pieces in memory before writing them, and resume buffers and probes read the files directly.
 - **HTTPS trackers:** these use WinHTTP.
 
 Remaining gaps:
 - No IPv6 DHT.
 - `stats()` peer-search fields are approximations. Data from the libtorrent backend in the
-same download directory is reused (tl re-hashes it once, then keeps a
-resume sidecar in `<download_dir>/.tl`).
+same download directory is reused (sbtl re-hashes it once, then keeps a
+resume sidecar in `<download_dir>/.sbtl`).
 
 ## Known gaps / not yet implemented
 
