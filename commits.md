@@ -1,3 +1,6 @@
+### `41e5bbc` · 2026-10-04 · fix(release): only npm runs through a shell on Windows
+- `scripts/release.mjs`
+
 ### `ec71470` · 2026-10-04 · docs: sbtl naming and git dependency (PLAN, FILE_INDEX, VENDORED)
 - `PLAN.md`
 - `FILE_INDEX.md`
