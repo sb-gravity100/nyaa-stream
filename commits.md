@@ -1,3 +1,6 @@
+### `2b7791a` · 2026-10-04 · docs: resume buffers verified live; dropped-buffer delete issue (PHASES)
+- `PHASES.md`
+
 ### `b970409` · 2026-10-04 · fix(player): one progress key per session; resume plays its saved source
 - `src/MediaPage.tsx`
 - `src/PlayerView.tsx`
