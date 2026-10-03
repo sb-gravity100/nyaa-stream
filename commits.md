@@ -1,3 +1,7 @@
+### `491c50c` · 2026-10-04 · feat(release): refuse to build without a tagged sbtl; dev:sbtl-local
+- `scripts/release.mjs`
+- `package.json`
+
 ### `96374a9` · 2026-10-04 · build: vcpkg builds only FFmpeg
 - `vcpkg.json`
 - `.cargo/config.toml`
