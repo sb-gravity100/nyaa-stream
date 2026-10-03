@@ -1,3 +1,6 @@
+### `2253456` · 2026-10-04 · fix(ui): pin home app bar flush under title bar
+- `src/App.css`
+
 ### `5aa5736` · 2026-10-03 · docs: tl backend review fixes (PLAN, FILE_INDEX)
 - `PLAN.md`
 - `FILE_INDEX.md`
