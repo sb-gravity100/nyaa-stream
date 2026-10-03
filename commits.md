@@ -1,3 +1,12 @@
+### `f39e19b` · 2026-10-04 · feat(sbtl-engine): torrent engine crate over sbtl
+- `crates/sbtl-engine/Cargo.toml`
+- `crates/sbtl-engine/LICENSE-enginefs`
+- `crates/sbtl-engine/src/lib.rs`
+- `crates/sbtl-engine/src/torrent.rs`
+- `crates/sbtl-engine/src/magnet.rs`
+- `crates/sbtl-engine/src/trackers.rs`
+- `crates/sbtl-engine/src/tracker_prober.rs`
+
 ### `d4e9410` · 2026-10-04 · docs: plan sbtl_engine, replacing the vendored enginefs (PLAN, PHASES)
 - `PLAN.md`
 - `PHASES.md`
