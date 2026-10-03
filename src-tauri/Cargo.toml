@@ -15,11 +15,11 @@ name = "nyaa_stream_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [features]
-# Torrent engine (see crates/torrent-engine): `--no-default-features --features tl`
-# builds with sb_torrent's tl instead of libtorrent.
+# Torrent engine (see crates/torrent-engine): `--no-default-features --features sbtl`
+# builds with sbtl instead of libtorrent.
 default = ["libtorrent"]
 libtorrent = ["torrent-engine/libtorrent"]
-tl = ["torrent-engine/tl"]
+sbtl = ["torrent-engine/sbtl"]
 
 [build-dependencies]
 tauri-build = { version = "2.4", features = [] }

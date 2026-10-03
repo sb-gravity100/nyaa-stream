@@ -11,7 +11,7 @@ const MB = 1024 * 1024;
 export function loadingProgress(stats: StreamStats | null): number {
   if (stats === null) return 0;
 
-  // Backends that track the player's buffer (tl) report real readiness:
+  // Backends that track the player's buffer (sbtl) report real readiness:
   // verified playback time ahead of where the player reads, against the
   // threshold at which mpv starts (cache-pause-wait matches it).
   const buffer = stats.buffer;

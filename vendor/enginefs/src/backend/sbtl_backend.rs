@@ -1,9 +1,10 @@
-//! (nyaa-stream) Backend over sb_torrent's `tl` engine (feature `tl`).
+//! (nyaa-stream) Backend over the sbtl engine (feature `sbtl`), the
+//! streaming-first BitTorrent library written for nyaa-stream.
 //!
-//! tl schedules downloads from reads: a reader's position is the playback
+//! sbtl schedules downloads from reads: a reader's position is the playback
 //! cursor, the read-ahead window follows it, and a read outside the window
 //! is a seek that preempts queued background requests. So this backend
-//! needs no playback coordinator: readers are tl streams, and
+//! needs no playback coordinator: readers are sbtl streams, and
 //! `manages_playback_lifecycle()` is `true` so enginefs' libtorrent-specific
 //! lifecycle (probing incomplete files from disk, prepare calls) stays off.
 //!
@@ -16,10 +17,10 @@
 //! - each torrent keeps one idle stream (idle NONE) open, so files nobody
 //!   asked for (other episodes in a batch) are not downloaded.
 //!
-//! Magnet metadata is cached as `<download_dir>/.tl/<infohash>.torrent`;
-//! tl's own resume sidecar sits next to it, so a reopened episode starts
-//! from the data already on disk. tl brings its own DHT (state kept in
-//! `<download_dir>/.tl/dht.dat`), uTP, seeding and HTTPS trackers.
+//! Magnet metadata is cached as `<download_dir>/.sbtl/<infohash>.torrent`;
+//! sbtl's own resume sidecar sits next to it, so a reopened episode starts
+//! from the data already on disk. sbtl brings its own DHT (state kept in
+//! `<download_dir>/.sbtl/dht.dat`), uTP, seeding and HTTPS trackers.
 
 use crate::backend::{
     BackendFileInfo, BackendMemoryDiagnostics, BufferStatus, EngineStats, FileStreamTrait, Growler, PeerSearch,
@@ -38,13 +39,13 @@ use tokio::sync::Mutex;
 const METADATA_TIMEOUT: Duration = Duration::from_secs(120);
 /// Readers report no data after this long (`direct_input` reopens on error).
 const READ_TIMEOUT: Duration = Duration::from_secs(60);
-/// tl's ready threshold: playback time verified ahead before starting.
+/// sbtl's ready threshold: playback time verified ahead before starting.
 pub const READY_MS: u64 = 3000;
 
-pub struct TlBackend {
-    session: tl::Session,
+pub struct SbtlBackend {
+    session: sbtl::Session,
     download_dir: PathBuf,
-    torrents: Mutex<HashMap<String, TlHandle>>,
+    torrents: Mutex<HashMap<String, SbtlHandle>>,
     /// One add at a time per info-hash, held across a magnet's metadata
     /// wait, so two requests for the same torrent can't both create it.
     adding: std::sync::Mutex<HashMap<String, Arc<Mutex<()>>>>,
@@ -58,23 +59,23 @@ struct Policy {
     dht: bool,
 }
 
-impl TlBackend {
+impl SbtlBackend {
     pub fn new(download_dir: PathBuf) -> Result<Self> {
-        std::fs::create_dir_all(download_dir.join(".tl")).context("creating the tl state directory")?;
-        let dht_on = std::env::var_os("NYAA_TL_NO_DHT").is_none();
-        let cfg = tl::Config {
+        std::fs::create_dir_all(download_dir.join(".sbtl")).context("creating the sbtl state directory")?;
+        let dht_on = std::env::var_os("NYAA_SBTL_NO_DHT").is_none();
+        let cfg = sbtl::Config {
             // node id + known nodes survive restarts: lookups start warm
-            dht_state_path: Some(download_dir.join(".tl").join("dht.dat")),
+            dht_state_path: Some(download_dir.join(".sbtl").join("dht.dat")),
             // tests against local swarms (engine_smoke) must not pull in
             // real peers for a well-known infohash
             dht: dht_on,
             ..Default::default()
         };
-        let session = tl::Session::new(&cfg).map_err(|e| anyhow!("tl session: {e}"))?;
+        let session = sbtl::Session::new(&cfg).map_err(|e| anyhow!("sbtl session: {e}"))?;
         tracing::info!(
             download_dir = %download_dir.display(),
             port = session.listen_port(),
-            "tl backend started"
+            "sbtl backend started"
         );
         Ok(Self {
             session,
@@ -92,10 +93,10 @@ impl TlBackend {
     }
 
     fn metadata_cache(&self, info_hash: &str) -> PathBuf {
-        self.download_dir.join(".tl").join(format!("{info_hash}.torrent"))
+        self.download_dir.join(".sbtl").join(format!("{info_hash}.torrent"))
     }
 
-    /// Turns a source into bytes tl accepts: .torrent bytes, a cached
+    /// Turns a source into bytes sbtl accepts: .torrent bytes, a cached
     /// .torrent for a known magnet, the magnet itself, or a downloaded URL.
     async fn resolve_source(&self, source: TorrentSource) -> Result<Vec<u8>> {
         match source {
@@ -104,14 +105,14 @@ impl TlBackend {
                 if let Some(hash) = magnet_info_hash(&url) {
                     let cached = self.metadata_cache(&hash);
                     if let Ok(bytes) = tokio::fs::read(&cached).await {
-                        tracing::info!(%hash, "tl: magnet metadata from cache");
+                        tracing::info!(%hash, "sbtl: magnet metadata from cache");
                         return Ok(bytes);
                     }
                 }
                 Ok(url.into_bytes())
             }
             TorrentSource::Url(url) => {
-                tracing::info!(%url, "tl: downloading .torrent");
+                tracing::info!(%url, "sbtl: downloading .torrent");
                 let resp = reqwest::get(&url).await.context("fetching .torrent")?.error_for_status()?;
                 Ok(resp.bytes().await?.to_vec())
             }
@@ -158,13 +159,13 @@ fn magnet_info_hash(url: &str) -> Option<String> {
 }
 
 #[async_trait::async_trait]
-impl TorrentBackend for TlBackend {
-    type Handle = TlHandle;
+impl TorrentBackend for SbtlBackend {
+    type Handle = SbtlHandle;
 
     async fn add_torrent(&self, source: TorrentSource, mut trackers: Vec<String>) -> Result<Self::Handle> {
         // Magnets: known hash up front, so the duplicate check and the
-        // per-hash lock come before tl is touched and before the metadata
-        // wait. Other sources: the hash is known once tl parsed them (tl
+        // per-hash lock come before sbtl is touched and before the metadata
+        // wait. Other sources: the hash is known once sbtl parsed them (sbtl
         // itself returns the existing torrent for a known hash).
         let mut guard = None;
         if let TorrentSource::Url(url) = &source {
@@ -184,40 +185,40 @@ impl TorrentBackend for TlBackend {
         let torrent = self
             .session
             .add_torrent(&bytes, &self.download_dir)
-            .map_err(|e| anyhow!("tl add_torrent: {e}"))?;
+            .map_err(|e| anyhow!("sbtl add_torrent: {e}"))?;
         let info_hash = torrent.status().infohash_hex();
         let _guard = match guard {
             Some(g) => g,
             None => self.hash_lock(&info_hash).lock_owned().await,
         };
         if let Some(existing) = self.existing(&info_hash, &trackers).await {
-            return Ok(existing);  /* `torrent` is the same tl torrent; dropping it is harmless */
+            return Ok(existing);  /* `torrent` is the same sbtl torrent; dropping it is harmless */
         }
         for t in &trackers {
             if let Err(e) = torrent.add_tracker(t) {
-                tracing::warn!(%info_hash, tracker = %t, %e, "tl: tracker rejected");
+                tracing::warn!(%info_hash, tracker = %t, %e, "sbtl: tracker rejected");
             }
         }
-        tracing::info!(%info_hash, has_metadata = torrent.status().has_metadata, "tl: torrent added");
+        tracing::info!(%info_hash, has_metadata = torrent.status().has_metadata, "sbtl: torrent added");
 
         if !torrent.status().has_metadata {
             let t = torrent.clone();
             let started = Instant::now();
             tokio::task::spawn_blocking(move || t.wait_metadata(METADATA_TIMEOUT))
                 .await?
-                .map_err(|e| anyhow!("tl: no metadata for {info_hash} after {METADATA_TIMEOUT:?}: {e}"))?;
-            tracing::info!(%info_hash, elapsed = ?started.elapsed(), "tl: magnet metadata received");
+                .map_err(|e| anyhow!("sbtl: no metadata for {info_hash} after {METADATA_TIMEOUT:?}: {e}"))?;
+            tracing::info!(%info_hash, elapsed = ?started.elapsed(), "sbtl: magnet metadata received");
             if let Ok(meta) = torrent.metainfo() {
                 if let Err(e) = tokio::fs::write(self.metadata_cache(&info_hash), meta).await {
-                    tracing::warn!(%info_hash, %e, "tl: could not cache metadata");
+                    tracing::warn!(%info_hash, %e, "sbtl: could not cache metadata");
                 }
             }
         }
 
         let idle = torrent
-            .open_stream(0, &tl::StreamOptions { sequential: false, idle: tl::Idle::None, tail_prefetch: false, ..Default::default() })
-            .map_err(|e| anyhow!("tl idle stream: {e}"))?;
-        let handle = TlHandle {
+            .open_stream(0, &sbtl::StreamOptions { sequential: false, idle: sbtl::Idle::None, tail_prefetch: false, ..Default::default() })
+            .map_err(|e| anyhow!("sbtl idle stream: {e}"))?;
+        let handle = SbtlHandle {
             inner: Arc::new(HandleInner {
                 policy: self.policy.clone(),
                 torrent,
@@ -235,9 +236,9 @@ impl TorrentBackend for TlBackend {
     }
 
     async fn remove_torrent(&self, info_hash: &str) -> Result<()> {
-        // tl frees the torrent once its last reader closes.
+        // sbtl frees the torrent once its last reader closes.
         let removed = self.torrents.lock().await.remove(&info_hash.to_lowercase());
-        tracing::info!(%info_hash, found = removed.is_some(), "tl: torrent removed");
+        tracing::info!(%info_hash, found = removed.is_some(), "sbtl: torrent removed");
         Ok(())
     }
 
@@ -250,17 +251,17 @@ impl TorrentBackend for TlBackend {
     }
 
     fn set_seeding_enabled(&self, enabled: bool) {
-        tracing::info!(enabled, "tl: seeding");
+        tracing::info!(enabled, "sbtl: seeding");
         self.policy.seeding.store(enabled, std::sync::atomic::Ordering::Relaxed);
         self.session.set_upload(enabled, None);
     }
 }
 
-impl TlBackend {
+impl SbtlBackend {
     /// The handle already serving `info_hash`, with `trackers` added to it.
-    async fn existing(&self, info_hash: &str, trackers: &[String]) -> Option<TlHandle> {
+    async fn existing(&self, info_hash: &str, trackers: &[String]) -> Option<SbtlHandle> {
         let existing = self.torrents.lock().await.get(info_hash).cloned()?;
-        tracing::debug!(%info_hash, "tl: torrent already added");
+        tracing::debug!(%info_hash, "sbtl: torrent already added");
         for t in trackers {
             let _ = existing.inner.torrent.add_tracker(t);
         }
@@ -271,34 +272,34 @@ impl TlBackend {
 struct HandleState {
     /// Held only to stay open: keeps files nobody reads from downloading
     /// (see the module docs).
-    _idle: tl::Stream,
-    preload: Option<(usize, tl::Stream)>,
-    keep: HashMap<usize, tl::Stream>,
+    _idle: sbtl::Stream,
+    preload: Option<(usize, sbtl::Stream)>,
+    keep: HashMap<usize, sbtl::Stream>,
     /// Newest foreground reader per file (weak: doesn't keep it open).
-    readers: HashMap<usize, tl::BufferProbe>,
+    readers: HashMap<usize, sbtl::BufferProbe>,
 }
 
 struct HandleInner {
     policy: Arc<Policy>,
-    torrent: tl::Torrent,
+    torrent: sbtl::Torrent,
     info_hash: String,
     save_dir: PathBuf,
     state: Mutex<HandleState>,
 }
 
 #[derive(Clone)]
-pub struct TlHandle {
+pub struct SbtlHandle {
     inner: Arc<HandleInner>,
 }
 
-impl TlHandle {
-    fn files(&self) -> Vec<tl::FileInfo> {
+impl SbtlHandle {
+    fn files(&self) -> Vec<sbtl::FileInfo> {
         self.inner.torrent.files().unwrap_or_default()
     }
 
     /// Torrent-relative path with native separators, as the libtorrent
     /// backend reports it (`Show\Episode 01.mkv` on Windows).
-    fn relative(&self, f: &tl::FileInfo) -> String {
+    fn relative(&self, f: &sbtl::FileInfo) -> String {
         Path::new(&f.path)
             .strip_prefix(&self.inner.save_dir)
             .map(|p| p.to_string_lossy().into_owned())
@@ -306,14 +307,14 @@ impl TlHandle {
             .replace(['/', '\\'], std::path::MAIN_SEPARATOR_STR)
     }
 
-    fn background_stream(&self, file_idx: usize) -> Result<tl::Stream> {
+    fn background_stream(&self, file_idx: usize) -> Result<sbtl::Stream> {
         self.inner
             .torrent
             .open_stream(
                 file_idx as u32,
-                &tl::StreamOptions { sequential: false, idle: tl::Idle::SeqAhead, tail_prefetch: false, ..Default::default() },
+                &sbtl::StreamOptions { sequential: false, idle: sbtl::Idle::SeqAhead, tail_prefetch: false, ..Default::default() },
             )
-            .map_err(|e| anyhow!("tl stream for file {file_idx}: {e}"))
+            .map_err(|e| anyhow!("sbtl stream for file {file_idx}: {e}"))
     }
 
     /// Verified runs already on disk: safe for anything reading the file
@@ -324,7 +325,7 @@ impl TlHandle {
 }
 
 #[async_trait::async_trait]
-impl TorrentHandle for TlHandle {
+impl TorrentHandle for SbtlHandle {
     fn info_hash(&self) -> String {
         self.inner.info_hash.clone()
     }
@@ -406,7 +407,7 @@ impl TorrentHandle for TlHandle {
     async fn add_trackers(&self, trackers: Vec<String>) -> Result<()> {
         for t in trackers {
             if let Err(e) = self.inner.torrent.add_tracker(&t) {
-                tracing::warn!(info_hash = %self.inner.info_hash, tracker = %t, %e, "tl: tracker rejected");
+                tracing::warn!(info_hash = %self.inner.info_hash, tracker = %t, %e, "sbtl: tracker rejected");
             }
         }
         Ok(())
@@ -419,7 +420,7 @@ impl TorrentHandle for TlHandle {
             info_hash = %self.inner.info_hash,
             throttled,
             seeding = self.inner.policy.seeding.load(std::sync::atomic::Ordering::Relaxed),
-            "tl: upload throttle"
+            "sbtl: upload throttle"
         );
         self.inner.torrent.set_upload_limit(throttled.then_some(16 * 1024));
         Ok(())
@@ -431,7 +432,7 @@ impl TorrentHandle for TlHandle {
 
     async fn set_preload_file(&self, file_idx: Option<usize>) -> Result<()> {
         let mut state = self.inner.state.lock().await;
-        tracing::debug!(info_hash = %self.inner.info_hash, ?file_idx, "tl: preload file");
+        tracing::debug!(info_hash = %self.inner.info_hash, ?file_idx, "sbtl: preload file");
         state.preload = match file_idx {
             Some(i) => Some((i, self.background_stream(i)?)),
             None => None,
@@ -448,10 +449,10 @@ impl TorrentHandle for TlHandle {
         let b = probe.buffer()?;
         Some(BufferStatus {
             level: match b.level {
-                tl::BufferLevel::Stalled => "stalled",
-                tl::BufferLevel::Low => "low",
-                tl::BufferLevel::Ready => "ready",
-                tl::BufferLevel::Full => "full",
+                sbtl::BufferLevel::Stalled => "stalled",
+                sbtl::BufferLevel::Low => "low",
+                sbtl::BufferLevel::Ready => "ready",
+                sbtl::BufferLevel::Full => "full",
             }
             .to_string(),
             pos: b.pos,
@@ -472,7 +473,7 @@ impl TorrentHandle for TlHandle {
     async fn keep_file_downloading(&self, file_idx: usize) -> Result<()> {
         let mut state = self.inner.state.lock().await;
         if !state.keep.contains_key(&file_idx) {
-            tracing::debug!(info_hash = %self.inner.info_hash, file_idx, "tl: keep file downloading");
+            tracing::debug!(info_hash = %self.inner.info_hash, file_idx, "sbtl: keep file downloading");
             let s = self.background_stream(file_idx)?;
             state.keep.insert(file_idx, s);
         }
@@ -490,9 +491,9 @@ impl TorrentHandle for TlHandle {
         let foreground = priority != 0
             && priority != 255
             && !matches!(intent, PlaybackIntent::Background | PlaybackIntent::InternalProbe | PlaybackIntent::ContainerMetadata);
-        let opts = tl::StreamOptions {
+        let opts = sbtl::StreamOptions {
             sequential: true,
-            idle: if foreground { tl::Idle::SeqAhead } else { tl::Idle::None },
+            idle: if foreground { sbtl::Idle::SeqAhead } else { sbtl::Idle::None },
             tail_prefetch: foreground,
             bitrate: bitrate.map(|b| b.min(u32::MAX as u64) as u32),
             read_timeout: Some(READ_TIMEOUT),
@@ -501,10 +502,10 @@ impl TorrentHandle for TlHandle {
             .inner
             .torrent
             .open_stream(file_idx as u32, &opts)
-            .map_err(|e| anyhow!("tl reader for file {file_idx}: {e}"))?;
+            .map_err(|e| anyhow!("sbtl reader for file {file_idx}: {e}"))?;
         stream.seek(std::io::SeekFrom::Start(start_offset))?;
         stream.set_buffer_targets(Some(Duration::from_millis(READY_MS)), None);
-        let reader = tl::AsyncStream::from(stream);
+        let reader = sbtl::AsyncStream::from(stream);
         if foreground {
             self.inner.state.lock().await.readers.insert(file_idx, reader.buffer_probe());
         }
@@ -515,7 +516,7 @@ impl TorrentHandle for TlHandle {
             ?intent,
             foreground,
             ?bitrate,
-            "tl: reader opened"
+            "sbtl: reader opened"
         );
         Ok(Box::new(reader))
     }
@@ -533,12 +534,12 @@ impl TorrentHandle for TlHandle {
         // Not called while manages_playback_lifecycle() is true; kept
         // meaningful anyway: wait for the file's first bytes.
         let ready = self.wait_for_piece_ready(file_idx, 0, Duration::from_secs(30), PlaybackIntent::DirectInitial).await?;
-        if ready.ready { Ok(()) } else { Err(anyhow!("tl: file {file_idx} not ready: {}", ready.reason)) }
+        if ready.ready { Ok(()) } else { Err(anyhow!("sbtl: file {file_idx} not ready: {}", ready.reason)) }
     }
 
     async fn clear_file_streaming(&self, file_idx: usize) -> Result<()> {
         let mut state = self.inner.state.lock().await;
-        tracing::debug!(info_hash = %self.inner.info_hash, file_idx, "tl: clear file streaming");
+        tracing::debug!(info_hash = %self.inner.info_hash, file_idx, "sbtl: clear file streaming");
         state.keep.remove(&file_idx);
         if state.preload.as_ref().is_some_and(|(i, _)| *i == file_idx) {
             state.preload = None;
@@ -556,14 +557,14 @@ impl TorrentHandle for TlHandle {
         let stream = self
             .inner
             .torrent
-            .open_stream(file_idx as u32, &tl::StreamOptions { idle: tl::Idle::None, tail_prefetch: false, ..Default::default() })
-            .map_err(|e| anyhow!("tl stream for file {file_idx}: {e}"))?;
+            .open_stream(file_idx as u32, &sbtl::StreamOptions { idle: sbtl::Idle::None, tail_prefetch: false, ..Default::default() })
+            .map_err(|e| anyhow!("sbtl stream for file {file_idx}: {e}"))?;
         let started = Instant::now();
         let ready = tokio::task::spawn_blocking(move || stream.wait(offset, 1, timeout))
             .await?
-            .map_err(|e| anyhow!("tl wait: {e}"))?;
+            .map_err(|e| anyhow!("sbtl wait: {e}"))?;
         let st = self.inner.torrent.status();
-        tracing::debug!(info_hash = %self.inner.info_hash, file_idx, offset, ready, elapsed = ?started.elapsed(), "tl: wait_for_piece_ready");
+        tracing::debug!(info_hash = %self.inner.info_hash, file_idx, offset, ready, elapsed = ?started.elapsed(), "sbtl: wait_for_piece_ready");
         Ok(PieceReadiness {
             ready,
             piece: -1,
@@ -572,7 +573,7 @@ impl TorrentHandle for TlHandle {
             elapsed_ms: started.elapsed().as_millis() as u64,
             peers: st.peers_connected as u64,
             download_rate: st.download_rate as u64,
-            reason: if ready { "tl-verified".into() } else { "tl-timeout".into() },
+            reason: if ready { "sbtl-verified".into() } else { "sbtl-timeout".into() },
         })
     }
 }

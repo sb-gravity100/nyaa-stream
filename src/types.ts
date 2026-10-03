@@ -105,7 +105,7 @@ export interface SubtitleInfo {
   fonts: string[];
 }
 
-/** Verified data ahead of the player's newest read (tl backend only). */
+/** Verified data ahead of the player's newest read (sbtl backend only). */
 export interface BufferStatus {
   level: "stalled" | "low" | "ready" | "full";
   pos: number;
