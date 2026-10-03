@@ -102,8 +102,8 @@ async fn ensure_mpv(app: &AppHandle, window: &WebviewWindow, state: &PlayerState
                 Vec::new()
             }
         };
-        // Overrides embedded.rs's built-in 10 s when the torrent backend
-        // tracks its own buffer (see torrent_engine::MPV_CACHE_PAUSE_WAIT_SECS).
+        // Overrides embedded.rs's built-in 10 s: sbtl tracks its own buffer
+        // (see torrent_engine::MPV_CACHE_PAUSE_WAIT_SECS).
         let pause_wait = torrent_engine::MPV_CACHE_PAUSE_WAIT_SECS;
         tracing::debug!(pause_wait, "mpv cache-pause-wait");
         extra_args.push(format!("--cache-pause-wait={pause_wait}"));

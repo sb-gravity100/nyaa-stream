@@ -1,11 +1,9 @@
 //! Smoke test of the streaming path mpv uses: TorrentEngine's loopback
-//! HTTP server (`/stream/<id>/<file>`) over whichever backend this build
-//! uses (libtorrent by default, sbtl with `--no-default-features --features
-//! sbtl`). Adds a torrent, then issues Range GETs like a player: the head,
+//! HTTP server (`/stream/<id>/<file>`) over the sbtl backend. Adds a torrent, then issues Range GETs like a player: the head,
 //! the tail (container index), the middle, and a few random seeks. Every
 //! response is timed and, with REF_FILE, compared byte for byte.
 //!
-//!   cargo run -p torrent-engine --example engine_smoke [--no-default-features --features sbtl] -- \
+//!   cargo run -p torrent-engine --example engine_smoke -- \
 //!       MAGNET_OR_URL [REF_FILE] [--dir DOWNLOAD_DIR]
 
 use std::io::{Read, Seek, SeekFrom};

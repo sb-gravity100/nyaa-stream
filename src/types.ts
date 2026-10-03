@@ -155,7 +155,7 @@ export interface StreamStats {
     running: boolean;
     subtitleTracks: number;
   } | null;
-  /** null with the libtorrent backend or before the player reads. */
+  /** null before the player reads. */
   buffer?: BufferStatus | null;
 }
 

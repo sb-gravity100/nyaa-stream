@@ -4,13 +4,8 @@ version = "0.1.8"
 edition = "2024"
 
 [dependencies]
-librqbit = { version = "8.1.1", optional = true }
 # (nyaa-stream) sbtl, the streaming engine built for nyaa-stream - see backend/sbtl_backend.rs
-sbtl = { git = "https://github.com/sb-gravity100/sbtl", tag = "v0.1.0", features = ["tokio"], optional = true }
-# Same pinned git revision as the upstream workspace this crate was
-# vendored from (see vendor/enginefs/VENDORED.md) - keeps the libtorrent
-# C++ build identical and cached.
-libtorrent-sys = { git = "https://github.com/stremio-native/stream-server", rev = "f585ab6eda9b1411034548c131bb0dc30c6f5f9e", optional = true }
+sbtl = { git = "https://github.com/sb-gravity100/sbtl", tag = "v0.1.0", features = ["tokio"] }
 tokio = { version = "1.42.0", features = [
     "rt-multi-thread",
     "macros",
@@ -40,8 +35,3 @@ bumpalo = { version = "3.19", features = ["collections"] }
 memmap2 = "0.9.9"
 parking_lot = "0.12.5"
 
-[features]
-default = ["libtorrent"]
-librqbit = ["dep:librqbit"]
-libtorrent = ["dep:libtorrent-sys"]
-sbtl = ["dep:sbtl"]

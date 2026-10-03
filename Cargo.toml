@@ -16,13 +16,10 @@ thiserror = "2"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
-# enginefs is vendored (vendor/enginefs, MIT) to fix its libtorrent disk
-# reader - see vendor/enginefs/VENDORED.md for what changed and why.
+# enginefs is vendored (vendor/enginefs, MIT) to add the sbtl backend - see
+# vendor/enginefs/VENDORED.md for what changed and why.
 [patch."https://github.com/stremio-native/stream-server"]
 enginefs = { path = "vendor/enginefs" }
-# libtorrent session settings (piece picking for streaming) - see
-# vendor/libtorrent-sys/VENDORED.md.
-libtorrent-sys = { path = "vendor/libtorrent-sys" }
 
 # Dev builds: line tables only for our crates (panics keep file:line) and no
 # debug info for dependencies - full debug info meant ~830 MB of PDBs
