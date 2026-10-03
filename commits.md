@@ -1,3 +1,8 @@
+### `b970409` · 2026-10-04 · fix(player): one progress key per session; resume plays its saved source
+- `src/MediaPage.tsx`
+- `src/PlayerView.tsx`
+- `src/HlsPlayerView.tsx`
+
 ### `2dfc515` · 2026-10-04 · docs: fixed progress key and resume source fix for v0.4.0 (PHASES)
 - `PHASES.md`
 
