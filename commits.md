@@ -1,3 +1,6 @@
+### `41e5bbc` · 2026-10-04 · fix(release): only npm runs through a shell on Windows
+- `scripts/release.mjs`
+
 ### `997b931` · 2026-09-30 · docs: load profiler as built, tasks done
 - `PHASES.md`
 - `PLAN.md`
