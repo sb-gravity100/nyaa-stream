@@ -1,3 +1,6 @@
+### `c934dc9` · 2026-10-04 · docs: sbtl engine checklist for v0.4.0 (PHASES)
+- `PHASES.md`
+
 ### `f155f39` · 2026-10-04 · docs: sbtl is the only engine (VENDORED, FILE_INDEX, CLAUDE, README)
 - `vendor/enginefs/VENDORED.md`
 - `FILE_INDEX.md`
