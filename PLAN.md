@@ -53,36 +53,30 @@ solid-color skeleton blocks, not a spinner).
   without libmpv: the HLS `<video>` + `hls.js` player
   (`src/HlsPlayerView.tsx`). libmpv is also used headlessly for thumbnail
   capture
-- **Torrent engine:** `enginefs`'s libtorrent backend (vendored via git
-  dependency from https://github.com/stremio-native/stream-server, pinned
-  to a specific commit - see `crates/torrent-engine/Cargo.toml`), replacing
-  an earlier librqbit-based implementation. Chosen for its real per-file
-  hot-piece prioritization (a batch torrent's actively-watched episode gets
-  the swarm's attention, others don't), RTT-ranked tracker probing, and a
-  working `remove_torrent` - librqbit's equivalent methods in the same
-  `enginefs` crate turned out to be mostly stub/no-op implementations, only
-  the libtorrent backend actually does this work (verified by reading its
-  source before adopting it). Building this crate now requires a C++
-  toolchain: CMake, MSVC, and `vcpkg` (see "Build prerequisites" below) -
-  `enginefs` compiles libtorrent-rasterbar + OpenSSL from source via a
-  vcpkg manifest (`vcpkg.json`/`triplets/` at the project root, copied from
-  stream-server's own build config) the first time it's built.
-  Torrents are keyed by info-hash `String` (`torrent_engine::TorrentId`),
-  not a numeric session id like librqbit's - this ripples into
-  `PlaySession.torrentId`/`get_stream_stats` on the frontend, which just
-  treat it as an opaque id.
-  Storage is disk-backed (`LibtorrentBackend::new_disk_backed`, not
-  `enginefs`'s memory-only mode) so partial downloads still survive an app
-  restart, matching the previous librqbit-based behavior.
-  **Known regression:** unlike the previous librqbit-based `remove()`,
-  `enginefs`'s libtorrent `remove_torrent` does not delete a torrent's
-  downloaded files from disk (verified in its vendored source - it calls
-  libtorrent's own removal with `delete_files = false`) - only our own HLS
-  transcode cache is guaranteed cleaned up on `remove()` today.
-- **Streaming server:** our own `axum` HTTP server (unchanged by the
-  torrent-engine swap above - it talks to the torrent engine only through
-  `enginefs`'s `Engine`/`TorrentHandle` API, not to librqbit or libtorrent
-  directly) with two layers: raw Range-capable file bytes (`axum-range`),
+- **Torrent engine:** sbtl (https://github.com/sb-gravity100/sbtl, a C
+  library with Rust bindings, built for nyaa-stream) behind `enginefs`'s
+  `TorrentBackend` trait (`vendor/enginefs/src/backend/sbtl_backend.rs`;
+  `enginefs` is a git dependency on
+  https://github.com/stremio-native/stream-server, pinned to a commit and
+  `[patch]`ed to the vendored copy). sbtl's readers drive the download: a
+  reader's position is the playback cursor, so seeks preempt queued work
+  and no playback coordinator is needed - see "sbtl backend". **The only
+  engine since 2026-10-04:** history - nyaa first ran its own librqbit
+  session, then `enginefs`'s libtorrent backend (chosen for real per-file
+  hot-piece priority; `enginefs`'s librqbit backend was mostly stubs), then
+  sbtl, which seeks faster. The libtorrent and librqbit backends,
+  `vendor/libtorrent-sys` and the engine build features were removed;
+  sections below that describe libtorrent behaviour (e.g. "Fast playback
+  start") are history.
+  Torrents are keyed by info-hash `String` (`torrent_engine::TorrentId`) -
+  `PlaySession.torrentId`/`get_stream_stats` on the frontend treat it as an
+  opaque id. Storage is disk-backed (`downloads/`, plus sbtl's state in
+  `downloads/.sbtl/`), so partial downloads survive an app restart; a
+  torrent's `remove()` keeps its files (the download cache decides when
+  they go).
+- **Streaming server:** our own `axum` HTTP server (it talks to the torrent
+  engine only through `enginefs`'s `Engine`/`TorrentHandle` API, never to
+  sbtl directly) with two layers: raw Range-capable file bytes (`axum-range`),
   and an HLS layer on top of that (FFmpeg-produced segments, one
   continuous run per file) that real playback actually uses, since raw
   torrent bytes aren't reliably playable in a browser `<video>`. FFmpeg
@@ -104,30 +98,28 @@ solid-color skeleton blocks, not a spinner).
   module could be swapped in later without touching the torrent engine, or
   vice versa.
 
-### Build prerequisites (new, added with the libtorrent backend)
+### Build prerequisites
 
 **No vcpkg needed to build:** `npm run setup` (`scripts/fetch-native-deps.mjs`)
-downloads the prebuilt static libtorrent/OpenSSL/FFmpeg tree (release asset
-`native-deps-v1`, SHA-256 checked) into `vcpkg_installed/`, which the
-`vcpkg` crate and `FFMPEG_DIR` read directly. vcpkg is only needed to
-*rebuild* that archive after changing `vcpkg.json` (then re-upload it as a
-new `native-deps-vN` release and bump the constants in the script). CMake
-and vcpkg bullets below describe that rebuild path; MSVC and LLVM
-(libclang) are still required to build.
+downloads the prebuilt static FFmpeg tree (release asset `native-deps-v1`,
+SHA-256 checked; v1 also holds libtorrent/OpenSSL from before sbtl, unused)
+into `vcpkg_installed/`, which `FFMPEG_DIR` reads directly. vcpkg is only
+needed to *rebuild* that archive after changing `vcpkg.json` (then
+re-upload it as a new `native-deps-vN` release and bump the constants in
+the script). CMake and vcpkg bullets below describe that rebuild path;
+MSVC and LLVM are still required to build.
 
-Building `torrent-engine` (and therefore the whole workspace) now additionally
-requires, beyond Rust/Node:
-- CMake
-- A working MSVC C++ toolchain (Visual Studio 2022 Build Tools or full IDE)
-- [`vcpkg`](https://github.com/microsoft/vcpkg), bootstrapped, with
-  `VCPKG_ROOT` pointed at it. On the dev machine this is `C:\vcpkg` - this
-  is a machine-local path, not something this repo can fully automate; a
-  fresh clone needs `vcpkg` bootstrapped once before its first
-  `cargo build`.
-- The first build compiles libtorrent-rasterbar 2.1.1 + OpenSSL from source
-  via `vcpkg install` against this project's `vcpkg.json`/`triplets/`
-  (took ~10 minutes on the dev machine; cached by vcpkg afterward).
-- The same `vcpkg install` also builds FFmpeg 7.1.2 (LGPL feature set, see
+Building the workspace requires, beyond Rust/Node:
+- A working MSVC toolchain (Visual Studio 2022 Build Tools or full IDE)
+- LLVM: `clang-cl` compiles sbtl's C sources (`sbtl-sys`'s build.rs, which
+  falls back to MSVC `cl.exe /std:c11`), and bindgen needs libclang
+- Network access to github.com on the first build: cargo fetches sbtl
+  (public repo, tagged) - see "sbtl backend" for how its versions are
+  pinned
+- Rebuilding `native-deps` only: CMake and
+  [`vcpkg`](https://github.com/microsoft/vcpkg), bootstrapped, with
+  `VCPKG_ROOT` pointed at it (`C:\vcpkg` on the dev machine).
+- `vcpkg install` builds FFmpeg 7.1.2 (LGPL feature set, see
   the streaming-server section; ~6 minutes, cached afterward).
   `ffmpeg-sys-next` finds it through `FFMPEG_DIR` (set in
   `.cargo/config.toml` to `vcpkg_installed/<triplet>` - the `vcpkg` crate
@@ -136,7 +128,7 @@ requires, beyond Rust/Node:
   bindgen needs LLVM's libclang (`LIBCLANG_PATH`, default
   `C:\Program Files\LLVM\bin` in the same config).
 - `.cargo/config.toml` at the project root sets `target-cpu=x86-64-v3`
-  (Haswell/2013+ CPUs) for both Rust and the vendored C++ code, matching
+  (Haswell/2013+ CPUs) for both Rust and the C code built from source (sbtl, FFmpeg), matching
   stream-server's own build config - this is a real minimum CPU
   requirement for anyone building or running this app, not just a compiler
   hint.
@@ -150,10 +142,11 @@ requires, beyond Rust/Node:
   until it reaches releases already stored. All requests share one throttle
   (`throttle.rs`: 2 in flight, paced, 429/503 back-off with `Retry-After`).
   The database is user data - "Clear cache" leaves it alone.
-- **Batch playback:** a batch source plays only its matched episode file (the
-  libtorrent coordinator keeps every other file at priority 0). While it plays,
-  the next episode's file is registered as a *preload file* (`preload_next_file`
-  → vendored `set_preload_file`, libtorrent priority 1) so it only takes spare
+- **Batch playback:** a batch source plays only its matched episode file (each
+  torrent keeps an idle sbtl stream open, so files nobody reads don't
+  download). While it plays, the next episode's file is registered as a
+  *preload file* (`preload_next_file` → vendored `set_preload_file`, a
+  reader-less sbtl stream behind everything else) so it only takes spare
   bandwidth; the next episode keeps using the same batch and torrent
   (`lastBatchMagnet`, `play_magnet` reuse, 4s deferred `stop_playback`).
 - **Torrent source:** nyaa.si search, scraping its paginated HTML results
@@ -193,12 +186,13 @@ requires, beyond Rust/Node:
 ```
 nyaa_stream/
   Cargo.toml                 workspace root
-  vcpkg.json                 vcpkg manifest (libtorrent + openssl, for torrent-engine)
+  vcpkg.json                 vcpkg manifest (static LGPL FFmpeg, for torrent-engine)
   triplets/                  custom vcpkg triplet (x64-windows-v3-static-md-release)
   .cargo/config.toml         vcpkg env vars + target-cpu=x86-64-v3 rustflags
+  vendor/enginefs/           vendored enginefs (MIT) + the sbtl backend, see its VENDORED.md
   src-tauri/                 Tauri app crate (commands, window, app state)
   crates/
-    torrent-engine/          enginefs (libtorrent backend) wrapper + local streaming/HLS HTTP server
+    torrent-engine/          enginefs (sbtl backend) wrapper + local streaming/HLS HTTP server
     nyaa-client/              nyaa.si search client (paginated HTML scrape)
     anilist-client/          AniList GraphQL client
     kitsu-client/            Kitsu API client (backdrop + episode thumbnails)
@@ -299,16 +293,11 @@ nyaa_stream/
    the user on the episode list) hands `PlayerView.tsx` the full list of
    that episode's releases; it auto-picks the one with the most seeders
    (`releases.ts`'s `bestRelease`) and calls `play_magnet`, which adds it
-   to the `enginefs` libtorrent engine and returns an HLS playlist URL from
-   the local streaming server. **Known gap from the librqbit→libtorrent
-   swap**: the previous implementation explicitly waited on librqbit's
-   `handle.wait_until_initialized()` before returning, since a magnet's
-   metadata arrives from peers asynchronously and a request made
-   immediately after `add()` used to 404 without that wait. `enginefs`'s
-   `BackendEngineFS::add_torrent` has no equivalent documented wait step -
-   this hasn't yet been verified live to confirm the race doesn't
-   reappear; test a fresh magnet add → immediate play before considering
-   this fully done. The frontend plays that
+   to the `enginefs` engine (sbtl backend) and returns an HLS playlist URL
+   from the local streaming server. A magnet's metadata arrives from peers
+   asynchronously; the sbtl backend's `add_torrent` waits for it (up to
+   120 s, cached in `downloads/.sbtl/<hash>.torrent` afterwards) before
+   returning, so a request right after `add()` doesn't 404. The frontend plays that
    via `hls.js` in a plain HTML5 `<video>` element — a solid-black bottom
    control bar (play/pause, seek with a download-progress highlight,
    mute, volume, fullscreen, time, a source-picker dropdown over the same
@@ -440,16 +429,16 @@ nyaa_stream/
    drives the player's "Converting to H.264" chip.
 
    **enginefs is vendored** (`vendor/enginefs`, MIT, `[patch]` in the
-   workspace manifest - see its `VENDORED.md`): its disk reader could hand
-   out zero bytes for pieces libtorrent had verified but not yet made
-   visible on disk, corrupting demux ("0x00 at pos N") and producing
-   pixelated frames. It now waits up to 8s per piece for real bytes,
-   preferring libtorrent's own `read_piece` copy. Video never waits on
+   workspace manifest - see its `VENDORED.md`): it holds the sbtl backend.
+   (Its libtorrent disk reader once handed out zero bytes for pieces
+   libtorrent had verified but not yet written, corrupting demux; sbtl
+   reads only verified bytes through its own storage, so that guard went
+   with libtorrent.) Video never waits on
    the probe: a run that starts before it finishes gets a subtitle-only
    ffmpeg attached (`HlsJobs::attach_subtitles`). A separate full-file
    subtitle pass (`sub_<index>_bg.ass`) reads `stream_handler` with
-   `?intent=background` (no playback-lease refresh, libtorrent piece
-   priority 1) so the whole track fills in as the torrent downloads
+   `?intent=background` (no playback-lease refresh, an sbtl stream with no
+   read-ahead beyond its window) so the whole track fills in as the torrent downloads
    without pulling priority from the playhead. hls.js `initPTS` is a raw
    33-bit PTS and is unwrapped before use (B-frame DTS just below zero
    wraps to ~95443s). A transcode whose ffmpeg exited is restarted on the
@@ -554,7 +543,7 @@ by an app-styled HTML menu whose items depend on what was right-clicked.
 
 Three published releases: **v0.3.2** (the playback fixes) as soon as it
 passes a live test, **v0.4.0** (splash/title bar, download cache, resume
-buffer, contact and send logs), then **v1.0.0** (the stable Windows release
+buffer, contact and send logs, and the sbtl torrent engine), then **v1.0.0** (the stable Windows release
 after v0.8.0). The milestones in between - v0.5.0 (context menus) → v0.6.0
 (build thumbnails) → v0.7.0 (HD banners) → v0.8.0 (seek preview) → v0.9.0
 (navigation/home rehaul) → v0.9.1 (Discover) - are each
@@ -565,6 +554,15 @@ i686 builds, see "32-bit Windows support").
 (Changed 2026-09-29 from "only v0.9.0 is published", so the playback fix
 doesn't wait on the features; contact/logs moved from v0.9.0 to v0.4.0; a
 multiplatform 1.0.0 was planned and dropped the same day - Windows only.)
+
+**sbtl in v0.4.0** (decided 2026-10-04): v0.4.0 also switches the torrent
+engine to sbtl and drops libtorrent (see "sbtl backend"). So a regression
+can be told apart from the other v0.4.0 features, the live test runs
+twice: once on main before the merge (libtorrent - the baseline numbers),
+then again after merging `sbtl-backend`. With libtorrent removed there is
+no engine to fall back to: an sbtl problem in v0.4.0 is fixed forward in
+a published **v0.4.x** patch release (the one exception to the three
+releases above).
 
 **Local release script** (GitHub Actions is unavailable: the account is
 billing-locked, 2026-09-29). `npm run release -- --notes "<text>"`
@@ -993,9 +991,9 @@ permissions (`core:window:allow-start-dragging`, `-minimize`,
 
 Downloaded pieces are kept on purpose and reused, instead of piling up by
 accident. Re-opening a torrent whose files are still in `downloads/` already
-reuses them: libtorrent re-hashes the existing data on add (`checking_files`,
-`state=1` in the waiting-piece log) and every verified piece is instantly
-available - seeking back or re-watching never downloads them again.
+reuses them: sbtl reads its resume file (`downloads/.sbtl/<hash>.resume`)
+or re-checks the existing data on add (`state=1`), and every verified piece
+is instantly available - seeking back or re-watching never downloads them again.
 
 - **Index:** `downloads/.cache-index.json` - per info hash: its files on disk,
   bytes used, `last_used`, and the (anime, episode) it was played for.
@@ -1010,21 +1008,21 @@ available - seeking back or re-watching never downloads them again.
   its files become ordinary cache entries and are evicted first.
 - **Clear cache** also empties `downloads/` (except the playing torrent).
 - **With the resume buffer (below):** both are kept. The resume buffer serves
-  the first seconds of a resume instantly even while libtorrent re-hashes a
+  the first seconds of a resume instantly even while sbtl re-checks a
   large cached file, and survives the cache evicting it.
-- **Later, if measured slow:** fast resume - save libtorrent resume data on
-  stop and add with it, skipping the re-hash. Needs `libtorrent-sys`
-  vendored and patched (its wrapper can trigger `save_resume_data` but
-  can't return the bytes or add a torrent with them).
+- **Fast resume:** built into sbtl (its resume file), so a cached torrent
+  skips the re-check unless the file changed.
 - Commands: `download_cache_status` (size/entries, for Settings),
   `set_download_cache_limit`; eviction logged per torrent (name, bytes,
   reason).
 - **As built** (`src-tauri/src/download_cache.rs`, `src/downloadCache.ts`):
-  entries hold file paths relative to `downloads/` plus libtorrent's
-  `.<hash>.parts` file, and the `<animeId>:<episodeKey>` episodes played
+  entries hold file paths relative to `downloads/` (eviction also deletes
+  the torrent's `.sbtl/<hash>.resume`/`.torrent` and any `.<hash>.parts`
+  libtorrent left; `downloads/.sbtl/` itself is never an orphan nor
+  pruned), and the `<animeId>:<episodeKey>` episodes played
   from them (`play_magnet`'s new `episode` arg). Sizes are *allocated*
   bytes (`GetCompressedFileSizeW`) - the files are sparse. Eviction runs 2s
-  after `stop_playback`'s removal (libtorrent releasing the files), at
+  after `stop_playback`'s removal (the engine releasing the files), at
   startup (also sweeping unindexed leftovers, by mtime - only then, so a
   just-added torrent is never mistaken for one), and on a limit or keep
   change. The frontend sends the Continue watching row's episodes via
@@ -1412,15 +1410,16 @@ or ARM was meant. The stable v1.0.0 ships both `windows-x86_64` and
 until then, but must not add 64-bit-only assumptions).
 
 - **Toolchain**: add the `i686-pc-windows-msvc` Rust target; vcpkg triplet
-  `x86-windows-static-md` for the LGPL FFmpeg (and libtorrent/openssl deps
-  of enginefs); LLVM libclang must be the x86-capable one for bindgen.
+  `x86-windows-static-md` for the LGPL FFmpeg; sbtl's C sources built for
+  i686 (`clang-cl -m32` / x86 `cl.exe`); LLVM libclang must be the
+  x86-capable one for bindgen.
 - **libmpv**: bundle a 32-bit `libmpv-2.dll` in `src-tauri/lib/x86/` (64-bit
   stays in `lib/x64/`); the loader picks by `cfg(target_pointer_width)`.
   `wid` embedding is unchanged.
 - **Memory limits**: a 32-bit process has ~2 GB (up to 4 GB large-address
   aware) of address space, so the 64-bit tuning must be scaled: mpv
   `--demuxer-max-bytes`/`max-back-bytes` (150 MiB), the enginefs read-ahead
-  cap (64 MB), the resume buffers and libtorrent's cache use per-arch caps;
+  cap (64 MB), the resume buffers and sbtl's cache use per-arch caps;
   mmap of multi-GB files is avoided (files are read in ranges, and file
   sizes/offsets are `u64` end to end - audit `usize` casts).
 - **Packaging/updater**: separate NSIS/MSI per arch (`--target
@@ -1431,7 +1430,7 @@ until then, but must not add 64-bit-only assumptions).
   this PC (installs and runs on 64-bit Windows, so live QA is possible
   here): playback, subtitles, resume, HLS fallback, updater. WebView2 is
   available for x86.
-- Risks: 32-bit builds of vcpkg FFmpeg/libtorrent may need patches; memory
+- Risks: 32-bit builds of vcpkg FFmpeg or sbtl may need patches; memory
   exhaustion on long HLS runs; small user base vs. extra build/QA cost.
 
 ## Navigation and home rehaul + Discover (planned, v0.9.0 rehaul, v0.9.1 Discover)
@@ -1501,6 +1500,107 @@ still link with MSVC.
 
 Not done: sccache (clean builds only); a Windows Defender exclusion for
 `target\`, `~\.cargo`, `~\.rustup` is the user's call.
+
+## sbtl backend (the torrent engine; default from v0.4.0)
+
+The torrent engine: sbtl, a streaming-first BitTorrent library
+(C + Rust crates) written for nyaa-stream, published at
+https://github.com/sb-gravity100/sbtl and pinned by tag (`v0.1.0`) in
+`vendor/enginefs/Cargo.toml`, plugged in as an `enginefs` backend
+(`vendor/enginefs/src/backend/sbtl_backend.rs`). It started as a
+build-time alternative to libtorrent; since 2026-10-04 it is the only
+engine (libtorrent and librqbit were removed - see the Stack section) and
+the build has no engine features.
+
+Why: sbtl is built around the stalls documented above (startup queue delay,
+pieces stuck on one slow peer, slow seeks, zero/stale bytes):
+
+- a reader's position is the playback cursor; a read outside the
+  read-ahead window is a seek that preempts queued background requests at
+  once (no 100 ms re-anchor debounce);
+- urgent blocks go only to peers at least 1/4 as fast as the fastest one,
+  duplicated only when another peer would clearly deliver first;
+- reads return only verified bytes, through sbtl's own storage handle (no
+  second OS handle racing a cache), so no zero guard or broker is needed;
+- a foreground reader gets the file tail early (MKV Cues / MP4 moov) and
+  the rest of its file in order afterwards; other files of a batch are not
+  downloaded unless preloaded or kept.
+
+Measured in sbtl's own benches (local throttled swarm, not real
+swarms yet): paced 700 KB/s playback with 10 random seeks per run - 1-3
+stalls (0.14-0.62 s total) and ~1 s seek start-up; a mid-file 8 MiB seek
+range completes in 1.50 s vs libtorrent's 2.24 s on the same swarm.
+
+Through this app's own streaming server (`crates/torrent-engine/examples/engine_smoke.rs`:
+magnet with peer hints -> metadata -> Range GETs for head 1 MiB, tail 2 MiB,
+middle 4 MiB and three random 2 MiB seeks; local swarm of 8 seeders at
+512 KiB/s each, debug builds, two runs each):
+
+| backend | metadata | head | middle | seeks | total | byte mismatches |
+|---|---|---|---|---|---|---|
+| sbtl | 0.36 s | 1.4-1.6 s | 0.8-1.3 s | 1.3-3.2 s | 8.7-9.8 s | 0 |
+| libtorrent | 1.6-1.8 s | 11.6-15.3 s | 16.5-19.2 s | 3.4-12.5 s | 50.6-65.2 s | 1 (head, first run) |
+
+Synthetic swarm, so it is no substitute for real ones; the libtorrent
+coordinator's leases and watch hints are not exercised by bare GETs.
+
+Buffer signals (sbtl only): `TorrentHandle::buffer_status` reports the
+verified playback time ahead of the newest foreground reader of a file
+(level stalled / low / ready / full, ETA to ready). `get_stream_stats`
+carries it as `StreamStats.buffer`, `src/loadingProgress.ts` shows real
+readiness from it instead of the peers/bytes/speed estimate, and mpv's
+`--cache-pause-wait` follows sbtl's ready threshold (3 s instead of 10 s;
+`torrent_engine::MPV_CACHE_PAUSE_WAIT_SECS`) since sbtl reports when that much
+is verified ahead. Measured with engine_smoke's playback phase (local swarm,
+700 KB/s reader from a fresh offset): stalled -> ready at 1.4 s, full (30 s
+ahead) at 4.1 s.
+
+sbtl now has the swarm features the libtorrent backend relied on:
+- **DHT:** IPv4 only. Its state is kept in `<download_dir>/.sbtl/dht.dat`. `NYAA_SBTL_NO_DHT=1` turns it off for local-swarm tests.
+- **uTP.**
+- **Seeding with a choker:** `set_seeding_enabled` maps onto sbtl's session-wide seeding switch. `set_upload_throttled` sets a per-torrent upload limit of 16 KiB/s and never turns seeding back on.
+- **Adding torrents:** a magnet already added, or one still waiting for its metadata, joins the existing torrent: a per-infohash lock covers the metadata wait. A cached `.torrent` keeps the magnet's `tr=` trackers.
+- **Downloaded ranges and file completeness** count only data already written to disk. sbtl's disk worker can hold verified pieces in memory before writing them, and resume buffers and probes read the files directly.
+- **HTTPS trackers:** these use WinHTTP.
+
+Remaining gaps:
+- No IPv6 DHT.
+- `stats()` peer-search fields are approximations.
+- Not yet measured on real swarms (only local ones): the v0.4.0 live test
+  covers that, including a poorly seeded torrent.
+- Data libtorrent downloaded into the same directory should be reused
+  (sbtl re-checks it once, then keeps a resume file in
+  `<download_dir>/.sbtl`) - to verify live in the v0.4.0 test.
+
+### sbtl versions and updates
+
+nyaa-stream pins a released sbtl: `sbtl = { git =
+"https://github.com/sb-gravity100/sbtl", tag = "vX.Y.Z" }` in
+`vendor/enginefs/Cargo.toml` (cargo finds the crate in the repo's
+`bindings/rust/sbtl`; `sbtl-sys`'s build.rs compiles the C sources from the
+same checkout). nyaa's `Cargo.lock` is gitignored, so the tag is the pin:
+a pushed sbtl tag is never moved or re-created.
+
+- **Working on both:** `npm run dev:sbtl-local` runs the app against the
+  sibling `../sb_torrent` checkout through `cargo --config
+  "patch.'https://github.com/sb-gravity100/sbtl'.sbtl.path=..."` - nothing
+  committed. Never put that `[patch]` in a `.cargo/config.toml` (e.g. one
+  in a parent directory): it would reach release builds silently.
+- **Release guard:** `scripts/release.mjs`'s preflight asks `cargo tree -p
+  sbtl` which sbtl the build resolves and fails unless it is a tag of the
+  sbtl repo.
+- **Releasing an sbtl change:** in sbtl - commit, bump the workspace
+  version (0.x: minor for API breaks, patch for fixes), tag `vX.Y.Z`,
+  push the tag. In nyaa - change `tag`, `cargo update -p sbtl -p
+  sbtl-sys`, `cargo check --workspace`, `engine_smoke`, commit `chore:
+  sbtl vX.Y.Z` (one line on what changed), add a row below. nyaa never
+  pins an untagged sbtl commit.
+- **API changes** come in pairs, in one sitting: the sbtl tag, then the
+  nyaa adapter commit (nyaa is sbtl's only consumer).
+
+| sbtl | nyaa commit | what changed |
+|---|---|---|
+| v0.1.0 | `250d871` | first tag: rename tl -> sbtl, public repo; one owner per torrent (duplicate-add use-after-free fix), on-disk file ranges, per-torrent upload limit |
 
 ## Known gaps / not yet implemented
 

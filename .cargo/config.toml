@@ -1,5 +1,5 @@
 [env]
-# Keep libtorrent on the same x86-64-v3 and /MD ABI as the Rust binaries.
+# Keep vcpkg's static FFmpeg on the same x86-64-v3 and /MD ABI as the Rust binaries.
 # Explicit CI environment values can still override these local defaults.
 VCPKGRS_TRIPLET = "x64-windows-v3-static-md-release"
 VCPKG_INSTALLED_DIR = { value = "vcpkg_installed", relative = true }

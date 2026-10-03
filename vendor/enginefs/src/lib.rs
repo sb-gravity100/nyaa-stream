@@ -39,11 +39,6 @@ pub mod trackers;
 // Re-export TrackerStorage for use by server crate
 pub use trackers::TrackerStorage;
 
-#[cfg(all(feature = "librqbit", not(feature = "libtorrent")))]
-use crate::backend::librqbit::LibrqbitBackend;
-#[cfg(feature = "libtorrent")]
-use crate::backend::libtorrent::LibtorrentBackend;
-
 use crate::backend::{
     BackendMemoryDiagnostics, HotFilePriorityPlan, TorrentBackend, TorrentFilePriorityPlan,
     TorrentHandle, TorrentSource,
@@ -103,8 +98,6 @@ pub struct BackendEngineFS<B: TorrentBackend> {
     /// wanted at a time. Single-file torrents bypass this selector.
     active_multifile_files: Arc<RwLock<HashMap<String, MultiFileActiveSelection>>>,
     priority_generation: Arc<AtomicU64>,
-    /// Optional disk cache for persisting completed files
-    disk_cache: Option<Arc<disk_cache::DiskCacheManager>>,
     /// When false, torrents are paused once their download completes.
     seeding_enabled: Arc<AtomicBool>,
 }
@@ -174,11 +167,9 @@ pub struct EngineDiagnosticsSnapshot {
     pub memory: BackendMemoryDiagnostics,
 }
 
-#[cfg(all(feature = "librqbit", not(feature = "libtorrent")))]
-pub type EngineFS = BackendEngineFS<LibrqbitBackend>;
-
-#[cfg(feature = "libtorrent")]
-pub type EngineFS = BackendEngineFS<LibtorrentBackend>;
+// (nyaa-stream) sbtl is the only engine; the librqbit and libtorrent
+// backends were removed (see VENDORED.md).
+pub type EngineFS = BackendEngineFS<backend::sbtl_backend::SbtlBackend>;
 
 impl<B: TorrentBackend + 'static> BackendEngineFS<B> {
     pub fn new_with_backend(
@@ -225,7 +216,6 @@ impl<B: TorrentBackend + 'static> BackendEngineFS<B> {
             active_playback_leases: Arc::new(RwLock::new(HashMap::new())),
             active_multifile_files: Arc::new(RwLock::new(HashMap::new())),
             priority_generation: Arc::new(AtomicU64::new(0)),
-            disk_cache: None,
             seeding_enabled: Arc::new(AtomicBool::new(true)),
         };
 
@@ -1424,167 +1414,6 @@ impl<B: TorrentBackend + 'static> BackendEngineFS<B> {
     /// Get a reference to the backend for direct access
     pub fn get_backend(&self) -> &Arc<B> {
         &self.backend
-    }
-}
-
-#[cfg(all(feature = "librqbit", not(feature = "libtorrent")))]
-impl BackendEngineFS<LibrqbitBackend> {
-    pub async fn new(
-        root_dir: std::path::PathBuf,
-        _cache_config: EngineCacheConfig,
-    ) -> Result<Self> {
-        let download_dir = root_dir.join("rqbit-downloads");
-        let (backend, restored) = LibrqbitBackend::new(download_dir.clone()).await?;
-        Ok(Self::new_with_backend(
-            backend,
-            restored,
-            root_dir.join("cache"),
-            download_dir,
-        ))
-    }
-}
-
-#[cfg(feature = "libtorrent")]
-impl BackendEngineFS<LibtorrentBackend> {
-    pub async fn new(
-        root_dir: std::path::PathBuf,
-        config: crate::backend::BackendConfig,
-    ) -> Result<Self> {
-        Self::new_with_storage(root_dir, config, None).await
-    }
-
-    pub async fn new_with_storage(
-        root_dir: std::path::PathBuf,
-        config: crate::backend::BackendConfig,
-        tracker_storage: Option<Arc<dyn crate::trackers::TrackerStorage>>,
-    ) -> Result<Self> {
-        let download_dir = root_dir.join("libtorrent-downloads");
-        let cache_size = config.cache.size;
-        let backend = LibtorrentBackend::new(download_dir.clone(), config)?;
-
-        let mut efs = Self::new_with_backend_and_storage(
-            backend,
-            HashMap::new(),
-            download_dir.clone(),
-            download_dir,
-            tracker_storage,
-        );
-
-        // Set up disk cache for conditional file persistence
-        let disk_cache_dir = root_dir.join("disk-cache");
-        efs.disk_cache = Some(Arc::new(disk_cache::DiskCacheManager::new(
-            disk_cache_dir,
-            cache_size,
-        )));
-
-        Ok(efs)
-    }
-
-    pub async fn new_disk_backed(
-        root_dir: std::path::PathBuf,
-        config: crate::backend::BackendConfig,
-        tracker_storage: Option<Arc<dyn crate::trackers::TrackerStorage>>,
-    ) -> Result<Self> {
-        let download_dir = root_dir.join("torrent-cache");
-        let backend = LibtorrentBackend::new_disk_backed(download_dir.clone(), config)?;
-
-        Ok(Self::new_with_backend_and_storage(
-            backend,
-            HashMap::new(),
-            download_dir.clone(),
-            download_dir,
-            tracker_storage,
-        ))
-    }
-
-    /// Update session settings dynamically (called when user changes torrent profile)
-    pub async fn update_speed_profile(&self, profile: &crate::backend::TorrentSpeedProfile) {
-        self.backend
-            .update_session_settings(profile, &crate::backend::TorrentPrivacyConfig::default())
-            .await;
-    }
-
-    /// Update session settings dynamically (called when user changes torrent settings)
-    pub async fn update_torrent_settings(
-        &self,
-        profile: &crate::backend::TorrentSpeedProfile,
-        privacy: &crate::backend::TorrentPrivacyConfig,
-    ) {
-        self.backend.update_session_settings(profile, privacy).await;
-    }
-
-    pub fn set_seeding_enabled(&self, enabled: bool) {
-        self.seeding_enabled.store(enabled, Ordering::Relaxed);
-        self.backend.set_seeding_enabled(enabled);
-        tracing::info!(seeding_enabled = enabled, "Seeding policy updated");
-
-        // When seeding is turned back on, resume torrents the seeding-disabled
-        // policy had paused so they can seed again. Turning seeding off is
-        // handled lazily by the periodic loop / schedule_torrent_pause.
-        if enabled {
-            let engines = self.engines.clone();
-            tokio::spawn(async move {
-                let read = engines.read().await;
-                for engine in read.values() {
-                    if engine.handle.manages_playback_lifecycle() {
-                        continue;
-                    }
-                    if engine.idle_paused.swap(false, Ordering::Relaxed)
-                        && let Err(err) = engine.handle.resume_torrent().await
-                    {
-                        tracing::warn!(
-                            info_hash = %engine.info_hash,
-                            error = %err,
-                            "Failed to resume torrent after re-enabling seeding"
-                        );
-                        engine.idle_paused.store(true, Ordering::Relaxed);
-                    }
-                }
-            });
-        }
-    }
-
-    pub fn seeding_enabled(&self) -> bool {
-        self.seeding_enabled.load(Ordering::Relaxed)
-    }
-
-    /// Mark the torrent as active without pausing other active torrents.
-    pub async fn focus_torrent(&self, target_info_hash: &str) {
-        if self
-            .get_engine(&target_info_hash.to_lowercase())
-            .await
-            .is_some_and(|engine| engine.handle.manages_playback_lifecycle())
-        {
-            return;
-        }
-        self.backend.set_streaming_mode(true).await;
-        // focus_torrent resumes the torrent and reannounces to the swarm. Only
-        // do that when the torrent still needs the swarm (not finished) or when
-        // seeding is enabled. A finished torrent with seeding disabled is served
-        // from disk and must stay paused so it is not re-seeded.
-        let needs_swarm = match self.get_engine(&target_info_hash.to_lowercase()).await {
-            Some(engine) => !engine.handle.is_finished().await,
-            None => false,
-        };
-        if needs_swarm || self.seeding_enabled.load(Ordering::Relaxed) {
-            self.backend.focus_torrent(target_info_hash).await;
-        }
-    }
-
-    /// Resume all paused torrents (called when streaming ends)
-    /// Also disables streaming mode (restores normal upload)
-    pub async fn resume_all_torrents(&self) {
-        self.backend.resume_all_torrents().await;
-    }
-
-    /// Pause all torrents (called when no active streams remain)
-    pub async fn pause_all_torrents(&self) {
-        self.backend.pause_all_torrents().await;
-    }
-
-    /// Enable or disable streaming mode (limits uploads during streaming)
-    pub async fn set_streaming_mode(&self, enabled: bool) {
-        self.backend.set_streaming_mode(enabled).await;
     }
 }
 

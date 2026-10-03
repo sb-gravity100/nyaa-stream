@@ -423,7 +423,9 @@ html.mpv-active .titlebar {
 
 .app-bar {
   position: sticky;
-  top: var(--titlebar-h);
+  /* .home-container is the scroller and already sits below the title bar
+     (body padding), so offsetting by --titlebar-h here left a 32px gap. */
+  top: 0;
   z-index: 30;
   display: grid;
   grid-template-columns: 1fr minmax(0, 620px) 1fr;

@@ -1,10 +1,12 @@
-// Downloads the prebuilt native libs (static libtorrent, OpenSSL, FFmpeg) into
-// vcpkg_installed/, so building needs no vcpkg. Run once per clone:
+// Downloads the prebuilt native libs (static FFmpeg) into vcpkg_installed/,
+// so building needs no vcpkg. Run once per clone:
 //
 //   npm run setup
 //
 // The archive is the release asset `native-deps-v1` (built once from
 // vcpkg.json; see PLAN.md). Bump VERSION/SHA256 together when it is rebuilt.
+// v1 also holds static libtorrent and OpenSSL from before sbtl replaced
+// libtorrent; nothing links them any more.
 import { createHash } from "node:crypto";
 import { createReadStream, createWriteStream, existsSync, mkdirSync, rmSync } from "node:fs";
 import { execFileSync } from "node:child_process";

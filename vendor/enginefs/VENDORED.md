@@ -2,10 +2,34 @@
 
 Copied from https://github.com/stremio-native/stream-server at rev
 `f585ab6eda9b1411034548c131bb0dc30c6f5f9e` (`enginefs/`), MIT licensed
-(see `LICENSE`). Wired in through `[patch]` in the workspace `Cargo.toml`;
-`libtorrent-sys` still comes from the same upstream git revision.
+(see `LICENSE`). Wired in through `[patch]` in the workspace `Cargo.toml`.
 
 ## Local changes
+
+- **sbtl is the only backend** (2026-10-04): `src/backend/libtorrent/`,
+  `src/backend/librqbit.rs`, their `EngineFS` aliases and constructors in
+  `src/lib.rs`, the `librqbit`/`libtorrent-sys` dependencies and all cargo
+  features were removed (with nyaa's `vendor/libtorrent-sys`), and the
+  `disk_cache` field only the libtorrent constructor set. Generic code
+  that still names libtorrent (`LIBTORRENT_HLS_PLAYBACK_LEASE_TTL`, the
+  `manages_playback_lifecycle()` branches, comments) was left as upstream
+  wrote it.
+- `src/backend/sbtl_backend.rs` (new): a `TorrentBackend`
+  over the sbtl engine (git dependency on
+  https://github.com/sb-gravity100/sbtl, tag `v0.1.0`). Readers are sbtl streams whose read
+  position drives the download (no playback coordinator;
+  `manages_playback_lifecycle()` is `true`). `Cargo.toml` gains the `sbtl`
+  dependency, `src/lib.rs` the `EngineFS` alias for it, `src/backend/mod.rs`
+  the module.
+- `src/backend/mod.rs`: `TorrentHandle::buffer_status` (default `None`)
+  and `BufferStatus`, implemented by the sbtl backend from its newest
+  foreground reader per file.
+
+### History: changes made while the libtorrent backend existed
+
+Files under `src/backend/libtorrent/` are gone; the parts of these entries
+that touched shared files (`priorities.rs`, `backend/mod.rs`, `engine.rs`,
+`piece_waiter.rs`) are still in place.
 
 - `src/backend/libtorrent/disk_stream.rs`: a disk read that returns an
   all-zero chunk is re-served from libtorrent's own `read_piece` (the

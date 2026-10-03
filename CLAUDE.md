@@ -133,8 +133,14 @@ full architecture; summary:
 
 - Tauri 2 desktop app: Rust backend (`src-tauri/` + `crates/*`) + Preact/TS
   frontend (`src/`)
-- `crates/torrent-engine` — librqbit-backed torrent client + local axum
-  streaming HTTP server with Range support
+- `crates/torrent-engine` — torrent client (vendored `enginefs` over the
+  sbtl engine, the only one - libtorrent and librqbit were removed) + local
+  axum streaming HTTP server with Range support
+- sbtl (https://github.com/sb-gravity100/sbtl, sibling checkout
+  `../sb_torrent`) is pinned by git tag in `vendor/enginefs/Cargo.toml`;
+  never pin an untagged commit or commit a local `[patch]` - use
+  `npm run dev:sbtl-local`. Update workflow: PLAN.md "sbtl versions and
+  updates"
 - `crates/nyaa-client` — nyaa.si search via RSS
 - `crates/anilist-client` — AniList GraphQL metadata client
 - `crates/mpv-player` — in-process libmpv (`libmpv-2.dll`, runtime-loaded,

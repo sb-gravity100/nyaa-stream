@@ -4,11 +4,7 @@ use tokio::io::{AsyncRead, AsyncSeek};
 
 use priorities::PlaybackIntent;
 
-#[cfg(feature = "librqbit")]
-pub mod librqbit;
-
-#[cfg(feature = "libtorrent")]
-pub mod libtorrent;
+pub mod sbtl_backend;
 
 pub mod metadata;
 pub mod priorities;
@@ -78,6 +74,12 @@ pub trait TorrentHandle: Send + Sync + Clone {
     /// selected generation and confirm a normal torrent pause.
     async fn end_hls_activity(&self, _file_idx: usize, _reason: &'static str) -> Result<()> {
         Ok(())
+    }
+    /// (nyaa-stream) Verified data ahead of the newest foreground reader of
+    /// `file_idx`, for the buffering UI and start decisions. `None` when the
+    /// backend can't tell (libtorrent) or no reader is open.
+    async fn buffer_status(&self, _file_idx: usize) -> Option<BufferStatus> {
+        None
     }
     /// Cheap per-file completion check used to avoid probing sparse local files.
     async fn is_file_complete(&self, _file_idx: usize) -> bool {
@@ -158,6 +160,26 @@ pub struct HotFilePriorityPlan {
     pub priority: u8,
     pub intent: PlaybackIntent,
     pub bitrate_bytes_per_sec: Option<u64>,
+}
+
+/// (nyaa-stream) A reader's buffer, from backends that track it (sbtl).
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BufferStatus {
+    /// "stalled" (a read blocks) | "low" (< ready) | "ready" | "full"
+    pub level: String,
+    /// Read position in the file.
+    pub pos: u64,
+    pub ahead_bytes: u64,
+    /// `ahead_bytes` in playback time at `rate`.
+    pub ahead_ms: u64,
+    /// Playback time ahead that counts as ready to start / resume.
+    pub ready_ms: u64,
+    /// Estimated time until ready at the current download rate.
+    pub eta_ready_ms: Option<u64>,
+    /// Consumption rate used, bytes/s; `rate_known` false = assumed.
+    pub rate: u64,
+    pub rate_known: bool,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
