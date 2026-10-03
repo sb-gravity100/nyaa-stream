@@ -409,7 +409,7 @@
       - [ ] Baseline live test on the last libtorrent commit (main at
             `031d9c0`): cold start, cached re-open, resume, seek into
             undownloaded data; record the numbers in PLAN.md
-      - [ ] Merge `sbtl-backend` into main (`--no-ff`)
+      - [x] Merge `sbtl-backend` into main (`--no-ff`, `1f95811`)
       - [ ] Same live test on sbtl, plus: a libtorrent-era partial download
             resumes after one re-check, a poorly seeded torrent,
             `engine_smoke` seek numbers against the baseline
