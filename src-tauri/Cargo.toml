@@ -14,13 +14,6 @@ edition = "2021"
 name = "nyaa_stream_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
-[features]
-# Torrent engine (see crates/torrent-engine): `--no-default-features --features sbtl`
-# builds with sbtl instead of libtorrent.
-default = ["libtorrent"]
-libtorrent = ["torrent-engine/libtorrent"]
-sbtl = ["torrent-engine/sbtl"]
-
 [build-dependencies]
 tauri-build = { version = "2.4", features = [] }
 
@@ -40,7 +33,7 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 # Rolling daily log file (release builds have no console, see lib.rs `init_logging`).
 tracing-appender = "0.2"
-torrent-engine = { path = "../crates/torrent-engine", default-features = false }
+torrent-engine = { path = "../crates/torrent-engine" }
 nyaa-client = { path = "../crates/nyaa-client" }
 anilist-client = { path = "../crates/anilist-client" }
 kitsu-client = { path = "../crates/kitsu-client" }

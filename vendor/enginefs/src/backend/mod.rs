@@ -4,13 +4,6 @@ use tokio::io::{AsyncRead, AsyncSeek};
 
 use priorities::PlaybackIntent;
 
-#[cfg(feature = "librqbit")]
-pub mod librqbit;
-
-#[cfg(feature = "libtorrent")]
-pub mod libtorrent;
-
-#[cfg(feature = "sbtl")]
 pub mod sbtl_backend;
 
 pub mod metadata;

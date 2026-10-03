@@ -960,7 +960,7 @@ async fn set_download_cache_limit(state: State<'_, Arc<AppState>>, limit_bytes: 
 }
 
 /// Load profiler: times how long a just-added torrent spends re-hashing
-/// cached files (libtorrent `checking_files` / `checking_resume_data`),
+/// cached files (state 1 / 7 in libtorrent's numbering, which sbtl keeps),
 /// polled every 250ms, and marks it on trace `trace` as `checking`.
 fn spawn_checking_probe(app: tauri::AppHandle, state: Arc<AppState>, torrent_id: TorrentId, trace: u64) {
     const POLL: Duration = Duration::from_millis(250);
@@ -993,7 +993,7 @@ fn spawn_checking_probe(app: tauri::AppHandle, state: Arc<AppState>, torrent_id:
     });
 }
 
-/// How long libtorrent may keep a removed torrent's files open.
+/// How long the torrent engine may keep a removed torrent's files open.
 const FILE_RELEASE_DELAY: Duration = Duration::from_secs(2);
 
 /// Removes the backing torrent from the session (stop seeding) - used by
