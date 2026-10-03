@@ -1,3 +1,9 @@
+### `b0a49ed` · 2026-10-04 · docs: sbtl-backend merged (PHASES)
+- `PHASES.md`
+
+### `1f95811` · 2026-10-04 · Merge branch 'sbtl-backend': sbtl becomes the only torrent engine
+- (merge: see the sbtl-backend entries below)
+
 ### `c934dc9` · 2026-10-04 · docs: sbtl engine checklist for v0.4.0 (PHASES)
 - `PHASES.md`
 
