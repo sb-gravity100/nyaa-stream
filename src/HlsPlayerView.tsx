@@ -115,6 +115,8 @@ interface Props {
    /** MediaPage group key ("Episode 5", "Batch", ...) - also the watch
     * progress key. */
    episodeKey: string;
+   /** Watch progress key, fixed for the player's lifetime (see PlayerView). */
+   progressKey: string;
    /** Episode number when the group is a numbered episode; used to find the
     * right file inside a batch torrent. */
    episode: number | null;
@@ -213,6 +215,7 @@ function loadVolume(): number {
 export function HlsPlayerView({
    anime,
    episodeKey,
+   progressKey,
    episode,
    releases,
    onClose,
@@ -317,7 +320,7 @@ export function HlsPlayerView({
    timeOffsetRef.current = timeOffset;
    // Resume target in source time, captured once per episode.
    const resumeAtRef = useRef<number | null>(
-      settings.resumePlayback ? resumePosition(anime.id, episodeKey) : null,
+      settings.resumePlayback ? resumePosition(anime.id, progressKey) : null,
    );
    const selectedReleaseRef = useRef(selectedRelease);
    selectedReleaseRef.current = selectedRelease;
@@ -357,8 +360,8 @@ export function HlsPlayerView({
             );
             const session = await playMagnet(
                selectedRelease.magnet,
-               `${displayTitle(anime.title)} ${episodeKey}`,
-               `${anime.id}:${episodeKey}`,
+               `${displayTitle(anime.title)} ${progressKey}`,
+               `${anime.id}:${progressKey}`,
             );
             if (cancelled) return;
             // A movie is the torrent's largest video (the backend's
@@ -384,7 +387,7 @@ export function HlsPlayerView({
       return () => {
          cancelled = true;
       };
-   }, [selectedRelease, anime.id, episodeKey, episode]);
+   }, [selectedRelease, anime.id, progressKey, episode]);
 
    // Per-file state resets (source switch or batch file switch).
    useEffect(() => {
@@ -667,7 +670,7 @@ export function HlsPlayerView({
       if (!video || !video.duration || video.readyState < 1) return;
       saveProgress(
          anime,
-         episodeKey,
+         progressKey,
          episode,
          video.currentTime + timeOffsetRef.current,
          video.duration,

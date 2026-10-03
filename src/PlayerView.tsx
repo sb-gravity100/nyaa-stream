@@ -98,9 +98,12 @@ async function captureLastFrameAndDetach({ video, animeId, episode, hasPlayed }:
 
 interface Props {
    anime: AnimeMedia;
-   /** MediaPage group key ("Episode 5", "Batch", ...) - also the watch
-    * progress key. */
+   /** MediaPage group key ("Episode 5", "Batch", ...), for display and the
+    * playlist; it can change while the player is open. */
    episodeKey: string;
+   /** Watch progress / resume buffer key, fixed for the player's lifetime
+    * (MediaPage's route label). */
+   progressKey: string;
    /** Episode number when the group is a numbered episode; used to find the
     * right file inside a batch torrent. */
    episode: number | null;
@@ -159,6 +162,27 @@ function baseName(path: string): string {
 /** The batch release each anime last played from, so the next episode
  * continues in the same torrent instead of jumping to another source. */
 const lastBatchMagnet = new Map<number, string>();
+
+/** The release to resume from: the listed one with `magnet`'s info-hash,
+ * else one made from the saved magnet itself (not listed, or not yet). */
+function resumeRelease(releases: NyaaResult[], magnet: string | undefined): NyaaResult | undefined {
+   if (!magnet) return undefined;
+   const hash = infoHashFromMagnet(magnet);
+   const listed = hash ? releases.find((r) => infoHashFromMagnet(r.magnet) === hash) : undefined;
+   if (listed) return listed;
+   console.info("[player] resume source not listed, playing its saved magnet", { hash });
+   const name = magnet.match(/[?&]dn=([^&]*)/)?.[1];
+   return {
+      title: name ? decodeURIComponent(name.replace(/\+/g, " ")) : (hash ?? "Saved source"),
+      magnet,
+      torrent_url: "",
+      view_url: "",
+      size: "",
+      seeders: 0,
+      leechers: 0,
+      published: "",
+   };
+}
 
 /** The source an unfinished episode was last watched from, if any. */
 function resumeSourceMagnet(animeId: number, episodeKey: string): string | undefined {
@@ -243,6 +267,7 @@ function loadVolume(): number {
 function MpvPlayerView({
    anime,
    episodeKey,
+   progressKey,
    episode,
    releases,
    onClose,
@@ -273,11 +298,12 @@ function MpvPlayerView({
    };
    const [selectedRelease, setSelectedRelease] = useState<NyaaResult>(
       () =>
+         // A resume plays the release it was watched from (its resume
+         // buffer holds those bytes) - matched by info-hash, and from its
+         // saved magnet when not listed (yet): releases arrive in phases.
+         resumeRelease(releases, resumeSourceMagnet(anime.id, progressKey)) ??
          // Keep playing from the same batch across episodes: its next
          // episode is already being preloaded (see the preload effect).
-         // A resume prefers the release it was watched from (its resume
-         // buffer matches those bytes), when still listed.
-         releases.find((r) => r.magnet === resumeSourceMagnet(anime.id, episodeKey)) ??
          releases.find((r) => r.magnet === lastBatchMagnet.get(anime.id)) ??
          bestRelease(releases, releasePrefs),
    );
@@ -375,7 +401,7 @@ function MpvPlayerView({
    menuOpenRef.current = menu != null;
    // Resume target in source time, captured once per episode.
    const resumeAtRef = useRef<number | null>(
-      settings.resumePlayback ? resumePosition(anime.id, episodeKey) : null,
+      settings.resumePlayback ? resumePosition(anime.id, progressKey) : null,
    );
    const selectedReleaseRef = useRef(selectedRelease);
    selectedReleaseRef.current = selectedRelease;
@@ -429,8 +455,8 @@ function MpvPlayerView({
          try {
             const session = await playMagnet(
                selectedRelease.magnet,
-               `${displayTitle(anime.title)} ${episodeKey}`,
-               `${anime.id}:${episodeKey}`,
+               `${displayTitle(anime.title)} ${progressKey}`,
+               `${anime.id}:${progressKey}`,
                await trace.id,
             );
             if (cancelled) return;
@@ -462,7 +488,7 @@ function MpvPlayerView({
          cancelled = true;
          traceEnd(trace, "abandoned");
       };
-   }, [selectedRelease, anime.id, episodeKey, episode]);
+   }, [selectedRelease, anime.id, progressKey, episode]);
 
    // Batch source: once this episode is playing, fetch the next episode's
    // file from the same torrent at the lowest priority (spare bandwidth
@@ -700,7 +726,7 @@ function MpvPlayerView({
       if (!video || fileIdx == null || !video.duration) return undefined;
       const position = video.currentTime;
       if (position < MIN_RESUME_SECONDS || position / video.duration >= COMPLETED_FRACTION) return undefined;
-      return { animeId: anime.id, episodeKey, fileIdx, position, magnet: selectedReleaseRef.current.magnet };
+      return { animeId: anime.id, episodeKey: progressKey, fileIdx, position, magnet: selectedReleaseRef.current.magnet };
    }
 
    function persistProgress() {
@@ -711,7 +737,7 @@ function MpvPlayerView({
       const file = selectedFileRef.current;
       saveProgress(
          anime,
-         episodeKey,
+         progressKey,
          episode,
          video.currentTime,
          video.duration,
