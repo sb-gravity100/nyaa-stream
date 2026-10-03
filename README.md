@@ -262,7 +262,7 @@ git config core.hooksPath .githooks
 ```
 
 - **Shell:** Tauri 2. The window stays opaque. Only the *webview* background is transparent, so mpv's video shows through under the HTML controls.
-- **Torrents:** [sbtl](https://github.com/sb-gravity100/sbtl), a streaming-first BitTorrent engine built for nyaa-stream, behind a vendored `enginefs` (`vendor/enginefs`). What the player reads decides what downloads, so seeks jump straight to the new spot and files you aren't watching don't download.
+- **Torrents:** [sbtl](https://github.com/sb-gravity100/sbtl), a streaming-first BitTorrent engine built for nyaa-stream, through `crates/sbtl-engine`. What the player reads decides what downloads, so seeks jump straight to the new spot and files you aren't watching don't download.
 - **Streaming server:** a local `axum` server with two layers: raw Range-capable bytes (mpv reads these directly) and an HLS layer (one continuous FFmpeg run per file, stream copy when possible, hardware H.264 transcode otherwise) for the browser fallback.
 - **FFmpeg** is linked statically and runs in-process, using **LGPL features only** (no x264).
 - **Search:** nyaa.si's HTML results are scraped, since its RSS feed caps at 75 results. All requests go through one shared throttle with 429/503 back-off, and every release lands in a permanent local database.
@@ -278,12 +278,12 @@ src/                  Preact + TypeScript frontend (pages, player, settings)
 src-tauri/            Tauri app: commands, embedded mpv, cache/backup, media keys
   lib/                bundled native libs (libmpv-2.dll, gitignored)
 crates/
-  torrent-engine/     torrent client, streaming server, HLS/FFmpeg pipeline
+  sbtl-engine/        torrent engine over sbtl
+  torrent-engine/     streaming server, HLS/FFmpeg pipeline
   nyaa-client/        nyaa.si search, throttle, release database, cache
   anilist-client/     AniList GraphQL metadata
   kitsu-client/       Kitsu metadata + AniList fallback
   mpv-player/         runtime-loaded libmpv: playback, thumbnails, clip encode
-vendor/enginefs/      vendored torrent backend (MIT, see VENDORED.md)
 scripts/              setup, version bump, installer artwork
 ```
 
@@ -337,7 +337,7 @@ The full list is in [PLAN.md → Known gaps](PLAN.md#known-gaps--not-yet-impleme
 ## Acknowledgements
 
 - [Stremio](https://github.com/Stremio): the UX inspiration, plus reference for the buffering indicator and statistics panel
-- [stremio-native/stream-server](https://github.com/stremio-native/stream-server): `enginefs`, the torrent backend
+- [stremio-native/stream-server](https://github.com/stremio-native/stream-server): `enginefs`, nyaa's torrent layer before sbtl_engine (its tracker list code lives on in `crates/sbtl-engine`)
 - [mpv](https://mpv.io/), [FFmpeg](https://ffmpeg.org/), [hls.js](https://github.com/video-dev/hls.js), [JASSUB](https://github.com/ThaUnknown/jassub)
 - [AniList](https://anilist.co/) and [Kitsu](https://kitsu.app/) for metadata
 - Bundled fonts: Gandhi Sans, Zen Kaku Gothic New, Outfit

@@ -410,14 +410,14 @@
             `031d9c0`): cold start, cached re-open, resume, seek into
             undownloaded data; record the numbers in PLAN.md
       - [x] Merge `sbtl-backend` into main (`--no-ff`, `1f95811`)
-      - [ ] sbtl_engine (see PLAN.md "sbtl_engine"): crate skeleton with
+      - [x] sbtl_engine (see PLAN.md "sbtl_engine"): crate skeleton with
             `Engine`/`Torrent`/`Reader`, sbtl backend logic moved in
-      - [ ] sbtl_engine: trackers (defaults, daily list, RTT ranking) and
+      - [x] sbtl_engine: trackers (defaults, daily list, RTT ranking) and
             the lease / idle-removal loop, with unit tests
-      - [ ] torrent-engine on sbtl_engine (`lib.rs`, `direct_input.rs`,
+      - [x] torrent-engine on sbtl_engine (`lib.rs`, `direct_input.rs`,
             resume buffers, `StreamStats`, checking probe, engine_smoke);
             watch hint removed end to end
-      - [ ] Remove `vendor/enginefs`, the `[patch]` and the enginefs git
+      - [x] Remove `vendor/enginefs`, the `[patch]` and the enginefs git
             dependency; docs (PLAN, FILE_INDEX, CLAUDE, README)
       - [ ] engine_smoke on a local swarm: numbers vs "sbtl backend"
       - [ ] Same live test on sbtl, plus: a libtorrent-era partial download
