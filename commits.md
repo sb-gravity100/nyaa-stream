@@ -1,3 +1,6 @@
+### `2dfc515` · 2026-10-04 · docs: fixed progress key and resume source fix for v0.4.0 (PHASES)
+- `PHASES.md`
+
 ### `fda1e2c` · 2026-10-04 · docs: v0.4.0 live test results, libtorrent vs sbtl_engine (PLAN, PHASES)
 - `PLAN.md`
 - `PHASES.md`
