@@ -1,3 +1,7 @@
+### `ae4b79f` · 2026-10-04 · docs: sbtl_engine engine_smoke A/B results (PLAN, PHASES)
+- `PLAN.md`
+- `PHASES.md`
+
 ### `0cf3c1c` · 2026-10-04 · docs: sbtl_engine as built, enginefs gone (PLAN, PHASES, FILE_INDEX, CLAUDE, README)
 - `PLAN.md`
 - `PHASES.md`
