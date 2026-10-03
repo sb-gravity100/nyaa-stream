@@ -1,3 +1,8 @@
+### `96374a9` · 2026-10-04 · build: vcpkg builds only FFmpeg
+- `vcpkg.json`
+- `.cargo/config.toml`
+- `scripts/fetch-native-deps.mjs`
+
 ### `7d6d02a` · 2026-10-04 · fix(cache): keep sbtl's state directory, evict a torrent's sbtl files
 - `src-tauri/src/download_cache.rs`
 
