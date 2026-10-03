@@ -357,8 +357,9 @@
             the row
       - [x] Settings "Download cache" size (default 10 GB, 0 = delete on
             stop) + usage; Clear cache empties downloads
-      - [ ] Measure re-hash time on a mostly-downloaded 2 GB file; decide on
-            fast resume (vendored libtorrent-sys)
+      - [x] Fast resume: comes with sbtl (`downloads/.sbtl/<hash>.resume`),
+            no libtorrent-sys work
+      - [ ] Verify live: a cached re-open skips the re-check
 - [ ] Continue-watching resume buffer (v0.4.0, see PLAN.md "Continue-watching
       resume buffer"): one commit each -
       - [x] Stream handler records the byte ranges mpv reads until
@@ -394,6 +395,26 @@
             seek / Resume traces from `mpvVideo`
       - [ ] Verify live: cold start, cached re-open, resume, seek into
             undownloaded data; decide fast resume from the numbers
+- [ ] sbtl torrent engine (v0.4.0, see PLAN.md "sbtl backend" and "Release
+      plan"): one commit each -
+      - [x] sbtl backend in enginefs; review fixes; renamed tl -> sbtl,
+            git dependency on github.com/sb-gravity100/sbtl tag `v0.1.0`
+      - [x] sbtl is the only engine: libtorrent/librqbit backends,
+            `vendor/libtorrent-sys` and engine features removed; vcpkg
+            builds only FFmpeg
+      - [x] Download cache keeps `downloads/.sbtl/`, evicts a torrent's
+            sbtl resume/metadata files
+      - [x] `release.mjs` refuses a build without a tagged sbtl;
+            `npm run dev:sbtl-local`
+      - [ ] Baseline live test on the last libtorrent commit (main at
+            `031d9c0`): cold start, cached re-open, resume, seek into
+            undownloaded data; record the numbers in PLAN.md
+      - [ ] Merge `sbtl-backend` into main (`--no-ff`)
+      - [ ] Same live test on sbtl, plus: a libtorrent-era partial download
+            resumes after one re-check, a poorly seeded torrent,
+            `engine_smoke` seek numbers against the baseline
+      - [ ] Run `npm run dev:sbtl-local` once (confirms the patch path
+            resolves from cargo's working directory under `tauri dev`)
 - [ ] Contact and send logs (v0.4.0, see PLAN.md "Contact and send
       logs"): one commit each -
       - [x] `export_logs`: zip logs + `system.txt` into Downloads, reveal;
@@ -491,7 +512,8 @@
       - [ ] Audit 64-bit assumptions (`usize` casts, sizes/offsets as `u64`,
             memory caps) across crates
       - [ ] `i686-pc-windows-msvc` target + vcpkg `x86-windows-static-md`
-            FFmpeg/libtorrent build; Build prerequisites section
+            FFmpeg build, sbtl's C sources for i686; Build prerequisites
+            section
       - [ ] 32-bit `libmpv-2.dll` in `src-tauri/lib/x86/`; arch-aware loader
       - [ ] Per-arch memory caps (mpv cache, read-ahead, resume buffers)
       - [ ] Tauri bundle per arch; `latest.json` `windows-i686`;
