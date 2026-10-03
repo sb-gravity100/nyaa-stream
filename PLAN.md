@@ -1557,7 +1557,9 @@ ahead) at 4.1 s.
 tl now has the swarm features the libtorrent backend relied on:
 - **DHT:** IPv4 only. Its state is kept in `<download_dir>/.tl/dht.dat`. `NYAA_TL_NO_DHT=1` turns it off for local-swarm tests.
 - **uTP.**
-- **Seeding with a choker:** `set_seeding_enabled` and `set_upload_throttled` map onto tl's session upload policy; throttled means 16 KiB/s.
+- **Seeding with a choker:** `set_seeding_enabled` maps onto tl's session-wide seeding switch. `set_upload_throttled` sets a per-torrent upload limit of 16 KiB/s and never turns seeding back on.
+- **Adding torrents:** a magnet already added, or one still waiting for its metadata, joins the existing torrent: a per-infohash lock covers the metadata wait. A cached `.torrent` keeps the magnet's `tr=` trackers.
+- **Downloaded ranges and file completeness** count only data already written to disk. tl's disk worker can hold verified pieces in memory before writing them, and resume buffers and probes read the files directly.
 - **HTTPS trackers:** these use WinHTTP.
 
 Remaining gaps:
