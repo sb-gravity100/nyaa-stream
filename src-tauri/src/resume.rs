@@ -60,11 +60,18 @@ fn dir_name(info_hash: &str, file_idx: usize) -> String {
 
 /// Every saved buffer with its directory. Unreadable ones are removed.
 pub fn list() -> Vec<(PathBuf, EntryMeta)> {
-    let Ok(read) = std::fs::read_dir(root()) else {
+    list_in(&root())
+}
+
+/// `list` for buffers under `root`. A save in progress (`<dir>.tmp`) is
+/// not a buffer: listed, `save` itself would remove it as an older buffer
+/// of the same episode just before renaming it into place.
+fn list_in(root: &std::path::Path) -> Vec<(PathBuf, EntryMeta)> {
+    let Ok(read) = std::fs::read_dir(root) else {
         return Vec::new();
     };
     let mut out = Vec::new();
-    for dir in read.flatten().map(|e| e.path()).filter(|p| p.is_dir()) {
+    for dir in read.flatten().map(|e| e.path()).filter(|p| p.is_dir() && p.extension().is_none_or(|ext| ext != "tmp")) {
         match std::fs::read(dir.join(ENTRY_FILE)).ok().and_then(|b| serde_json::from_slice::<EntryMeta>(&b).ok()) {
             Some(meta) => out.push((dir, meta)),
             None => {
@@ -199,3 +206,38 @@ pub fn sweep(keep: &[String]) {
     }
 }
 
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn entry(episode_key: &str) -> Vec<u8> {
+        let meta = EntryMeta {
+            anime_id: 1,
+            episode_key: episode_key.to_string(),
+            info_hash: "aaaa".into(),
+            file_idx: 0,
+            file_name: "ep.mkv".into(),
+            position: 60.0,
+            magnet: String::new(),
+            bytes: 4,
+            updated_at: 0,
+        };
+        serde_json::to_vec(&meta).unwrap()
+    }
+
+    #[test]
+    fn save_in_progress_is_not_listed() {
+        let root = std::env::temp_dir().join(format!("nyaa-stream-resume-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        for name in ["aaaa-0", "aaaa-0.tmp"] {
+            std::fs::create_dir_all(root.join(name)).unwrap();
+            std::fs::write(root.join(name).join(ENTRY_FILE), entry("Episode 1")).unwrap();
+        }
+        let listed = list_in(&root);
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].0, root.join("aaaa-0"));
+        assert!(root.join("aaaa-0.tmp").join(ENTRY_FILE).exists(), "the save in progress is left alone");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+}
