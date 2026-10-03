@@ -1,3 +1,9 @@
+### `f155f39` · 2026-10-04 · docs: sbtl is the only engine (VENDORED, FILE_INDEX, CLAUDE, README)
+- `vendor/enginefs/VENDORED.md`
+- `FILE_INDEX.md`
+- `CLAUDE.md`
+- `README.md`
+
 ### `4875f10` · 2026-10-04 · docs: sbtl is the only engine, sbtl update workflow, v0.4.0 release plan (PLAN)
 - `PLAN.md`
 
