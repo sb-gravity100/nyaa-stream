@@ -432,8 +432,16 @@
             Continue watching didn't know, so it was swept; Resume matches
             the saved source by info-hash and plays its saved magnet when
             not listed (yet)
-      - [ ] Live: a resume served from a resume buffer (`buffer_bytes` > 0),
-            incl. a Season 2+ episode
+      - [x] Live: resumes served from resume buffers (Fate Ep 11 41 MB,
+            Arknights 38 MB, Fate Ep 7 49 MB, Mushoku S2 Ep 10 24 MB with
+            no torrent bytes) in 134-415 ms; one play_magnet per click;
+            unlisted saved sources played from their magnet
+      - [ ] Known issue: a dropped buffer (episode left Continue watching)
+            sometimes fails to delete with os error 32 seconds after it
+            was written, leaving an empty dir that clears after a restart
+            (likely an antivirus scan holding the new data.bin); re-saving
+            that episode in the same session may fail. Confirm the holder
+            (handle.exe / Process Monitor), then retry or rename-aside
       - [~] libtorrent-era partial download reopened on sbtl: not testable
             (data cleared); accepted - sbtl re-checks data on add, keeps
             verified pieces only
