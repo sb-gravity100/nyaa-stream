@@ -7,15 +7,15 @@ Copied from https://github.com/stremio-native/stream-server at rev
 
 ## Local changes
 
-- `src/backend/tl_backend.rs` (new, feature `tl`): a `TorrentBackend`
-  over sb_torrent's `tl` engine (path dependency on the sibling checkout
-  `../sb_torrent/bindings/rust/tl`). Readers are tl streams whose read
+- `src/backend/sbtl_backend.rs` (new, feature `sbtl`): a `TorrentBackend`
+  over the sbtl engine (git dependency on
+  https://github.com/sb-gravity100/sbtl, tag `v0.1.0`). Readers are sbtl streams whose read
   position drives the download (no playback coordinator;
-  `manages_playback_lifecycle()` is `true`). `Cargo.toml` gains the `tl`
+  `manages_playback_lifecycle()` is `true`). `Cargo.toml` gains the `sbtl`
   feature, `src/lib.rs` an `EngineFS` alias for it (libtorrent wins if
   both features are on), `src/backend/mod.rs` the module.
 - `src/backend/mod.rs`: `TorrentHandle::buffer_status` (default `None`)
-  and `BufferStatus`, implemented by the tl backend from its newest
+  and `BufferStatus`, implemented by the sbtl backend from its newest
   foreground reader per file.
 - `src/backend/libtorrent/disk_stream.rs`: a disk read that returns an
   all-zero chunk is re-served from libtorrent's own `read_piece` (the
