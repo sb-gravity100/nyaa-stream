@@ -456,9 +456,10 @@
             issue, public notice) buttons
       - [x] Discord contact: username `__sb______` shown with a Copy button
             (a profile link needs the numeric user id)
-      - [ ] PLAN.md/FILE_INDEX.md sync, `npm run bump -- minor`, tag
+      - [x] PLAN.md/FILE_INDEX.md sync, `npm run bump -- minor`, tag
             `v0.4.0`, push the tag, build + publish the release (see PLAN.md
-            "Release plan")
+            "Release plan") - published 2026-10-04; notes fixed up after npm
+            cut them to one line (`release.mjs --notes-file` since)
 - [ ] Context menus (v0.5.0, see PLAN.md "Context menus"): one commit each -
       - [ ] `tauri-plugin-clipboard-manager` (Rust, capability, JS)
       - [ ] `contextMenu.ts` store + `ContextMenu.tsx` component

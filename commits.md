@@ -1,3 +1,7 @@
+### `c43ec45` · 2026-10-04 · fix(release): --notes-file for multi-line release notes
+- `scripts/release.mjs`
+- `CLAUDE.md`
+
 ### `15f492d` · 2026-10-04 · chore: release v0.4.0
 - `package.json`
 - `src-tauri/Cargo.toml`
