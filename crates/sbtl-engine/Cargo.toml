@@ -1,0 +1,17 @@
+[package]
+name = "sbtl-engine"
+version = "0.1.0"
+edition.workspace = true
+
+[dependencies]
+# The torrent engine (https://github.com/sb-gravity100/sbtl), pinned by tag -
+# see PLAN.md "sbtl versions and updates" before changing it.
+sbtl = { git = "https://github.com/sb-gravity100/sbtl", tag = "v0.1.0", features = ["tokio"] }
+tokio = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+serde = { workspace = true }
+reqwest = { workspace = true }
+hex = "0.4"
+url = "2.5"
+urlencoding = "2.1"
