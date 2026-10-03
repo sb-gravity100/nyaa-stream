@@ -1602,6 +1602,60 @@ a pushed sbtl tag is never moved or re-created.
 |---|---|---|
 | v0.1.0 | `250d871` | first tag: rename tl -> sbtl, public repo; one owner per torrent (duplicate-add use-after-free fix), on-disk file ranges, per-torrent upload limit |
 
+## sbtl_engine (planned, v0.4.0 - replaces the vendored enginefs)
+
+With sbtl the only engine, `vendor/enginefs` (~6k lines from
+stream-server) is mostly unused: nyaa calls about a dozen entry points,
+and under sbtl several are no-ops (watch hints, the seeding-disabled pause
+loop, lease-expiry cleanup). The rest is libtorrent-shaped (leases named
+after it, libtorrent state codes, `manages_playback_lifecycle()`
+branches). **sbtl_engine** is a new workspace crate (`crates/sbtl-engine`,
+lib `sbtl_engine`) holding only what nyaa needs, written against sbtl
+directly. `torrent-engine` keeps the HTTP streaming server, HLS, probes
+and resume buffers and switches from `enginefs` to `sbtl_engine`.
+Afterwards stream-server is no build dependency at all: `vendor/enginefs`,
+the `[patch]` and the `enginefs` git dependency go.
+
+**API** (all logged per the logging rules):
+- `Engine::start(download_dir)` - sbtl session (DHT state in
+  `.sbtl/dht.dat`, `NYAA_SBTL_NO_DHT`), tracker manager, background loop.
+- `Engine::add(Source)` (magnet / .torrent URL / bytes) -> `Arc<Torrent>`:
+  default trackers + the daily-refreshed public list ranked by RTT
+  (enginefs's `trackers.rs`/`tracker_prober.rs`, ported as-is, MIT) +
+  the magnet's `tr=`; metadata cache `.sbtl/<hash>.torrent`; per-hash add
+  lock across the metadata wait (as in the sbtl backend today).
+- `Engine::get(hash)`, `Engine::remove(hash)`,
+  `Engine::touch_playback(hash, file_idx)` (the lease that replaces
+  `refresh_hls_playback`).
+- `Torrent`: `info_hash`, `name`, `files()` (cached), `stats()` ->
+  `TorrentStats` (state as an enum `Checking / Metadata / Downloading /
+  Finished` instead of libtorrent codes; rates, bytes, peers, per-file
+  on-disk ranges), `open(file_idx, offset, ReadKind)` -> `Reader`
+  (`AsyncRead + AsyncSeek`; `Foreground` = sequential + tail prefetch +
+  SEQ_AHEAD + buffer probe, `Background` / `Probe` = window only),
+  `buffer(file_idx)`, `set_preload_file`, `keep_downloading`,
+  `clear_file`, `file_path`, `throttle_upload`.
+- **Lifecycle** (what enginefs's loop did that still matters under sbtl):
+  every 15 s, leases older than 15 s expire; a torrent with no open
+  `Reader`, no lease and no access for 5 min is removed (files kept).
+
+**Not ported** (unused by nyaa): enginefs's HLS module, subtitle
+extraction, hwaccel, piece/disk/metadata caches, OpenSubtitles hash,
+libtorrent priorities and coordinator, multi-file selection, the
+seeding-disabled pause loop (sbtl's session switch covers it), and the
+watch hint (a no-op under sbtl: `play_magnet`'s `watch` argument and
+`torrent_engine::WatchHint` go too).
+
+**torrent-engine changes:** `efs` -> `sbtl_engine::Engine` in `lib.rs`,
+`direct_input.rs` and the resume-buffer path; `StreamStats` mapped from
+`TorrentStats`; the load profiler's checking probe uses
+`TorrentState::Checking`; `engine_smoke` ported.
+
+**Verify:** unit tests (magnet parsing, trackers, lease/idle removal),
+`cargo check --workspace`, `engine_smoke` on a local swarm against the
+numbers in "sbtl backend", then the v0.4.0 sbtl live test (it runs on
+sbtl_engine, so it covers this change).
+
 ## Known gaps / not yet implemented
 
 - (HLS fallback player only - mpv reads the file's real duration.) The
