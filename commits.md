@@ -1,3 +1,10 @@
+### `0cf3c1c` · 2026-10-04 · docs: sbtl_engine as built, enginefs gone (PLAN, PHASES, FILE_INDEX, CLAUDE, README)
+- `PLAN.md`
+- `PHASES.md`
+- `FILE_INDEX.md`
+- `CLAUDE.md`
+- `README.md`
+
 ### `88c33b5` · 2026-10-04 · refactor: remove the vendored enginefs
 - `Cargo.toml`
 - `vendor/enginefs/` (removed)
