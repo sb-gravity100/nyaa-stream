@@ -1,3 +1,20 @@
+### `5b22bbe` · 2026-10-04 · refactor: sbtl is the only torrent engine
+- `Cargo.toml`
+- `crates/torrent-engine/Cargo.toml`
+- `crates/torrent-engine/examples/engine_smoke.rs`
+- `crates/torrent-engine/src/lib.rs`
+- `package.json`
+- `src-tauri/Cargo.toml`
+- `src-tauri/src/lib.rs`
+- `src-tauri/src/player.rs`
+- `src/types.ts`
+- `vendor/enginefs/Cargo.toml`
+- `vendor/enginefs/src/lib.rs`
+- `vendor/enginefs/src/backend/mod.rs`
+- `vendor/enginefs/src/backend/librqbit.rs` (removed)
+- `vendor/enginefs/src/backend/libtorrent/` (removed)
+- `vendor/libtorrent-sys/` (removed)
+
 ### `41e5bbc` · 2026-10-04 · fix(release): only npm runs through a shell on Windows
 - `scripts/release.mjs`
 
