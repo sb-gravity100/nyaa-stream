@@ -6,18 +6,13 @@ import type { PlaySession, StreamStats, SubtitleInfo } from "./types";
 // browserFallback.ts) - there's no meaningful fallback for actual playback,
 // so these just reject/no-op there rather than pretending to stream.
 
-/** How the file starts - drives the engine's download order (see PLAN.md
- * "Fast playback start"): "first" = from 0:00, "resume" = a start time
- * follows (Continue watching / Resume, or a source switch mid-episode). */
-export type WatchHint = "first" | "resume";
-
 /** `episode` (`<animeId>:<episodeKey>`) ties the torrent's cached files to
  * a Continue watching entry - see PLAN.md "Download cache". `trace` is the
  * load profiler's start trace (see loadTrace.ts). */
-export async function playMagnet(magnet: string, title: string, watch: WatchHint, episode: string, trace: number | null = null): Promise<PlaySession> {
+export async function playMagnet(magnet: string, title: string, episode: string, trace: number | null = null): Promise<PlaySession> {
   if (!isTauriAvailable()) throw new Error("Playback requires the Tauri app, not the browser preview");
-  console.debug("[play_magnet] invoked", { title, watch, episode, trace });
-  const session = await invoke<PlaySession>("play_magnet", { magnet, title, watch, episode, trace });
+  console.debug("[play_magnet] invoked", { title, episode, trace });
+  const session = await invoke<PlaySession>("play_magnet", { magnet, title, episode, trace });
   console.info("[play_magnet] succeeded", { title, torrentId: session.torrentId, files: session.files.length });
   return session;
 }

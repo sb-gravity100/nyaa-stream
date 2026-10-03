@@ -430,7 +430,6 @@ function MpvPlayerView({
             const session = await playMagnet(
                selectedRelease.magnet,
                `${displayTitle(anime.title)} ${episodeKey}`,
-               resumeAtRef.current != null ? "resume" : "first",
                `${anime.id}:${episodeKey}`,
                await trace.id,
             );
