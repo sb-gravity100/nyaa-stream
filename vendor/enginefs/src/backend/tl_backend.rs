@@ -45,17 +45,29 @@ pub struct TlBackend {
     session: tl::Session,
     download_dir: PathBuf,
     torrents: Mutex<HashMap<String, TlHandle>>,
+    /// One add at a time per info-hash, held across a magnet's metadata
+    /// wait, so two requests for the same torrent can't both create it.
+    adding: std::sync::Mutex<HashMap<String, Arc<Mutex<()>>>>,
+    policy: Arc<Policy>,
+}
+
+/// Backend-wide settings handles need to respect.
+struct Policy {
+    /// `set_seeding_enabled`: per-torrent throttling must not turn it back on.
+    seeding: std::sync::atomic::AtomicBool,
+    dht: bool,
 }
 
 impl TlBackend {
     pub fn new(download_dir: PathBuf) -> Result<Self> {
         std::fs::create_dir_all(download_dir.join(".tl")).context("creating the tl state directory")?;
+        let dht_on = std::env::var_os("NYAA_TL_NO_DHT").is_none();
         let cfg = tl::Config {
             // node id + known nodes survive restarts: lookups start warm
             dht_state_path: Some(download_dir.join(".tl").join("dht.dat")),
             // tests against local swarms (engine_smoke) must not pull in
             // real peers for a well-known infohash
-            dht: std::env::var_os("NYAA_TL_NO_DHT").is_none(),
+            dht: dht_on,
             ..Default::default()
         };
         let session = tl::Session::new(&cfg).map_err(|e| anyhow!("tl session: {e}"))?;
@@ -64,7 +76,19 @@ impl TlBackend {
             port = session.listen_port(),
             "tl backend started"
         );
-        Ok(Self { session, download_dir, torrents: Mutex::new(HashMap::new()) })
+        Ok(Self {
+            session,
+            download_dir,
+            torrents: Mutex::new(HashMap::new()),
+            adding: std::sync::Mutex::new(HashMap::new()),
+            policy: Arc::new(Policy { seeding: std::sync::atomic::AtomicBool::new(true), dht: dht_on }),
+        })
+    }
+
+    fn hash_lock(&self, info_hash: &str) -> Arc<Mutex<()>> {
+        let mut adding = self.adding.lock().unwrap_or_else(|e| e.into_inner());
+        adding.retain(|_, l| Arc::strong_count(l) > 1);  /* drop locks nobody holds */
+        adding.entry(info_hash.to_string()).or_insert_with(|| Arc::new(Mutex::new(()))).clone()
     }
 
     fn metadata_cache(&self, info_hash: &str) -> PathBuf {
@@ -93,6 +117,15 @@ impl TlBackend {
             }
         }
     }
+}
+
+/// A magnet's `tr=` announce URLs, decoded. A cached .torrent holds only
+/// the info dictionary, so these are added explicitly.
+fn magnet_trackers(url: &str) -> Vec<String> {
+    url.split(['?', '&'])
+        .filter_map(|kv| kv.strip_prefix("tr="))
+        .filter_map(|v| urlencoding::decode(&v.replace('+', " ")).ok().map(|d| d.into_owned()))
+        .collect()
 }
 
 /// Lowercase hex info-hash from a magnet's `xt=urn:btih:` (hex or base32).
@@ -128,20 +161,37 @@ fn magnet_info_hash(url: &str) -> Option<String> {
 impl TorrentBackend for TlBackend {
     type Handle = TlHandle;
 
-    async fn add_torrent(&self, source: TorrentSource, trackers: Vec<String>) -> Result<Self::Handle> {
+    async fn add_torrent(&self, source: TorrentSource, mut trackers: Vec<String>) -> Result<Self::Handle> {
+        // Magnets: known hash up front, so the duplicate check and the
+        // per-hash lock come before tl is touched and before the metadata
+        // wait. Other sources: the hash is known once tl parsed them (tl
+        // itself returns the existing torrent for a known hash).
+        let mut guard = None;
+        if let TorrentSource::Url(url) = &source {
+            if url.starts_with("magnet:") {
+                trackers.extend(magnet_trackers(url));
+                if let Some(hash) = magnet_info_hash(url) {
+                    let lock = self.hash_lock(&hash);
+                    let held = lock.lock_owned().await;
+                    if let Some(existing) = self.existing(&hash, &trackers).await {
+                        return Ok(existing);
+                    }
+                    guard = Some(held);
+                }
+            }
+        }
         let bytes = self.resolve_source(source).await?;
         let torrent = self
             .session
             .add_torrent(&bytes, &self.download_dir)
             .map_err(|e| anyhow!("tl add_torrent: {e}"))?;
         let info_hash = torrent.status().infohash_hex();
-        if let Some(existing) = self.torrents.lock().await.get(&info_hash).cloned() {
-            // tl keeps one copy per add; drop the new one, keep serving the old.
-            tracing::debug!(%info_hash, "tl: torrent already added");
-            for t in &trackers {
-                let _ = existing.inner.torrent.add_tracker(t);
-            }
-            return Ok(existing);
+        let _guard = match guard {
+            Some(g) => g,
+            None => self.hash_lock(&info_hash).lock_owned().await,
+        };
+        if let Some(existing) = self.existing(&info_hash, &trackers).await {
+            return Ok(existing);  /* `torrent` is the same tl torrent; dropping it is harmless */
         }
         for t in &trackers {
             if let Err(e) = torrent.add_tracker(t) {
@@ -169,7 +219,7 @@ impl TorrentBackend for TlBackend {
             .map_err(|e| anyhow!("tl idle stream: {e}"))?;
         let handle = TlHandle {
             inner: Arc::new(HandleInner {
-                session: self.session.clone(),
+                policy: self.policy.clone(),
                 torrent,
                 info_hash: info_hash.clone(),
                 save_dir: self.download_dir.clone(),
@@ -201,7 +251,20 @@ impl TorrentBackend for TlBackend {
 
     fn set_seeding_enabled(&self, enabled: bool) {
         tracing::info!(enabled, "tl: seeding");
+        self.policy.seeding.store(enabled, std::sync::atomic::Ordering::Relaxed);
         self.session.set_upload(enabled, None);
+    }
+}
+
+impl TlBackend {
+    /// The handle already serving `info_hash`, with `trackers` added to it.
+    async fn existing(&self, info_hash: &str, trackers: &[String]) -> Option<TlHandle> {
+        let existing = self.torrents.lock().await.get(info_hash).cloned()?;
+        tracing::debug!(%info_hash, "tl: torrent already added");
+        for t in trackers {
+            let _ = existing.inner.torrent.add_tracker(t);
+        }
+        Some(existing)
     }
 }
 
@@ -216,7 +279,7 @@ struct HandleState {
 }
 
 struct HandleInner {
-    session: tl::Session,
+    policy: Arc<Policy>,
     torrent: tl::Torrent,
     info_hash: String,
     save_dir: PathBuf,
@@ -253,12 +316,10 @@ impl TlHandle {
             .map_err(|e| anyhow!("tl stream for file {file_idx}: {e}"))
     }
 
+    /// Verified runs already on disk: safe for anything reading the file
+    /// directly (resume buffers, probes), and cheap (no stream).
     fn file_ranges(&self, file_idx: usize) -> Vec<(u64, u64)> {
-        self.inner
-            .torrent
-            .open_stream(file_idx as u32, &tl::StreamOptions { sequential: false, idle: tl::Idle::None, tail_prefetch: false, ..Default::default() })
-            .map(|s| s.downloaded_ranges())
-            .unwrap_or_default()
+        self.inner.torrent.file_ranges(file_idx as u32).unwrap_or_default()
     }
 }
 
@@ -300,7 +361,7 @@ impl TorrentHandle for TlHandle {
             files,
             sources: vec![],
             opts: StatsOptions {
-                dht: true,
+                dht: self.inner.policy.dht,
                 tracker: true,
                 path: self.inner.save_dir.to_string_lossy().into_owned(),
                 growler: Growler { flood: 0, pulse: None },
@@ -352,9 +413,15 @@ impl TorrentHandle for TlHandle {
     }
 
     async fn set_upload_throttled(&self, throttled: bool) -> Result<()> {
-        // tl's upload policy is session-wide: a trickle while throttled
-        tracing::debug!(info_hash = %self.inner.info_hash, throttled, "tl: upload throttle");
-        self.inner.session.set_upload(true, throttled.then_some(16 * 1024));
+        // Per torrent, and never re-enables seeding the user turned off:
+        // the session-wide seeding switch stays as set_seeding_enabled left it.
+        tracing::debug!(
+            info_hash = %self.inner.info_hash,
+            throttled,
+            seeding = self.inner.policy.seeding.load(std::sync::atomic::Ordering::Relaxed),
+            "tl: upload throttle"
+        );
+        self.inner.torrent.set_upload_limit(throttled.then_some(16 * 1024));
         Ok(())
     }
 
@@ -526,5 +593,14 @@ mod tests {
             Some("dd8255ecdc7ca55fb0bbf81323d87062db1f6d1c")
         );
         assert_eq!(magnet_info_hash("magnet:?dn=x"), None);
+    }
+
+    #[test]
+    fn magnet_tracker_list() {
+        let m = "magnet:?xt=urn:btih:dd8255ecdc7ca55fb0bbf81323d87062db1f6d1c&tr=udp%3A%2F%2Ftracker.example%3A1337%2Fannounce&dn=x&tr=https%3A%2F%2Fa.b%2Fannounce";
+        assert_eq!(
+            super::magnet_trackers(m),
+            vec!["udp://tracker.example:1337/announce".to_string(), "https://a.b/announce".to_string()]
+        );
     }
 }
