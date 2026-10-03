@@ -425,8 +425,18 @@
             (PLAN.md "sbtl_engine" Live test)
       - [x] Fix: resume buffers never survived a save (`list()` included the
             save's own `.tmp`)
-      - [ ] Live: a libtorrent-era partial download (Fate Ep 3/7) reopens on
-            sbtl after one re-check; a resume served from a resume buffer
+      - [x] Fix: one fixed progress key per player session (MediaPage's
+            route label) for play_magnet, watch progress and the resume
+            request - group relabeling ("Season 2 Episode 10" -> "Episode
+            10") re-ran play_magnet and saved the buffer under a key
+            Continue watching didn't know, so it was swept; Resume matches
+            the saved source by info-hash and plays its saved magnet when
+            not listed (yet)
+      - [ ] Live: a resume served from a resume buffer (`buffer_bytes` > 0),
+            incl. a Season 2+ episode
+      - [~] libtorrent-era partial download reopened on sbtl: not testable
+            (data cleared); accepted - sbtl re-checks data on add, keeps
+            verified pieces only
       - [ ] Run `npm run dev:sbtl-local` once (confirms the patch path
             resolves from cargo's working directory under `tauri dev`)
 - [ ] Contact and send logs (v0.4.0, see PLAN.md "Contact and send
