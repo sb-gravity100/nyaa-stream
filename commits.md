@@ -1,3 +1,6 @@
+### `dff9fa3` · 2026-10-03 · fix(enginefs): tl backend review fixes
+- `vendor/enginefs/src/backend/tl_backend.rs`
+
 ### `b37c74f` · 2026-10-03 · docs: tl backend gains DHT, uTP, seeding, HTTPS trackers
 - `PLAN.md`
 - `FILE_INDEX.md`
