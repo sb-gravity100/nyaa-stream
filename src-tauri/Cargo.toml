@@ -1,6 +1,6 @@
 [package]
 name = "nyaa-stream"
-version = "0.3.2"
+version = "0.4.0"
 description = "Anime-focused Stremio-like streaming client"
 authors = ["you"]
 edition = "2021"
