@@ -1,3 +1,6 @@
+### `8532f1d` · 2026-10-04 · fix(resume): a save no longer deletes its own buffer
+- `src-tauri/src/resume.rs`
+
 ### `ae4b79f` · 2026-10-04 · docs: sbtl_engine engine_smoke A/B results (PLAN, PHASES)
 - `PLAN.md`
 - `PHASES.md`
