@@ -3,11 +3,6 @@
     "version-string": "0.1.0",
     "dependencies": [
         {
-            "name": "libtorrent",
-            "default-features": false
-        },
-        "openssl",
-        {
             "name": "ffmpeg",
             "default-features": false,
             "features": [
@@ -25,11 +20,5 @@
             ]
         }
     ],
-    "builtin-baseline": "84bab45d415d22042bd0b9081aea57f362da3f35",
-    "overrides": [
-        {
-            "name": "libtorrent",
-            "version": "2.1.1"
-        }
-    ]
+    "builtin-baseline": "84bab45d415d22042bd0b9081aea57f362da3f35"
 }
