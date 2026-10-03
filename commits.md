@@ -1,3 +1,7 @@
+### `d4e9410` · 2026-10-04 · docs: plan sbtl_engine, replacing the vendored enginefs (PLAN, PHASES)
+- `PLAN.md`
+- `PHASES.md`
+
 ### `b0a49ed` · 2026-10-04 · docs: sbtl-backend merged (PHASES)
 - `PHASES.md`
 
