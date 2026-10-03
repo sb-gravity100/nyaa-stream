@@ -40,7 +40,10 @@ function run(cmd, cmdArgs, { env, allowFail = false, inherit = false } = {}) {
   log("run", { cmd: [cmd, ...cmdArgs].join(" ") });
   const res = spawnSync(cmd, cmdArgs, {
     encoding: "utf8",
-    shell: process.platform === "win32",
+    // Only npm needs a shell on Windows (npm.cmd). With a shell, arguments
+    // aren't quoted - cmd split `--title nyaa-stream v0.3.2` and the notes
+    // into words, and gh took them as asset files to upload.
+    shell: process.platform === "win32" && cmd === "npm",
     env: env ?? process.env,
     stdio: inherit ? "inherit" : ["ignore", "pipe", "pipe"],
   });
