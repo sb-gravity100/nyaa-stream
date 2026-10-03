@@ -1,3 +1,7 @@
+### `88c33b5` · 2026-10-04 · refactor: remove the vendored enginefs
+- `Cargo.toml`
+- `vendor/enginefs/` (removed)
+
 ### `e0353a3` · 2026-10-04 · refactor: torrent-engine runs on sbtl_engine; watch hint removed
 - `crates/torrent-engine/Cargo.toml`
 - `crates/torrent-engine/src/lib.rs`
