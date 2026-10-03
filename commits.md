@@ -1,3 +1,8 @@
+### `15f492d` · 2026-10-04 · chore: release v0.4.0
+- `package.json`
+- `src-tauri/Cargo.toml`
+- `src-tauri/tauri.conf.json`
+
 ### `2b7791a` · 2026-10-04 · docs: resume buffers verified live; dropped-buffer delete issue (PHASES)
 - `PHASES.md`
 
