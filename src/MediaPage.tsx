@@ -161,6 +161,14 @@ function useLocalThumbnails(animeId: number, episodes: number[]): Record<number,
   return found;
 }
 
+
+/** Watch-progress key of an episode group: numbered episodes by number
+ * ("Episode 5" - season-agnostic, like the player route and the cards that
+ * link to it), others by their group key ("Batch", ...). Also the resume
+ * buffer's and download cache's episode key. */
+function progressKeyOf(key: string, group: { label: { kind: string; number?: number } }): string {
+  return group.label.kind === "episode" && group.label.number != null ? `Episode ${group.label.number}` : key;
+}
 export function MediaPage({
   anime,
   kitsu,
@@ -239,6 +247,10 @@ export function MediaPage({
     );
   }, [playing, visibleSources]);
 
+  /** A group's watch progress: under its progress key (see `progressKeyOf`),
+   * else under its group key (entries saved before keys were fixed). */
+  const progressOf = (key: string, group: (typeof groupedSources)[number][1]) => progress[progressKeyOf(key, group)] ?? progress[key];
+
   // The first episode that isn't finished, after the most recently
   // watched one - what the primary button plays.
   const continueTarget = useMemo(() => {
@@ -246,7 +258,7 @@ export function MediaPage({
     if (episodes.length === 0) return visibleSources[0] ?? null;
     const latest = Object.values(progress).sort((a, b) => b.updatedAt - a.updatedAt)[0];
     if (!latest) return episodes[0];
-    const latestIndex = episodes.findIndex(([key]) => key === latest.episodeKey);
+    const latestIndex = episodes.findIndex(([key, g]) => progressKeyOf(key, g) === latest.episodeKey || key === latest.episodeKey);
     if (latestIndex < 0) return episodes[0];
     if (!latest.completed) return episodes[latestIndex];
     return episodes[latestIndex + 1] ?? episodes[latestIndex];
@@ -267,7 +279,7 @@ export function MediaPage({
   const thumbnails = useMemo(() => ({ ...localThumbnails, ...kitsuThumbnails }), [localThumbnails, kitsuThumbnails]);
   const paragraphs = anime.description ? descriptionParagraphs(anime.description) : [];
   const watchedCount = Object.values(progress).filter((p) => p.completed).length;
-  const continueEntry = continueTarget ? progress[continueTarget[0]] : undefined;
+  const continueEntry = continueTarget ? progressOf(continueTarget[0], continueTarget[1]) : undefined;
   const continueLabel = continueTarget
     ? continueEntry && !continueEntry.completed
       ? `Resume ${continueTarget[0]}`
@@ -285,7 +297,7 @@ export function MediaPage({
           episode: number,
           thumbnail: number != null ? (thumbnails[number] ?? null) : null,
           releaseCount: group.releases.length,
-          progress: progress[key] ?? null,
+          progress: progressOf(key, group) ?? null,
         };
       }),
     [visibleSources, thumbnails, progress],
@@ -294,8 +306,8 @@ export function MediaPage({
   /** Marks every numbered episode listed before `index` as watched. */
   function markPreviousWatched(index: number) {
     for (const [key, group] of visibleSources.slice(0, index)) {
-      if (group.label.kind !== "episode" || progress[key]?.completed) continue;
-      setWatched(anime, key, group.label.number, true);
+      if (group.label.kind !== "episode" || progressOf(key, group)?.completed) continue;
+      setWatched(anime, progressKeyOf(key, group), group.label.number, true);
     }
   }
 
@@ -310,6 +322,10 @@ export function MediaPage({
       key={watchLabel ?? playing[0]}
       anime={anime}
       episodeKey={playing[0]}
+      // Fixed for the player's lifetime (like its `key`): the group key can
+      // change as release details arrive, which re-ran play_magnet and split
+      // progress and the resume buffer across two keys.
+      progressKey={watchLabel ?? playing[0]}
       episode={playing[1].label.kind === "episode" ? playing[1].label.number : null}
       releases={playing[1].releases}
       onClose={onCloseWatch}
@@ -485,7 +501,7 @@ export function MediaPage({
                 const episodeNumber = group.label.kind === "episode" ? group.label.number : null;
                 // A movie's row shows its key art, not a "1".
                 const thumbnail = movie ? (backdrop ?? undefined) : episodeNumber != null ? thumbnails[episodeNumber] : undefined;
-                const entry = progress[key];
+                const entry = progressOf(key, group);
                 const watched = entry?.completed ?? false;
                 const fraction = entry && !watched ? Math.min(1, entry.position / entry.duration) : 0;
                 return (
