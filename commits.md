@@ -1,3 +1,7 @@
+### `5aa5736` · 2026-10-03 · docs: tl backend review fixes (PLAN, FILE_INDEX)
+- `PLAN.md`
+- `FILE_INDEX.md`
+
 ### `dff9fa3` · 2026-10-03 · fix(enginefs): tl backend review fixes
 - `vendor/enginefs/src/backend/tl_backend.rs`
 
