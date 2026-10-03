@@ -174,15 +174,15 @@ pub struct EngineDiagnosticsSnapshot {
     pub memory: BackendMemoryDiagnostics,
 }
 
-#[cfg(all(feature = "librqbit", not(feature = "libtorrent"), not(feature = "tl")))]
+#[cfg(all(feature = "librqbit", not(feature = "libtorrent"), not(feature = "sbtl")))]
 pub type EngineFS = BackendEngineFS<LibrqbitBackend>;
 
 #[cfg(feature = "libtorrent")]
 pub type EngineFS = BackendEngineFS<LibtorrentBackend>;
 
-// (nyaa-stream) sb_torrent's tl engine; libtorrent wins if both are enabled.
-#[cfg(all(feature = "tl", not(feature = "libtorrent")))]
-pub type EngineFS = BackendEngineFS<backend::tl_backend::TlBackend>;
+// (nyaa-stream) the sbtl engine; libtorrent wins if both are enabled.
+#[cfg(all(feature = "sbtl", not(feature = "libtorrent")))]
+pub type EngineFS = BackendEngineFS<backend::sbtl_backend::SbtlBackend>;
 
 impl<B: TorrentBackend + 'static> BackendEngineFS<B> {
     pub fn new_with_backend(

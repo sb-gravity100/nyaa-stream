@@ -1045,12 +1045,12 @@ struct StreamRouterState {
 }
 
 /// mpv's start/resume threshold (`--cache-pause-wait`, seconds) for this
-/// build's backend. tl only serves verified data and reports when its ready
+/// build's backend. sbtl only serves verified data and reports when its ready
 /// threshold is buffered ahead of the reader, so mpv needn't hold back for
 /// 10 s of its own cache; libtorrent keeps the conservative 10 s.
-#[cfg(all(feature = "tl", not(feature = "libtorrent")))]
-pub const MPV_CACHE_PAUSE_WAIT_SECS: u32 = (enginefs::backend::tl_backend::READY_MS / 1000) as u32;
-#[cfg(not(all(feature = "tl", not(feature = "libtorrent"))))]
+#[cfg(all(feature = "sbtl", not(feature = "libtorrent")))]
+pub const MPV_CACHE_PAUSE_WAIT_SECS: u32 = (enginefs::backend::sbtl_backend::READY_MS / 1000) as u32;
+#[cfg(not(all(feature = "sbtl", not(feature = "libtorrent"))))]
 pub const MPV_CACHE_PAUSE_WAIT_SECS: u32 = 10;
 
 /// Trimmed-down mirror of librqbit's `TorrentStats` - mirrors Stremio's own
@@ -1109,7 +1109,7 @@ pub struct StreamStats {
     /// The current HLS run, if any (see `HlsRunInfo`).
     pub run: Option<HlsRunInfo>,
     /// Verified data ahead of the player's newest read of this file, when
-    /// the backend tracks it (tl; `None` with libtorrent). PLAN.md "tl
+    /// the backend tracks it (sbtl; `None` with libtorrent). PLAN.md "sbtl
     /// backend": the buffering UI shows real readiness from it.
     pub buffer: Option<enginefs::backend::BufferStatus>,
 }
@@ -1158,10 +1158,10 @@ impl TorrentEngine {
             let config = enginefs::backend::BackendConfig::default();
             enginefs::backend::libtorrent::LibtorrentBackend::new_disk_backed(download_dir.clone(), config)?
         };
-        #[cfg(all(feature = "tl", not(feature = "libtorrent")))]
+        #[cfg(all(feature = "sbtl", not(feature = "libtorrent")))]
         let backend = {
-            tracing::info!("starting enginefs with the tl backend");
-            enginefs::backend::tl_backend::TlBackend::new(download_dir.clone())?
+            tracing::info!("starting enginefs with the sbtl backend");
+            enginefs::backend::sbtl_backend::SbtlBackend::new(download_dir.clone())?
         };
         let efs: Arc<EngineFS> = Arc::new(EngineFS::new_with_backend(backend, HashMap::new(), cache_dir, download_dir));
         let sources = TorrentSources::new(efs.clone());

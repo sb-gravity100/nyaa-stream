@@ -27,9 +27,9 @@ ez-ffmpeg = { version = "0.19", features = ["static"] }
 ffmpeg-next = { version = "8.1", features = ["static"] }
 
 [features]
-# Torrent engine behind enginefs: libtorrent (default) or sb_torrent's tl
-# (a sibling checkout at ../sb_torrent; see PLAN.md's streaming-server
-# section). If both are enabled, libtorrent wins.
+# Torrent engine behind enginefs: libtorrent (default) or sbtl
+# (https://github.com/sb-gravity100/sbtl, pinned in vendor/enginefs; see
+# PLAN.md "sbtl backend"). If both are enabled, libtorrent wins.
 default = ["libtorrent"]
 libtorrent = ["enginefs/libtorrent"]
-tl = ["enginefs/tl"]
+sbtl = ["enginefs/sbtl"]

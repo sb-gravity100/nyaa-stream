@@ -10,8 +10,8 @@ pub mod librqbit;
 #[cfg(feature = "libtorrent")]
 pub mod libtorrent;
 
-#[cfg(feature = "tl")]
-pub mod tl_backend;
+#[cfg(feature = "sbtl")]
+pub mod sbtl_backend;
 
 pub mod metadata;
 pub mod priorities;
@@ -169,7 +169,7 @@ pub struct HotFilePriorityPlan {
     pub bitrate_bytes_per_sec: Option<u64>,
 }
 
-/// (nyaa-stream) A reader's buffer, from backends that track it (tl).
+/// (nyaa-stream) A reader's buffer, from backends that track it (sbtl).
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BufferStatus {
