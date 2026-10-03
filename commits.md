@@ -1,3 +1,6 @@
+### `7d6d02a` · 2026-10-04 · fix(cache): keep sbtl's state directory, evict a torrent's sbtl files
+- `src-tauri/src/download_cache.rs`
+
 ### `5b22bbe` · 2026-10-04 · refactor: sbtl is the only torrent engine
 - `Cargo.toml`
 - `crates/torrent-engine/Cargo.toml`
