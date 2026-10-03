@@ -1655,6 +1655,16 @@ lifecycle, `torrent.rs` Torrent/Reader/stats, `magnet.rs`, ported
 `TorrentState`; `vendor/enginefs`, the `[patch]` and the stream-server git
 dependency are gone. Unit tests: magnet parsing, idle rule, lease expiry.
 
+**engine_smoke A/B** (BBB, 8 local libtorrent seeders at 512 KiB/s, DHT
+off, debug builds, old = enginefs + sbtl backend at `e0db1c3`, runs
+alternated): 0 mismatches in every run. Range GETs: metadata 0.36 s, head
+1.6-1.75 s, seeks 1.0-2.2 s, GET phase ~8.6-8.9 s (same as "sbtl
+backend"). Playback phase, time to ready / full: old 1.96 s / 5.35 s and
+2.28 s / 9.60 s; new 1.74 s / 5.86 s and 2.28 s / 4.13 s (two earlier new
+runs: 4.2 s / 7.6 s, 3.2 s / 9.6 s, on a cold swarm). Both show brief
+stalled dips before ready. No regression; the earlier 1.4 s / 4.1 s in
+"sbtl backend" was a single run.
+
 ## Known gaps / not yet implemented
 
 - (HLS fallback player only - mpv reads the file's real duration.) The

@@ -419,7 +419,8 @@
             watch hint removed end to end
       - [x] Remove `vendor/enginefs`, the `[patch]` and the enginefs git
             dependency; docs (PLAN, FILE_INDEX, CLAUDE, README)
-      - [ ] engine_smoke on a local swarm: numbers vs "sbtl backend"
+      - [x] engine_smoke on a local swarm: numbers vs "sbtl backend"
+            (no regression, see PLAN.md "sbtl_engine" As built)
       - [ ] Same live test on sbtl, plus: a libtorrent-era partial download
             resumes after one re-check, a poorly seeded torrent,
             `engine_smoke` seek numbers against the baseline
