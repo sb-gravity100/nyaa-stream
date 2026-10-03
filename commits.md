@@ -1,3 +1,21 @@
+### `ec71470` · 2026-10-04 · docs: sbtl naming and git dependency (PLAN, FILE_INDEX, VENDORED)
+- `PLAN.md`
+- `FILE_INDEX.md`
+- `vendor/enginefs/VENDORED.md`
+
+### `250d871` · 2026-10-04 · refactor: tl engine renamed sbtl, built from its public repo
+- `vendor/enginefs/Cargo.toml`
+- `vendor/enginefs/src/lib.rs`
+- `vendor/enginefs/src/backend/mod.rs`
+- `vendor/enginefs/src/backend/sbtl_backend.rs`
+- `crates/torrent-engine/Cargo.toml`
+- `crates/torrent-engine/src/lib.rs`
+- `crates/torrent-engine/examples/engine_smoke.rs`
+- `src-tauri/Cargo.toml`
+- `package.json`
+- `src/types.ts`
+- `src/loadingProgress.ts`
+
 ### `2253456` · 2026-10-04 · fix(ui): pin home app bar flush under title bar
 - `src/App.css`
 
