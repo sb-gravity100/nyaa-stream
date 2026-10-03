@@ -1,8 +1,12 @@
 // Builds, signs and publishes a release from this PC - what
 // .github/workflows/release.yml did before GitHub Actions became unavailable.
 //
-//   npm run release -- --notes "<release notes>" [--dry-run] [--skip-build]
+//   npm run release -- --notes-file notes.md [--dry-run] [--skip-build]
+//   npm run release -- --notes "<one-line notes>" [--dry-run] [--skip-build]
 //
+// Multi-line notes need --notes-file: on Windows npm passes arguments through
+// cmd, which cuts --notes at its first line break (v0.4.0 published only its
+// first bullet that way).
 // Expects HEAD to be the `chore: release vX.Y.Z` commit tagged vX.Y.Z (npm run
 // bump, commit, git tag). --dry-run builds and stages the files without
 // pushing or publishing; --skip-build reuses the existing bundle output.
@@ -29,9 +33,14 @@ function parseArgs(argv) {
     if (a === "--dry-run") args.dryRun = true;
     else if (a === "--skip-build") args.skipBuild = true;
     else if (a === "--notes") args.notes = argv[++i] ?? null;
-    else fail(`unknown argument: ${a}`);
+    else if (a === "--notes-file") {
+      const file = argv[++i];
+      if (!file || !existsSync(file)) fail(`notes file not found: ${file}`);
+      args.notes = readFileSync(file, "utf8").trim();
+      log("notes from file", { file, lines: args.notes.split(/\r?\n/).length });
+    } else fail(`unknown argument: ${a}`);
   }
-  if (!args.notes) fail('usage: npm run release -- --notes "<text>" [--dry-run] [--skip-build]');
+  if (!args.notes) fail('usage: npm run release -- --notes-file <file> | --notes "<text>" [--dry-run] [--skip-build]');
   return args;
 }
 

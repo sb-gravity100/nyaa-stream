@@ -103,8 +103,10 @@ updater only offers builds with a higher version than the installed one.
 - Release builds need the key *contents* (the `_PATH` variant is not read):
   `export TAURI_SIGNING_PRIVATE_KEY="$(cat ~/.tauri/nyaa-stream.key)"` and
   `TAURI_SIGNING_PRIVATE_KEY_PASSWORD=""` (never commit the key).
-- Publishing: on the tagged release commit, `npm run release -- --notes
-  "<text>"` (`scripts/release.mjs`; try `--dry-run` first). It builds with the
+- Publishing: on the tagged release commit, `npm run release -- --notes-file
+  notes.md` (`scripts/release.mjs`; try `--dry-run` first). Multi-line notes
+  must go through `--notes-file`: npm on Windows cuts `--notes "<text>"` at
+  its first line break. It builds with the
   signing key, then uploads the NSIS `-setup.exe`, its `.sig`, the MSI +
   `.sig` and a `latest.json` (`version`, `notes`, `pub_date`,
   `platforms.windows-x86_64.{signature,url}` using the NSIS `.sig` text) via
