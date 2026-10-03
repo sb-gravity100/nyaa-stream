@@ -7,7 +7,7 @@ edition.workspace = true
 # Pinned to the exact commit validated locally (built + `cargo check`ed
 # against our own vcpkg.json/triplet at the project root) - see PLAN.md's
 # streaming-server section for why this replaced our own librqbit session.
-enginefs = { git = "https://github.com/stremio-native/stream-server", rev = "f585ab6eda9b1411034548c131bb0dc30c6f5f9e" }
+enginefs = { git = "https://github.com/stremio-native/stream-server", rev = "f585ab6eda9b1411034548c131bb0dc30c6f5f9e"}
 tokio = { workspace = true }
 tokio-util = { version = "0.7", features = ["io"] }
 axum = "0.8"

@@ -1,5 +1,128 @@
+### `c934dc9` · 2026-10-04 · docs: sbtl engine checklist for v0.4.0 (PHASES)
+- `PHASES.md`
+
+### `f155f39` · 2026-10-04 · docs: sbtl is the only engine (VENDORED, FILE_INDEX, CLAUDE, README)
+- `vendor/enginefs/VENDORED.md`
+- `FILE_INDEX.md`
+- `CLAUDE.md`
+- `README.md`
+
+### `4875f10` · 2026-10-04 · docs: sbtl is the only engine, sbtl update workflow, v0.4.0 release plan (PLAN)
+- `PLAN.md`
+
+### `491c50c` · 2026-10-04 · feat(release): refuse to build without a tagged sbtl; dev:sbtl-local
+- `scripts/release.mjs`
+- `package.json`
+
+### `96374a9` · 2026-10-04 · build: vcpkg builds only FFmpeg
+- `vcpkg.json`
+- `.cargo/config.toml`
+- `scripts/fetch-native-deps.mjs`
+
+### `7d6d02a` · 2026-10-04 · fix(cache): keep sbtl's state directory, evict a torrent's sbtl files
+- `src-tauri/src/download_cache.rs`
+
+### `5b22bbe` · 2026-10-04 · refactor: sbtl is the only torrent engine
+- `Cargo.toml`
+- `crates/torrent-engine/Cargo.toml`
+- `crates/torrent-engine/examples/engine_smoke.rs`
+- `crates/torrent-engine/src/lib.rs`
+- `package.json`
+- `src-tauri/Cargo.toml`
+- `src-tauri/src/lib.rs`
+- `src-tauri/src/player.rs`
+- `src/types.ts`
+- `vendor/enginefs/Cargo.toml`
+- `vendor/enginefs/src/lib.rs`
+- `vendor/enginefs/src/backend/mod.rs`
+- `vendor/enginefs/src/backend/librqbit.rs` (removed)
+- `vendor/enginefs/src/backend/libtorrent/` (removed)
+- `vendor/libtorrent-sys/` (removed)
+
 ### `41e5bbc` · 2026-10-04 · fix(release): only npm runs through a shell on Windows
 - `scripts/release.mjs`
+
+### `ec71470` · 2026-10-04 · docs: sbtl naming and git dependency (PLAN, FILE_INDEX, VENDORED)
+- `PLAN.md`
+- `FILE_INDEX.md`
+- `vendor/enginefs/VENDORED.md`
+
+### `250d871` · 2026-10-04 · refactor: tl engine renamed sbtl, built from its public repo
+- `vendor/enginefs/Cargo.toml`
+- `vendor/enginefs/src/lib.rs`
+- `vendor/enginefs/src/backend/mod.rs`
+- `vendor/enginefs/src/backend/sbtl_backend.rs`
+- `crates/torrent-engine/Cargo.toml`
+- `crates/torrent-engine/src/lib.rs`
+- `crates/torrent-engine/examples/engine_smoke.rs`
+- `src-tauri/Cargo.toml`
+- `package.json`
+- `src/types.ts`
+- `src/loadingProgress.ts`
+
+### `2253456` · 2026-10-04 · fix(ui): pin home app bar flush under title bar
+- `src/App.css`
+
+### `5aa5736` · 2026-10-03 · docs: tl backend review fixes (PLAN, FILE_INDEX)
+- `PLAN.md`
+- `FILE_INDEX.md`
+
+### `dff9fa3` · 2026-10-03 · fix(enginefs): tl backend review fixes
+- `vendor/enginefs/src/backend/tl_backend.rs`
+
+### `b37c74f` · 2026-10-03 · docs: tl backend gains DHT, uTP, seeding, HTTPS trackers
+- `PLAN.md`
+- `FILE_INDEX.md`
+
+### `e42f4d2` · 2026-10-03 · feat(enginefs): tl backend uses tl's DHT state, seeding and upload throttle
+- `vendor/enginefs/src/backend/tl_backend.rs`
+
+### `5672b89` · 2026-10-03 · docs: tl buffer signals (PLAN, FILE_INDEX, VENDORED)
+- `PLAN.md`
+- `FILE_INDEX.md`
+- `vendor/enginefs/VENDORED.md`
+
+### `d729ed2` · 2026-10-03 · test: engine_smoke playback phase prints buffer levels
+- `crates/torrent-engine/examples/engine_smoke.rs`
+
+### `59f0f2b` · 2026-10-03 · feat: buffering progress from the backend's real buffer when available
+- `src/types.ts`
+- `src/loadingProgress.ts`
+
+### `61970c0` · 2026-10-03 · feat: StreamStats.buffer and per-backend mpv cache-pause-wait
+- `crates/torrent-engine/src/lib.rs`
+- `src-tauri/src/player.rs`
+
+### `612dbd7` · 2026-10-03 · feat(enginefs): buffer_status in TorrentHandle, implemented by the tl backend
+- `vendor/enginefs/src/backend/mod.rs`
+- `vendor/enginefs/src/backend/tl_backend.rs`
+
+### `7f82268` · 2026-10-03 · docs: engine_smoke and tl vs libtorrent measurements
+- `FILE_INDEX.md`
+- `PLAN.md`
+
+### `fa6cf98` · 2026-10-03 · test: engine_smoke example for the Range-GET streaming path
+- `crates/torrent-engine/examples/engine_smoke.rs`
+
+### `c6112de` · 2026-10-03 · fix(enginefs): tl backend file names use native separators like libtorrent
+- `vendor/enginefs/src/backend/tl_backend.rs`
+
+### `38143f7` · 2026-10-02 · docs: tl backend (PLAN, FILE_INDEX, VENDORED)
+- `PLAN.md`
+- `FILE_INDEX.md`
+- `vendor/enginefs/VENDORED.md`
+
+### `df84a29` · 2026-10-02 · feat: build-time engine switch (libtorrent default, tl optional)
+- `crates/torrent-engine/Cargo.toml`
+- `crates/torrent-engine/src/lib.rs`
+- `src-tauri/Cargo.toml`
+- `package.json`
+
+### `f19325d` · 2026-10-02 · feat(enginefs): tl backend behind the tl feature
+- `vendor/enginefs/src/backend/tl_backend.rs`
+- `vendor/enginefs/src/backend/mod.rs`
+- `vendor/enginefs/src/lib.rs`
+- `vendor/enginefs/Cargo.toml`
 
 ### `997b931` · 2026-09-30 · docs: load profiler as built, tasks done
 - `PHASES.md`

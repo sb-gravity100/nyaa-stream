@@ -19,7 +19,7 @@ Pick a release and it starts playing while the torrent downloads.</p>
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?style=flat-square&logo=tauri&logoColor=white">
   <img alt="Rust" src="https://img.shields.io/badge/Rust-backend-CE422B?style=flat-square&logo=rust&logoColor=white">
   <img alt="Preact" src="https://img.shields.io/badge/Preact-frontend-673AB8?style=flat-square&logo=preact&logoColor=white">
-  <img alt="libtorrent" src="https://img.shields.io/badge/libtorrent-streaming-3b3f5c?style=flat-square">
+  <img alt="sbtl" src="https://img.shields.io/badge/sbtl-streaming-3b3f5c?style=flat-square">
   <img alt="mpv" src="https://img.shields.io/badge/mpv-player-691F69?style=flat-square&logo=mpv&logoColor=white">
 </p>
 
@@ -189,8 +189,8 @@ Open them with the gear icon in the app bar.
 | `libmpv-2.dll` | Optional. A GPL build (e.g. [zhongfly/mpv-winbuild](https://github.com/zhongfly/mpv-winbuild), `mpv-dev-x86_64-*.7z`) placed in `src-tauri/lib/`. Without it the app uses the HLS fallback player |
 
 You don't need vcpkg or CMake. `npm run setup` downloads a prebuilt, checksum-verified archive of static
-**libtorrent-rasterbar, OpenSSL and FFmpeg 7.1.2** (about 1.3 GB) into `vcpkg_installed/`. You only need vcpkg to
-*rebuild* that archive after changing `vcpkg.json`. See [PLAN.md → Build prerequisites](PLAN.md#build-prerequisites-new-added-with-the-libtorrent-backend).
+**FFmpeg 7.1.2** into `vcpkg_installed/` (the current archive, about 1.3 GB, still holds libtorrent and OpenSSL from before sbtl; nothing links them). The first build also fetches [sbtl](https://github.com/sb-gravity100/sbtl) from GitHub and compiles its C sources with LLVM's `clang-cl`. You only need vcpkg to
+*rebuild* that archive after changing `vcpkg.json`. See [PLAN.md → Build prerequisites](PLAN.md#build-prerequisites).
 
 ### Run in development
 
@@ -254,7 +254,7 @@ git config core.hooksPath .githooks
 │  │  anilist-client   kitsu-client   nyaa-client (+SQLite)  │  │
 │  │                                                         │  │
 │  │  torrent-engine ──► local axum HTTP server              │  │
-│  │   (libtorrent)       ├─ raw bytes (Range)  ──► libmpv   │  │
+│  │   (sbtl)             ├─ raw bytes (Range)  ──► libmpv   │  │
 │  │                      └─ HLS (in-process FFmpeg) ► hls.js│  │
 │  └─────────────────────────────────────────────────────────┘  │
 │  libmpv renders into the window (wid) beneath the webview     │
@@ -262,7 +262,7 @@ git config core.hooksPath .githooks
 ```
 
 - **Shell:** Tauri 2. The window stays opaque. Only the *webview* background is transparent, so mpv's video shows through under the HTML controls.
-- **Torrents:** `enginefs`'s libtorrent backend (vendored in `vendor/enginefs`), which gives real per-file piece prioritization so the file you're watching gets the swarm's bandwidth.
+- **Torrents:** [sbtl](https://github.com/sb-gravity100/sbtl), a streaming-first BitTorrent engine built for nyaa-stream, behind a vendored `enginefs` (`vendor/enginefs`). What the player reads decides what downloads, so seeks jump straight to the new spot and files you aren't watching don't download.
 - **Streaming server:** a local `axum` server with two layers: raw Range-capable bytes (mpv reads these directly) and an HLS layer (one continuous FFmpeg run per file, stream copy when possible, hardware H.264 transcode otherwise) for the browser fallback.
 - **FFmpeg** is linked statically and runs in-process, using **LGPL features only** (no x264).
 - **Search:** nyaa.si's HTML results are scraped, since its RSS feed caps at 75 results. All requests go through one shared throttle with 429/503 back-off, and every release lands in a permanent local database.
@@ -318,7 +318,7 @@ Every user-facing change ships with a version bump, because the updater only off
 | Stuck buffering | The torrent may have few seeders. Check peers in the statistics panel or pick another source |
 | Fallback player stutters on 1080p HEVC/AV1 | No hardware encoder was found, so transcoding runs on the CPU. mpv playback doesn't need to transcode |
 | Build fails in `bindgen` / `clang` | Install LLVM, or point `LIBCLANG_PATH` in `.cargo/config.toml` at its `bin` folder |
-| Build can't find libtorrent / FFmpeg | Run `npm run setup` |
+| Build can't find FFmpeg | Run `npm run setup` |
 | Anything else | Check the logs in `%LOCALAPPDATA%\nyaa-stream\logs\` |
 
 ---
@@ -338,7 +338,7 @@ The full list is in [PLAN.md → Known gaps](PLAN.md#known-gaps--not-yet-impleme
 
 - [Stremio](https://github.com/Stremio): the UX inspiration, plus reference for the buffering indicator and statistics panel
 - [stremio-native/stream-server](https://github.com/stremio-native/stream-server): `enginefs`, the torrent backend
-- [mpv](https://mpv.io/), [FFmpeg](https://ffmpeg.org/), [libtorrent](https://libtorrent.org/), [hls.js](https://github.com/video-dev/hls.js), [JASSUB](https://github.com/ThaUnknown/jassub)
+- [mpv](https://mpv.io/), [FFmpeg](https://ffmpeg.org/), [hls.js](https://github.com/video-dev/hls.js), [JASSUB](https://github.com/ThaUnknown/jassub)
 - [AniList](https://anilist.co/) and [Kitsu](https://kitsu.app/) for metadata
 - Bundled fonts: Gandhi Sans, Zen Kaku Gothic New, Outfit
 

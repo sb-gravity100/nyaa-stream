@@ -61,6 +61,15 @@ function versions() {
   return { pkg, conf, cargo };
 }
 
+/** The sbtl source cargo resolves for this build (no local override). */
+const SBTL_PINNED = /^sbtl v\S+ \(https:\/\/github\.com\/sb-gravity100\/sbtl\?tag=v[^#)]+#[0-9a-f]+\)$/;
+
+function sbtlSource() {
+  const line = run("cargo", ["tree", "-p", "sbtl", "--depth", "0", "--prefix", "none", "-e", "normal"]).out.split(/\r?\n/).pop();
+  log("sbtl source", { line });
+  return line;
+}
+
 function preflight(args) {
   log("preflight");
   const v = versions();
@@ -78,6 +87,10 @@ function preflight(args) {
   }
   if (!run("gh", ["auth", "status"], { allowFail: true }).ok) fail("gh is not logged in (gh auth login)");
   if (!existsSync("vcpkg_installed")) fail("vcpkg_installed/ missing - run npm run setup");
+  // A release must use a tagged sbtl from its repo, never a local checkout
+  // (a [patch] left in some .cargo/config.toml) or an untagged commit.
+  const sbtl = sbtlSource();
+  if (!SBTL_PINNED.test(sbtl)) fail(`sbtl is not a tagged git dependency: ${sbtl}`);
   if (!existsSync("src-tauri/lib/libmpv-2.dll")) fail("src-tauri/lib/libmpv-2.dll missing - see src-tauri/lib/README.md");
   if (!args.skipBuild && !existsSync(KEY_PATH)) fail(`signing key not found at ${KEY_PATH}`);
   if (!args.dryRun && run("gh", ["release", "view", tag, "--repo", REPO], { allowFail: true }).ok) {

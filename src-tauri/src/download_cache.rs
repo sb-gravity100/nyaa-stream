@@ -1,6 +1,7 @@
 //! Download cache: played torrents' files stay in `downloads/` so a re-open
-//! reuses every verified piece (libtorrent re-hashes them on add), tracked in
-//! `downloads/.cache-index.json` - see PLAN.md "Download cache".
+//! reuses every verified piece (sbtl's resume file in `downloads/.sbtl/`, or
+//! a re-check on add), tracked in `downloads/.cache-index.json` - see PLAN.md
+//! "Download cache".
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -10,6 +11,10 @@ use serde::{Deserialize, Serialize};
 use torrent_engine::TorrentFile;
 
 const INDEX_FILE: &str = ".cache-index.json";
+/// sbtl's state directory in `downloads/` (DHT state, and per torrent its
+/// resume file and cached metadata). sbtl creates it once, at startup, so it
+/// is never an orphan and never pruned when it empties.
+const SBTL_DIR: &str = ".sbtl";
 /// Settings -> "Download cache" default.
 const DEFAULT_LIMIT_BYTES: u64 = 10 * 1024 * 1024 * 1024;
 
@@ -38,7 +43,7 @@ impl Index {
 struct Entry {
     /// What was played, for logs.
     name: String,
-    /// File paths relative to `downloads/`, as libtorrent lays them out.
+    /// File paths relative to `downloads/`, as the torrent lays them out.
     files: Vec<String>,
     /// Unix seconds; updated whenever a file of it starts streaming.
     last_used: u64,
@@ -118,10 +123,14 @@ impl DownloadCache {
         self.save(&index);
     }
 
-    /// Everything on disk that belongs to a torrent: its files and
-    /// libtorrent's part file (pieces of skipped files).
+    /// Everything on disk that belongs to a torrent: its files, sbtl's
+    /// resume file and cached metadata, and the part file libtorrent left
+    /// (pieces of skipped files) before sbtl replaced it.
     fn entry_paths(&self, info_hash: &str, entry: &Entry) -> Vec<PathBuf> {
         let mut paths: Vec<PathBuf> = entry.files.iter().map(|f| self.dir.join(Path::new(f))).collect();
+        let sbtl = self.dir.join(SBTL_DIR);
+        paths.push(sbtl.join(format!("{info_hash}.resume")));
+        paths.push(sbtl.join(format!("{info_hash}.torrent")));
         paths.push(self.dir.join(format!(".{info_hash}.parts")));
         paths
     }
@@ -129,9 +138,8 @@ impl DownloadCache {
     /// Top-level items in `downloads/` no index entry claims - left by
     /// versions before the index, or a crash before `touch`.
     fn orphans(&self, index: &Index) -> Vec<PathBuf> {
-        let mut claimed: Vec<std::ffi::OsString> = vec![INDEX_FILE.into(), format!("{INDEX_FILE}.tmp").into()];
-        for (hash, entry) in &index.torrents {
-            claimed.push(format!(".{hash}.parts").into());
+        let mut claimed: Vec<std::ffi::OsString> = vec![INDEX_FILE.into(), format!("{INDEX_FILE}.tmp").into(), SBTL_DIR.into()];
+        for entry in index.torrents.values() {
             for file in &entry.files {
                 if let Some(first) = Path::new(file).components().next() {
                     claimed.push(first.as_os_str().to_os_string());
@@ -162,7 +170,11 @@ impl DownloadCache {
             }
             let mut parent = path.parent();
             while let Some(dir) = parent {
-                if dir == self.dir || !dir.starts_with(&self.dir) || std::fs::remove_dir(dir).is_err() {
+                if dir == self.dir
+                    || dir == self.dir.join(SBTL_DIR)
+                    || !dir.starts_with(&self.dir)
+                    || std::fs::remove_dir(dir).is_err()
+                {
                     break;
                 }
                 parent = dir.parent();
@@ -325,8 +337,8 @@ impl DownloadCache {
     }
 }
 
-/// Bytes a file or directory tree actually occupies - libtorrent's files
-/// are sparse, so their length overstates a partial download.
+/// Bytes a file or directory tree actually occupies - torrent files are
+/// sparse, so their length overstates a partial download.
 fn disk_size(path: &Path) -> u64 {
     let Ok(meta) = std::fs::symlink_metadata(path) else {
         return 0;
@@ -402,6 +414,26 @@ mod tests {
         assert!(cache.dir.join("Show A/ep1.mkv").exists());
         assert!(cache.dir.join("leftover.mkv").exists());
         assert!(cache.dir.join(INDEX_FILE).exists());
+        let _ = std::fs::remove_dir_all(&cache.dir);
+    }
+
+    #[test]
+    fn sbtl_state_survives_orphan_sweep() {
+        let cache = cache("sbtl");
+        let sbtl = cache.dir.join(SBTL_DIR);
+        std::fs::create_dir_all(&sbtl).unwrap();
+        for name in ["dht.dat", "aaaa.resume", "aaaa.torrent", "bbbb.resume"] {
+            std::fs::write(sbtl.join(name), b"x").unwrap();
+        }
+        cache.set_limit(0);
+        cache.evict(Some("bbbb"), true, "test");
+        assert!(sbtl.join("dht.dat").exists(), "sbtl's state directory is not an orphan");
+        assert!(!sbtl.join("aaaa.resume").exists() && !sbtl.join("aaaa.torrent").exists(), "evicted torrent's sbtl files deleted");
+        assert!(sbtl.join("bbbb.resume").exists(), "playing torrent's resume file kept");
+        cache.clear(None).unwrap();
+        std::fs::remove_file(sbtl.join("dht.dat")).ok();
+        cache.discard_unindexed("cccc", &[file("ep2.mkv")]);
+        assert!(sbtl.is_dir(), "sbtl's directory is never pruned, even when empty");
         let _ = std::fs::remove_dir_all(&cache.dir);
     }
 

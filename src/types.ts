@@ -105,6 +105,18 @@ export interface SubtitleInfo {
   fonts: string[];
 }
 
+/** Verified data ahead of the player's newest read (sbtl backend only). */
+export interface BufferStatus {
+  level: "stalled" | "low" | "ready" | "full";
+  pos: number;
+  aheadBytes: number;
+  aheadMs: number;
+  readyMs: number;
+  etaReadyMs: number | null;
+  rate: number;
+  rateKnown: boolean;
+}
+
 export interface StreamStats {
   state: "initializing" | "live" | "paused" | "error";
   progressPercent: number;
@@ -143,6 +155,8 @@ export interface StreamStats {
     running: boolean;
     subtitleTracks: number;
   } | null;
+  /** null before the player reads. */
+  buffer?: BufferStatus | null;
 }
 
 /** AniList format MOVIE: one film, not episodes. */
