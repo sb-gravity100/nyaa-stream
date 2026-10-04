@@ -1592,6 +1592,7 @@ a pushed sbtl tag is never moved or re-created.
 | sbtl | nyaa commit | what changed |
 |---|---|---|
 | v0.1.0 | `250d871` | first tag: rename tl -> sbtl, public repo; one owner per torrent (duplicate-add use-after-free fix), on-disk file ranges, per-torrent upload limit |
+| v0.1.1 | (this commit) | magnet metadata no longer waits 10 s on a silent peer (engine_smoke on BBB: metadata 12.4 s -> 2.1 s median); MP4/MKV index and `media_probe` (nyaa leaves it off); shared-library build with an ABI check |
 
 ## sbtl_engine (v0.4.0 - replaced the vendored enginefs)
 

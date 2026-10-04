@@ -238,6 +238,7 @@ impl Torrent {
             sequential: true,
             idle: if foreground { sbtl::Idle::SeqAhead } else { sbtl::Idle::None },
             tail_prefetch: foreground,
+            media_probe: false, // sbtl's own container index: nyaa probes media itself (media.rs)
             bitrate: None,
             read_timeout: Some(READ_TIMEOUT),
         };
