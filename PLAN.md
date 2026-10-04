@@ -1761,6 +1761,25 @@ Python and run offline):
   of the entry it matched (a season-specific name pins the season, e.g.
   "The Second Plate"). Parser: `~` as a range separator, roman-numeral
   seasons, `SxxEaa-Ebb` as a range.
+- *Unsure → read the view page* (requested 2026-10-04). Some titles say
+  nothing about their contents. Example: `[Reza] Shokugeki no Souma
+  [BDRip 1080p HEVC FLAC] (Dual Audio) (Food Wars)` (157 GiB) has no
+  season, episode or "batch". Its view page (`/view/1465193`) does: folders
+  `Season 1`…`Season 5`, 91 files `[Reza] Food Wars S01E01.mkv` …
+  `S05E13.mkv`. `get_torrent_details_batch` already scrapes view pages for
+  unresolved titles, but `TorrentDetails` keeps only `file_count`. Extend
+  it with the file list (path incl. folders, size) and parse each file name
+  with the same season/episode rules (a folder name like `Season 2` gives
+  the files under it their season). The release's seasons are the union.
+  It is kept for the browsed entry if that union contains the entry's
+  season, as a batch whose matching files are known (so play can pick the
+  right file index), and dropped otherwise.
+  *Unsure* means a release that matched but whose title gives no season
+  marker and no episode number, or matched only via a sibling-ambiguous
+  name. It also covers what the title-only rules mis-assign (`[ASW]
+  Mushoku Tensei (Batch)`). Scrapes are cached per release id in the
+  nyaa-client store (`store.rs`), so each view page is fetched once ever,
+  under the existing throttle and bounded concurrency.
 
 Prototype results on the crawls: Mushoku S3 266 → **375/375**. Slime S4
 drops the 9 wrong-season batches it used to accept. Slime S2/S3 pages
@@ -1772,8 +1791,7 @@ as separate entries (Mushoku S1 vs "Cour 2", S2 vs "Season 2 Part 2").
 They share a season number, so both still get both cours' releases (same
 as today). Groups that number seasons differently from AniList
 (`[Cleo] … San no Sara - Toutsuki Ressha-hen | Food Wars! S4`) still
-mis-assign. Releases with no marker and no episode number (`[ASW]
-Mushoku Tensei (Batch)`) still go to season 1.
+mis-assign, unless their file names say otherwise (view-page scrape).
 
 **Test data**: titles (+ sizes) from the crawls are committed as fixtures
 (`src-tauri/tests/fixtures/nyaa_titles/`), with expected entry/season per

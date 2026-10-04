@@ -94,6 +94,10 @@
   - [ ] `episodeParser.ts`: `~` ranges, roman-numeral seasons,
         `SxxEaa-Ebb` ranges
   - [ ] No-episode matched release → season batch of the matched entry
+  - [ ] `TorrentDetails` file list (paths, folders, sizes) + per-release
+        cache in `store.rs`
+  - [ ] Unsure releases resolved from their file names (season union,
+        matching file indexes)
   - [ ] Live check (Mushoku S1-S3, Slime S2-S4, Food Wars S1/S2) via
         `search_debug`
   - [ ] `chore: release v0.4.2` + tag (publish decision: see Release plan)
