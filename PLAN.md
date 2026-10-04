@@ -103,8 +103,11 @@ MSVC and LLVM are still required to build.
 
 Building the workspace requires, beyond Rust/Node:
 - A working MSVC toolchain (Visual Studio 2022 Build Tools or full IDE)
-- LLVM: `clang-cl` compiles sbtl's C sources (`sbtl-sys`'s build.rs, which
-  falls back to MSVC `cl.exe /std:c11`), and bindgen needs libclang
+- LLVM: bindgen needs libclang. sbtl itself is linked as the prebuilt
+  `native/sbtl/sbtl.dll` (see "sbtl versions and updates"), so `clang-cl`
+  is only needed to rebuild that DLL or when `SBTL_PREBUILT_DIR` is unset
+  (`sbtl-sys`'s build.rs then compiles the C sources, falling back to MSVC
+  `cl.exe /std:c11`)
 - Network access to github.com on the first build: cargo fetches sbtl
   (public repo, tagged) - see "sbtl backend" for how its versions are
   pinned
@@ -1583,16 +1586,23 @@ a pushed sbtl tag is never moved or re-created.
 - **Releasing an sbtl change:** in sbtl - commit, bump the workspace
   version (0.x: minor for API breaks, patch for fixes), tag `vX.Y.Z`,
   push the tag. In nyaa - change `tag`, `cargo update -p sbtl -p
-  sbtl-sys`, `cargo check --workspace`, `engine_smoke`, commit `chore:
-  sbtl vX.Y.Z` (one line on what changed), add a row below. nyaa never
-  pins an untagged sbtl commit.
+  sbtl-sys`, rebuild the DLL at that tag and replace `native/sbtl/*`
+  (`native/sbtl/README.md`), `cargo check --workspace`, `engine_smoke`,
+  commit `chore: sbtl vX.Y.Z` (one line on what changed), add a row below.
+  nyaa never pins an untagged sbtl commit.
+- **The DLL:** nyaa links `native/sbtl/sbtl.dll` (built with sbtl's `nyaa`
+  preset: no media indexer, nyaa probes media itself) instead of compiling
+  sbtl's C on every clean build; the bundle ships it beside the exe. A
+  mismatching DLL fails at session start (`sbtl_abi_version`), and
+  `scripts/release.mjs` refuses a release whose `native/sbtl/VERSION` is not
+  the pinned tag.
 - **API changes** come in pairs, in one sitting: the sbtl tag, then the
   nyaa adapter commit (nyaa is sbtl's only consumer).
 
 | sbtl | nyaa commit | what changed |
 |---|---|---|
 | v0.1.0 | `250d871` | first tag: rename tl -> sbtl, public repo; one owner per torrent (duplicate-add use-after-free fix), on-disk file ranges, per-torrent upload limit |
-| v0.1.1 | (this commit) | magnet metadata no longer waits 10 s on a silent peer (engine_smoke on BBB: metadata 12.4 s -> 2.1 s median); MP4/MKV index and `media_probe` (nyaa leaves it off); shared-library build with an ABI check |
+| v0.1.1 | `4c1e4bf` | magnet metadata no longer waits 10 s on a silent peer (engine_smoke on BBB: metadata 12.4 s -> 2.1 s median); MP4/MKV index and `media_probe` (nyaa leaves it off); shared-library build with an ABI check |
 
 ## sbtl_engine (v0.4.0 - replaced the vendored enginefs)
 

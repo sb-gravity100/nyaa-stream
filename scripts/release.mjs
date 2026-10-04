@@ -100,6 +100,12 @@ function preflight(args) {
   // (a [patch] left in some .cargo/config.toml) or an untagged commit.
   const sbtl = sbtlSource();
   if (!SBTL_PINNED.test(sbtl)) fail(`sbtl is not a tagged git dependency: ${sbtl}`);
+  // The committed sbtl.dll must be the build of the pinned tag (native/sbtl/README.md).
+  const pinnedTag = /\?tag=(v[^#)]+)#/.exec(sbtl)?.[1];
+  const dllTag = existsSync("native/sbtl/VERSION") ? readFileSync("native/sbtl/VERSION", "utf8").trim() : "";
+  if (!existsSync("native/sbtl/sbtl.dll") || dllTag !== pinnedTag) {
+    fail(`native/sbtl is ${dllTag || "missing"}, sbtl is pinned at ${pinnedTag} - rebuild the DLL (native/sbtl/README.md)`);
+  }
   if (!existsSync("src-tauri/lib/libmpv-2.dll")) fail("src-tauri/lib/libmpv-2.dll missing - see src-tauri/lib/README.md");
   if (!args.skipBuild && !existsSync(KEY_PATH)) fail(`signing key not found at ${KEY_PATH}`);
   if (!args.dryRun && run("gh", ["release", "view", tag, "--repo", REPO], { allowFail: true }).ok) {

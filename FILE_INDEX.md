@@ -57,6 +57,7 @@ yaa-stream.<date>.log`, last 7 kept - release builds have no console), app state
 | `crates/mpv-player/src/encode.rs` | `encode_clip`: libmpv encode mode (`--o`, H.264 encoder fallback chain, AAC) writes an A-B clip with the active subtitle track burned in through libass in the player's own style - what the FFmpeg export can't do | backend, mpv, export |
 | `crates/mpv-player/examples/encode_smoke.rs` | Scratch tool: encode a 3s clip of a video with a subtitle track burned in | backend, mpv, dev-tool |
 | `crates/mpv-player/examples/smoke.rs` | Scratch tool (`cargo run -p mpv-player --example smoke -- <libmpv-2.dll> [media]`): loads libmpv, round-trips properties, prints events | backend, mpv, dev-tool |
+| `native/sbtl/` | Prebuilt `sbtl.dll` + `sbtl_import.lib` (committed) that `sbtl-sys` links via `SBTL_PREBUILT_DIR` in `.cargo/config.toml`, and `VERSION` (the sbtl tag they were built from; `scripts/release.mjs` checks it). README says how to rebuild | build-config, native, sbtl |
 | `src-tauri/lib/` | Bundled native libs (`bundle.resources`): `libmpv-2.dll` (gitignored, see its README) | backend, build-config |
 | `crates/kitsu-client/src/lib.rs` | Kitsu API client: resolves AniList id → Kitsu id via the mapping endpoint, fetches wide backdrop banner + per-episode thumbnails | backend, metadata |
 | `crates/kitsu-client/src/anime.rs` | `search_anime` (text search, `include=mappings`) and `anime_by_anilist_id` - Kitsu anime carrying the AniList id they map to (unmapped entries dropped), for the AniList fallback | backend, metadata, fallback |

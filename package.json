@@ -8,7 +8,7 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "dev:sbtl-local": "tauri dev -- --config \"patch.'https://github.com/sb-gravity100/sbtl'.sbtl.path='../../sb_torrent/bindings/rust/sbtl'\"",
+    "dev:sbtl-local": "tauri dev -- --config \"patch.'https://github.com/sb-gravity100/sbtl'.sbtl.path='../../sb_torrent/bindings/rust/sbtl'\" --config \"env.SBTL_PREBUILT_DIR={value='../../sb_torrent/build/nyaa/bin', relative=true}\"",
     "bump": "node scripts/bump-version.mjs",
     "setup": "node scripts/fetch-native-deps.mjs",
     "release": "node scripts/release.mjs"
