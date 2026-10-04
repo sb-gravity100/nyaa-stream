@@ -1,3 +1,7 @@
+### `885e304` · 2026-10-04 · docs: plan season-aware source matching (v0.4.2)
+- `PLAN.md`
+- `PHASES.md`
+
 ### `e9cefff` · 2026-10-04 · chore: release v0.4.1
 - `package.json`
 - `src-tauri/Cargo.toml`
