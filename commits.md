@@ -1,3 +1,7 @@
+### `b818365` · 2026-10-04 · test: nyaa title fixtures for season-aware matching
+- `FILE_INDEX.md`
+- `src-tauri/tests/fixtures/nyaa_titles/franchises.json`
+
 ### `8a8ae2b` · 2026-10-04 · docs: plan view-page fallback for unsure releases
 - `PLAN.md`
 - `PHASES.md`
