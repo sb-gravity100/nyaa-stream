@@ -1,3 +1,25 @@
+### `e9cefff` · 2026-10-04 · chore: release v0.4.1
+- `package.json`
+- `src-tauri/Cargo.toml`
+- `src-tauri/tauri.conf.json`
+
+### `662f1ad` · 2026-10-04 · build: link sbtl as a prebuilt DLL (native/sbtl)
+- `native/sbtl/sbtl.dll`
+- `native/sbtl/sbtl_import.lib`
+- `native/sbtl/VERSION`
+- `native/sbtl/README.md`
+- `.cargo/config.toml`
+- `src-tauri/tauri.conf.json`
+- `scripts/release.mjs`
+- `package.json`
+- `PLAN.md`
+- `FILE_INDEX.md`
+
+### `4c1e4bf` · 2026-10-04 · chore: sbtl v0.1.1
+- `crates/sbtl-engine/Cargo.toml`
+- `crates/sbtl-engine/src/torrent.rs`
+- `PLAN.md`
+
 ### `c43ec45` · 2026-10-04 · fix(release): --notes-file for multi-line release notes
 - `scripts/release.mjs`
 - `CLAUDE.md`
