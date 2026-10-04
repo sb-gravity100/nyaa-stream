@@ -10,6 +10,10 @@ VCPKG_INSTALLED_DIR = { value = "vcpkg_installed", relative = true }
 # dependencies. bindgen needs libclang - a dev-machine default, overridden by
 # a real LIBCLANG_PATH environment variable.
 FFMPEG_DIR = { value = "vcpkg_installed/x64-windows-v3-static-md-release", relative = true }
+# sbtl is linked as a prebuilt DLL (committed in native/sbtl, see its README),
+# not compiled from C on every clean build. sbtl-sys copies sbtl.dll next to
+# the built executables; the bundle ships it beside the app (tauri.conf.json).
+SBTL_PREBUILT_DIR = { value = "native/sbtl", relative = true }
 LIBCLANG_PATH = "C:\\Program Files\\LLVM\\bin"
 
 [target.'cfg(all(windows, target_env = "msvc"))']
