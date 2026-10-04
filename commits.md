@@ -1,3 +1,7 @@
+### `b7dc2a0` · 2026-10-04 · docs: fold title analysis into the season-aware matching plan
+- `PHASES.md`
+- `PLAN.md`
+
 ### `3817e9d` · 2026-10-04 · docs: nyaa title format analysis
 - `FILE_INDEX.md`
 - `TITLE_ANALYSIS.md`
