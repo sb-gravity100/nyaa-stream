@@ -1,3 +1,7 @@
+### `3817e9d` · 2026-10-04 · docs: nyaa title format analysis
+- `FILE_INDEX.md`
+- `TITLE_ANALYSIS.md`
+
 ### `b818365` · 2026-10-04 · test: nyaa title fixtures for season-aware matching
 - `FILE_INDEX.md`
 - `src-tauri/tests/fixtures/nyaa_titles/franchises.json`
