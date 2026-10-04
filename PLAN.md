@@ -1696,6 +1696,90 @@ Found and fixed meanwhile: resume buffers never survived a save (a
 libtorrent-era partial download (Ep 3/7) reopened on sbtl, and a
 resume served from a resume buffer.
 
+## Season-aware source matching (planned, v0.4.2 - patch: fix)
+
+**Problem** (measured 2026-10-04 on nyaa.si crawls made with the
+`nyaasi_extractor` Chrome extension, a sibling project; matcher ported to
+Python and run offline):
+
+1. *Real releases dropped.* `matches_show` needs one of the entry's full
+   names as a contiguous phrase, but groups write the short name plus a
+   season marker: `[Breeze] Mushoku Tensei S03E12`, `[MiniMTBB] Mushoku
+   Tensei S3 - 14 | Jobless Reincarnation`, `[DKB] Mushoku Tensei: Isekai
+   Ittara Honki Dasu - S03E14`. Mushoku Tensei Season 3: **109 of 375**
+   real releases dropped (all carry an explicit S3 marker). On the query
+   side, the romaji `Mushoku Tensei III: Isekai…` keeps its `III` (only
+   "Season/Cour/Part" are stripped), and synonyms are never stripped
+   (`…3rd Season`), so the app's own queries return only 310 of the 375.
+   Season batches, which are named by season and not called "batch"
+   (`[SubsPlease] Mushoku Tensei S2`, `[RUDY] Mushoku Tensei S02`,
+   `[MTBB] Mushoku Tensei S1`, `[Lia] Mushoku Tensei (Season 1 - Part 1)`),
+   are dropped the same way.
+2. *Wrong-season releases kept.* The season-stripped base name ("That Time
+   I Got Reincarnated as a Slime") matches every season. Slime **Season 3**
+   accepts 658 Season 4 releases. Because episodes group by number, S4's
+   episodes then sit under S3's episode numbers. The Mushoku S3 page also
+   accepts S1 and S2 BD batches.
+3. *Seasons named without a number.* Food Wars! names its seasons "The
+   Second Plate" / "Ni no Sara" / … The S1 entry's name "Food Wars!" is a
+   prefix of every sequel's, so the S1 page accepts S2-S5 batches.
+   `episodeParser.ts` labels those batches `unknown` (37 of the 75 biggest
+   Food Wars releases), even though the matched name pins the season.
+4. *Parser gaps* (`episodeParser.ts`, same data): tilde ranges
+   (`01 ~ 11`, `00~12`) come out `unknown`; `Mushoku Tensei II … 00 ~ 12`
+   is labelled season 1 (roman numerals aren't read); `S02E00-E06` and
+   `S00E02-E03` are labelled single episodes, not ranges.
+
+**Fix** (`src-tauri/src/title_match.rs` + `episodeParser.ts`):
+
+- *Entry season number*: read from the entry's own titles ("Season N",
+  "Nth Season", "SN", a standalone roman numeral II-X after the name).
+  If there is none, use its position in the AniList TV prequel chain,
+  which is already walked for the absolute-episode offset. "Part/Cour N"
+  entries share their season's number.
+- *Season markers in a release*: `S03`, `S3`, `S03E12`, `Season 3`, `3rd
+  Season`, a roman numeral right after the name (`Mushoku Tensei II`), and
+  ranges/lists (`S01-S03`, `S1 - S5`, `Season 1+2`, `S1+SP`). Ranges are
+  parsed on the raw title, before `normalize` drops the separators. A
+  prototype that parsed normalized text read "2nd Season - 01 ~ 12" as
+  seasons 1-12.
+- *Matching rule*: reject a release whose markers name only other seasons.
+  Otherwise keep it if it has a full name (today's rule), or if it has a
+  short base name (the season-stripped name, the part before the first
+  `:`, roman numeral removed; min 2 words / 5 chars) plus a marker for
+  this season. A release with a base name and no marker counts as
+  season 1. Releases with no marker keep today's behaviour, because
+  absolute-numbered releases (Slime/Doomdos, JJK) depend on it.
+- *Sibling entries*: once the prequel/sequel chain's titles are known, a
+  release that matches a sibling's longer, more specific name ("Food Wars!
+  The Second Plate") belongs to that sibling. The longest name wins.
+- *Queries*: apply the same season stripping (with roman numerals) to
+  synonyms. For season ≥2 entries, add the short base name ("Mushoku
+  Tensei") as a candidate. Its words are a subset of the full names', so
+  `build_candidates` drops those, and the query count doesn't grow.
+- *Batches*: a matched release with no episode number is a season batch
+  of the entry it matched (a season-specific name pins the season, e.g.
+  "The Second Plate"). Parser: `~` as a range separator, roman-numeral
+  seasons, `SxxEaa-Ebb` as a range.
+
+Prototype results on the crawls: Mushoku S3 266 → **375/375**. Slime S4
+drops the 9 wrong-season batches it used to accept. Slime S2/S3 pages
+stop accepting 600+ S4 episodes. Food Wars and the sibling rule are
+specified here but not yet prototyped.
+
+**Not covered**: telling apart split cours of one season that AniList lists
+as separate entries (Mushoku S1 vs "Cour 2", S2 vs "Season 2 Part 2").
+They share a season number, so both still get both cours' releases (same
+as today). Groups that number seasons differently from AniList
+(`[Cleo] … San no Sara - Toutsuki Ressha-hen | Food Wars! S4`) still
+mis-assign. Releases with no marker and no episode number (`[ASW]
+Mushoku Tensei (Batch)`) still go to season 1.
+
+**Test data**: titles (+ sizes) from the crawls are committed as fixtures
+(`src-tauri/tests/fixtures/nyaa_titles/`), with expected entry/season per
+title for the Mushoku Tensei, Slime and Food Wars franchises. They're used
+by `title_match.rs` unit tests and an `episodeParser` check script.
+
 ## Known gaps / not yet implemented
 
 - (HLS fallback player only - mpv reads the file's real duration.) The

@@ -79,6 +79,24 @@
 - [x] Per-anime preferred fansub group memory (`releases.ts`): remembered
       once a release actually starts playing, preferred by the auto-pick
       when reasonably seeded, then preferred resolution, then seeders
+- [ ] Season-aware source matching - v0.4.2 (patch: fix), see PLAN.md
+      "Season-aware source matching". One commit each:
+  - [ ] Fixtures: crawled titles + expected entry/season
+        (`src-tauri/tests/fixtures/nyaa_titles/`)
+  - [ ] `title_match.rs`: release season markers (incl. raw-title ranges)
+        + entry season number from titles
+  - [ ] `title_match.rs`: reject other-season releases; base name +
+        matching marker accepted
+  - [ ] Entry season fallback + sibling names from the AniList prequel
+        chain; longest-name-wins assignment
+  - [ ] `build_candidates`: strip synonyms (roman numerals too), base-name
+        query for season ≥2
+  - [ ] `episodeParser.ts`: `~` ranges, roman-numeral seasons,
+        `SxxEaa-Ebb` ranges
+  - [ ] No-episode matched release → season batch of the matched entry
+  - [ ] Live check (Mushoku S1-S3, Slime S2-S4, Food Wars S1/S2) via
+        `search_debug`
+  - [ ] `chore: release v0.4.2` + tag (publish decision: see Release plan)
 
 ## Phase 3 — Playback quality of life
 - [x] Wire a video player to the media page: play button per episode row
