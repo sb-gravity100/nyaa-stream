@@ -6,7 +6,7 @@ edition.workspace = true
 [dependencies]
 # The torrent engine (https://github.com/sb-gravity100/sbtl), pinned by tag -
 # see PLAN.md "sbtl versions and updates" before changing it.
-sbtl = { git = "https://github.com/sb-gravity100/sbtl", tag = "v0.1.0", features = ["tokio"] }
+sbtl = { git = "https://github.com/sb-gravity100/sbtl", tag = "v0.1.1", features = ["tokio"] }
 tokio = { workspace = true }
 anyhow = { workspace = true }
 tracing = { workspace = true }
