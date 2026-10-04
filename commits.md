@@ -1,3 +1,7 @@
+### `8a8ae2b` · 2026-10-04 · docs: plan view-page fallback for unsure releases
+- `PLAN.md`
+- `PHASES.md`
+
 ### `885e304` · 2026-10-04 · docs: plan season-aware source matching (v0.4.2)
 - `PLAN.md`
 - `PHASES.md`
