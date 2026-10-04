@@ -1732,17 +1732,36 @@ Python and run offline):
 
 **Fix** (`src-tauri/src/title_match.rs` + `episodeParser.ts`):
 
-- *Entry season number*: read from the entry's own titles ("Season N",
-  "Nth Season", "SN", a standalone roman numeral II-X after the name).
-  If there is none, use its position in the AniList TV prequel chain,
-  which is already walked for the absolute-episode offset. "Part/Cour N"
-  entries share their season's number.
-- *Season markers in a release*: `S03`, `S3`, `S03E12`, `Season 3`, `3rd
-  Season`, a roman numeral right after the name (`Mushoku Tensei II`), and
-  ranges/lists (`S01-S03`, `S1 - S5`, `Season 1+2`, `S1+SP`). Ranges are
-  parsed on the raw title, before `normalize` drops the separators. A
-  prototype that parsed normalized text read "2nd Season - 01 ~ 12" as
-  seasons 1-12.
+Title formats this must handle are surveyed in `TITLE_ANALYSIS.md`
+(8,038 titles, 42 franchises). Section numbers below (§) refer to it.
+
+- *Entry season numbers are a set* (§5: groups number seasons
+  differently; Demon Slayer's Swordsmith Village is `S3` on Crunchyroll
+  and `S4` for Salieri/TVDB). The set holds:
+  - its TVDB season from Fribb/anime-lists (`anime-list-full.json`,
+    `anilist_id` → `season.tvdb`). The repo has no license, so the file is
+    fetched at runtime and cached on disk, refreshed weekly, not bundled.
+  - the number in its own AniList titles ("Season N", "Nth Season", "SN",
+    a roman numeral II-X after the name).
+  - its position in the AniList TV prequel chain (fallback when it isn't
+    in the dataset or we're offline). That chain is already walked for the
+    absolute-episode offset.
+
+  "Part/Cour N" entries share their season's number.
+- *Season markers in a release* (§2): `S03`, `S3`, `Season 3`, `3rd
+  Season`, a roman numeral right after a known name (`Mushoku Tensei II`,
+  `Mob Psycho 100 III`, but not `Infinity Castle I`), `S04Part01`, and
+  multi-season packs (`S01-S04`, `S1-3`, `S01-05`, `Season 1-4`,
+  `Season 1 - 3`, `S1+S2+S3`, `Season 01 + Season 02`, `ALL SEASONS`).
+  Ranges are parsed on the raw title, before `normalize` drops the
+  separators: a prototype that parsed normalized text read "2nd Season -
+  01 ~ 12" as seasons 1-12. `Season N - M` (Doomdos) is season N,
+  episode M, not a range. **An `SxxEyy` marker outranks every other
+  marker**: VARYG writes `S04E03 … (… 3rd Season)`.
+- *Normalization* (§4): apostrophes (`'`, `’`, `` ` ``) are removed, not
+  separators. Today `Journey's` becomes `journey s`, so `Frieren Beyond
+  Journeys End` never matches; same for `God's`/`Gods` (Konosuba). Glued
+  numbers on a known name (`danmachi5`) split off.
 - *Matching rule*: reject a release whose markers name only other seasons.
   Otherwise keep it if it has a full name (today's rule), or if it has a
   short base name (the season-stripped name, the part before the first
@@ -1759,8 +1778,25 @@ Python and run offline):
   `build_candidates` drops those, and the query count doesn't grow.
 - *Batches*: a matched release with no episode number is a season batch
   of the entry it matched (a season-specific name pins the season, e.g.
-  "The Second Plate"). Parser: `~` as a range separator, roman-numeral
-  seasons, `SxxEaa-Ebb` as a range.
+  "The Second Plate").
+- *Parser fixes* (`episodeParser.ts`, §1-§2, with counts of titles that
+  are wrong today):
+  - roman-numeral seasons: 265 `Mob Psycho 100 III - 10` episodes are
+    filed as season 1.
+  - multi-season packs read as one episode (98).
+  - `~` ranges, `01 ~ 25` / `[1~25]` / `00~12`: 113 unknown.
+  - `Nth Season` titles: 43 unknown.
+  - `SxxEaa-bb` / `SxxEaa-Ebb` / `SxxEaa~Ebb` read as one episode (45).
+  - CJK `第19话/話/集` episodes read as batches (45).
+  - `Sx - ep` read as a batch (48).
+  - `Season 04 - 32-36` read as one episode.
+  - `#23` episodes; `.5` episodes kept off the number grid.
+- *Kinds kept off a TV season's episode grid* (§3): movies, OVA/OAD/ONA/
+  specials, `S00`, recaps and re-edits (`Chronicle`, `Shin Henshuu-ban`).
+  They go to their own AniList entry by name (longest name wins). A TV
+  entry keeps them only inside a multi-season pack that names its season.
+  Spin-offs that share the name (`Mr. Ginpachi's Zany Class`, `Gun Gale
+  Online`, `Junior High`) are routed the same way.
 - *Unsure → read the view page* (requested 2026-10-04). Some titles say
   nothing about their contents. Example: `[Reza] Shokugeki no Souma
   [BDRip 1080p HEVC FLAC] (Dual Audio) (Food Wars)` (157 GiB) has no
@@ -1775,8 +1811,9 @@ Python and run offline):
   season, as a batch whose matching files are known (so play can pick the
   right file index), and dropped otherwise.
   *Unsure* means a release that matched but whose title gives no season
-  marker and no episode number, or matched only via a sibling-ambiguous
-  name. It also covers what the title-only rules mis-assign (`[ASW]
+  marker and no episode number (828 titles, 10% of the survey: §6), or
+  matched only via a sibling-ambiguous name, or whose season marker is in
+  two siblings' sets. It also covers what the title-only rules mis-assign (`[ASW]
   Mushoku Tensei (Batch)`). Scrapes are cached per release id in the
   nyaa-client store (`store.rs`), so each view page is fetched once ever,
   under the existing throttle and bounded concurrency.
@@ -1789,9 +1826,9 @@ specified here but not yet prototyped.
 **Not covered**: telling apart split cours of one season that AniList lists
 as separate entries (Mushoku S1 vs "Cour 2", S2 vs "Season 2 Part 2").
 They share a season number, so both still get both cours' releases (same
-as today). Groups that number seasons differently from AniList
-(`[Cleo] … San no Sara - Toutsuki Ressha-hen | Food Wars! S4`) still
-mis-assign, unless their file names say otherwise (view-page scrape).
+as today). Groups whose numbering is in neither TVDB nor the entry's own
+titles (`[Cleo] … San no Sara - Toutsuki Ressha-hen | Food Wars! S4`; TVDB
+says 3) still mis-assign unless the name or file names say otherwise.
 
 **Test data**: titles (+ sizes) from the crawls are committed as fixtures
 (`src-tauri/tests/fixtures/nyaa_titles/`), with expected entry/season per

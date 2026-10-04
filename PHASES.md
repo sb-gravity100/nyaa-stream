@@ -81,18 +81,25 @@
       when reasonably seeded, then preferred resolution, then seeders
 - [ ] Season-aware source matching - v0.4.2 (patch: fix), see PLAN.md
       "Season-aware source matching". One commit each:
-  - [ ] Fixtures: crawled titles + expected entry/season
+  - [x] Fixtures: crawled titles + expected entry/season
         (`src-tauri/tests/fixtures/nyaa_titles/`)
-  - [ ] `title_match.rs`: release season markers (incl. raw-title ranges)
-        + entry season number from titles
+  - [x] Title format survey (`TITLE_ANALYSIS.md`)
+  - [ ] `title_match.rs`: apostrophe-removing normalization
+  - [ ] `title_match.rs`: release season markers (raw-title ranges,
+        multi-season packs, `SxxEyy` precedence) + entry season numbers
+        from titles
   - [ ] `title_match.rs`: reject other-season releases; base name +
         matching marker accepted
+  - [ ] TVDB season numbers: fetch + cache Fribb/anime-lists, entry
+        season set
   - [ ] Entry season fallback + sibling names from the AniList prequel
-        chain; longest-name-wins assignment
+        chain; longest-name-wins assignment, kinds (movie/OVA/special)
+        routed to their own entries
   - [ ] `build_candidates`: strip synonyms (roman numerals too), base-name
         query for season ≥2
-  - [ ] `episodeParser.ts`: `~` ranges, roman-numeral seasons,
-        `SxxEaa-Ebb` ranges
+  - [ ] `episodeParser.ts`: the TITLE_ANALYSIS §1-§2 fixes (roman
+        seasons, multi-season packs, `~` ranges, `Nth Season`,
+        `SxxEaa-bb`, CJK episodes, `Sx - ep`, `#ep`, `.5`)
   - [ ] No-episode matched release → season batch of the matched entry
   - [ ] `TorrentDetails` file list (paths, folders, sizes) + per-release
         cache in `store.rs`
