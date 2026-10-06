@@ -4,7 +4,7 @@ import { getSettings as getSettingsSnapshot } from "./settings";
 import {
   episodeLabelText,
   extractSeasonNumber,
-  parseEpisode,
+  labelOf,
   parseSubmitterFromTitle,
   type EpisodeLabel,
 } from "./episodeParser";
@@ -70,7 +70,7 @@ const SERIES_PACK = /\b(batch|complete|season\s*\d|s\d{1,2})\b|\d{1,3}\s*[-~]\s*
 function movieSources(sources: NyaaResult[]): [string, { label: EpisodeLabel; releases: NyaaResult[] }][] {
   const releases = sources.filter((source) => {
     if (MOVIE_TITLE.test(source.title)) return true;
-    const parsed = parseEpisode(source.title);
+    const parsed = labelOf(source.label, source.title);
     if (parsed.kind === "episode") return false;
     return !SERIES_PACK.test(source.title);
   });
@@ -443,7 +443,7 @@ function App() {
     // nyaa.si scrape). Scraping only the leftover ambiguous titles cuts
     // requests to nyaa.si from one-per-result down to a handful.
     const needsScrape = results.filter(
-      (r) => parseSubmitterFromTitle(r.title) === null || parseEpisode(r.title).kind === "unknown",
+      (r) => parseSubmitterFromTitle(r.title) === null || labelOf(r.label, r.title).kind === "unknown",
     );
     if (needsScrape.length === 0) {
       console.debug("[get_torrent_details_batch] skipped, nothing ambiguous", { total: results.length });
@@ -512,11 +512,11 @@ function App() {
     // episode (Frieren's "S02E05"), not this entry's.
     const seasonOneNumbers = new Set<number>();
     for (const source of sources) {
-      const label = parseEpisode(source.title);
+      const label = labelOf(source.label, source.title);
       if (label.kind === "episode" && label.season === 1) seasonOneNumbers.add(label.number);
     }
     for (const source of sources) {
-      const parsed = parseEpisode(source.title);
+      const parsed = labelOf(source.label, source.title);
       // The title-regex parser can't tell a batch apart from a genuinely
       // unparseable title. When we have ground truth from the torrent's
       // view page (file_count > 1), trust that over the "Unknown" guess.
@@ -570,7 +570,7 @@ function App() {
       // exists, so a part 2 that numbers on as "S02E13" still shows.
       if (
         currentAnimeSeason === 1 &&
-        label.kind !== "unknown" &&
+        (label.kind === "episode" || label.kind === "batch") &&
         label.season > 1 &&
         (label.kind === "episode" ? seasonOneNumbers.has(label.number) : seasonOneNumbers.size > 0)
       ) {
@@ -580,7 +580,7 @@ function App() {
       // See currentAnimeSeason's doc comment - drop releases we're
       // confident belong to a different season of the same franchise
       // rather than this anime's own episodes.
-      if (currentAnimeSeason !== 1 && label.kind !== "unknown" && label.season !== currentAnimeSeason) {
+      if (currentAnimeSeason !== 1 && (label.kind === "episode" || label.kind === "batch") && label.season !== currentAnimeSeason) {
         continue;
       }
 

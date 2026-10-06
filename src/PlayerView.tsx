@@ -15,7 +15,7 @@ import { saveFrameThumbnail } from "./torrentThumbnail";
 import { loadingProgress } from "./loadingProgress";
 import { bestRelease, isBatchRelease, getAnimeResolution, getPreferredGroup, releaseBadges, releaseGroup, releaseResolution, seederHealth, setAnimeResolution, setPreferredGroup, sortReleases } from "./releases";
 import type { PreferredResolution } from "./settings";
-import { parseEpisode } from "./episodeParser";
+import { labelOf } from "./episodeParser";
 import { Buffering } from "./Buffering";
 import { StatisticsMenu } from "./StatisticsMenu";
 import { getSettings as getSettingsSnapshot, useSettings } from "./settings";
@@ -196,10 +196,10 @@ function resumeSourceMagnet(animeId: number, episodeKey: string): string | undef
 function nextEpisodeFile(files: PlayFile[], current: PlayFile): PlayFile | null {
    const videos = files.filter((f) => f.isVideo);
    if (videos.length < 2) return null;
-   const label = parseEpisode(baseName(current.name));
+   const label = labelOf(current.label, baseName(current.name));
    if (label.kind !== "episode") return null;
    const next = videos.filter((f) => {
-      const l = parseEpisode(baseName(f.name));
+      const l = labelOf(f.label, baseName(f.name));
       return l.kind === "episode" && l.number === label.number + 1;
    });
    return next.length > 0 ? next.reduce((a, b) => (b.length > a.length ? b : a)) : null;
@@ -216,7 +216,7 @@ function pickFile(
    const videos = files.filter((f) => f.isVideo);
    if (videos.length > 1 && episode != null) {
       const matches = videos.filter((f) => {
-         const label = parseEpisode(baseName(f.name));
+         const label = labelOf(f.label, baseName(f.name));
          return label.kind === "episode" && label.number === episode;
       });
       if (matches.length > 0) {
@@ -245,7 +245,7 @@ function pickFile(
 }
 
 function fileLabel(file: PlayFile): string {
-   const label = parseEpisode(baseName(file.name));
+   const label = labelOf(file.label, baseName(file.name));
    const prefix = label.kind === "episode" ? `Ep ${label.number} · ` : "";
    return `${prefix}${baseName(file.name)}`;
 }

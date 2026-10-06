@@ -1,3 +1,4 @@
+import type { EpisodeLabel } from "./episodeParser";
 export interface AnimeTitle {
   romaji: string | null;
   english: string | null;
@@ -39,6 +40,8 @@ export interface NyaaResult {
   seeders: number;
   leechers: number;
   published: string;
+  /** Parsed by the backend (release-parse); absent in the browser preview. */
+  label?: EpisodeLabel;
 }
 
 export interface TorrentDetails {
@@ -75,6 +78,8 @@ export interface PlayFile {
   hlsUrl: string;
   /** Raw Range-capable byte stream - what the embedded mpv opens. */
   streamUrl: string;
+  /** The file name's episode label, parsed by the backend. */
+  label?: EpisodeLabel;
 }
 
 export interface PlaySession {
