@@ -1,3 +1,18 @@
+### `2b639e8` · 2026-10-06 · feat: release-parse crate, faithful anitopy port (MPL-2.0)
+- `FILE_INDEX.md`
+- `crates/release-parse/Cargo.toml`
+- `crates/release-parse/LICENSE`
+- `crates/release-parse/README.md`
+- `crates/release-parse/examples/parse_lines.rs`
+- `crates/release-parse/src/element.rs`
+- `crates/release-parse/src/helper.rs`
+- `crates/release-parse/src/keyword.rs`
+- `crates/release-parse/src/lib.rs`
+- `crates/release-parse/src/number.rs`
+- `crates/release-parse/src/parser.rs`
+- `crates/release-parse/src/token.rs`
+- `crates/release-parse/src/tokenizer.rs`
+
 ### `2d1eabd` · 2026-10-06 · docs: plan release-parse crate (MPL-2.0 anitopy port)
 - `PHASES.md`
 - `PLAN.md`
