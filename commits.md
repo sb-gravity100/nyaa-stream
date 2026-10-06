@@ -1,3 +1,11 @@
+### `3289434` · 2026-10-06 · feat: EpisodeLabel from release-parse on search results and play files
+- `FILE_INDEX.md`
+- `crates/nyaa-client/Cargo.toml`
+- `crates/nyaa-client/src/label.rs`
+- `crates/nyaa-client/src/lib.rs`
+- `crates/nyaa-client/src/store.rs`
+- `src-tauri/src/lib.rs`
+
 ### `aeefab3` · 2026-10-06 · feat(release-parse): typed Release result + fixes from the episodeParser diff
 - `FILE_INDEX.md`
 - `crates/release-parse/README.md`
