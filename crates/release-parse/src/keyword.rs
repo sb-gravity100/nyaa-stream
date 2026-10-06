@@ -51,8 +51,8 @@ impl KeywordManager {
         m.add(DeviceCompatibility, UNIDENTIFIABLE, &["ANDROID"]);
         m.add(EpisodePrefix, DEFAULT, &["EP", "EP.", "EPS", "EPS.", "EPISODE", "EPISODE.", "EPISODES", "CAPITULO", "EPISODIO", "FOLGE"]);
         // anitopy writes '\x7B2C' meaning U+7B2C (第), but Python reads it
-        // as "{2C" - kept for parity here; fixed in the improvements.
-        m.add(EpisodePrefix, INVALID, &["E", "{2C"]);
+        // as "{2C", so its 第 prefix never matched. Fixed here.
+        m.add(EpisodePrefix, INVALID, &["E", "\u{7B2C}"]);
         m.add(FileExtension, DEFAULT, &["3GP", "AVI", "DIVX", "FLV", "M2TS", "MKV", "MOV", "MP4", "MPG", "OGM", "RM", "RMVB", "TS", "WEBM", "WMV"]);
         m.add(FileExtension, INVALID, &["AAC", "AIFF", "FLAC", "M4A", "MP3", "MKA", "OGG", "WAV", "WMA", "7Z", "RAR", "ZIP", "ASS", "SRT"]);
         m.add(Language, DEFAULT, &["ENG", "ENGLISH", "ESPANOL", "JAP", "PT-BR", "SPANISH", "VOSTFR"]);
