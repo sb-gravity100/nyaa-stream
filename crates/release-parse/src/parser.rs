@@ -14,6 +14,7 @@ use crate::Ctx;
 impl Ctx {
     pub(crate) fn parse_tokens(&mut self) -> bool {
         self.search_for_keywords();
+        self.search_for_cjk_seasons();
         self.search_for_isolated_numbers();
         self.search_for_episode_number();
         self.search_for_anime_title();

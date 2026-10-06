@@ -8,6 +8,7 @@
 //! season, episode, release group, resolution, ...). See README.md.
 
 mod element;
+mod extra;
 mod helper;
 mod keyword;
 mod number;
@@ -97,5 +98,20 @@ mod tests {
         let e = parse("[Erai-raws] Jujutsu Kaisen 2nd Season - 01 ~ 23 [1080p][BATCH][Multiple Subtitle]");
         assert_eq!(first(&e, Category::AnimeTitle), Some("Jujutsu Kaisen"));
         assert_eq!(e.get(Category::AnimeSeason), ["2"]);
+    }
+}
+
+#[cfg(test)]
+mod extra_tests {
+    use super::*;
+
+    #[test]
+    fn cjk_episode_and_season_counters() {
+        let e = parse("[Doomdos] - Re:ZERO -Starting Life in Another World- Season 4 - \u{7B2C}19\u{8BDD} - [1080p BILIBILI COM WEB-DL]");
+        assert_eq!(e.get(Category::EpisodeNumber), ["19"]);
+        assert_eq!(e.get(Category::AnimeSeason), ["4"]);
+        let e = parse("[CRUCiBLE] Oshi no Ko Season 2 (S02) (BD Remux 1080p FLAC H.264) [Dual Audio] | \u{7B2C}2\u{671F}");
+        assert!(e.get(Category::EpisodeNumber).is_empty());
+        assert!(e.get(Category::AnimeSeason).iter().all(|s| s.trim_start_matches('0') == "2"));
     }
 }

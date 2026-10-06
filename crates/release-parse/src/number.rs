@@ -254,11 +254,13 @@ impl Ctx {
         false
     }
 
+    /// Episode counters: 話 (anitopy), plus simplified 话 and 集 (Chinese
+    /// releases, e.g. Doomdos' `第19话`).
     fn match_japanese_counter_pattern(&mut self, word: &str, token: TokenId) -> bool {
-        if !word.ends_with('\u{8A71}') {
+        if !word.ends_with(['\u{8A71}', '\u{8BDD}', '\u{96C6}']) {
             return false;
         }
-        let Some(c) = re!("^(\\d{1,3})\u{8A71}$").captures(word) else { return false };
+        let Some(c) = re!("^(\\d{1,3})[\u{8A71}\u{8BDD}\u{96C6}]$").captures(word) else { return false };
         let n = c[1].to_string();
         self.set_episode_number(&n, token, false)
     }
