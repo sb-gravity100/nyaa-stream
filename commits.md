@@ -1,3 +1,7 @@
+### `a85585a` · 2026-10-06 · feat: build_dataset example (crawl JSON -> release database)
+- `FILE_INDEX.md`
+- `crates/nyaa-client/examples/build_dataset.rs`
+
 ### `1215b3b` · 2026-10-06 · feat: import a nyaa.si release database (Settings > Backup)
 - `FILE_INDEX.md`
 - `crates/nyaa-client/src/lib.rs`
