@@ -1733,8 +1733,8 @@ Python and run offline):
 **Fix** (`src-tauri/src/title_match.rs` + `episodeParser.ts`):
 
 **Parser design: anitopy-style, in Rust** (decided 2026-10-06). Release
-titles are parsed by one Rust module (`src-tauri/src/release_parse.rs`)
-modelled on [anitopy](https://github.com/igorcmoura/anitopy) (the Python
+titles are parsed by one Rust crate (`crates/release-parse`, a fork/port of
+anitopy 2.1.1, decided 2026-10-06), modelled on [anitopy](https://github.com/igorcmoura/anitopy) (the Python
 port of Anitomy). It tokenizes on brackets and delimiters, uses keyword
 tables (episode/season prefixes, video/audio/source terms, type words), and
 returns named elements: `title`, `seasons`, `episodes` (number or range),
@@ -1749,7 +1749,12 @@ TITLE_ANALYSIS cases: `Mob Psycho 100 III` (numeral stays in the title, no
 season), `01 ~ 12` (episode 01 only), `第19话` (no episode), `S01-04` /
 `Season 1-4` (episodes 1-4), `S04E29~E31` (nothing), and arc names left in
 the title (`Jujutsu Kaisen - Kaigyoku Gyokusetsu`). Those are added on top
-of its rules. It isn't a dependency: the design is copied, not the code.
+of its rules. The crate is a port, so it is a derived work: anitopy is
+**MPL-2.0**, so the crate's files are MPL-2.0 too, with headers, a
+`LICENSE` and an attribution in its README. MPL is per-file copyleft, so
+the rest of the app's licensing is unaffected. Tested against the existing
+fixtures (`src-tauri/tests/fixtures/nyaa_titles/`) plus the survey corpus
+with expected elements.
 
 Title formats this must handle are surveyed in `TITLE_ANALYSIS.md`
 (8,038 titles, 42 franchises). Section numbers below (§) refer to it.
