@@ -1,3 +1,7 @@
+### `ef939b7` · 2026-10-06 · test: nyaa title corpus fixture (10,151 titles)
+- `FILE_INDEX.md`
+- `src-tauri/tests/fixtures/nyaa_titles/corpus.txt`
+
 ### `58f203e` · 2026-10-06 · feat(release-parse): season ranges, roman-numeral seasons, ~ episode ranges
 - `crates/release-parse/src/extra.rs`
 - `crates/release-parse/src/lib.rs`
