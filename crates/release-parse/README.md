@@ -22,8 +22,19 @@ and the rest of nyaa-stream is unaffected.
    prefix is the literal string `{2C` (Python reads `'\x7B2C'` as `{` +
    `2C`), and searching back from the first token wraps around to the
    last.
-2. **Improvements** (next, see PLAN.md "Season-aware source matching"):
-   the TITLE_ANALYSIS.md fixes on top.
+2. **Improvements** (`src/extra.rs`, plus marked edits in the ported
+   modules): CJK episode/season counters (`第19话`, `第14～25話`, `第3期`),
+   roman-numeral seasons (`Mob Psycho 100 III`), season ranges and lists
+   (`S01-04`, `S1 - S5`, `(Season 1 - 3)`, `Season 1+2+Movies`), spaced
+   `~` episode ranges, 4-digit episodes (`S01E1180`, `0001-1155`),
+   `SxxEyy` seasons outranking alt-title seasons, audio channels / frame
+   rates / `H 264` not read as episodes, `Jujutsu Kaisen 0` not episode 0,
+   and the season-relative episode kept over an `Episode 93` absolute one.
+   Each was checked by reviewing every changed title in the 10,151-title
+   corpus (`src-tauri/tests/fixtures/nyaa_titles/corpus.txt`).
+3. **Typed result** (`src/release.rs`): `parse_release` → `Release`
+   (title, seasons, episode range, kind: episode / batch / movie /
+   special / unknown, extras, group, version), the shape the app uses.
 
 ## Differences from anitopy
 
