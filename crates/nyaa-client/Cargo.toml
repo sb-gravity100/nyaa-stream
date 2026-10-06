@@ -14,6 +14,8 @@ serde_json = { workspace = true }
 tracing = { workspace = true }
 scraper = "0.27.0"
 rusqlite = { version = "0.40.2", features = ["bundled"] }
+# Release title parsing for `EpisodeLabel` (MPL-2.0 anitopy port).
+release-parse = { path = "../release-parse" }
 
 [dev-dependencies]
 tracing-subscriber.workspace = true

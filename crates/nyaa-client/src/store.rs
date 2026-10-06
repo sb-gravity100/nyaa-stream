@@ -199,8 +199,10 @@ impl Store {
 }
 
 fn row_to_result(row: &rusqlite::Row<'_>) -> rusqlite::Result<NyaaResult> {
+    let title: String = row.get(0)?;
     Ok(NyaaResult {
-        title: row.get(0)?,
+        label: crate::EpisodeLabel::of(&title),
+        title,
         magnet: row.get(1)?,
         torrent_url: row.get(2)?,
         view_url: row.get(3)?,
@@ -225,6 +227,7 @@ mod tests {
             seeders,
             leechers: 0,
             published: "2026-01-01".into(),
+            label: Default::default(),
         }
     }
 
