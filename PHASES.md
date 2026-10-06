@@ -79,15 +79,30 @@
 - [x] Per-anime preferred fansub group memory (`releases.ts`): remembered
       once a release actually starts playing, preferred by the auto-pick
       when reasonably seeded, then preferred resolution, then seeders
-- [ ] Season-aware source matching - v0.4.2 (patch: fix), see PLAN.md
-      "Season-aware source matching". One commit each:
+- [ ] Release parsing + nyaa.si database import - v0.4.2 (patch: fix),
+      see PLAN.md "Season-aware source matching" (scope split 2026-10-06)
   - [x] Fixtures: crawled titles + expected entry/season
-        (`src-tauri/tests/fixtures/nyaa_titles/`)
+        (`src-tauri/tests/fixtures/nyaa_titles/`), 10,151-title corpus
   - [x] Title format survey (`TITLE_ANALYSIS.md`)
+  - [x] `crates/release-parse` (MPL-2.0 anitopy port): faithful port
+        (0 differences vs anitopy on 8,894 titles), then the
+        TITLE_ANALYSIS fixes, then the typed `Release`
+  - [x] `EpisodeLabel` on `NyaaResult` and play files; frontend uses it
+        (`labelOf`), `episodeParser.ts` parsing only as the browser
+        preview fallback; movie/special groups
+  - [ ] nyaa.si database import: `Store::import` (ATTACH, releases only,
+        fresher row wins, `words` recomputed), `import_nyaa_database`
+        command, Settings button
+  - [ ] Dataset: `build_dataset` example builds a release database from
+        crawl JSON (nyaasi_extractor output); today's crawls compiled
+  - [ ] `chore: release v0.4.2` + tag (publish decision: see Release plan)
+- [ ] Season-aware source matching - v0.4.3 (patch: fix), see PLAN.md
+      "Season-aware source matching". One commit each:
   - [ ] `title_match.rs`: apostrophe-removing normalization
-  - [ ] `title_match.rs`: release season markers (raw-title ranges,
+  - [ ] `title_match.rs`: release seasons from `release-parse` (incl.
         multi-season packs, `SxxEyy` precedence) + entry season numbers
-        from titles
+        from titles; matcher also checks the whole title (mixed-script
+        titles like `路人超能 100 第三季 / Mob Psycho 100 III`)
   - [ ] `title_match.rs`: reject other-season releases; base name +
         matching marker accepted
   - [ ] TVDB season numbers: fetch + cache Fribb/anime-lists, entry
@@ -97,13 +112,6 @@
         routed to their own entries
   - [ ] `build_candidates`: strip synonyms (roman numerals too), base-name
         query for season ≥2
-  - [ ] `crates/release-parse` (MPL-2.0 anitopy port): faithful port
-        first (tokenizer, keywords, number parsing), then elements (title,
-        seasons, episodes, kind, group, version) with the TITLE_ANALYSIS §1-§2 fixes (roman seasons, multi-season packs, `~`
-        ranges, `Nth Season`, `SxxEaa-bb`, CJK episodes, `Sx - ep`, `#ep`,
-        `.5`); fixture-tested
-  - [ ] Parsed elements on `NyaaResult`; frontend uses them instead of
-        `episodeParser.ts` parsing
   - [ ] No-episode matched release → season batch of the matched entry
   - [ ] `TorrentDetails` file list (paths, folders, sizes) + per-release
         cache in `store.rs`
@@ -111,7 +119,7 @@
         matching file indexes)
   - [ ] Live check (Mushoku S1-S3, Slime S2-S4, Food Wars S1/S2) via
         `search_debug`
-  - [ ] `chore: release v0.4.2` + tag (publish decision: see Release plan)
+  - [ ] `chore: release v0.4.3` + tag
 
 ## Phase 3 — Playback quality of life
 - [x] Wire a video player to the media page: play button per episode row
