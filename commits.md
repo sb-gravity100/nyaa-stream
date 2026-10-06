@@ -1,3 +1,14 @@
+### `aeefab3` · 2026-10-06 · feat(release-parse): typed Release result + fixes from the episodeParser diff
+- `FILE_INDEX.md`
+- `crates/release-parse/README.md`
+- `crates/release-parse/examples/labels.rs`
+- `crates/release-parse/src/element.rs`
+- `crates/release-parse/src/extra.rs`
+- `crates/release-parse/src/lib.rs`
+- `crates/release-parse/src/number.rs`
+- `crates/release-parse/src/parser.rs`
+- `crates/release-parse/src/release.rs`
+
 ### `ef939b7` · 2026-10-06 · test: nyaa title corpus fixture (10,151 titles)
 - `FILE_INDEX.md`
 - `src-tauri/tests/fixtures/nyaa_titles/corpus.txt`
