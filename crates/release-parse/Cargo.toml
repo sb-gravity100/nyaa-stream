@@ -1,0 +1,15 @@
+[package]
+name = "release-parse"
+version = "0.1.0"
+edition.workspace = true
+# A port of anitopy (MPL-2.0), so this crate's files are MPL-2.0 too - see
+# README.md and LICENSE. The rest of the workspace is unaffected.
+license = "MPL-2.0"
+
+[dependencies]
+regex = "1"
+unicode-normalization = "0.1"
+tracing = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
