@@ -1,3 +1,7 @@
+### `5bdd011` · 2026-10-06 · docs: plan anitopy-style release parser in Rust
+- `PHASES.md`
+- `PLAN.md`
+
 ### `b7dc2a0` · 2026-10-04 · docs: fold title analysis into the season-aware matching plan
 - `PHASES.md`
 - `PLAN.md`
