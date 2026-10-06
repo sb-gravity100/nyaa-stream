@@ -105,6 +105,9 @@ impl Ctx {
         }
         let number = content[number_begin..].to_string();
         match category {
+            // nyaa-stream: after 第 only a real counter counts ("第１夜" is
+            // not an episode).
+            Category::EpisodePrefix if prefix == "\u{7B2C}" => self.match_episode_patterns(&number, token),
             Category::EpisodePrefix => self.match_episode_patterns(&number, token) || self.set_episode_number(&number, token, false),
             Category::VolumePrefix => self.match_volume_patterns(&number, token) || self.set_volume_number(&number, token, false),
             Category::AnimeSeasonPrefix => self.set_season_number(&number, token),
@@ -186,7 +189,7 @@ impl Ctx {
     }
 
     fn match_season_and_episode_pattern(&mut self, word: &str, token: TokenId) -> bool {
-        let re = re!(r"(?i)^S?(\d{1,2})(?:-S?(\d{1,2}))?(?:x|[ ._-x]?E)(\d{1,3})(?:-E?(\d{1,3}))?(?:[vV](\d))?$");
+        let re = re!(r"(?i)^S?(\d{1,2})(?:-S?(\d{1,2}))?(?:x|[ ._-x]?E)(\d{1,3})(?:[-~]E?(\d{1,3}))?(?:[vV](\d))?$");
         let Some(c) = re.captures(word) else { return false };
         let g: Vec<Option<String>> = (0..6).map(|i| group(&c, i).map(str::to_string)).collect();
         self.elements.insert(Category::AnimeSeason, g[1].clone().unwrap());
@@ -260,9 +263,15 @@ impl Ctx {
         if !word.ends_with(['\u{8A71}', '\u{8BDD}', '\u{96C6}']) {
             return false;
         }
-        let Some(c) = re!("^(\\d{1,3})[\u{8A71}\u{8BDD}\u{96C6}]$").captures(word) else { return false };
+        // Also ranges: "14～25話"
+        let Some(c) = re!("^(\\d{1,3})(?:[~\u{FF5E}-](\\d{1,3}))?[\u{8A71}\u{8BDD}\u{96C6}]$").captures(word) else { return false };
         let n = c[1].to_string();
-        self.set_episode_number(&n, token, false)
+        let end = c.get(2).map(|m| m.as_str().to_string());
+        let ok = self.set_episode_number(&n, token, false);
+        if let (true, Some(end)) = (ok, end) {
+            self.set_episode_number(&end, token, false);
+        }
+        ok
     }
 
     pub(crate) fn match_episode_patterns(&mut self, word: &str, token: TokenId) -> bool {
