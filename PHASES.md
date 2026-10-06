@@ -97,9 +97,9 @@
         routed to their own entries
   - [ ] `build_candidates`: strip synonyms (roman numerals too), base-name
         query for season ≥2
-  - [ ] `release_parse.rs`: anitopy-style tokenizer + keyword tables +
-        elements (title, seasons, episodes, kind, group, version), with the
-        TITLE_ANALYSIS §1-§2 fixes (roman seasons, multi-season packs, `~`
+  - [ ] `crates/release-parse` (MPL-2.0 anitopy port): faithful port
+        first (tokenizer, keywords, number parsing), then elements (title,
+        seasons, episodes, kind, group, version) with the TITLE_ANALYSIS §1-§2 fixes (roman seasons, multi-season packs, `~`
         ranges, `Nth Season`, `SxxEaa-bb`, CJK episodes, `Sx - ep`, `#ep`,
         `.5`); fixture-tested
   - [ ] Parsed elements on `NyaaResult`; frontend uses them instead of
