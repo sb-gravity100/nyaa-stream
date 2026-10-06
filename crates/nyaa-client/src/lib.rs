@@ -1,6 +1,7 @@
 use scraper::{Html, Selector};
 use serde::{Deserialize, Serialize};
 
+mod label;
 mod cache;
 mod fansubbers;
 mod store;
@@ -10,6 +11,7 @@ use store::Store;
 use throttle::Throttle;
 
 pub use fansubbers::group_tag;
+pub use label::EpisodeLabel;
 pub use store::release_id;
 
 const NYAA_BASE_URL: &str = "https://nyaa.si";
@@ -24,6 +26,10 @@ pub struct NyaaResult {
     pub seeders: u32,
     pub leechers: u32,
     pub published: String,
+    /// What the title says it holds (episode / batch / movie / ...), parsed
+    /// once here so the frontend doesn't re-parse titles.
+    #[serde(default)]
+    pub label: EpisodeLabel,
 }
 
 /// Ground-truth batch/submitter info scraped from a torrent's nyaa.si view
@@ -373,7 +379,6 @@ impl NyaaClient {
             let leechers = cell_text(4).and_then(|s| s.parse().ok()).unwrap_or(0);
 
             results.push(NyaaResult {
-                title,
                 magnet,
                 torrent_url,
                 view_url,
@@ -381,6 +386,8 @@ impl NyaaClient {
                 seeders,
                 leechers,
                 published,
+                label: EpisodeLabel::of(&title),
+                title,
             });
         }
 
