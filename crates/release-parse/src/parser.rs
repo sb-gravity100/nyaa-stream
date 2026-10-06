@@ -15,6 +15,8 @@ impl Ctx {
     pub(crate) fn parse_tokens(&mut self) -> bool {
         self.search_for_keywords();
         self.search_for_cjk_seasons();
+        self.search_for_season_ranges();
+        self.search_for_roman_seasons();
         self.search_for_isolated_numbers();
         self.search_for_episode_number();
         self.search_for_anime_title();
@@ -111,6 +113,10 @@ impl Ctx {
         }
         self.elements.check_alt_number = self.elements.contains(Category::EpisodeNumber);
 
+        // nyaa-stream: "01 ~ 25"
+        if self.search_for_spaced_ranges(&tokens) {
+            return;
+        }
         // A known episode pattern has to be the episode number.
         if self.search_for_episode_patterns(&tokens) {
             return;
