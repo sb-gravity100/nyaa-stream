@@ -1,3 +1,7 @@
+### `2d1eabd` · 2026-10-06 · docs: plan release-parse crate (MPL-2.0 anitopy port)
+- `PHASES.md`
+- `PLAN.md`
+
 ### `5bdd011` · 2026-10-06 · docs: plan anitopy-style release parser in Rust
 - `PHASES.md`
 - `PLAN.md`
