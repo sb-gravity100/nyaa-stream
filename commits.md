@@ -1,3 +1,7 @@
+### `c1ddcf9` · 2026-10-06 · docs: plan v0.4.2 scope (parsing + db import), matching moves to v0.4.3
+- `PHASES.md`
+- `PLAN.md`
+
 ### `a46910f` · 2026-10-06 · feat: frontend uses backend release labels (movie/special groups)
 - `FILE_INDEX.md`
 - `src/App.tsx`
