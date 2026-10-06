@@ -1,6 +1,6 @@
 import type { NyaaResult } from "./types";
 import type { PreferredResolution } from "./settings";
-import { parseEpisode, parseSubmitterFromTitle } from "./episodeParser";
+import { labelOf, parseSubmitterFromTitle } from "./episodeParser";
 
 // localStorage map of AniList id -> fansub group last chosen for that
 // anime, so the next episode auto-picks the same group (consistent
@@ -117,7 +117,7 @@ function score(release: NyaaResult, prefs: ReleasePreferences): number {
 
 // Whether the title is a season/batch pack rather than one episode.
 export function isBatchRelease(release: NyaaResult): boolean {
-  return parseEpisode(release.title).kind === "batch";
+  return labelOf(release.label, release.title).kind === "batch";
 }
 
 // Healthy single-episode releases rank before healthy batches, which rank

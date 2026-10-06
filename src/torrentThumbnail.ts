@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { isTauriAvailable } from "./browserFallback";
-import { parseEpisode } from "./episodeParser";
+import { labelOf } from "./episodeParser";
 import type { AnimeTitle, NyaaResult } from "./types";
 
 // Module-level cache + in-flight dedupe, same pattern as kitsu.ts. Values
@@ -42,7 +42,7 @@ function cacheKey(anilistId: number, episode: number): string {
 // the most seeders for the fastest/most reliable minimal download.
 function pickCandidate(results: NyaaResult[], episode: number): NyaaResult | null {
   const matches = results.filter((r) => {
-    const label = parseEpisode(r.title);
+    const label = labelOf(r.label, r.title);
     return label.kind === "episode" && label.number === episode;
   });
   if (matches.length === 0) return null;

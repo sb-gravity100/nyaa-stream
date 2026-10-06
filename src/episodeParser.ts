@@ -168,10 +168,21 @@ export function extractSeasonNumber(title: string): number {
 // its own bucket instead of sharing "Batch" with them.
 const BATCH_EXTRAS_PATTERN = /\bS\d{1,2}\s*\+\s*\S|\+\s*(?:movies?|films?|specials?|tv\s*specials?|ovas?|oads?|extras?|bonus)/i;
 
+// `seasons`: every season the title names (set by the backend parser).
 export type EpisodeLabel =
-  | { kind: "episode"; season: number; number: number }
-  | { kind: "batch"; season: number; episodeRange: [number, number] | null; extras?: boolean }
+  | { kind: "episode"; season: number; number: number; seasons?: number[] }
+  | { kind: "batch"; season: number; episodeRange: [number, number] | null; extras?: boolean; seasons?: number[] }
+  | { kind: "movie" }
+  | { kind: "special" }
   | { kind: "unknown" };
+
+/** A release's or file's label: the one the backend parsed (release-parse,
+ * attached to search results and play files), else this file's regex
+ * parser on `text` (the browser preview has no backend). A copy, since
+ * callers adjust episode numbers in place. */
+export function labelOf(label: EpisodeLabel | undefined, text: string): EpisodeLabel {
+  return label ? { ...label } : parseEpisode(text);
+}
 
 function batchLabel(title: string, withRange = true): Extract<EpisodeLabel, { kind: "batch" }> {
   const label: Extract<EpisodeLabel, { kind: "batch" }> = { kind: "batch", season: extractSeasonNumber(title), episodeRange: withRange ? extractEpisodeRange(title) : null };
@@ -237,6 +248,10 @@ export function episodeLabelText(label: EpisodeLabel): string {
     case "batch":
       if (label.season === FINAL_SEASON_NUMBER) return label.extras ? "Final Season Batch + extras" : "Final Season Batch";
       return `${label.season === 1 ? "Batch" : `Season ${label.season} Batch`}${label.extras ? " + extras" : ""}`;
+    case "movie":
+      return "Movie";
+    case "special":
+      return "Specials";
     case "unknown":
       return "Unknown";
   }

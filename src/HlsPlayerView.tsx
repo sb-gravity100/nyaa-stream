@@ -10,7 +10,7 @@ import { getStreamStats, getSubtitleTracks, playMagnet, reportDecoderSupport, st
 import { saveFrameThumbnail } from "./torrentThumbnail";
 import { loadingProgress } from "./loadingProgress";
 import { bestRelease, codecPlayable, getPreferredGroup, releaseCodec, releaseGroup, releaseResolution, setPreferredGroup, sortReleases } from "./releases";
-import { parseEpisode } from "./episodeParser";
+import { labelOf } from "./episodeParser";
 import { Buffering } from "./Buffering";
 import { StatisticsMenu } from "./StatisticsMenu";
 import { getSettings as getSettingsSnapshot, useSettings } from "./settings";
@@ -163,7 +163,7 @@ function pickFile(
    const videos = files.filter((f) => f.isVideo);
    if (videos.length > 1 && episode != null) {
       const matches = videos.filter((f) => {
-         const label = parseEpisode(baseName(f.name));
+         const label = labelOf(f.label, baseName(f.name));
          return label.kind === "episode" && label.number === episode;
       });
       if (matches.length > 0) {
@@ -192,7 +192,7 @@ function pickFile(
 }
 
 function fileLabel(file: PlayFile): string {
-   const label = parseEpisode(baseName(file.name));
+   const label = labelOf(file.label, baseName(file.name));
    const prefix = label.kind === "episode" ? `Ep ${label.number} · ` : "";
    return `${prefix}${baseName(file.name)}`;
 }
