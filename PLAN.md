@@ -1696,7 +1696,26 @@ Found and fixed meanwhile: resume buffers never survived a save (a
 libtorrent-era partial download (Ep 3/7) reopened on sbtl, and a
 resume served from a resume buffer.
 
-## Season-aware source matching (planned, v0.4.2 - patch: fix)
+## Season-aware source matching (v0.4.2 parsing + db import; v0.4.3 matching - patch: fix)
+
+**Scope split (2026-10-06).** v0.4.2 ships the parsing half: the
+`release-parse` crate (below), `EpisodeLabel` on every search result and
+play file, and importing a nyaa.si release database. v0.4.3 does the
+matching half: season sets, TVDB seasons, sibling routing, and view-page
+file lists.
+
+**Importing a nyaa.si database** (v0.4.2). Settings → "Import nyaa.si
+database" picks a SQLite file with nyaa-stream's own `releases` schema
+(`store.rs`), for example one built by the `build_dataset` example from
+nyaasi_extractor crawl JSON. `Store::import` ATTACHes it and upserts its
+`releases` rows by nyaa id. A row already stored wins unless the imported
+one is fresher (`updated_at`). `words` is recomputed, not trusted.
+`searches` / `search_hits` are *not* imported: they claim "this query was
+fetched at T", which only holds for this app's own fetches. Imported
+releases still answer `search_local` (offline/429 fallback, instant first
+results). Files without a compatible `releases` table are refused with a
+message.
+
 
 **Problem** (measured 2026-10-04 on nyaa.si crawls made with the
 `nyaasi_extractor` Chrome extension, a sibling project; matcher ported to
