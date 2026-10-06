@@ -1,3 +1,9 @@
+### `58f203e` · 2026-10-06 · feat(release-parse): season ranges, roman-numeral seasons, ~ episode ranges
+- `crates/release-parse/src/extra.rs`
+- `crates/release-parse/src/lib.rs`
+- `crates/release-parse/src/number.rs`
+- `crates/release-parse/src/parser.rs`
+
 ### `dbfb06a` · 2026-10-06 · feat(release-parse): CJK episode (第N话/集) and season (第N期/季) counters
 - `crates/release-parse/src/extra.rs`
 - `crates/release-parse/src/keyword.rs`
