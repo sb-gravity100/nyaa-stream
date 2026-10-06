@@ -97,9 +97,13 @@
         routed to their own entries
   - [ ] `build_candidates`: strip synonyms (roman numerals too), base-name
         query for season ≥2
-  - [ ] `episodeParser.ts`: the TITLE_ANALYSIS §1-§2 fixes (roman
-        seasons, multi-season packs, `~` ranges, `Nth Season`,
-        `SxxEaa-bb`, CJK episodes, `Sx - ep`, `#ep`, `.5`)
+  - [ ] `release_parse.rs`: anitopy-style tokenizer + keyword tables +
+        elements (title, seasons, episodes, kind, group, version), with the
+        TITLE_ANALYSIS §1-§2 fixes (roman seasons, multi-season packs, `~`
+        ranges, `Nth Season`, `SxxEaa-bb`, CJK episodes, `Sx - ep`, `#ep`,
+        `.5`); fixture-tested
+  - [ ] Parsed elements on `NyaaResult`; frontend uses them instead of
+        `episodeParser.ts` parsing
   - [ ] No-episode matched release → season batch of the matched entry
   - [ ] `TorrentDetails` file list (paths, folders, sizes) + per-release
         cache in `store.rs`

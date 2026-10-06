@@ -1732,6 +1732,25 @@ Python and run offline):
 
 **Fix** (`src-tauri/src/title_match.rs` + `episodeParser.ts`):
 
+**Parser design: anitopy-style, in Rust** (decided 2026-10-06). Release
+titles are parsed by one Rust module (`src-tauri/src/release_parse.rs`)
+modelled on [anitopy](https://github.com/igorcmoura/anitopy) (the Python
+port of Anitomy). It tokenizes on brackets and delimiters, uses keyword
+tables (episode/season prefixes, video/audio/source terms, type words), and
+returns named elements: `title`, `seasons`, `episodes` (number or range),
+`kind`, `group`, `version`. Both the matcher (`title_match.rs` compares the
+extracted `title` against AniList names, not the whole string) and the
+frontend (the elements ride along on `NyaaResult`, replacing the parsing
+in `episodeParser.ts`) use it, so the two can't disagree.
+
+anitopy itself, run over the 8,038-title corpus: it gets `2nd Season`,
+`S04E29-31`, `S3 - 12`, `Movie`/`OVA` right. It gets wrong exactly the
+TITLE_ANALYSIS cases: `Mob Psycho 100 III` (numeral stays in the title, no
+season), `01 ~ 12` (episode 01 only), `第19话` (no episode), `S01-04` /
+`Season 1-4` (episodes 1-4), `S04E29~E31` (nothing), and arc names left in
+the title (`Jujutsu Kaisen - Kaigyoku Gyokusetsu`). Those are added on top
+of its rules. It isn't a dependency: the design is copied, not the code.
+
 Title formats this must handle are surveyed in `TITLE_ANALYSIS.md`
 (8,038 titles, 42 franchises). Section numbers below (§) refer to it.
 
