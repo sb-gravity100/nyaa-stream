@@ -1,3 +1,10 @@
+### `1215b3b` · 2026-10-06 · feat: import a nyaa.si release database (Settings > Backup)
+- `FILE_INDEX.md`
+- `crates/nyaa-client/src/lib.rs`
+- `crates/nyaa-client/src/store.rs`
+- `src-tauri/src/lib.rs`
+- `src/SettingsPanel.tsx`
+
 ### `c1ddcf9` · 2026-10-06 · docs: plan v0.4.2 scope (parsing + db import), matching moves to v0.4.3
 - `PHASES.md`
 - `PLAN.md`
