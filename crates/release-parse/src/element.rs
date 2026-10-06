@@ -108,6 +108,9 @@ impl Category {
 pub struct Elements {
     items: Vec<(Category, Vec<String>)>,
     pub(crate) check_alt_number: bool,
+    /// nyaa-stream: seasons from an `SxxEyy` marker, which outrank every
+    /// other season marker (VARYG writes `S04E03 (... 3rd Season)`).
+    pub(crate) episode_seasons: Vec<String>,
 }
 
 impl Elements {
@@ -146,6 +149,10 @@ impl Elements {
 
     pub fn first(&self, category: Category) -> Option<&str> {
         self.get(category).first().map(String::as_str)
+    }
+
+    pub fn episode_seasons(&self) -> &[String] {
+        &self.episode_seasons
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (Category, &[String])> {

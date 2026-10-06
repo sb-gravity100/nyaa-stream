@@ -171,7 +171,7 @@ impl Ctx {
     }
 
     fn match_multi_episode_pattern(&mut self, word: &str, token: TokenId) -> bool {
-        let Some(c) = re!(r"^(\d{1,3})(?:[vV](\d))?[-~&+](\d{1,3})(?:[vV](\d))?$").captures(word) else { return false };
+        let Some(c) = re!(r"^(\d{1,4})(?:[vV](\d))?[-~&+]E?(\d{1,4})(?:[vV](\d))?$").captures(word) else { return false };
         let (lower, upper) = (c[1].to_string(), c[3].to_string());
         let (v1, v2) = (group(&c, 2).map(str::to_string), group(&c, 4).map(str::to_string));
         // Avoid matching expressions such as "009-1" or "5-2"
@@ -189,12 +189,14 @@ impl Ctx {
     }
 
     fn match_season_and_episode_pattern(&mut self, word: &str, token: TokenId) -> bool {
-        let re = re!(r"(?i)^S?(\d{1,2})(?:-S?(\d{1,2}))?(?:x|[ ._-x]?E)(\d{1,3})(?:[-~]E?(\d{1,3}))?(?:[vV](\d))?$");
+        let re = re!(r"(?i)^S?(\d{1,2})(?:-S?(\d{1,2}))?(?:x|[ ._-x]?E)(\d{1,4})(?:[-~](?:S\d{1,2})?E?(\d{1,4}))?(?:[vV](\d))?$");
         let Some(c) = re.captures(word) else { return false };
         let g: Vec<Option<String>> = (0..6).map(|i| group(&c, i).map(str::to_string)).collect();
         self.elements.insert(Category::AnimeSeason, g[1].clone().unwrap());
+        self.elements.episode_seasons.push(g[1].clone().unwrap());
         if let Some(s) = &g[2] {
             self.elements.insert(Category::AnimeSeason, s.clone());
+            self.elements.episode_seasons.push(s.clone());
         }
         self.set_episode_number(g[3].as_deref().unwrap(), token, false);
         if let Some(e) = &g[4] {
@@ -441,6 +443,11 @@ impl Ctx {
             if index == 0 || self.tok(token).enclosed {
                 continue;
             }
+            // nyaa-stream: a bare 0 here is part of the name ("Jujutsu
+            // Kaisen 0"); real episode 0s come as "- 00" or "S02E00".
+            if self.tok(token).content == "0" {
+                continue;
+            }
             // Not the first non-enclosed, non-delimiter token either.
             if self.tokens[..index].iter().all(|t| t.enclosed || t.category == TokenCategory::Delimiter) {
                 continue;
@@ -449,7 +456,8 @@ impl Ctx {
             let previous = self.find_previous(Some(token), flags::NOT_DELIMITER);
             if self.category_of(previous) == Some(TokenCategory::Unknown) {
                 let p = self.content(previous).to_lowercase();
-                if p == "movie" || p == "part" {
+                // nyaa-stream: also "Cour 2", "Movies 1, 2", "Box 13".
+                if matches!(p.as_str(), "movie" | "part" | "cour" | "movies" | "box" | "set") {
                     continue;
                 }
             }

@@ -98,7 +98,8 @@ impl Ctx {
     pub(crate) fn search_for_season_ranges(&mut self) {
         let s_range = re!(r"(?i)^S(\d{1,2})[-~]S?(\d{1,2})$");
         let s_single = re!(r"(?i)^S(\d{1,2})$");
-        let n_range = re!(r"^(\d{1,2})[-~+&](\d{1,2})$");
+        let n_range = re!(r"^(\d{1,2})[-~](\d{1,2})$");
+        let n_list = re!(r"^(\d{1,2}(?:[+&]\d{1,2})*)(?:[+:\-]\D*)?$");
         for id in self.get_list(None, None, None) {
             let t = self.tok(id).clone();
             if t.category == TokenCategory::Delimiter || t.category == TokenCategory::Bracket {
@@ -121,6 +122,13 @@ impl Ctx {
                     let nc = self.tok(next).content.clone();
                     if let Some(c) = n_range.captures(&nc) {
                         found = Some((c[1].parse().unwrap(), c[2].parse().unwrap(), vec![id, next]));
+                    } else if let Some(c) = n_list.captures(&nc).filter(|_| !nc.chars().all(|c| c.is_ascii_digit())) {
+                        // "Season 1+2+3+4", "Season 1+2+Movies"
+                        for n in c[1].split(['+', '&']).filter_map(|n| n.parse::<u32>().ok()) {
+                            self.elements.insert(Category::AnimeSeason, n.to_string());
+                        }
+                        self.tok_mut(id).category = TokenCategory::Identifier;
+                        self.tok_mut(next).category = TokenCategory::Identifier;
                     } else if t.enclosed && nc.chars().all(|c| c.is_ascii_digit()) && !nc.is_empty() {
                         // "(Season 1 - 3)"
                         let dash = self.token_after(next).filter(|&d| is_dash(&self.tok(d).content));
@@ -203,5 +211,49 @@ impl Ctx {
             }
         }
         false
+    }
+
+    /// Numbers that are audio channels or frame rates in scene-style names:
+    /// `TRUHD.51`, `AC3.20`, `143.8561fps` (Raze). anitopy's last-number
+    /// fallback takes them as episodes.
+    pub(crate) fn search_for_technical_numbers(&mut self) {
+        const AUDIO: &[&str] = &["TRUHD", "TRUEHD", "AC3", "EAC3", "DD", "DDP", "AAC", "DTS", "FLAC", "OPUS", "PCM", "LPCM", "ATMOS", "DTSHD", "DTS-HD", "MA"];
+        for id in self.get_list(Some(flags::UNKNOWN), None, None) {
+            let content = self.tok(id).content.clone();
+            if re!(r"(?i)^\d+(\.\d+)?fps$").is_match(&content) {
+                self.elements.insert(Category::VideoTerm, content);
+                self.tok_mut(id).category = TokenCategory::Identifier;
+                continue;
+            }
+            if matches!(content.as_str(), "264" | "265") {
+                if let Some(prev) = self.token_before(id) {
+                    if matches!(self.tok(prev).content.as_str(), "H" | "h" | "x" | "X") {
+                        self.elements.insert(Category::VideoTerm, content);
+                        self.tok_mut(id).category = TokenCategory::Identifier;
+                        continue;
+                    }
+                }
+            }
+            if !matches!(content.as_str(), "20" | "51" | "71" | "2" | "5" | "7" | "1" | "0") {
+                continue;
+            }
+            let Some(prev) = self.token_before(id) else { continue };
+            let p = crate::keyword::normalize(&self.tok(prev).content);
+            let trimmed = p.trim_end_matches(|c: char| c.is_ascii_digit() || c == '.');
+            if AUDIO.contains(&p.as_str()) || AUDIO.contains(&trimmed) {
+                self.elements.insert(Category::AudioTerm, content);
+                self.tok_mut(id).category = TokenCategory::Identifier;
+            }
+        }
+        // "143.8561fps" tokenizes as "143" "." "8561fps": the number before.
+        for id in self.get_list(Some(flags::IDENTIFIER), None, None) {
+            if !re!(r"(?i)^\d+fps$").is_match(&self.tok(id).content) {
+                continue;
+            }
+            let i = self.idx(id);
+            if i >= 2 && self.tokens[i - 1].content == "." && self.tokens[i - 2].category == TokenCategory::Unknown && self.tokens[i - 2].content.chars().all(|c| c.is_ascii_digit()) {
+                self.tokens[i - 2].category = TokenCategory::Identifier;
+            }
+        }
     }
 }

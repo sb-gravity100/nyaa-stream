@@ -17,6 +17,7 @@ impl Ctx {
         self.search_for_cjk_seasons();
         self.search_for_season_ranges();
         self.search_for_roman_seasons();
+        self.search_for_technical_numbers();
         self.search_for_isolated_numbers();
         self.search_for_episode_number();
         self.search_for_anime_title();
@@ -122,6 +123,11 @@ impl Ctx {
             return;
         }
         if self.elements.contains(Category::EpisodeNumber) {
+            // nyaa-stream: "4th Season - 21 [...] | Episode 93" - the dash
+            // number is the season-relative one; set_episode_number keeps
+            // the smaller as the episode and the other as the alt.
+            let numeric: Vec<_> = tokens.iter().copied().filter(|&id| py_isdigit(&self.tok(id).content)).collect();
+            self.search_for_separated_numbers(&numeric);
             return; // found via keywords
         }
 

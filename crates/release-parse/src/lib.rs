@@ -13,10 +13,12 @@ mod helper;
 mod keyword;
 mod number;
 mod parser;
+mod release;
 mod token;
 mod tokenizer;
 
 pub use element::{Category, Elements};
+pub use release::{parse_release, Kind, Release, FINAL_SEASON};
 
 use keyword::{keyword_manager, normalize};
 use token::Token;
@@ -160,5 +162,68 @@ mod extra_tests {
         assert!(seasons("[MeruMeruSubs] Rockman Irregular Hunter X - The Day of Sigma v2").is_empty());
         assert!(seasons("[Doomdos] - Demon Slayer: Kimetsu no Yaiba Infinity Castle I - 1 - [4K BILIBILI COM WEB-DL]").is_empty());
         assert!(seasons("Final Fantasy VII Advent Children (BD 1080p)").is_empty());
+    }
+}
+
+#[cfg(test)]
+mod release_tests {
+    use super::*;
+
+    fn r(title: &str) -> Release {
+        parse_release(title)
+    }
+
+    #[test]
+    fn sxxeyy_season_wins() {
+        let x = r("OSHI NO KO S03E06 Idols and Relationships 1080p CR WEB-DL MULTi AAC2.0 H 264-VARYG ([Oshi no Ko] 2nd Season)");
+        assert_eq!(x.seasons, [3]);
+        assert_eq!(x.episodes, Some((6, 6)));
+        assert_eq!(x.kind, Kind::Episode);
+    }
+
+    #[test]
+    fn technical_numbers_are_not_episodes() {
+        let x = r("SPY x FAMILY CODE White 2023 1080p CR WEB-DL AAC2.0 H 264 DUAL-VARYG (Spy x Family Movie: Code: White)");
+        assert_eq!(x.episodes, None);
+        let x = r("Attack.on.Titan.S03.Bluray.REMUX.1080p.TRUHD.51.AC351.TRUHD20.AC320.Eng+Jap.EngSubs");
+        assert_eq!((x.seasons.as_slice(), x.episodes, x.kind), (&[3][..], None, Kind::Batch));
+        let x = r("[Raze] Jujutsu Kaisen S3 - 12 x265 10bit 1080p 143.8561fps.mkv");
+        assert_eq!((x.seasons.as_slice(), x.episodes), (&[3][..], Some((12, 12))));
+    }
+
+    #[test]
+    fn names_with_numbers() {
+        let x = r("[TTGA] Jujutsu Kaisen 0 (2021) (Movie) [BD Remux] [1080p TrueHD AVC]");
+        assert_eq!(x.kind, Kind::Movie);
+        assert_eq!(x.title.as_deref(), Some("Jujutsu Kaisen 0"));
+    }
+
+    #[test]
+    fn season_relative_episode_beats_absolute() {
+        let x = r("[Asakura] Tensei Shitara Slime Datta Ken 4th Season - 21 [1080p WEB AAC x264] | Episode 93");
+        assert_eq!(x.seasons, [4]);
+        assert_eq!(x.episodes, Some((21, 21)));
+    }
+
+    #[test]
+    fn long_running_and_packs() {
+        assert_eq!(r("One Piece S01E1180 Elbaph in Despair 1080p CR WEB-DL").episodes, Some((1180, 1180)));
+        assert_eq!(r("[Buzz-Subs] Black Clover (2017) S01E158-S01E170 (BD 1080p HEVC OPUS) [Dual Audio]").episodes, Some((158, 170)));
+        let x = r("[Tenrai-Sensei] Frieren: Beyond Journey's End (Season 1+OVAs) [BD][1080p][HEVC 10bit x265]");
+        assert_eq!((x.seasons.as_slice(), x.kind), (&[1][..], Kind::Batch));
+        assert!(x.extras);
+        let x = r("[224] Shingeki no Kyojin (S01-S03) [BDRip 1080p x265 FLAC]");
+        assert_eq!((x.seasons.as_slice(), x.kind), (&[1, 2, 3][..], Kind::Batch));
+        let x = r("[ZeroBuild] Mushoku Tensei: Jobless Reincarnation Season 2 Cour 2 (WEB CR 1080p x264 8-bit E-AC-3) [Dual Audio]");
+        assert_eq!((x.seasons.as_slice(), x.episodes, x.kind), (&[2][..], None, Kind::Batch));
+    }
+
+    #[test]
+    fn kinds() {
+        assert_eq!(r("[Breeze] Shingeki no Kyojin OAD (Attack on Titan OVA) [1080p BD][AV1][dual audio]").kind, Kind::Special);
+        assert_eq!(r("[ASW] Shingeki no Kyojin Movie - The Last Attack [1080p HEVC x265 10Bit][AAC]").kind, Kind::Movie);
+        assert_eq!(r("[Erai-raws] Jujutsu Kaisen - 01 ~ 24 [1080p][Multiple Subtitle]").kind, Kind::Batch);
+        let x = r("[SubsPlease] Shingeki no Kyojin - The Final Season Part 3 - 02 (1080p) [49B60365].mkv");
+        assert_eq!((x.seasons.as_slice(), x.episodes), (&[FINAL_SEASON][..], Some((2, 2))));
     }
 }
