@@ -41,6 +41,83 @@ fn padded_words(text: &str) -> String {
     format!(" {} ", words.join(" "))
 }
 
+/// The `releases` columns an imported database must have.
+const RELEASE_COLUMNS: &[&str] =
+    &["id", "category", "title", "magnet", "torrent_url", "view_url", "size", "published", "seeders", "leechers", "first_seen", "updated_at"];
+
+const SCHEMA: &str = "PRAGMA journal_mode = WAL;
+     PRAGMA synchronous = NORMAL;
+     CREATE TABLE IF NOT EXISTS releases (
+         id INTEGER PRIMARY KEY,
+         category TEXT NOT NULL,
+         title TEXT NOT NULL,
+         words TEXT NOT NULL,
+         magnet TEXT NOT NULL,
+         torrent_url TEXT NOT NULL,
+         view_url TEXT NOT NULL,
+         size TEXT NOT NULL,
+         published TEXT NOT NULL,
+         seeders INTEGER NOT NULL,
+         leechers INTEGER NOT NULL,
+         first_seen INTEGER NOT NULL,
+         updated_at INTEGER NOT NULL
+     );
+     CREATE TABLE IF NOT EXISTS searches (
+         key TEXT PRIMARY KEY,
+         fetched_at INTEGER NOT NULL
+     );
+     CREATE TABLE IF NOT EXISTS search_hits (
+         key TEXT NOT NULL,
+         release_id INTEGER NOT NULL,
+         PRIMARY KEY (key, release_id)
+     ) WITHOUT ROWID;";
+
+const UPSERT: &str = "INSERT INTO releases (id, category, title, words, magnet, torrent_url, view_url, size, published, seeders, leechers, first_seen, updated_at)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?12)
+     ON CONFLICT(id) DO UPDATE SET
+         title = excluded.title, words = excluded.words, magnet = excluded.magnet, torrent_url = excluded.torrent_url,
+         size = excluded.size, published = excluded.published, seeders = excluded.seeders,
+         leechers = excluded.leechers, updated_at = excluded.updated_at";
+
+/// Upserts one release; `None` when its view URL has no nyaa id.
+fn upsert_release(stmt: &mut rusqlite::CachedStatement<'_>, category: &str, r: &NyaaResult, stamp: i64) -> rusqlite::Result<Option<i64>> {
+    let Some(id) = release_id(&r.view_url) else { return Ok(None) };
+    stmt.execute(params![id, category, r.title, padded_words(&r.title), r.magnet, r.torrent_url, r.view_url, r.size, r.published, r.seeders, r.leechers, stamp])?;
+    Ok(Some(id))
+}
+
+/// What an import did.
+#[derive(Debug, Clone, Copy, Default, serde::Serialize)]
+pub struct ImportStats {
+    /// Releases in the imported file.
+    pub total: u64,
+    /// New to this database.
+    pub added: u64,
+    /// Already stored, replaced by a fresher imported row.
+    pub updated: u64,
+}
+
+/// Writes `releases` (category code, release) into a release database at
+/// `path` (created if missing) - for building importable datasets.
+pub fn write_release_database(path: &Path, releases: &[(String, NyaaResult)]) -> anyhow::Result<usize> {
+    let mut conn = Connection::open(path)?;
+    conn.execute_batch(SCHEMA)?;
+    let tx = conn.transaction()?;
+    let stamp = now();
+    let mut written = 0;
+    {
+        let mut upsert = tx.prepare_cached(UPSERT)?;
+        for (category, r) in releases {
+            if upsert_release(&mut upsert, category, r, stamp)?.is_some() {
+                written += 1;
+            }
+        }
+    }
+    tx.commit()?;
+    tracing::info!(path = %path.display(), written, "release database written");
+    Ok(written)
+}
+
 fn now() -> i64 {
     SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs() as i64
 }
@@ -62,34 +139,7 @@ impl Store {
             std::fs::create_dir_all(dir)?;
         }
         let conn = Connection::open(path)?;
-        conn.execute_batch(
-            "PRAGMA journal_mode = WAL;
-             PRAGMA synchronous = NORMAL;
-             CREATE TABLE IF NOT EXISTS releases (
-                 id INTEGER PRIMARY KEY,
-                 category TEXT NOT NULL,
-                 title TEXT NOT NULL,
-                 words TEXT NOT NULL,
-                 magnet TEXT NOT NULL,
-                 torrent_url TEXT NOT NULL,
-                 view_url TEXT NOT NULL,
-                 size TEXT NOT NULL,
-                 published TEXT NOT NULL,
-                 seeders INTEGER NOT NULL,
-                 leechers INTEGER NOT NULL,
-                 first_seen INTEGER NOT NULL,
-                 updated_at INTEGER NOT NULL
-             );
-             CREATE TABLE IF NOT EXISTS searches (
-                 key TEXT PRIMARY KEY,
-                 fetched_at INTEGER NOT NULL
-             );
-             CREATE TABLE IF NOT EXISTS search_hits (
-                 key TEXT NOT NULL,
-                 release_id INTEGER NOT NULL,
-                 PRIMARY KEY (key, release_id)
-             ) WITHOUT ROWID;",
-        )?;
+        conn.execute_batch(SCHEMA)?;
         tracing::info!(path = %path.display(), "nyaa release database opened");
         Ok(Self { conn: Arc::new(Mutex::new(conn)) })
     }
@@ -108,22 +158,11 @@ impl Store {
             let tx = conn.transaction()?;
             let stamp = now();
             {
-                let mut upsert = tx.prepare_cached(
-                    "INSERT INTO releases (id, category, title, words, magnet, torrent_url, view_url, size, published, seeders, leechers, first_seen, updated_at)
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?12)
-                     ON CONFLICT(id) DO UPDATE SET
-                         title = excluded.title, words = excluded.words, magnet = excluded.magnet, torrent_url = excluded.torrent_url,
-                         size = excluded.size, published = excluded.published, seeders = excluded.seeders,
-                         leechers = excluded.leechers, updated_at = excluded.updated_at",
-                )?;
+                let mut upsert = tx.prepare_cached(UPSERT)?;
                 let mut hit = tx.prepare_cached("INSERT OR IGNORE INTO search_hits (key, release_id) VALUES (?1, ?2)")?;
                 tx.execute("DELETE FROM search_hits WHERE key = ?1", params![key])?;
                 for r in &results {
-                    let Some(id) = release_id(&r.view_url) else { continue };
-                    upsert.execute(params![
-                        id, category, r.title, padded_words(&r.title), r.magnet, r.torrent_url, r.view_url, r.size, r.published,
-                        r.seeders, r.leechers, stamp
-                    ])?;
+                    let Some(id) = upsert_release(&mut upsert, &category, r, stamp)? else { continue };
                     hit.execute(params![key, id])?;
                 }
             }
@@ -181,6 +220,56 @@ impl Store {
         .await
     }
 
+    /// Imports another release database's `releases` (see PLAN.md
+    /// "Importing a nyaa.si database"): upsert by nyaa id, a stored row wins
+    /// unless the imported one is fresher, `words` recomputed. Query caches
+    /// (`searches`, `search_hits`) aren't imported.
+    pub(crate) async fn import(&self, path: &Path) -> anyhow::Result<ImportStats> {
+        let path = path.to_path_buf();
+        let conn = self.conn.clone();
+        tokio::task::spawn_blocking(move || -> anyhow::Result<ImportStats> {
+            let mut conn = conn.lock().unwrap();
+            conn.execute("ATTACH DATABASE ?1 AS src", params![path.to_string_lossy()])?;
+            let result = (|| -> anyhow::Result<ImportStats> {
+                let columns: Vec<String> =
+                    conn.prepare("SELECT name FROM pragma_table_info('releases', 'src')")?.query_map([], |row| row.get(0))?.collect::<rusqlite::Result<_>>()?;
+                let missing: Vec<&str> = RELEASE_COLUMNS.iter().copied().filter(|c| !columns.iter().any(|have| have == c)).collect();
+                if !missing.is_empty() {
+                    anyhow::bail!("not a nyaa-stream release database (no `releases` table with {})", missing.join(", "));
+                }
+                let tx = conn.transaction()?;
+                let total: i64 = tx.query_row("SELECT COUNT(*) FROM src.releases", [], |row| row.get(0))?;
+                let before: i64 = tx.query_row("SELECT COUNT(*) FROM main.releases", [], |row| row.get(0))?;
+                let changed = tx.execute(
+                    "INSERT INTO main.releases (id, category, title, words, magnet, torrent_url, view_url, size, published, seeders, leechers, first_seen, updated_at)
+                     SELECT id, category, title, '', magnet, torrent_url, view_url, size, published, seeders, leechers, first_seen, updated_at
+                     FROM src.releases WHERE id IS NOT NULL
+                     ON CONFLICT(id) DO UPDATE SET
+                         title = excluded.title, words = '', magnet = excluded.magnet, torrent_url = excluded.torrent_url,
+                         size = excluded.size, published = excluded.published, seeders = excluded.seeders,
+                         leechers = excluded.leechers, updated_at = excluded.updated_at
+                     WHERE excluded.updated_at > main.releases.updated_at",
+                    [],
+                )? as i64;
+                let after: i64 = tx.query_row("SELECT COUNT(*) FROM main.releases", [], |row| row.get(0))?;
+                {
+                    let titles: Vec<(i64, String)> =
+                        tx.prepare("SELECT id, title FROM main.releases WHERE words = ''")?.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?.collect::<rusqlite::Result<_>>()?;
+                    let mut set = tx.prepare("UPDATE main.releases SET words = ?2 WHERE id = ?1")?;
+                    for (id, title) in titles {
+                        set.execute(params![id, padded_words(&title)])?;
+                    }
+                }
+                tx.commit()?;
+                let added = (after - before).max(0);
+                Ok(ImportStats { total: total.max(0) as u64, added: added as u64, updated: (changed - added).max(0) as u64 })
+            })();
+            let _ = conn.execute("DETACH DATABASE src", []);
+            result
+        })
+        .await?
+    }
+
     /// Ids among `ids` already stored.
     pub(crate) async fn known_ids(&self, ids: &[i64]) -> anyhow::Result<HashSet<i64>> {
         let ids = ids.to_vec();
@@ -229,6 +318,24 @@ mod tests {
             published: "2026-01-01".into(),
             label: Default::default(),
         }
+    }
+
+    #[tokio::test]
+    async fn imports_another_database() {
+        let src = temp_db("import-src");
+        let _ = std::fs::remove_file(&src);
+        write_release_database(&src, &[("1_2".into(), release(1, "[SubsPlease] Frieren - 01 (1080p)", 50)), ("1_2".into(), release(2, "[SubsPlease] Frieren - 02 (1080p)", 40))]).unwrap();
+        let store = Store::open(&temp_db("import-dst")).unwrap();
+        store.save_search("frieren", "1_2", &[release(2, "[SubsPlease] Frieren - 02 (1080p)", 99)]).await.unwrap();
+        let stats = store.import(&src).await.unwrap();
+        assert_eq!((stats.total, stats.added), (2, 1));
+        let found = store.search_local("1_2", "frieren 01", 10).await.unwrap();
+        assert_eq!(found.len(), 1);
+        // Not a release database
+        let bad = temp_db("import-bad");
+        let _ = std::fs::remove_file(&bad);
+        rusqlite::Connection::open(&bad).unwrap().execute_batch("CREATE TABLE other (x)").unwrap();
+        assert!(store.import(&bad).await.is_err());
     }
 
     fn temp_db(name: &str) -> std::path::PathBuf {
