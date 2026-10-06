@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import { invoke } from "@tauri-apps/api/core";
-import { open as pickFolder } from "@tauri-apps/plugin-dialog";
+import { open as pickFolder, open as pickFile } from "@tauri-apps/plugin-dialog";
 import type { JSX } from "preact";
 import { DEFAULT_SUBTITLE_STYLE, resetSettings, updateSettings, useSettings, type PreferredResolution, type SubtitleStyle } from "./settings";
 import { CloseIcon } from "./icons";
@@ -260,6 +260,30 @@ function BackupSection() {
                 const count = await importBackup();
                 window.setTimeout(() => window.location.reload(), 800);
                 return `Restored ${count} entries - reloading…`;
+              })
+            }
+          >
+            Import
+          </button>
+        </span>
+      </div>
+      <div class="setting-row">
+        <span class="setting-text">
+          <span class="setting-label">nyaa.si release database</span>
+          <span class="setting-hint">Merge a SQLite release database (nyaa-stream's format) into the local one - searches find its releases instantly and offline</span>
+        </span>
+        <span class="setting-control">
+          <button
+            class="button button-quiet"
+            disabled={busy}
+            onClick={() =>
+              void run(async () => {
+                const path = await pickFile({ multiple: false, directory: false, filters: [{ name: "SQLite database", extensions: ["db", "sqlite", "sqlite3"] }] });
+                if (typeof path !== "string") return "Import cancelled";
+                console.info("[settings] importing nyaa release database", { path });
+                const stats = await invoke<{ total: number; added: number; updated: number }>("import_nyaa_database", { path });
+                console.info("[settings] nyaa release database imported", stats);
+                return `Imported ${stats.total} releases: ${stats.added} new, ${stats.updated} updated`;
               })
             }
           >

@@ -543,6 +543,18 @@ async fn capture_thumbnail_uncached(
     }
 }
 
+/// Settings -> "nyaa.si release database" Import: merges another release
+/// database's releases into ours (see PLAN.md "Importing a nyaa.si
+/// database").
+#[tauri::command]
+async fn import_nyaa_database(state: State<'_, Arc<AppState>>, path: String) -> Result<nyaa_client::ImportStats, String> {
+    tracing::info!(%path, "import_nyaa_database invoked");
+    state.nyaa.import_database(std::path::Path::new(&path)).await.map_err(|err| {
+        tracing::error!(%path, %err, "nyaa release database import failed");
+        err.to_string()
+    })
+}
+
 #[tauri::command]
 async fn search_torrents(state: State<'_, Arc<AppState>>, query: String) -> Result<Vec<NyaaResult>, String> {
     tracing::debug!(%query, "search_torrents invoked");
@@ -1450,6 +1462,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             app_ready,
+            import_nyaa_database,
             log_frontend,
             search_anime,
             get_anime_details,

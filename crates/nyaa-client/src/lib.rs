@@ -12,7 +12,7 @@ use throttle::Throttle;
 
 pub use fansubbers::group_tag;
 pub use label::EpisodeLabel;
-pub use store::release_id;
+pub use store::{release_id, write_release_database, ImportStats};
 
 const NYAA_BASE_URL: &str = "https://nyaa.si";
 
@@ -167,6 +167,15 @@ impl NyaaClient {
             Err(err) => tracing::error!(%err, path = %db_path.display(), "couldn't open the nyaa release database"),
         }
         client
+    }
+
+    /// Imports a nyaa.si release database file (see `Store::import`).
+    pub async fn import_database(&self, path: &std::path::Path) -> anyhow::Result<ImportStats> {
+        let Some(store) = &self.store else { anyhow::bail!("the release database isn't open") };
+        tracing::info!(path = %path.display(), "importing nyaa release database");
+        let stats = store.import(path).await?;
+        tracing::info!(?stats, "nyaa release database imported");
+        Ok(stats)
     }
 
     /// Releases already in the local database whose titles contain every word
