@@ -1,3 +1,13 @@
+### `a46910f` · 2026-10-06 · feat: frontend uses backend release labels (movie/special groups)
+- `FILE_INDEX.md`
+- `src/App.tsx`
+- `src/HlsPlayerView.tsx`
+- `src/PlayerView.tsx`
+- `src/episodeParser.ts`
+- `src/releases.ts`
+- `src/torrentThumbnail.ts`
+- `src/types.ts`
+
 ### `3289434` · 2026-10-06 · feat: EpisodeLabel from release-parse on search results and play files
 - `FILE_INDEX.md`
 - `crates/nyaa-client/Cargo.toml`
