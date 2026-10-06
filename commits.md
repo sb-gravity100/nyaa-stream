@@ -1,3 +1,10 @@
+### `dbfb06a` · 2026-10-06 · feat(release-parse): CJK episode (第N话/集) and season (第N期/季) counters
+- `crates/release-parse/src/extra.rs`
+- `crates/release-parse/src/keyword.rs`
+- `crates/release-parse/src/lib.rs`
+- `crates/release-parse/src/number.rs`
+- `crates/release-parse/src/parser.rs`
+
 ### `2b639e8` · 2026-10-06 · feat: release-parse crate, faithful anitopy port (MPL-2.0)
 - `FILE_INDEX.md`
 - `crates/release-parse/Cargo.toml`
