@@ -1,6 +1,6 @@
 //! Matching an AniList show to nyaa.si releases: which queries to send
 //! (`build_candidates`) and which returned releases actually belong to the
-//! show (`matches_show`).
+//! show (`ShowMatcher`).
 //!
 //! nyaa.si's search is a per-word AND match that ignores punctuation, so:
 //! - "Fate/strange Fake" and "Fate strange Fake" are the same query;
@@ -17,6 +17,8 @@ const MAX_CANDIDATES: usize = 4;
 /// Shortest normalized synonym worth its own query: short aliases match far
 /// too many unrelated releases.
 const MIN_SYNONYM_LEN: usize = 5;
+/// Shortest normalized base name (the short form before a season marker).
+const MIN_BASE_NAME_LEN: usize = 5;
 
 /// Apostrophes and their lookalikes: dropped, not separators, so "Journey's"
 /// and "Journeys" both become `journeys` (groups write either).
@@ -143,16 +145,84 @@ pub fn entry_seasons(english: Option<&str>, romaji: Option<&str>, synonyms: &[St
     seasons
 }
 
-/// Whether a release title contains one of the show's names as whole words.
-/// `names` are the output of `match_names`.
-pub fn matches_show(release_title: &str, names: &[String]) -> bool {
-    let haystack = format!(" {} ", normalize(release_title));
-    names.iter().any(|name| haystack.contains(&format!(" {name} ")))
+/// `text` as a normalized haystack: words padded with spaces, so a phrase is
+/// found only on word boundaries.
+fn haystack(text: &str) -> String {
+    format!(" {} ", normalize(text))
 }
 
-/// The normalized names `matches_show` compares against.
-pub fn match_names(english: Option<&str>, romaji: Option<&str>, synonyms: &[String]) -> Vec<String> {
-    names(english, romaji, synonyms).iter().map(|name| normalize(name)).collect()
+fn is_roman_numeral(word: &str) -> bool {
+    matches!(word, "ii" | "iii" | "iv" | "v" | "vi" | "vii" | "viii" | "ix" | "x")
+}
+
+/// The short name groups write before a season marker: the part of a title
+/// before the first `:`, a trailing roman numeral removed ("Mushoku Tensei
+/// III: Isekai Ittara Honki Dasu" -> "mushoku tensei"). None when it is under
+/// 2 words or 5 characters, because shorter names match unrelated shows.
+fn base_name(title: &str) -> Option<String> {
+    let head = title.split(':').next().unwrap_or(title);
+    let normalized = normalize(head);
+    let mut words: Vec<&str> = normalized.split(' ').collect();
+    if words.len() > 1 && words.last().is_some_and(|w| is_roman_numeral(w)) {
+        words.pop();
+    }
+    let base = words.join(" ");
+    (words.len() >= 2 && base.len() >= MIN_BASE_NAME_LEN).then_some(base)
+}
+
+/// Decides which returned releases belong to one AniList entry: its names
+/// plus its season numbers, so a release naming only other
+/// seasons is dropped and a short name with this entry's season marker is
+/// accepted (see PLAN.md "Season-aware source matching").
+pub struct ShowMatcher {
+    names: Vec<String>,
+    bases: Vec<String>,
+    seasons: BTreeSet<u32>,
+}
+
+impl ShowMatcher {
+    pub fn new(english: Option<&str>, romaji: Option<&str>, synonyms: &[String]) -> Self {
+        let titles = names(english, romaji, synonyms);
+        let mut bases: Vec<String> = Vec::new();
+        for title in [english, romaji].into_iter().flatten() {
+            let unseasoned = strip_season_suffix(title);
+            for candidate in unseasoned.as_deref().into_iter().chain(std::iter::once(title)) {
+                if let Some(base) = base_name(candidate) {
+                    if !bases.contains(&base) {
+                        bases.push(base);
+                    }
+                }
+            }
+        }
+        let matcher = ShowMatcher { names: titles.iter().map(|name| normalize(name)).collect(), bases, seasons: entry_seasons(english, romaji, synonyms) };
+        tracing::debug!(names = ?matcher.names, bases = ?matcher.bases, seasons = ?matcher.seasons, "show matcher built");
+        matcher
+    }
+
+    /// Whether `release_title` belongs to this entry.
+    pub fn matches(&self, release_title: &str) -> bool {
+        let haystack = haystack(release_title);
+        let release_seasons = release_seasons(release_title);
+        // Markers that name only other seasons rule the release out, even
+        // when a full name matches ("Slime" names every season). With no
+        // season known for the entry nothing is ruled out.
+        if !self.seasons.is_empty() && !release_seasons.is_empty() && !release_seasons.iter().any(|season| self.seasons.contains(season)) {
+            tracing::trace!(release_title, ?release_seasons, entry_seasons = ?self.seasons, "rejected: other season");
+            return false;
+        }
+        if self.names.iter().any(|name| haystack.contains(&format!(" {name} "))) {
+            return true;
+        }
+        // The short name needs this entry's season: the marker, or season 1
+        // for a release that has none.
+        let effective = if release_seasons.is_empty() { vec![1] } else { release_seasons };
+        let season_ok = effective.iter().any(|season| self.seasons.contains(season));
+        let accepted = season_ok && self.bases.iter().any(|base| haystack.contains(&format!(" {base} ")));
+        if accepted {
+            tracing::trace!(release_title, "accepted: base name + season");
+        }
+        accepted
+    }
 }
 
 #[cfg(test)]
@@ -174,9 +244,9 @@ mod tests {
 
     #[test]
     fn apostrophe_titles_match_either_spelling() {
-        let names = match_names(Some("Frieren: Beyond Journey's End"), None, &[]);
-        assert!(matches_show("[Group] Frieren Beyond Journeys End - 01 [1080p]", &names));
-        assert!(matches_show("[Group] Frieren Beyond Journey's End - 01 [1080p]", &names));
+        let matcher = ShowMatcher::new(Some("Frieren: Beyond Journey's End"), None, &[]);
+        assert!(matcher.matches("[Group] Frieren Beyond Journeys End - 01 [1080p]"));
+        assert!(matcher.matches("[Group] Frieren Beyond Journey's End - 01 [1080p]"));
     }
 
     #[test]
@@ -194,6 +264,43 @@ mod tests {
         assert_eq!(entry_seasons(Some("That Time I Got Reincarnated as a Slime Season 4"), Some("Tensei shitara Slime Datta Ken 4th Season"), &[]), s(&[4]));
         assert_eq!(entry_seasons(Some("Mushoku Tensei: Jobless Reincarnation Season 3"), Some("Mushoku Tensei III: Isekai Ittara Honki Dasu"), &[]), s(&[3]));
         assert_eq!(entry_seasons(Some("Frieren: Beyond Journey's End"), Some("Sousou no Frieren"), &[]), s(&[]));
+    }
+
+    #[test]
+    fn rejects_releases_of_other_seasons() {
+        let matcher = ShowMatcher::new(Some("That Time I Got Reincarnated as a Slime Season 3"), Some("Tensei shitara Slime Datta Ken 3rd Season"), &[]);
+        assert!(matcher.matches("[Group] Tensei shitara Slime Datta Ken S03E05 [1080p]"));
+        assert!(matcher.matches("[Group] That Time I Got Reincarnated as a Slime - 05 (3rd Season)"));
+        assert!(!matcher.matches("[ToonsHub] That Time I Got Reincarnated as a Slime S04E21 [1080p]"));
+        assert!(matcher.matches("[Group] That Time I Got Reincarnated as a Slime S01-S04 [BD]"));
+    }
+
+    #[test]
+    fn short_name_with_season_marker_is_accepted() {
+        let matcher = ShowMatcher::new(Some("Mushoku Tensei: Jobless Reincarnation Season 3"), Some("Mushoku Tensei III: Isekai Ittara Honki Dasu"), &[]);
+        assert!(matcher.matches("[Breeze] Mushoku Tensei S03E12 [1080p]"));
+        assert!(matcher.matches("[MiniMTBB] Mushoku Tensei S3 - 14 | Jobless Reincarnation"));
+        assert!(matcher.matches("[DKB] Mushoku Tensei: Isekai Ittara Honki Dasu - S03E14"));
+        assert!(!matcher.matches("[SubsPlease] Mushoku Tensei S2 - 05"));
+        // No marker = season 1, which isn't this entry.
+        assert!(!matcher.matches("[ASW] Mushoku Tensei - 05"));
+        assert!(!matcher.matches("[SubsPlease] Fate Grand Order S03E01"));
+    }
+
+    #[test]
+    fn unknown_entry_season_keeps_todays_rules() {
+        let matcher = ShowMatcher::new(Some("Frieren: Beyond Journey's End"), Some("Sousou no Frieren"), &[]);
+        assert!(matcher.matches("[Group] Sousou no Frieren S02E01 [1080p]"));
+        assert!(matcher.matches("[Group] Frieren Beyond Journeys End - 05"));
+        assert!(!matcher.matches("[Group] Fate strange Fake - 05"));
+    }
+
+    #[test]
+    fn base_names_drop_roman_numerals_and_subtitles() {
+        assert_eq!(base_name("Mushoku Tensei III: Isekai Ittara Honki Dasu").as_deref(), Some("mushoku tensei"));
+        assert_eq!(base_name("Mushoku Tensei: Jobless Reincarnation").as_deref(), Some("mushoku tensei"));
+        assert_eq!(base_name("Fate"), None);
+        assert_eq!(base_name("Tensura"), None);
     }
 
     #[test]
@@ -223,10 +330,10 @@ mod tests {
 
     #[test]
     fn matches_show_needs_whole_word_name() {
-        let names = match_names(Some("Fate/strange Fake"), None, &[]);
-        assert!(matches_show("[Kaleido-subs] Fate strange Fake - 13 (S01E13)", &names));
-        assert!(matches_show("[Erai-raws] Fate/Strange Fake - 13 [1080p]", &names));
-        assert!(!matches_show("[SubsPlease] Fate Grand Order - 13 (1080p)", &names));
-        assert!(!matches_show("[SubsPlease] Fate strange Fakery - 13", &names));
+        let matcher = ShowMatcher::new(Some("Fate/strange Fake"), None, &[]);
+        assert!(matcher.matches("[Kaleido-subs] Fate strange Fake - 13 (S01E13)"));
+        assert!(matcher.matches("[Erai-raws] Fate/Strange Fake - 13 [1080p]"));
+        assert!(!matcher.matches("[SubsPlease] Fate Grand Order - 13 (1080p)"));
+        assert!(!matcher.matches("[SubsPlease] Fate strange Fakery - 13"));
     }
 }
