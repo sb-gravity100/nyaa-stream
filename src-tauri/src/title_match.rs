@@ -18,10 +18,18 @@ const MAX_CANDIDATES: usize = 4;
 /// too many unrelated releases.
 const MIN_SYNONYM_LEN: usize = 5;
 
-/// Lowercased words of `text` with all punctuation (`/ : - ! ☆ '`...) as
-/// separators - the way nyaa.si compares titles.
+/// Apostrophes and their lookalikes: dropped, not separators, so "Journey's"
+/// and "Journeys" both become `journeys` (groups write either).
+fn is_apostrophe(c: char) -> bool {
+    matches!(c, '\'' | '\u{2019}' | '\u{2018}' | '\u{02BC}' | '`' | '\u{00B4}')
+}
+
+/// Lowercased words of `text` with all punctuation (`/ : - ! ☆`...) as
+/// separators - the way nyaa.si compares titles - except apostrophes, which
+/// are removed (`God's` -> `gods`).
 pub fn normalize(text: &str) -> String {
     text.chars()
+        .filter(|c| !is_apostrophe(*c))
         .map(|c| if c.is_alphanumeric() { c.to_lowercase().next().unwrap_or(c) } else { ' ' })
         .collect::<String>()
         .split_whitespace()
@@ -129,6 +137,21 @@ mod tests {
     #[test]
     fn normalize_ignores_punctuation_and_case() {
         assert_eq!(normalize("Fate/strange Fake: Whispers-of Dawn!"), "fate strange fake whispers of dawn");
+    }
+
+    #[test]
+    fn normalize_removes_apostrophes() {
+        assert_eq!(normalize("Frieren: Beyond Journey's End"), "frieren beyond journeys end");
+        assert_eq!(normalize("Frieren Beyond Journeys End"), "frieren beyond journeys end");
+        assert_eq!(normalize("Kono Subarashii: God\u{2019}s Blessing"), "kono subarashii gods blessing");
+        assert_eq!(normalize("Gods` Game"), "gods game");
+    }
+
+    #[test]
+    fn apostrophe_titles_match_either_spelling() {
+        let names = match_names(Some("Frieren: Beyond Journey's End"), None, &[]);
+        assert!(matches_show("[Group] Frieren Beyond Journeys End - 01 [1080p]", &names));
+        assert!(matches_show("[Group] Frieren Beyond Journey's End - 01 [1080p]", &names));
     }
 
     #[test]
