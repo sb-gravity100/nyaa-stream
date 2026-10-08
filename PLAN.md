@@ -1529,16 +1529,30 @@ choosing a release per episode.
 - **Queue UI**: a panel in the player and on the media page showing upcoming
   episodes with the chosen release; reorder/skip/swap release per episode;
   episodes with no source are shown greyed and skipped.
-- **Settings**: auto-advance on/off, look-ahead depth, prefer same
-  group/quality, cross-season continuation, skip intro/outro (only if
-  chapter data exists in the file; no external skip-time service).
+- **Customizable (decided 2026-10-08)**: nothing about Binge Mode is
+  hardcoded; every behaviour is a setting, with a global default in
+  Settings → Binge Mode and a per-show override saved with the queue
+  (set from the Binge button's options popover):
+  - Auto-advance: on / ask each time / off; overlay countdown length.
+  - Skip intro/outro: off / auto-skip / show a skip button (only when the
+    file has chapter data; no external skip-time service).
+  - Release choice: prefer same group / same quality / most seeders / smallest
+    size; preferred groups, resolution, audio and sub language lists.
+  - Season batches: allow or avoid them as a source.
+  - Cross-season continuation: off / ask at season end / automatic.
+  - Missing episode or dead torrent: skip silently / pause and ask / try the
+    next-best release after a timeout (timeout configurable).
+  - Look-ahead depth (0 = off), capped by the cache size setting.
+  - Start point: from episode 1 / resume point / chosen episode.
+  - Per-episode overrides in the queue panel beat all of the above.
+  Defaults are conservative (auto-advance on, same group/quality, no
+  cross-season, ask on missing episode, look-ahead 1).
 
 Open questions (to decide before this becomes phases):
-1. Is skip intro/outro in scope, or just auto-advance?
-2. Cross-season continuation: default on or off?
-3. Missing episode: skip silently, or pause and ask?
-4. Does Binge Mode replace the existing "next episode" behaviour or sit
-   beside it as an explicit mode?
+1. Does Binge Mode replace the existing "next episode" behaviour or sit
+   beside it as an explicit mode (leaning: explicit mode, and its
+   auto-advance setting subsumes the old one)?
+2. Should settings be shareable as named presets (e.g. "Dub marathon")?
 
 Risks: inconsistent release groups mid-series (quality/audio jumps), torrents
 with no seeders stalling the queue (needs a timeout then fall back to the
