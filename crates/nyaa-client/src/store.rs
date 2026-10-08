@@ -19,7 +19,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use rusqlite::{params, Connection};
 
-use crate::NyaaResult;
+use crate::{NyaaResult, TorrentDetails};
 
 /// nyaa.si's release id: `https://nyaa.si/view/2012345` -> 2012345.
 pub fn release_id(view_url: &str) -> Option<i64> {
@@ -70,7 +70,12 @@ const SCHEMA: &str = "PRAGMA journal_mode = WAL;
          key TEXT NOT NULL,
          release_id INTEGER NOT NULL,
          PRIMARY KEY (key, release_id)
-     ) WITHOUT ROWID;";
+     ) WITHOUT ROWID;
+     CREATE TABLE IF NOT EXISTS details (
+         id INTEGER PRIMARY KEY,
+         json TEXT NOT NULL,
+         fetched_at INTEGER NOT NULL
+     );";
 
 const UPSERT: &str = "INSERT INTO releases (id, category, title, words, magnet, torrent_url, view_url, size, published, seeders, leechers, first_seen, updated_at)
      VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?12)
@@ -272,6 +277,39 @@ impl Store {
         .await?
     }
 
+    /// The scraped view page of release `id`, if it was ever fetched. A row
+    /// that no longer deserializes is treated as missing (refetched).
+    pub(crate) async fn details(&self, id: i64) -> anyhow::Result<Option<TorrentDetails>> {
+        let json: Option<String> = self
+            .run(move |conn| match conn.query_row("SELECT json FROM details WHERE id = ?1", params![id], |row| row.get(0)) {
+                Ok(json) => Ok(Some(json)),
+                Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+                Err(err) => Err(err),
+            })
+            .await?;
+        Ok(json.and_then(|json| match serde_json::from_str(&json) {
+            Ok(details) => Some(details),
+            Err(err) => {
+                tracing::warn!(id, %err, "unreadable stored torrent details, ignoring");
+                None
+            }
+        }))
+    }
+
+    /// Stores the scraped view page of release `id` (replacing any earlier one).
+    pub(crate) async fn save_details(&self, id: i64, details: &TorrentDetails) -> anyhow::Result<()> {
+        let json = serde_json::to_string(details)?;
+        self.run(move |conn| {
+            conn.execute(
+                "INSERT INTO details (id, json, fetched_at) VALUES (?1, ?2, ?3)
+                 ON CONFLICT(id) DO UPDATE SET json = excluded.json, fetched_at = excluded.fetched_at",
+                params![id, json, now()],
+            )
+            .map(|_| ())
+        })
+        .await
+    }
+
     /// Ids among `ids` already stored.
     pub(crate) async fn known_ids(&self, ids: &[i64]) -> anyhow::Result<HashSet<i64>> {
         let ids = ids.to_vec();
@@ -344,6 +382,30 @@ mod tests {
         let path = std::env::temp_dir().join(format!("nyaa-store-test-{name}-{}.db", std::process::id()));
         let _ = std::fs::remove_file(&path);
         path
+    }
+
+    #[tokio::test]
+    async fn stores_details_by_release_id() {
+        let store = Store::open(&temp_db("details")).unwrap();
+        assert!(store.details(7).await.unwrap().is_none());
+        let details = TorrentDetails {
+            submitter: "Reza".into(),
+            is_batch: true,
+            file_count: 1,
+            files: vec![crate::TorrentFile { path: "Season 2/a S02E01.mkv".into(), size: 5, index: 0, season: Some(2), episode: Some(1) }],
+            seasons: vec![2],
+        };
+        store.save_details(7, &details).await.unwrap();
+        let back = store.details(7).await.unwrap().unwrap();
+        assert_eq!((back.submitter.as_str(), back.seasons.clone(), back.files.len()), ("Reza", vec![2], 1));
+        assert_eq!(back.files[0].season, Some(2));
+        assert!(store.details(8).await.unwrap().is_none());
+    }
+
+    #[test]
+    fn old_details_json_still_deserializes() {
+        let old: TorrentDetails = serde_json::from_str(r#"{"submitter":"x","is_batch":false,"file_count":1}"#).unwrap();
+        assert!(old.files.is_empty() && old.seasons.is_empty());
     }
 
     #[test]

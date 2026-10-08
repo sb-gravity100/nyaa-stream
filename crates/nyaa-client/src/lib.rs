@@ -490,16 +490,43 @@ impl NyaaClient {
     /// Fetches and parses a torrent's view page to determine its real
     /// submitter and batch status (see `TorrentDetails` doc comment).
     pub async fn fetch_details(&self, view_url: &str) -> anyhow::Result<TorrentDetails> {
-        // A torrent's submitter and file list never change after upload.
+        // A torrent's submitter and file list never change after upload, so
+        // the release database keeps each scrape for good.
+        let id = release_id(view_url);
+        if let (Some(store), Some(id)) = (&self.store, id) {
+            match store.details(id).await {
+                Ok(Some(details)) => {
+                    tracing::debug!(view_url, id, "nyaa.si torrent details served from the release database");
+                    return Ok(details);
+                }
+                Ok(None) => tracing::debug!(view_url, id, "torrent details not in the release database"),
+                Err(err) => tracing::warn!(view_url, %err, "reading stored torrent details failed"),
+            }
+        }
         if let Some(cache) = &self.cache {
             if let Some(hit) = cache.get::<TorrentDetails>("details", view_url).await {
-                tracing::debug!(view_url, "nyaa.si torrent details served from cache");
-                return Ok(hit.value);
+                // Entries cached before the file list existed have none: refetch.
+                if hit.value.file_count == 0 || !hit.value.files.is_empty() {
+                    tracing::debug!(view_url, "nyaa.si torrent details served from cache");
+                    if let (Some(store), Some(id)) = (&self.store, id) {
+                        if let Err(err) = store.save_details(id, &hit.value).await {
+                            tracing::warn!(view_url, %err, "storing torrent details failed");
+                        }
+                    }
+                    return Ok(hit.value);
+                }
+                tracing::debug!(view_url, "cached torrent details predate the file list, refetching");
             }
         }
         let details = self.fetch_details_uncached(view_url).await?;
         if let Some(cache) = &self.cache {
             cache.put("details", view_url, &details).await;
+        }
+        if let (Some(store), Some(id)) = (&self.store, id) {
+            match store.save_details(id, &details).await {
+                Ok(()) => tracing::debug!(view_url, id, files = details.files.len(), "torrent details stored"),
+                Err(err) => tracing::warn!(view_url, %err, "storing torrent details failed"),
+            }
         }
         Ok(details)
     }
