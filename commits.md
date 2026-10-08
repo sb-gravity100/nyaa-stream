@@ -1,3 +1,6 @@
+### `9b698a0` · 2026-10-08 · fix: built release databases are a single file (no WAL sidecars)
+- `crates/nyaa-client/src/store.rs`
+
 ### `a85585a` · 2026-10-06 · feat: build_dataset example (crawl JSON -> release database)
 - `FILE_INDEX.md`
 - `crates/nyaa-client/examples/build_dataset.rs`
