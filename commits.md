@@ -1,3 +1,11 @@
+### `e74ed39` · 2026-10-08 · docs: sync FILE_INDEX and PHASES for ShowMatcher
+- `FILE_INDEX.md`
+- `PHASES.md`
+
+### `6ec553d` · 2026-10-08 · feat(title_match): reject other-season releases, accept short name with season marker
+- `src-tauri/src/title_match.rs`
+- `src-tauri/src/lib.rs`
+
 ### `9f211f9` · 2026-10-08 · docs(phases): tick release/entry seasons
 - `PHASES.md`
 
