@@ -21,7 +21,10 @@ use serde::Deserialize;
 const DATASET_URL: &str = "https://raw.githubusercontent.com/Fribb/anime-lists/master/anime-list-full.json";
 /// A cached copy older than this is refreshed.
 const REFRESH_AFTER: Duration = Duration::from_secs(7 * 24 * 60 * 60);
-const FETCH_TIMEOUT: Duration = Duration::from_secs(90);
+/// Whole-download limit: the 7.5 MB file shares the connection with a torrent
+/// that may be saturating it (a 90 s limit failed in practice).
+const FETCH_TIMEOUT: Duration = Duration::from_secs(600);
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(20);
 
 #[derive(Deserialize)]
 struct Entry {
@@ -88,14 +91,16 @@ impl AnimeLists {
         }
         match self.refresh().await {
             Ok(entries) => tracing::info!(entries, "anime-lists refreshed"),
-            Err(err) => tracing::warn!(%err, "anime-lists refresh failed, keeping the cached copy"),
+            Err(err) => tracing::warn!(err = %format!("{err:#}"), "anime-lists refresh failed, keeping the cached copy"),
         }
     }
 
     async fn refresh(&self) -> anyhow::Result<usize> {
         tracing::debug!(url = DATASET_URL, "fetching anime-lists");
-        let client = reqwest::Client::builder().timeout(FETCH_TIMEOUT).user_agent("nyaa-stream").build()?;
-        let bytes = client.get(DATASET_URL).send().await?.error_for_status()?.bytes().await?;
+        let client = reqwest::Client::builder().connect_timeout(CONNECT_TIMEOUT).timeout(FETCH_TIMEOUT).user_agent("nyaa-stream").build()?;
+        let started = std::time::Instant::now();
+        let bytes = client.get(DATASET_URL).send().await?.error_for_status()?.bytes().await.map_err(|err| anyhow::anyhow!("reading the body ({:?} in): {err:?}", started.elapsed()))?;
+        tracing::debug!(bytes = bytes.len(), elapsed = ?started.elapsed(), "anime-lists downloaded");
         let seasons = tokio::task::spawn_blocking(move || parse_dataset(&bytes)).await??;
         if seasons.is_empty() {
             anyhow::bail!("dataset parsed to zero entries");
