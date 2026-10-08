@@ -1,3 +1,16 @@
+### `89189d9` · 2026-10-08 · docs(phases): tick wrong-file fix
+- `PHASES.md`
+
+### `e16017f` · 2026-10-08 · fix(player): pick the episode's file from the entry's season and skip OVA/NCOP-style files
+- `src/App.tsx`
+- `src/MediaPage.tsx`
+- `src/PlayerView.tsx`
+- `src/HlsPlayerView.tsx`
+
+### `5da2f1e` · 2026-10-08 · feat: get_entry_season - the matcher's primary season (TVDB, titles, first-season flag)
+- `src-tauri/src/title_match.rs`
+- `src-tauri/src/lib.rs`
+
 ### `219d5aa` · 2026-10-08 · feat: season and complete-series packs without an episode range serve each episode of their seasons
 - `src/App.tsx`
 
