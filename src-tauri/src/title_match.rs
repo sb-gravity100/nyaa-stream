@@ -228,6 +228,21 @@ fn base_title(title: &str) -> Option<String> {
     (normalized.split(' ').count() >= 2 && normalized.len() >= MIN_BASE_NAME_LEN).then_some(base)
 }
 
+/// Whether a normalized title is a later part of a season ("... Part 2",
+/// "2nd Cour", "Cour III"): it shares its season with the entry before it.
+fn is_split_part_name(normalized: &str) -> bool {
+    let words: Vec<&str> = normalized.split(' ').collect();
+    words.windows(2).any(|pair| {
+        let [a, b] = [pair[0], pair[1]];
+        let later = |w: &str| w.parse::<u32>().is_ok_and(|n| n >= 2) || roman_value(w).is_some();
+        ((a == "part" || a == "cour") && later(b)) || ((b == "part" || b == "cour") && a.trim_end_matches(|c: char| c.is_alphabetic()).parse::<u32>().is_ok_and(|n| n >= 2))
+    })
+}
+
+fn is_split_part(english: &Option<String>, romaji: &Option<String>) -> bool {
+    [english, romaji].into_iter().flatten().any(|title| is_split_part_name(&normalize(title)))
+}
+
 fn roman_value(word: &str) -> Option<u32> {
     Some(match word {
         "ii" => 2,
@@ -329,6 +344,18 @@ impl ShowMatcher {
         if is_tv(self.format.as_deref()) && !franchise.has_tv_prequel {
             self.seasons.insert(1);
             self.primary.get_or_insert(1);
+        }
+        // No TVDB season and none in the titles: the number of earlier
+        // TV seasons. Only a display/pick hint (never in `seasons`, which
+        // rejects releases): split cours ("Part 2") count as one season.
+        if self.primary.is_none() && is_tv(self.format.as_deref()) && franchise.has_tv_prequel {
+            let earlier = franchise
+                .relatives
+                .iter()
+                .filter(|r| r.relation == "PREQUEL" && is_tv(r.format.as_deref()) && !is_split_part(&r.title.english, &r.title.romaji))
+                .count() as u32;
+            let own_part = self.names.iter().any(|name| is_split_part_name(name));
+            self.primary = Some(if own_part { earlier } else { earlier + 1 }.max(1));
         }
         for base in shared_bases(&self.names, franchise) {
             if !self.bases.contains(&base) {
@@ -549,6 +576,32 @@ mod tests {
         let third = food_wars(true, "Food Wars! The Third Plate", "Shokugeki no Souma: San no Sara");
         assert!(third.matches("[DB] Shokugeki no Souma | Food Wars! (Complete Series+OVAs) [Dual Audio 10bit BD1080p][HEVC-x265]"));
         assert!(third.matches("[Anime Time] Food Wars! (Shokugeki no Soma) S1 - S5 [Full Series][BD][Dual Audio]"));
+    }
+
+    #[test]
+    fn primary_season_falls_back_to_the_prequel_chain_without_split_cours() {
+        let tv = |english: &str, romaji: &str| relative(english, romaji, "PREQUEL", "TV");
+        let primary = |english: Option<&str>, romaji: Option<&str>, relatives: Vec<anilist_client::Relative>, tvdb: Option<u32>| {
+            let franchise = Franchise { format: Some("TV".into()), has_tv_prequel: !relatives.is_empty(), relatives };
+            ShowMatcher::new(english, romaji, &[], tvdb).with_franchise(&franchise).primary_season()
+        };
+        // Food Wars! The Second Plate: one TV season before it.
+        let s1 = tv("Food Wars! Shokugeki no Soma", "Shokugeki no Souma");
+        assert_eq!(primary(Some("Food Wars! The Second Plate"), Some("Shokugeki no Souma: Ni no Sara"), vec![s1.clone()], None), Some(2));
+        // Slime S2 Part 2 shares season 2 with its own prequel.
+        let slime = vec![tv("That Time I Got Reincarnated as a Slime Season 2", "Tensei shitara Slime Datta Ken 2nd Season"), tv("That Time I Got Reincarnated as a Slime", "Tensei shitara Slime Datta Ken")];
+        assert_eq!(primary(None, Some("Tensei shitara Slime Datta Ken 2nd Season Part 2"), slime, None), Some(2));
+        // Mushoku S3 Part 2 behind S1, Cour 2, S2, S2 Part 2, S3.
+        let mushoku = vec![
+            tv("Mushoku Tensei: Jobless Reincarnation Season 3", "Mushoku Tensei III: Isekai Ittara Honki Dasu"),
+            tv("Mushoku Tensei: Jobless Reincarnation Season 2 Part 2", "Mushoku Tensei II: Isekai Ittara Honki Dasu Part 2"),
+            tv("Mushoku Tensei: Jobless Reincarnation Season 2", "Mushoku Tensei II: Isekai Ittara Honki Dasu"),
+            tv("Mushoku Tensei: Jobless Reincarnation Cour 2", "Mushoku Tensei: Isekai Ittara Honki Dasu Part 2"),
+            tv("Mushoku Tensei: Jobless Reincarnation", "Mushoku Tensei: Isekai Ittara Honki Dasu"),
+        ];
+        assert_eq!(primary(None, Some("Mushoku Tensei III: Isekai Ittara Honki Dasu Part 2"), mushoku, None), Some(3));
+        // TVDB wins over everything.
+        assert_eq!(primary(Some("Food Wars! The Second Plate"), None, vec![s1], Some(2)), Some(2));
     }
 
     #[test]
