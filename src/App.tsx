@@ -501,6 +501,7 @@ function App() {
   const groupedSources = useMemo(() => {
     if (selectedAnime && isMovie(selectedAnime)) return movieSources(sources);
     const groups = new Map<string, { label: EpisodeLabel; releases: NyaaResult[] }>();
+    const packs: { source: NyaaResult; label: Extract<EpisodeLabel, { kind: "batch" }> }[] = [];
     const addToGroup = (label: EpisodeLabel, source: NyaaResult) => {
       const key = episodeLabelText(label);
       const bucket = groups.get(key) ?? { label, releases: [] };
@@ -612,7 +613,26 @@ function App() {
         continue;
       }
 
+      if (label.kind === "batch") packs.push({ source, label });
       addToGroup(label, source);
+    }
+    // A pack with no episode range (a season pack, "S1-S5", "Complete
+    // Series") also serves each episode of the seasons it holds - the player
+    // picks the episode's file inside it. With its file list scraped, a file
+    // must exist for that season and episode; without one, the title must
+    // name the season itself.
+    for (const group of groups.values()) {
+      if (group.label.kind !== "episode") continue;
+      const { season, number } = group.label;
+      for (const { source, label } of packs) {
+        if (label.episodeRange !== null || group.releases.includes(source)) continue;
+        const files = details[source.view_url]?.files ?? [];
+        const covers =
+          files.length > 0
+            ? files.some((f) => f.episode === number && (f.season === null || f.season === season))
+            : label.season === season || (label.seasons ?? []).includes(season);
+        if (covers) group.releases.push(source);
+      }
     }
     // Rank episodes before batches before genuinely unknown titles; within
     // episodes, sort by season then episode number so a title search that
