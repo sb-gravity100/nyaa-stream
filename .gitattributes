@@ -1,0 +1,8 @@
+# Line endings: LF in the repo and the working tree, whatever core.autocrlf
+# says. Build tools (tauri/cargo, npm run bump) rewrite files with LF; with
+# autocrlf's CRLF checkouts that showed as modified and failed the release
+# preflight's clean-tree check (2026-10-08).
+* text=auto eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
