@@ -10,6 +10,38 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.4.2",
+    date: "2026-10-08",
+    features: [
+      "Much better at reading release names: seasons written as II/III/IV, season packs like \"S01-S04\" or \"Season 1-3\", \"01 ~ 24\" batches, Chinese and Japanese episode numbers, and 4-digit episodes.",
+      "Movies and OVAs/specials get their own groups instead of \"Unknown\".",
+      "Settings → Backup → nyaa.si release database: import a release database to search those releases instantly, even offline.",
+    ],
+    fixes: [
+      "Audio channels, frame rates and \"H 264\" in release names are no longer mistaken for episode numbers.",
+      "An S01E06-style number now wins over a different season mentioned elsewhere in the name.",
+      "This What's new window now appears after updating to 0.4.x, and after updates installed outside the app.",
+    ],
+  },
+  {
+    version: "0.4.1",
+    date: "2026-10-04",
+    features: [],
+    fixes: ["Episodes start faster: connecting no longer waits on peers that don't answer."],
+  },
+  {
+    version: "0.4.0",
+    date: "2026-10-04",
+    features: [
+      "New torrent engine: faster startup and much faster seeking, and seeking into parts that aren't downloaded yet no longer stalls. The installer is smaller too.",
+      "Continue watching resumes instantly: the first seconds of an unfinished episode are kept, and Resume reopens the exact release you were watching.",
+      "Download cache: played episodes stay on disk (10 GB by default, adjustable in Settings), so rewatching or seeking back doesn't download again.",
+      "A loading screen while the app starts, and a new title bar.",
+      "Settings → Help: Contact and Send logs, for reporting problems.",
+    ],
+    fixes: ["Subtitles show on the first play, and switching subtitles no longer re-buffers."],
+  },
+  {
     version: "0.3.2",
     date: "2026-09-29",
     features: [
