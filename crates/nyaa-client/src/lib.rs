@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 mod label;
 mod cache;
 mod fansubbers;
+mod files;
 mod store;
 mod throttle;
 use cache::DiskCache;
@@ -11,6 +12,7 @@ use store::Store;
 use throttle::Throttle;
 
 pub use fansubbers::group_tag;
+pub use files::TorrentFile;
 pub use label::EpisodeLabel;
 pub use store::{release_id, write_release_database, ImportStats};
 
