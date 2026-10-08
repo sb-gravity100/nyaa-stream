@@ -1,3 +1,6 @@
+### `fe95c93` · 2026-10-08 · docs: v0.4.2 checklist done (PHASES)
+- `PHASES.md`
+
 ### `9b698a0` · 2026-10-08 · fix: built release databases are a single file (no WAL sidecars)
 - `crates/nyaa-client/src/store.rs`
 
