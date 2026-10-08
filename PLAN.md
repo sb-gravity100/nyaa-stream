@@ -956,6 +956,21 @@ never on a fresh install or a normal launch.
   written for 0.4.0/0.4.1, so updating to 0.4.x showed nothing - the
   dialog has nothing to list). `release.mjs`'s preflight now refuses a
   version without one.
+- **Fixture check of v0.4.3 matching** (2026-10-08,
+  `title_match_fixture_tests.rs`, `cargo test -p nyaa-stream
+  title_match_fixture -- --nocapture`). Recall per entry with the TVDB
+  season: Mushoku 100% on S3 (375/375), 100% on Cour 2, 86-100% elsewhere;
+  Slime 100% except S4 Part 3 (588/655: AniList gives that entry no English
+  title); Food Wars 100% on S1/S2/S4/S5. Known gaps: without a TVDB season a
+  later entry with a TV prequel and no season in its titles rules nothing
+  out (Mushoku Cour 2 keeps 118 S3 releases) and cannot accept the bare
+  "Food Wars! S03" form (Food Wars S2-S5 recall 35-74%); ~80% of entries
+  lack a Fribb TVDB season, so the prequel chain stays a first-season flag.
+  Rules the check added: a sibling only takes a release that carries none of
+  this entry's seasons; shared leading words with a relative are the entry's
+  short name (also a search query); "movie/OVA/OAD/special" words keep a
+  release off a TV entry unless it is a pack that bundles extras; a roman
+  numeral after a short name is a season.
 - **`CHANGELOG.md`** (2026-10-08) is the developer-facing mirror of
   `src/changelog.ts` (Keep a Changelog format, plus an `Unreleased`
   section). Add the entry to both when a release is cut.

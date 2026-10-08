@@ -135,8 +135,11 @@
         cache in `store.rs`
   - [x] Unsure releases resolved from their file names (season union,
         matching file indexes)
-  - [ ] Live check (Mushoku S1-S3, Slime S2-S4, Food Wars S1/S2) via
-        `search_debug`
+  - [x] Check (Mushoku S1-S3, Slime S2-S4, Food Wars S1-S5) offline against
+        the 1275 labelled fixture titles instead of live nyaa.si:
+        `title_match_fixture_tests.rs`; found and fixed same-season sibling
+        theft, missing shared short names, extras packs, bare roman numerals.
+        A live run in the app is still to do before publishing
   - [ ] `chore: release v0.4.3` + tag
 
 ## Phase 3 — Playback quality of life
