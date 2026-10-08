@@ -1,3 +1,6 @@
+### `a8f3a9d` · 2026-10-08 · fix: a pack's season-less files cover only its named season (else season 1), not every season
+- `src/App.tsx`
+
 ### `89189d9` · 2026-10-08 · docs(phases): tick wrong-file fix
 - `PHASES.md`
 
