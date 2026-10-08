@@ -137,6 +137,65 @@ struct RelationNode {
 }
 
 #[derive(Deserialize)]
+struct FranchiseData {
+    #[serde(rename = "Media")]
+    media: FranchiseMedia,
+}
+
+#[derive(Deserialize, Clone)]
+struct FranchiseMedia {
+    format: Option<String>,
+    relations: FranchiseRelations,
+}
+
+#[derive(Deserialize, Clone)]
+struct FranchiseRelations {
+    edges: Vec<FranchiseEdge>,
+}
+
+#[derive(Deserialize, Clone)]
+struct FranchiseEdge {
+    #[serde(rename = "relationType")]
+    relation_type: String,
+    node: FranchiseNode,
+}
+
+#[derive(Deserialize, Clone)]
+struct FranchiseNode {
+    id: i64,
+    title: AnimeTitle,
+    #[serde(default)]
+    synonyms: Vec<String>,
+    format: Option<String>,
+    #[serde(rename = "type")]
+    media_type: String,
+}
+
+/// Another entry of the same franchise: a prequel/sequel in the chain, or a
+/// side story / spin-off / alternative of the entry it was asked about.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Relative {
+    pub id: i64,
+    pub title: AnimeTitle,
+    pub synonyms: Vec<String>,
+    pub format: Option<String>,
+    pub relation: String,
+}
+
+/// What the matcher needs to know about an entry's neighbours.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct Franchise {
+    /// The entry's own AniList format (TV, MOVIE, OVA, ...).
+    pub format: Option<String>,
+    /// Some TV/TV_SHORT entry precedes it (through OVAs/movies if need be).
+    /// False for a first season - the one thing the chain position says
+    /// reliably: counting prequels instead would put split cours
+    /// ("Part 2") in the wrong season.
+    pub has_tv_prequel: bool,
+    pub relatives: Vec<Relative>,
+}
+
+#[derive(Deserialize)]
 struct AiringSchedulesData {
     #[serde(rename = "Page")]
     page: AiringSchedulesPage,
@@ -209,6 +268,24 @@ query ($id: Int) {
       edges {
         relationType(version: 2)
         node { id episodes format type }
+      }
+    }
+  }
+}
+"#;
+
+/// Relations with titles, for `franchise`.
+/// Most hops walked along a PREQUEL or SEQUEL chain by `franchise`.
+const FRANCHISE_HOPS: usize = 12;
+
+const FRANCHISE_QUERY: &str = r#"
+query ($id: Int) {
+  Media(id: $id, type: ANIME) {
+    format
+    relations {
+      edges {
+        relationType(version: 2)
+        node { id title { romaji english } synonyms format type }
       }
     }
   }
@@ -379,6 +456,55 @@ impl AniListClient {
             }
         };
         Ok(parsed.data.media)
+    }
+
+    async fn get_franchise_media(&self, id: i64) -> anyhow::Result<FranchiseMedia> {
+        let body = serde_json::json!({ "query": FRANCHISE_QUERY, "variables": { "id": id } });
+        let resp = self.http.post(ANILIST_URL).json(&body).send().await.inspect_err(|err| tracing::error!(id, %err, "AniList franchise request failed to send"))?;
+        let resp = resp.error_for_status().inspect_err(|err| tracing::error!(id, %err, "AniList franchise returned an error status"))?;
+        let parsed: GraphQlResponse<FranchiseData> = resp.json().await.inspect_err(|err| tracing::error!(id, %err, "failed to parse AniList franchise response body"))?;
+        Ok(parsed.data.media)
+    }
+
+    /// The entry's neighbours: every entry on its PREQUEL and SEQUEL chains
+    /// (a request per hop, at most `FRANCHISE_HOPS` each way) and its own
+    /// side stories, spin-offs and alternatives. A failed request fails the
+    /// whole call, because a half-walked chain could claim "no TV prequel"
+    /// wrongly. Callers cache the result.
+    pub async fn franchise(&self, media_id: i64) -> anyhow::Result<Franchise> {
+        tracing::debug!(media_id, "AniList franchise walk started");
+        let own = self.get_franchise_media(media_id).await?;
+        let mut franchise = Franchise { format: own.format.clone(), ..Default::default() };
+        let mut seen = std::collections::HashSet::from([media_id]);
+        let relative = |edge: &FranchiseEdge| Relative {
+            id: edge.node.id,
+            title: edge.node.title.clone(),
+            synonyms: edge.node.synonyms.clone(),
+            format: edge.node.format.clone(),
+            relation: edge.relation_type.clone(),
+        };
+        for edge in own.relations.edges.iter().filter(|e| e.node.media_type == "ANIME" && matches!(e.relation_type.as_str(), "SIDE_STORY" | "SPIN_OFF" | "ALTERNATIVE")) {
+            if seen.insert(edge.node.id) {
+                franchise.relatives.push(relative(edge));
+            }
+        }
+        for direction in ["PREQUEL", "SEQUEL"] {
+            let mut media = own.clone();
+            for _ in 0..FRANCHISE_HOPS {
+                let Some(edge) = media.relations.edges.iter().find(|e| e.relation_type == direction && e.node.media_type == "ANIME") else { break };
+                let id = edge.node.id;
+                if !seen.insert(id) {
+                    break;
+                }
+                if direction == "PREQUEL" && matches!(edge.node.format.as_deref(), Some("TV" | "TV_SHORT")) {
+                    franchise.has_tv_prequel = true;
+                }
+                franchise.relatives.push(relative(edge));
+                media = self.get_franchise_media(id).await?;
+            }
+        }
+        tracing::debug!(media_id, relatives = franchise.relatives.len(), has_tv_prequel = franchise.has_tv_prequel, "AniList franchise walk done");
+        Ok(franchise)
     }
 
     /// Walks the PREQUEL chain backward from `media_id`, summing each
