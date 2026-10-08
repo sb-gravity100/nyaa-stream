@@ -1,3 +1,8 @@
+### `1a5eb81` · 2026-10-08 · fix: What's new shows after updates to 0.4.x and manual installs
+- `PHASES.md`
+- `src/WhatsNew.tsx`
+- `src/changelog.ts`
+
 ### `4bada10` · 2026-10-08 · chore: release v0.4.2
 - `package.json`
 - `src-tauri/Cargo.toml`
