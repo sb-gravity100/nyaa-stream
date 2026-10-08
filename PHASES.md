@@ -128,12 +128,12 @@
   - [x] Entry season fallback + sibling names from the AniList prequel
         chain; longest-name-wins assignment, kinds (movie/OVA/special)
         routed to their own entries
-  - [ ] `build_candidates`: strip synonyms (roman numerals too), base-name
+  - [x] `build_candidates`: strip synonyms (roman numerals too), base-name
         query for season ≥2
-  - [ ] No-episode matched release → season batch of the matched entry
-  - [ ] `TorrentDetails` file list (paths, folders, sizes) + per-release
+  - [x] No-episode matched release → season batch of the matched entry
+  - [x] `TorrentDetails` file list (paths, folders, sizes) + per-release
         cache in `store.rs`
-  - [ ] Unsure releases resolved from their file names (season union,
+  - [x] Unsure releases resolved from their file names (season union,
         matching file indexes)
   - [ ] Live check (Mushoku S1-S3, Slime S2-S4, Food Wars S1/S2) via
         `search_debug`
