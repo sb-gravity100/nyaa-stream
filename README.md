@@ -42,7 +42,7 @@ playing while the torrent downloads. You don't have to wait for the whole file.
 Metadata comes from AniList, with Kitsu as a fallback, and playback runs through
 an embedded [mpv](https://mpv.io/) player.
 
-> **Status:** early development (v0.3.x), Windows x64 only.
+> **Status:** early development (v0.4.x), Windows x64 only. See the [changelog](CHANGELOG.md).
 
 ---
 
@@ -60,6 +60,7 @@ an embedded [mpv](https://mpv.io/) player.
 - [Releasing](#releasing)
 - [Troubleshooting](#troubleshooting)
 - [Known limitations](#known-limitations)
+- [Changelog](#changelog)
 - [Acknowledgements](#acknowledgements)
 - [Disclaimer](#disclaimer)
 
@@ -68,7 +69,7 @@ an embedded [mpv](https://mpv.io/) player.
 ## Features
 
 ### Discover
-- Live anime search with recent-search history
+- Live anime search with recent-search history. Search covers nyaa's whole anime category, not just English-translated releases
 - Show pages with key art, facts, an episode list, per-episode progress and watched toggles
 - Home page with a featured hero, **Continue watching**, **New episodes** (airing shows in your library) and your **Library**
 - Metadata from AniList GraphQL. When AniList is rate limited or down, the app falls back to Kitsu on its own
@@ -76,8 +77,9 @@ an embedded [mpv](https://mpv.io/) player.
 
 ### Find a source
 - nyaa.si releases matched to the show, season and episode, with franchise-wide ("absolute") episode numbers mapped back to the season
+- A release-title parser (`release-parse`) that reads Roman-numeral and ranged seasons, `01 ~ 24` batches and CJK episode numbers, and sorts movies and OVAs/specials into their own groups
 - Ranking by remembered fansub group, preferred fansubber, preferred resolution and seeders
-- A local SQLite database of every release seen, so show pages fill in instantly and still work offline or when nyaa.si rate-limits
+- A local SQLite database of every release seen, so show pages fill in instantly and still work offline or when nyaa.si rate-limits. You can import a prebuilt release database from **Settings → Backup**
 - Batch torrents play only the file for the matched episode, and the next episode's file preloads in the background
 
 ### Play
@@ -86,11 +88,15 @@ an embedded [mpv](https://mpv.io/) player.
 - **A-B loop and clip export** to MP4, with subtitles optionally burned in
 - Frame capture: save a PNG (`X`) or copy to the clipboard (`Ctrl+C`)
 - Picture-in-picture mini window, fullscreen, media keys, autoplay of the next episode, and resume
+- **Instant resume:** the first seconds of an unfinished episode are kept, so **Continue watching** reopens the exact release without waiting on peers
+- The seek bar shows which parts of the episode are already downloaded
 - Stremio-style buffering indicator and a statistics panel (peers, speeds, codecs, hardware decoding, dropped frames)
 - **Fallback player:** when libmpv isn't available, an HLS player built on FFmpeg and hls.js takes over automatically, with JASSUB (libass) subtitles
 
 ### Manage
 - Cache sizes and one-click clearing (nyaa responses, thumbnails, HLS segments, torrent data)
+- A download cache (10 GB by default): played episodes stay on disk, so rewatching or seeking back doesn't download again
+- **Settings → Help:** contact details and a *Send logs* export (logs are scrubbed first)
 - Back up and restore your library, progress and settings
 - In-app updates from GitHub Releases
 
@@ -156,11 +162,12 @@ Open them with the gear icon in the app bar.
 
 | Section | What you can change |
 | --- | --- |
-| **Playback** | Resume where you left off, autoplay the next episode, stick with the same fansub group, hide unlisted sources, custom `libmpv-2.dll` path, screenshot folder, preferred fansubber, preferred quality |
+| **Playback** | Resume where you left off, autoplay the next episode, stick with the same fansub group, hide unlisted sources, hardware video decoding, custom `libmpv-2.dll` path, screenshot folder, preferred fansubber, preferred quality |
 | **Subtitles** | On by default, preferred language, full default style with a live preview, restyle ASS subtitles |
-| **Storage** | Cache sizes per category and clearing them |
+| **Storage** | Cache sizes per category (including the download cache limit) and clearing them |
 | **Updates** | Check for and install new versions |
-| **Backup** | Export or import library, progress and settings as one file |
+| **Backup** | Export or import library, progress and settings as one file, or import a nyaa.si release database |
+| **Help** | Contact and *Send logs* |
 
 ---
 
@@ -252,6 +259,7 @@ git config core.hooksPath .githooks
 │  │  commands · title matching · Kitsu fallback · cache     │  │
 │  │                                                         │  │
 │  │  anilist-client   kitsu-client   nyaa-client (+SQLite)  │  │
+│  │  release-parse (title parser)                           │  │
 │  │                                                         │  │
 │  │  torrent-engine ──► local axum HTTP server              │  │
 │  │   (sbtl)             ├─ raw bytes (Range)  ──► libmpv   │  │
@@ -265,6 +273,7 @@ git config core.hooksPath .githooks
 - **Torrents:** [sbtl](https://github.com/sb-gravity100/sbtl), a streaming-first BitTorrent engine built for nyaa-stream, through `crates/sbtl-engine`. What the player reads decides what downloads, so seeks jump straight to the new spot and files you aren't watching don't download.
 - **Streaming server:** a local `axum` server with two layers: raw Range-capable bytes (mpv reads these directly) and an HLS layer (one continuous FFmpeg run per file, stream copy when possible, hardware H.264 transcode otherwise) for the browser fallback.
 - **FFmpeg** is linked statically and runs in-process, using **LGPL features only** (no x264).
+- **Release parsing:** `release-parse` turns a nyaa title into group, resolution, season(s) and episode(s), checked against a corpus of real nyaa titles ([TITLE_ANALYSIS.md](TITLE_ANALYSIS.md)).
 - **Search:** nyaa.si's HTML results are scraped, since its RSS feed caps at 75 results. All requests go through one shared throttle with 429/503 back-off, and every release lands in a permanent local database.
 
 [PLAN.md](PLAN.md) covers the full design and its reasoning. [PHASES.md](PHASES.md) has the build order.
@@ -281,10 +290,11 @@ crates/
   sbtl-engine/        torrent engine over sbtl
   torrent-engine/     streaming server, HLS/FFmpeg pipeline
   nyaa-client/        nyaa.si search, throttle, release database, cache
+  release-parse/      release title parser (MPL-2.0 port of anitopy + nyaa fixes)
   anilist-client/     AniList GraphQL metadata
   kitsu-client/       Kitsu metadata + AniList fallback
   mpv-player/         runtime-loaded libmpv: playback, thumbnails, clip encode
-scripts/              setup, version bump, installer artwork
+scripts/              setup, version bump, release, installer artwork
 ```
 
 [FILE_INDEX.md](FILE_INDEX.md) describes every file.
@@ -295,17 +305,22 @@ scripts/              setup, version bump, installer artwork
 
 Every user-facing change ships with a version bump, because the updater only offers versions newer than the installed one.
 
-1. Bump the version. This keeps `package.json`, `tauri.conf.json` and `src-tauri/Cargo.toml` in sync:
+1. Add an entry to [CHANGELOG.md](CHANGELOG.md) and to `src/changelog.ts` (the in-app *What's new* window). The release script refuses a version with no entry in `src/changelog.ts`.
+2. Bump the version. This keeps `package.json`, `tauri.conf.json` and `src-tauri/Cargo.toml` in sync:
    ```bash
    npm run bump -- patch
    ```
-2. Commit `chore: release vX.Y.Z` and tag `vX.Y.Z`.
-3. Build with the updater signing key. Never commit this key.
+3. Commit `chore: release vX.Y.Z` and tag `vX.Y.Z`.
+4. Export the updater signing key (its *contents*, not a path). Never commit this key:
    ```bash
-   TAURI_SIGNING_PRIVATE_KEY_PATH=~/.tauri/nyaa-stream.key npm run tauri build
+   export TAURI_SIGNING_PRIVATE_KEY="$(cat ~/.tauri/nyaa-stream.key)"
+   export TAURI_SIGNING_PRIVATE_KEY_PASSWORD=""
    ```
-4. Upload the installer, its `.sig`, and `latest.json` to the GitHub release. The updater reads
-   `releases/latest/download/latest.json`.
+5. Publish from the tagged commit. Try `--dry-run` first; multi-line notes go through `--notes-file`:
+   ```bash
+   npm run release -- --notes-file notes.md
+   ```
+   The script builds, uploads the installers, their `.sig` files and `latest.json` to a GitHub release, and pushes `main` and only that tag. The updater reads `releases/latest/download/latest.json`.
 
 ---
 
@@ -331,6 +346,12 @@ Every user-facing change ships with a version bump, because the updater only off
 - Removing a torrent doesn't delete its downloaded data right away. Use **Settings → Storage** to clear it.
 
 The full list is in [PLAN.md → Known gaps](PLAN.md#known-gaps--not-yet-implemented).
+
+---
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for what changed in each release.
 
 ---
 
