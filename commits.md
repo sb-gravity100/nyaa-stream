@@ -1,3 +1,6 @@
+### `219d5aa` · 2026-10-08 · feat: season and complete-series packs without an episode range serve each episode of their seasons
+- `src/App.tsx`
+
 ### `69d2363` · 2026-10-08 · fix(title_match): complete-series packs and multi-season packs on entries of unknown season
 - `src-tauri/src/title_match.rs`
 
