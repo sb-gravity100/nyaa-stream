@@ -116,7 +116,7 @@
   - [x] PLAN.md/FILE_INDEX.md sync
 - [ ] Season-aware source matching - v0.4.3 (patch: fix), see PLAN.md
       "Season-aware source matching". One commit each:
-  - [ ] `title_match.rs`: apostrophe-removing normalization
+  - [x] `title_match.rs`: apostrophe-removing normalization
   - [ ] `title_match.rs`: release seasons from `release-parse` (incl.
         multi-season packs, `SxxEyy` precedence) + entry season numbers
         from titles; matcher also checks the whole title (mixed-script
