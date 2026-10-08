@@ -580,6 +580,7 @@ function App() {
         currentAnimeSeason === 1 &&
         (label.kind === "episode" || label.kind === "batch") &&
         label.season > 1 &&
+        (label.seasons ?? []).length < 2 &&
         (label.kind === "episode" ? seasonOneNumbers.has(label.number) : seasonOneNumbers.size > 0)
       ) {
         continue;
@@ -588,7 +589,13 @@ function App() {
       // See currentAnimeSeason's doc comment - drop releases we're
       // confident belong to a different season of the same franchise
       // rather than this anime's own episodes.
-      if (currentAnimeSeason !== 1 && (label.kind === "episode" || label.kind === "batch") && label.season !== currentAnimeSeason) {
+      // (A multi-season pack - "S1-S5" - belongs to every season it names.)
+      if (
+        currentAnimeSeason !== 1 &&
+        (label.kind === "episode" || label.kind === "batch") &&
+        label.season !== currentAnimeSeason &&
+        !(label.seasons ?? []).includes(currentAnimeSeason)
+      ) {
         continue;
       }
 
