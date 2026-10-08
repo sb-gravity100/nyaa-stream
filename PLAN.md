@@ -562,10 +562,9 @@ no engine to fall back to: an sbtl problem in v0.4.0 is fixed forward in
 a published **v0.4.x** patch release (the one exception to the three
 releases above).
 
-**v0.4.2** (release parsing, nyaa.si database import, What's new fix) is
-bumped and tagged locally; whether to publish it - it isn't an sbtl fix,
-so it falls outside the exception above - is the user's call (asked
-2026-10-08).
+**v0.4.2** (release parsing, nyaa.si database import, What's new fix) was
+published 2026-10-08 on the user's go-ahead, although it isn't an sbtl fix
+(an exception to the exception above).
 
 **Local release script** (GitHub Actions is unavailable: the account is
 billing-locked, 2026-09-29). `npm run release -- --notes "<text>"`
