@@ -149,7 +149,13 @@ Building the workspace requires, beyond Rust/Node:
   always cap at 75 results — see `crates/nyaa-client`); responses are
   cached on disk (`nyaa-client/src/cache.rs`) because nyaa.si rate-limits:
   searches reused for 30 min and served stale when a refetch fails (a 429
-  is an error, never an empty result), view-page details kept forever
+  is an error, never an empty result), view-page details kept forever.
+  **Main filter (since 2026-10-08):** `?f=0&c=1_0&q=` - no trusted/remake
+  filter, category Anime (all: English-translated, raw, non-English), i.e.
+  `Category::AllAnime`; it replaced `c=1_2` (English-translated) in every
+  app search and in the browser RSS fallback. Cache and store entries are
+  keyed by category code, so releases stored under `1_2` aren't found by
+  `1_0` searches until re-fetched. Target version: next patch (bump pending)
 - **Metadata:** AniList GraphQL API (`https://graphql.anilist.co`), no auth
   required for public queries; Kitsu API (`crates/kitsu-client`) as a
   secondary source for wide backdrop banners and per-episode thumbnails,
