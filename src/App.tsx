@@ -96,6 +96,8 @@ function App() {
   const [routeError, setRouteError] = useState<string | null>(null);
   const [sources, setSources] = useState<NyaaResult[]>([]);
   const [sourcesLoading, setSourcesLoading] = useState(false);
+  /** The backend's season per entry (TVDB, else titles, else first season): titles alone call "The Second Plate" season 1. */
+  const [entrySeasonByMedia, setEntrySeasonByMedia] = useState<Record<number, number>>({});
   const [details, setDetails] = useState<Record<string, TorrentDetails>>({});
   // Session-lifetime cache of both the nyaa.si search and the per-torrent
   // view-page scrape (see loadDetails), keyed by AniList id - same
@@ -279,6 +281,11 @@ function App() {
       const preferredFansubber = getSettingsSnapshot().preferredFansubber.trim();
       const args = { title: anime.title, synonyms: anime.synonyms ?? [], anilistId: anime.id };
       if (isTauriAvailable()) {
+        void invoke<number | null>("get_entry_season", args)
+          .then((season) => {
+            if (season != null) setEntrySeasonByMedia((current) => ({ ...current, [anime.id]: season }));
+          })
+          .catch((err) => console.warn("[get_entry_season] failed", { err }));
         // 1) what the local database already holds (instant), 2) only the preferred fansubber's uploads (a few requests).
         void invoke<NyaaResult[]>("search_local_releases", args)
           .then((local) => showEarly("search_local_releases", local))
@@ -491,10 +498,12 @@ function App() {
   // hiding real matches instead of removing wrong-season noise.
   const currentAnimeSeason = useMemo(() => {
     if (!selectedAnime) return 1;
+    const known = entrySeasonByMedia[selectedAnime.id];
+    if (known != null) return known;
     const fromEnglish = selectedAnime.title.english ? extractSeasonNumber(selectedAnime.title.english) : 1;
     if (fromEnglish !== 1) return fromEnglish;
     return selectedAnime.title.romaji ? extractSeasonNumber(selectedAnime.title.romaji) : 1;
-  }, [selectedAnime]);
+  }, [selectedAnime, entrySeasonByMedia]);
 
   const currentEpisodeOffset = selectedAnime ? (episodeOffsetByMedia[selectedAnime.id] ?? 0) : 0;
 
@@ -692,6 +701,7 @@ function App() {
           anime={selectedAnime}
           kitsu={kitsuByMedia[selectedAnime.id] ?? null}
           groupedSources={groupedSources}
+          entrySeason={entrySeasonByMedia[selectedAnime.id] ?? null}
           sourcesLoading={sourcesLoading}
           sourcesCount={sources.length}
           watch={route.watch}

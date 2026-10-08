@@ -28,6 +28,8 @@ interface Props {
   anime: AnimeMedia;
   kitsu: KitsuMetadata | null;
   groupedSources: SourceGroup[];
+  /** The entry's season from the backend; falls back to the episode group's. */
+  entrySeason?: number | null;
   sourcesLoading: boolean;
   sourcesCount: number;
   /** The route's player target (`#/anime/:id/episode/:n` or `/play/:key`),
@@ -173,6 +175,7 @@ export function MediaPage({
   anime,
   kitsu,
   groupedSources,
+  entrySeason = null,
   sourcesLoading,
   sourcesCount,
   watch,
@@ -327,7 +330,7 @@ export function MediaPage({
       // progress and the resume buffer across two keys.
       progressKey={watchLabel ?? playing[0]}
       episode={playing[1].label.kind === "episode" ? playing[1].label.number : null}
-      season={playing[1].label.kind === "episode" ? playing[1].label.season : null}
+      season={entrySeason ?? (playing[1].label.kind === "episode" ? playing[1].label.season : null)}
       releases={playing[1].releases}
       onClose={onCloseWatch}
       onNext={next ? () => play(next[0], true) : null}

@@ -156,6 +156,9 @@ function baseName(path: string): string {
    return path.split(/[\\/]/).pop() ?? path;
 }
 
+/** Files that are not episodes: OVA/OAD/ONA, specials, creditless openings/endings. */
+const EXTRA_FILE = /\b(OVA|OAD|ONA|SP|Specials?|NCOP|NCED|Extras?|PV|Trailer)\d*\b/i;
+
 /** The file inside the torrent to play: the one whose name parses to the
  * requested episode (batches), else the backend's default (largest video). */
 function pickFile(
@@ -166,10 +169,14 @@ function pickFile(
 ): PlayFile | null {
    const videos = files.filter((f) => f.isVideo);
    if (videos.length > 1 && episode != null) {
-      const matches = videos.filter((f) => {
+      const numbered = videos.filter((f) => {
          const label = labelOf(f.label, baseName(f.name));
          return label.kind === "episode" && label.number === episode;
       });
+      // OVAs, openings and endings number from 1 too ("S01 - OVA1"): they are
+      // not the episode, unless nothing else is.
+      const regular = numbered.filter((f) => !EXTRA_FILE.test(baseName(f.name)));
+      const matches = regular.length > 0 ? regular : numbered;
       if (matches.length > 0) {
          // Several seasons in one pack: this entry's season first.
          const inSeason = season == null ? [] : matches.filter((f) => labelOf(f.label, baseName(f.name)).kind === "episode" && (labelOf(f.label, baseName(f.name)) as { season: number }).season === season);
