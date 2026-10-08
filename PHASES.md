@@ -140,7 +140,7 @@
         `title_match_fixture_tests.rs`; found and fixed same-season sibling
         theft, missing shared short names, extras packs, bare roman numerals.
         A live run in the app is still to do before publishing
-  - [ ] Wrong file from a multi-season pack (found 2026-10-08: Food Wars
+  - [x] Wrong file from a multi-season pack (found 2026-10-08: Food Wars
         S2 ep 1 played `S01 - OVA1.mkv` from the Anime Time S1-S5 pack): the
         frontend only knew an entry's season from its titles ("The Second
         Plate" -> 1). `get_entry_season` returns the matcher's primary season
