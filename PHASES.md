@@ -123,7 +123,7 @@
         titles like `路人超能 100 第三季 / Mob Psycho 100 III`)
   - [x] `title_match.rs`: reject other-season releases; base name +
         matching marker accepted
-  - [ ] TVDB season numbers: fetch + cache Fribb/anime-lists, entry
+  - [x] TVDB season numbers: fetch + cache Fribb/anime-lists, entry
         season set
   - [ ] Entry season fallback + sibling names from the AniList prequel
         chain; longest-name-wins assignment, kinds (movie/OVA/special)
