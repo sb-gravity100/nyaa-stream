@@ -130,8 +130,12 @@ fn names(english: Option<&str>, romaji: Option<&str>, synonyms: &[String]) -> Ve
 /// For a season 2+ entry the short base name ("Mushoku Tensei") joins the
 /// names: groups write it with a season marker, and its words are a subset of
 /// the full names', so those are dropped and the query count doesn't grow.
-pub fn build_candidates(english: Option<&str>, romaji: Option<&str>, synonyms: &[String], tvdb_season: Option<u32>) -> Vec<String> {
+pub fn build_candidates(english: Option<&str>, romaji: Option<&str>, synonyms: &[String], tvdb_season: Option<u32>, franchise: Option<&Franchise>) -> Vec<String> {
     let mut all = names(english, romaji, synonyms);
+    if let Some(franchise) = franchise.filter(|f| f.has_tv_prequel) {
+        // "Food Wars! The Third Plate" -> "Food Wars!": the bare name groups use.
+        all.extend(franchise_base_names(english, romaji, synonyms, franchise));
+    }
     if entry_seasons(english, romaji, synonyms, tvdb_season).iter().any(|season| *season >= 2) {
         for title in [english, romaji].into_iter().flatten() {
             let unseasoned = strip_season_suffix(title);
@@ -184,12 +188,14 @@ fn haystack(text: &str) -> String {
     format!(" {} ", normalize(text))
 }
 
-fn is_tv(format: Option<&str>) -> bool {
-    matches!(format, Some("TV" | "TV_SHORT"))
+/// Whether a normalized release title says it is a movie, OVA/OAD or
+/// special - release-parse misses "the Movie: Tears of the Azure Sea".
+fn names_extra(haystack: &str) -> bool {
+    ["movie", "movies", "ova", "ovas", "oad", "oads", "special", "specials"].iter().any(|word| haystack.contains(&format!(" {word} ")))
 }
 
-fn parse_kind(release_title: &str) -> Kind {
-    release_parse::parse_release(release_title).kind
+fn is_tv(format: Option<&str>) -> bool {
+    matches!(format, Some("TV" | "TV_SHORT"))
 }
 
 fn is_roman_numeral(word: &str) -> bool {
@@ -214,6 +220,62 @@ fn base_title(title: &str) -> Option<String> {
     let base = words.join(" ");
     let normalized = normalize(&base);
     (normalized.split(' ').count() >= 2 && normalized.len() >= MIN_BASE_NAME_LEN).then_some(base)
+}
+
+fn roman_value(word: &str) -> Option<u32> {
+    Some(match word {
+        "ii" => 2,
+        "iii" => 3,
+        "iv" => 4,
+        "v" => 5,
+        "vi" => 6,
+        "vii" => 7,
+        "viii" => 8,
+        "ix" => 9,
+        "x" => 10,
+        _ => return None,
+    })
+}
+
+/// Words that end a shared name prefix without being part of the name.
+fn is_season_word(word: &str) -> bool {
+    matches!(word, "season" | "cour" | "part" | "final" | "the") || word.chars().all(|c| c.is_ascii_digit()) || is_roman_numeral(word)
+}
+
+/// The short names a later entry shares with the rest of its franchise: the
+/// leading words its titles have in common with a relative's ("Food Wars!
+/// The Third Plate" and "Food Wars! Shokugeki no Soma" -> "food wars"),
+/// minus trailing season words. Groups write that bare name with a season
+/// marker, though no title of the entry says it. Normalized; needs 2 words
+/// and `MIN_BASE_NAME_LEN` characters, like `base_name`.
+pub fn franchise_base_names(english: Option<&str>, romaji: Option<&str>, synonyms: &[String], franchise: &Franchise) -> Vec<String> {
+    let own: Vec<String> = names(english, romaji, synonyms).iter().map(|name| normalize(name)).collect();
+    shared_bases(&own, franchise)
+}
+
+/// `franchise_base_names` for already normalized names.
+fn shared_bases(own: &[String], franchise: &Franchise) -> Vec<String> {
+    let mut bases: Vec<String> = Vec::new();
+    for relative in &franchise.relatives {
+        for title in [relative.title.english.as_deref(), relative.title.romaji.as_deref()].into_iter().flatten() {
+            let theirs = normalize(title);
+            let theirs: Vec<&str> = theirs.split(' ').collect();
+            for name in own {
+                let ours: Vec<&str> = name.split(' ').collect();
+                let mut shared = ours.iter().zip(&theirs).take_while(|(a, b)| a == b).count();
+                while shared > 0 && is_season_word(ours[shared - 1]) {
+                    shared -= 1;
+                }
+                let base = ours[..shared].join(" ");
+                // Only a proper prefix of the entry's own name is a shorter form of it.
+                if shared >= 2 && shared < ours.len() && base.len() >= MIN_BASE_NAME_LEN && !bases.contains(&base) {
+                    bases.push(base);
+                }
+            }
+        }
+    }
+    tracing::debug!(?bases, "franchise base names");
+    bases
 }
 
 /// Decides which returned releases belong to one AniList entry: its names
@@ -258,6 +320,11 @@ impl ShowMatcher {
         if is_tv(self.format.as_deref()) && !franchise.has_tv_prequel {
             self.seasons.insert(1);
         }
+        for base in shared_bases(&self.names, franchise) {
+            if !self.bases.contains(&base) {
+                self.bases.push(base);
+            }
+        }
         self.siblings = franchise
             .relatives
             .iter()
@@ -265,6 +332,15 @@ impl ShowMatcher {
             .collect();
         tracing::debug!(format = ?self.format, seasons = ?self.seasons, siblings = self.siblings.len(), "show matcher given its franchise");
         self
+    }
+
+    /// The season a roman numeral right after one of the short names gives.
+    fn roman_season(&self, haystack: &str) -> Option<u32> {
+        self.bases.iter().find_map(|base| {
+            let pattern = format!(" {base} ");
+            let rest = &haystack[haystack.find(&pattern)? + pattern.len()..];
+            roman_value(rest.split(' ').next()?)
+        })
     }
 
     /// Words in the longest of `names` found in `haystack` (0 = none).
@@ -275,7 +351,12 @@ impl ShowMatcher {
     /// Whether `release_title` belongs to this entry.
     pub fn matches(&self, release_title: &str) -> bool {
         let haystack = haystack(release_title);
-        let release_seasons = release_seasons(release_title);
+        let mut release_seasons = release_seasons(release_title);
+        // "Mushoku Tensei II Isekai ..." - a roman numeral right after a
+        // known short name is its season (release-parse can't know names).
+        if release_seasons.is_empty() {
+            release_seasons.extend(self.roman_season(&haystack));
+        }
         // Markers that name only other seasons rule the release out, even
         // when a full name matches ("Slime" names every season). With no
         // season known for the entry nothing is ruled out.
@@ -285,30 +366,36 @@ impl ShowMatcher {
         }
         // Movies, OVAs and specials are filed under their own entry, not
         // a TV season's episode list.
-        if is_tv(self.format.as_deref()) && matches!(parse_kind(release_title), Kind::Movie | Kind::Special) {
+        // A pack naming several seasons may bundle them ("S01-S05 + OVA").
+        let parsed = release_parse::parse_release(release_title);
+        // (A season pack that bundles extras - "S01 + OVA" - is still its season's.)
+        if is_tv(self.format.as_deref()) && release_seasons.len() < 2 && (matches!(parsed.kind, Kind::Movie | Kind::Special) || (names_extra(&haystack) && !parsed.extras)) {
             tracing::trace!(release_title, "rejected: movie/special on a TV entry");
             return false;
         }
-        let own = Self::longest_match(&haystack, &self.names);
-        if own > 0 {
-            // A sibling's longer, more specific name wins ("Food Wars! The
-            // Second Plate" is not the first season's).
-            let sibling = self.siblings.iter().map(|names| Self::longest_match(&haystack, names)).max().unwrap_or(0);
-            if sibling > own {
-                tracing::trace!(release_title, own, sibling, "rejected: names a sibling more specifically");
+        // How specifically the release names this entry: a full name, else
+        // the short name - which needs this entry's season: the marker, or
+        // season 1 for a release that has none.
+        let in_season = release_seasons.iter().any(|season| self.seasons.contains(season));
+        let mut own = Self::longest_match(&haystack, &self.names);
+        if own == 0 {
+            let effective_ok = in_season || (release_seasons.is_empty() && self.seasons.contains(&1));
+            own = if effective_ok { Self::longest_match(&haystack, &self.bases) } else { 0 };
+            if own == 0 {
                 return false;
             }
-            return true;
+            tracing::trace!(release_title, "short name + season");
         }
-        // The short name needs this entry's season: the marker, or season 1
-        // for a release that has none.
-        let effective = if release_seasons.is_empty() { vec![1] } else { release_seasons };
-        let season_ok = effective.iter().any(|season| self.seasons.contains(season));
-        let accepted = season_ok && self.bases.iter().any(|base| haystack.contains(&format!(" {base} ")));
-        if accepted {
-            tracing::trace!(release_title, "accepted: base name + season");
+        // A sibling's longer, more specific name wins ("Food Wars! The Second
+        // Plate" is not the first season's). A season marker that is this
+        // entry's keeps the release here: the sibling is then a split cour or
+        // its own season-qualified name ("... Season 3"), not another season.
+        let sibling = if in_season { 0 } else { self.siblings.iter().map(|names| Self::longest_match(&haystack, names)).max().unwrap_or(0) };
+        if sibling > own {
+            tracing::trace!(release_title, own, sibling, "rejected: names a sibling more specifically");
+            return false;
         }
-        accepted
+        true
     }
 }
 
@@ -397,6 +484,49 @@ mod tests {
     }
 
     #[test]
+    fn franchise_shares_a_bare_name_with_later_entries() {
+        let third = Franchise {
+            format: Some("TV".into()),
+            has_tv_prequel: true,
+            relatives: vec![relative("Food Wars! Shokugeki no Soma", "Shokugeki no Souma", "PREQUEL", "TV")],
+        };
+        let english = Some("Food Wars! The Third Plate");
+        let romaji = Some("Shokugeki no Souma: San no Sara");
+        assert_eq!(franchise_base_names(english, romaji, &[], &third), vec!["food wars", "shokugeki no souma"]);
+        assert_eq!(build_candidates(english, romaji, &[], Some(3), Some(&third)), vec!["food wars", "shokugeki no souma"]);
+        let matcher = ShowMatcher::new(english, romaji, &[], Some(3)).with_franchise(&third);
+        assert!(matcher.matches("[crane0922] Food Wars! Season 3 (BD 1080p HEVC Opus) [Dual Audio]"));
+        assert!(!matcher.matches("[crane0922] Food Wars! Season 4 (BD 1080p HEVC Opus) [Dual Audio]"));
+    }
+
+    #[test]
+    fn same_season_siblings_do_not_take_each_others_releases() {
+        // Split cour: the sibling's "... Season 3" name is longer, but the release is season 3.
+        let franchise = Franchise {
+            format: Some("TV".into()),
+            has_tv_prequel: true,
+            relatives: vec![relative("Mushoku Tensei: Jobless Reincarnation Season 3", "Mushoku Tensei III: Isekai Ittara Honki Dasu", "PREQUEL", "TV")],
+        };
+        let part2 = ShowMatcher::new(None, Some("Mushoku Tensei III: Isekai Ittara Honki Dasu Part 2"), &["Mushoku Tensei: Jobless Reincarnation".to_string()], None).with_franchise(&franchise);
+        assert!(part2.matches("[Doomdos] - Mushoku Tensei: Jobless Reincarnation Season 3 - 第11话 - [1080p]"));
+    }
+
+    #[test]
+    fn roman_numeral_after_the_short_name_is_a_season() {
+        let first = ShowMatcher::new(Some("Mushoku Tensei: Jobless Reincarnation"), Some("Mushoku Tensei: Isekai Ittara Honki Dasu"), &[], Some(1));
+        assert!(!first.matches("[New-raws] Mushoku Tensei II Isekai Ittara Honki Dasu - 00~12"));
+        assert!(first.matches("[Group] Mushoku Tensei Isekai Ittara Honki Dasu - 05"));
+    }
+
+    #[test]
+    fn extras_words_keep_movies_off_tv_but_not_season_packs() {
+        let tv = food_wars(false, "Food Wars! Shokugeki no Soma", "Shokugeki no Souma");
+        assert!(!tv.matches("[Koten_Gars] Shokugeki no Souma - OADs [DVD]"));
+        assert!(tv.matches("[Anitsu] Shokugeki no Souma S01 + OVA [BD 1080p]"));
+        assert!(tv.matches("[Sokudo] Shokugeki no Souma S1-S5+OVA v2 [1080p BD]"));
+    }
+
+    #[test]
     fn first_season_flag_adds_season_one() {
         let first = food_wars(false, "Food Wars! Shokugeki no Soma", "Shokugeki no Souma");
         assert!(!first.matches("[Group] Shokugeki no Souma S02E05 [1080p]"));
@@ -466,13 +596,14 @@ mod tests {
             Some("Tensei shitara Slime Datta Ken 4th Season"),
             &["Tensura".to_string(), "\u{8EE2}\u{751F}".to_string()],
             None,
+            None,
         );
         assert_eq!(candidates, vec!["Tensura", "Tensei shitara Slime Datta Ken", "That Time I Got Reincarnated as a Slime"]);
     }
 
     #[test]
     fn synonyms_and_roman_numerals_are_stripped_in_queries() {
-        let candidates = build_candidates(Some("Mob Psycho 100 III"), Some("Mob Psycho 100 III"), &["Mob Psycho 100 3rd Season".to_string()], None);
+        let candidates = build_candidates(Some("Mob Psycho 100 III"), Some("Mob Psycho 100 III"), &["Mob Psycho 100 3rd Season".to_string()], None, None);
         assert_eq!(candidates, vec!["Mob Psycho 100"]);
         assert_eq!(strip_roman_suffix("Rocky V"), None);
         assert_eq!(strip_roman_suffix("Mob Psycho 100 III").as_deref(), Some("Mob Psycho 100"));
@@ -480,22 +611,22 @@ mod tests {
 
     #[test]
     fn later_seasons_query_the_short_base_name() {
-        let candidates = build_candidates(Some("Mushoku Tensei: Jobless Reincarnation Season 3"), Some("Mushoku Tensei III: Isekai Ittara Honki Dasu"), &[], None);
+        let candidates = build_candidates(Some("Mushoku Tensei: Jobless Reincarnation Season 3"), Some("Mushoku Tensei III: Isekai Ittara Honki Dasu"), &[], None, None);
         assert_eq!(candidates, vec!["Mushoku Tensei"]);
         // Season 1 keeps its full names.
-        let first = build_candidates(Some("Mushoku Tensei: Jobless Reincarnation"), Some("Mushoku Tensei: Isekai Ittara Honki Dasu"), &[], Some(1));
+        let first = build_candidates(Some("Mushoku Tensei: Jobless Reincarnation"), Some("Mushoku Tensei: Isekai Ittara Honki Dasu"), &[], Some(1), None);
         assert_eq!(first, vec!["Mushoku Tensei: Jobless Reincarnation", "Mushoku Tensei: Isekai Ittara Honki Dasu"]);
         // A TVDB season >= 2 alone is enough.
-        let tvdb = build_candidates(Some("Kimetsu no Yaiba: Yuukaku-hen"), None, &[], Some(2));
+        let tvdb = build_candidates(Some("Kimetsu no Yaiba: Yuukaku-hen"), None, &[], Some(2), None);
         assert_eq!(tvdb, vec!["Kimetsu no Yaiba"]);
     }
 
     #[test]
     fn fate_strange_fake_collapses_to_one_query() {
-        let candidates = build_candidates(Some("Fate/strange Fake"), Some("Fate/strange Fake"), &[], None);
+        let candidates = build_candidates(Some("Fate/strange Fake"), Some("Fate/strange Fake"), &[], None, None);
         assert_eq!(candidates, vec!["Fate/strange Fake"]);
         // The subtitle tells the special apart from the TV series: kept.
-        let candidates = build_candidates(Some("Fate/strange Fake: Whispers of Dawn"), Some("Fate/strange Fake: Whispers of Dawn"), &[], None);
+        let candidates = build_candidates(Some("Fate/strange Fake: Whispers of Dawn"), Some("Fate/strange Fake: Whispers of Dawn"), &[], None, None);
         assert_eq!(candidates, vec!["Fate/strange Fake: Whispers of Dawn"]);
     }
 

@@ -213,9 +213,10 @@ fn title_match_fixture_recall_and_precision() {
 #[test]
 fn title_match_fixture_candidate_queries() {
     let (entries, _) = load();
-    for entry in &entries {
+    for (index, entry) in entries.iter().enumerate() {
+        let franchise = franchise_of(&entries, index);
         for tvdb in [None, entry.season] {
-            let candidates = build_candidates(entry.english.as_deref(), entry.romaji.as_deref(), &entry.synonyms, tvdb);
+            let candidates = build_candidates(entry.english.as_deref(), entry.romaji.as_deref(), &entry.synonyms, tvdb, Some(&franchise));
             println!("{} {} {} tvdb={:?}: {:?}", entry.franchise, entry.id, entry.format, tvdb, candidates);
             assert!(candidates.len() <= 4, "{} {}: {} queries", entry.franchise, entry.id, candidates.len());
             assert!(!candidates.is_empty(), "{} {}: no query", entry.franchise, entry.id);

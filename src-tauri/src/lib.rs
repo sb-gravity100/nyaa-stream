@@ -578,6 +578,24 @@ async fn search_torrents(state: State<'_, Arc<AppState>>, query: String) -> Resu
     }
 }
 
+/// The entry's franchise (sibling names, first-season flag, shared short
+/// names). With `network`, fetched when not cached - waiting at most 5s, so a
+/// slow AniList only costs the franchise-aware parts; otherwise only a cached
+/// copy is used.
+async fn load_franchise(state: &AppState, anilist_id: Option<i64>, network: bool) -> Option<anilist_client::Franchise> {
+    let id = anilist_id?;
+    if !network {
+        return state.franchise_cache.cached(id).await;
+    }
+    match tokio::time::timeout(std::time::Duration::from_secs(5), state.franchise_cache.get(&state.anilist, id)).await {
+        Ok(franchise) => franchise,
+        Err(_) => {
+            tracing::warn!(id, "franchise fetch timed out, searching without it");
+            None
+        }
+    }
+}
+
 /// The matcher for one show: its names, its TVDB season and, when known,
 /// its franchise (see `title_match::ShowMatcher`).
 fn show_matcher(state: &AppState, title: &AnimeTitle, synonyms: &[String], anilist_id: Option<i64>, franchise: Option<&anilist_client::Franchise>) -> title_match::ShowMatcher {
@@ -611,17 +629,13 @@ async fn search_torrents_for_anime(
     fansubber: Option<String>,
 ) -> Result<Vec<NyaaResult>, String> {
     let synonyms = synonyms.unwrap_or_default();
-    let candidates = title_match::build_candidates(title.english.as_deref(), title.romaji.as_deref(), &synonyms, anilist_id.and_then(|id| state.anime_lists.tvdb_season(id)));
+    let franchise = load_franchise(&state, anilist_id, true).await;
+    let candidates = title_match::build_candidates(title.english.as_deref(), title.romaji.as_deref(), &synonyms, anilist_id.and_then(|id| state.anime_lists.tvdb_season(id)), franchise.as_ref());
     if candidates.is_empty() {
         tracing::warn!("search_torrents_for_anime called with no usable title");
         return Ok(Vec::new());
     }
     tracing::debug!(?candidates, "search_torrents_for_anime invoked");
-    // The franchise (sibling names, first-season flag) loads while nyaa.si is searched.
-    let franchise_task = anilist_id.map(|id| {
-        let app = state.inner().clone();
-        tokio::spawn(async move { app.franchise_cache.get(&app.anilist, id).await })
-    });
 
     let mut searches = tokio::task::JoinSet::new();
     for (order, candidate) in candidates.into_iter().enumerate() {
@@ -667,10 +681,6 @@ async fn search_torrents_for_anime(
         }
     }
 
-    let franchise = match franchise_task {
-        Some(task) => task.await.ok().flatten(),
-        None => None,
-    };
     let matcher = show_matcher(&state, &title, &synonyms, anilist_id, franchise.as_ref());
     let before = merged.len();
     merged.retain(|result| matcher.matches(&result.title));
@@ -701,15 +711,12 @@ async fn search_local_releases(
     anilist_id: Option<i64>,
 ) -> Result<Vec<NyaaResult>, String> {
     let synonyms = synonyms.unwrap_or_default();
-    let candidates = title_match::build_candidates(title.english.as_deref(), title.romaji.as_deref(), &synonyms, anilist_id.and_then(|id| state.anime_lists.tvdb_season(id)));
+    let franchise = load_franchise(&state, anilist_id, false).await;
+    let candidates = title_match::build_candidates(title.english.as_deref(), title.romaji.as_deref(), &synonyms, anilist_id.and_then(|id| state.anime_lists.tvdb_season(id)), franchise.as_ref());
     let mut lists = Vec::new();
     for candidate in &candidates {
         lists.push(state.nyaa.search_local(candidate, Category::AllAnime).await);
     }
-    let franchise = match anilist_id {
-        Some(id) => state.franchise_cache.cached(id).await,
-        None => None,
-    };
     let matcher = show_matcher(&state, &title, &synonyms, anilist_id, franchise.as_ref());
     let mut merged = merge_unique(lists);
     merged.retain(|result| matcher.matches(&result.title));
@@ -734,7 +741,8 @@ async fn search_fansubber_releases(
     let Some(tag) = fansubber.split_whitespace().next() else { return Ok(Vec::new()) };
     let user = state.nyaa.resolve_fansubber(tag).await;
     let synonyms = synonyms.unwrap_or_default();
-    let candidates = title_match::build_candidates(title.english.as_deref(), title.romaji.as_deref(), &synonyms, anilist_id.and_then(|id| state.anime_lists.tvdb_season(id)));
+    let franchise = load_franchise(&state, anilist_id, false).await;
+    let candidates = title_match::build_candidates(title.english.as_deref(), title.romaji.as_deref(), &synonyms, anilist_id.and_then(|id| state.anime_lists.tvdb_season(id)), franchise.as_ref());
 
     let mut searches = tokio::task::JoinSet::new();
     for (order, candidate) in candidates.into_iter().enumerate() {
@@ -759,10 +767,6 @@ async fn search_fansubber_releases(
         .filter_map(|(_, outcome)| outcome.inspect_err(|err| tracing::warn!(%err, "uploader-only search failed")).ok())
         .collect();
 
-    let franchise = match anilist_id {
-        Some(id) => state.franchise_cache.cached(id).await,
-        None => None,
-    };
     let matcher = show_matcher(&state, &title, &synonyms, anilist_id, franchise.as_ref());
     let mut merged = merge_unique(lists);
     let tag_word = title_match::normalize(tag);
