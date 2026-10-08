@@ -117,7 +117,7 @@
 - [ ] Season-aware source matching - v0.4.3 (patch: fix), see PLAN.md
       "Season-aware source matching". One commit each:
   - [x] `title_match.rs`: apostrophe-removing normalization
-  - [ ] `title_match.rs`: release seasons from `release-parse` (incl.
+  - [x] `title_match.rs`: release seasons from `release-parse` (incl.
         multi-season packs, `SxxEyy` precedence) + entry season numbers
         from titles; matcher also checks the whole title (mixed-script
         titles like `路人超能 100 第三季 / Mob Psycho 100 III`)
