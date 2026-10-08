@@ -1,3 +1,6 @@
+### `b2c6421` · 2026-10-08 · docs: Binge Mode watch order decision in PLAN.md
+- `PLAN.md`
+
 ### `319b37a` · 2026-10-08 · docs: Binge Mode header button and setup modal in PLAN.md
 - `PLAN.md`
 
