@@ -636,9 +636,14 @@ function App() {
       for (const { source, label } of packs) {
         if (label.episodeRange !== null || group.releases.includes(source)) continue;
         const files = details[source.view_url]?.files ?? [];
+        // A file with no season anywhere takes its pack's single named
+        // season, else season 1: an unmarked pack numbers from the start
+        // (absolute numbering would otherwise hand season 1's file to any season).
+        const named = label.seasons ?? [];
+        const unmarkedSeason = named.length === 1 ? named[0] : 1;
         const covers =
           files.length > 0
-            ? files.some((f) => f.episode === number && (f.season === null || f.season === season))
+            ? files.some((f) => f.episode === number && (f.season ?? unmarkedSeason) === season)
             : label.season === season || (label.seasons ?? []).includes(season);
         if (covers) group.releases.push(source);
       }
