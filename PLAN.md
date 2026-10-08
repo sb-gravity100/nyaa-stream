@@ -1508,9 +1508,29 @@ PLAN.md-only for now). Whole-series queue: pick a show once and the app
 builds an ordered episode queue and plays it through without the user
 choosing a release per episode.
 
-- **Entry point**: a "Binge" button on the media page (and a context-menu
-  item, v0.5.0). Starts from episode 1, or from the resume point when the
-  show is in Continue watching.
+- **Entry point (decided 2026-10-08)**: a "Binge" button in the app header
+  (title bar / top chrome, visible on every page except the player) that
+  opens a **setup modal**. The media-page button and context-menu item
+  (v0.5.0) are secondary shortcuts that open the same modal with the show
+  preselected.
+- **Setup modal** (`src/BingeModal.tsx`), a short wizard:
+  1. *Pick series*: search box (AniList, same search as the app) with
+     results as poster rows; one or more series can be added (a marathon of
+     several shows is allowed, in the order chosen, reorderable).
+  2. *Compile*: for each picked series the app works out what needs to be
+     watched and shows it as a checklist: all seasons/cours of the franchise
+     in watch order (AniList relations: prequel/sequel chain, TV entries
+     first; movies, OVAs and specials listed but unchecked by default,
+     toggleable), with episode counts, already-watched episodes marked and
+     skipped by default, and per-episode source status (found / batch /
+     missing) from the matcher.
+  3. *Options*: the customizable settings below, preloaded from the global
+     defaults or a preset, overridable here for this binge only.
+  4. *Start*: creates the queue and starts playing from the first unwatched
+     episode (or the chosen start point).
+  The modal can be closed and reopened without losing the draft; a running
+  binge shows in the header button (progress badge) and reopening shows the
+  queue panel instead of the wizard.
 - **Queue building**: reuse the season-aware matcher (`ShowMatcher`,
   `EpisodeLabel`, season sets) to list the entry's episodes from the release
   store/nyaa results. Per episode choose one release by preference: same
@@ -1570,11 +1590,20 @@ episode" behaviour stays as is, untouched); settings are saved as **named
 presets** (e.g. "Dub marathon"), possibly - a later stage, not blocking the
 first release of Binge Mode.
 
+**OP/ED detection is deferred (2026-10-08)**: sources label chapters
+inconsistently (`OP`, `Opening`, `Intro`, `Chapter 2`, language variants,
+none at all), so the whole skip/keep/theme-tracking block above is parked
+until a later stage; label normalisation and fingerprinting get designed
+then. The first Binge Mode release ships the header button, setup modal,
+queue, auto-advance, release choice and look-ahead without skipping.
+
 Open questions (to decide before this becomes phases):
-1. OP/ED detection: chapter titles only for the first release, with
-   fingerprinting as a later stage? (Fingerprinting is the hard part and
-   what makes theme tracking deterministic.)
-2. Does a preset also hold per-show overrides, or only the global defaults?
+1. "Compile what needs to be watched": is the franchise watch order from
+   AniList relations enough, or should recap episodes / specials be placed
+   in broadcast order too?
+2. Multi-series marathons: keep, or one series per binge for the first
+   release?
+3. Does a preset also hold per-show overrides, or only the global defaults?
 
 Risks: inconsistent release groups mid-series (quality/audio jumps), torrents
 with no seeders stalling the queue (needs a timeout then fall back to the
