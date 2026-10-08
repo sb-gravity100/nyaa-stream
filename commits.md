@@ -1,3 +1,10 @@
+### `9f211f9` · 2026-10-08 · docs(phases): tick release/entry seasons
+- `PHASES.md`
+
+### `4beb539` · 2026-10-08 · feat(title_match): release seasons and entry seasons from release-parse
+- `src-tauri/src/title_match.rs`
+- `src-tauri/Cargo.toml`
+
 ### `e2e7332` · 2026-10-08 · docs(phases): tick apostrophe normalization
 - `PHASES.md`
 
