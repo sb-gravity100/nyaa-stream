@@ -558,7 +558,7 @@ async fn import_nyaa_database(state: State<'_, Arc<AppState>>, path: String) -> 
 #[tauri::command]
 async fn search_torrents(state: State<'_, Arc<AppState>>, query: String) -> Result<Vec<NyaaResult>, String> {
     tracing::debug!(%query, "search_torrents invoked");
-    match state.nyaa.search(&query, Category::AnimeEnglishTranslated).await {
+    match state.nyaa.search(&query, Category::AllAnime).await {
         Ok(results) => {
             tracing::info!(%query, count = results.len(), "search_torrents succeeded");
             Ok(results)
@@ -603,7 +603,7 @@ async fn search_torrents_for_anime(
     for (order, candidate) in candidates.into_iter().enumerate() {
         let app = state.inner().clone();
         searches.spawn(async move {
-            let outcome = app.nyaa.search(&candidate, Category::AnimeEnglishTranslated).await;
+            let outcome = app.nyaa.search(&candidate, Category::AllAnime).await;
             (order, candidate, outcome)
         });
     }
@@ -675,7 +675,7 @@ async fn search_local_releases(
     let candidates = title_match::build_candidates(title.english.as_deref(), title.romaji.as_deref(), &synonyms);
     let mut lists = Vec::new();
     for candidate in &candidates {
-        lists.push(state.nyaa.search_local(candidate, Category::AnimeEnglishTranslated).await);
+        lists.push(state.nyaa.search_local(candidate, Category::AllAnime).await);
     }
     let names = title_match::match_names(title.english.as_deref(), title.romaji.as_deref(), &synonyms);
     let mut merged = merge_unique(lists);
@@ -707,8 +707,8 @@ async fn search_fansubber_releases(
         let (app, user, tag) = (state.inner().clone(), user.clone(), tag.to_string());
         searches.spawn(async move {
             let outcome = match &user {
-                Some(user) => app.nyaa.search_user(user, &candidate, Category::AnimeEnglishTranslated).await,
-                None => app.nyaa.search(&format!("{tag} {candidate}"), Category::AnimeEnglishTranslated).await,
+                Some(user) => app.nyaa.search_user(user, &candidate, Category::AllAnime).await,
+                None => app.nyaa.search(&format!("{tag} {candidate}"), Category::AllAnime).await,
             };
             (order, outcome)
         });

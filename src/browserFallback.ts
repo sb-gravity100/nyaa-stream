@@ -109,7 +109,7 @@ function sanitizeQuery(query: string): string {
 
 export async function fallbackSearchTorrents(query: string): Promise<any[]> {
   const sanitized = sanitizeQuery(query);
-  const url = `${NYAA_BASE_URL}/?page=rss&c=1_2&f=0&q=${encodeURIComponent(sanitized)}`;
+  const url = `${NYAA_BASE_URL}/?page=rss&c=1_0&f=0&q=${encodeURIComponent(sanitized)}`;
   const resp = await fetch(url);
   if (!resp.ok) throw new Error(`nyaa.si request failed: ${resp.status}`);
   const text = await resp.text();
