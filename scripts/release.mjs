@@ -90,7 +90,15 @@ function preflight(args) {
     fail(`src/changelog.ts has no CHANGELOG entry for ${version} - the What's new dialog would show nothing`);
   }
 
-  if (run("git", ["status", "--porcelain"]).out) fail("working tree is not clean");
+  // Content-based, not `git status --porcelain`: on Windows a file a build
+  // tool rewrote with other line endings but identical content shows there
+  // as modified (stale index stat after eol conversion) - that blocked the
+  // v0.4.2 release. Real edits, staged changes or untracked files still fail.
+  const dirty =
+    !run("git", ["diff", "--quiet"], { allowFail: true }).ok ||
+    !run("git", ["diff", "--cached", "--quiet"], { allowFail: true }).ok ||
+    run("git", ["ls-files", "--others", "--exclude-standard"]).out;
+  if (dirty) fail("working tree is not clean");
   const headTags = run("git", ["tag", "--points-at", "HEAD"]).out.split(/\s+/);
   if (!headTags.includes(tag)) {
     const msg = `HEAD is not tagged ${tag} (tags at HEAD: ${headTags.filter(Boolean).join(", ") || "none"})`;
