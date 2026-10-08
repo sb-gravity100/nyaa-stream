@@ -1,3 +1,9 @@
+### `be4c053` · 2026-10-08 · feat(title_match): primary season falls back to the prequel chain (split cours count once)
+- `src-tauri/src/title_match.rs`
+
+### `463dc98` · 2026-10-08 · fix(anime_lists): 10 min download limit (90 s timed out under a saturated connection), log the real error
+- `src-tauri/src/anime_lists.rs`
+
 ### `a8f3a9d` · 2026-10-08 · fix: a pack's season-less files cover only its named season (else season 1), not every season
 - `src/App.tsx`
 
