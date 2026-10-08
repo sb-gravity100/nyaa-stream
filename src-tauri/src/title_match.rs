@@ -194,6 +194,12 @@ fn names_extra(haystack: &str) -> bool {
     ["movie", "movies", "ova", "ovas", "oad", "oads", "special", "specials"].iter().any(|word| haystack.contains(&format!(" {word} ")))
 }
 
+/// Whether a normalized release title says it holds every season ("Complete
+/// Series+OVAs", "Full Series", "All Seasons"), whatever markers it lacks.
+fn names_whole_series(haystack: &str) -> bool {
+    ["complete series", "complete collection", "full series", "all seasons", "complete season", "complete batch"].iter().any(|phrase| haystack.contains(&format!(" {phrase}")))
+}
+
 fn is_tv(format: Option<&str>) -> bool {
     matches!(format, Some("TV" | "TV_SHORT"))
 }
@@ -369,14 +375,17 @@ impl ShowMatcher {
         // A pack naming several seasons may bundle them ("S01-S05 + OVA").
         let parsed = release_parse::parse_release(release_title);
         // (A season pack that bundles extras - "S01 + OVA" - is still its season's.)
-        if is_tv(self.format.as_deref()) && release_seasons.len() < 2 && (matches!(parsed.kind, Kind::Movie | Kind::Special) || (names_extra(&haystack) && !parsed.extras)) {
+        if is_tv(self.format.as_deref()) && release_seasons.len() < 2 && (matches!(parsed.kind, Kind::Movie | Kind::Special) || (names_extra(&haystack) && !parsed.extras && !names_whole_series(&haystack))) {
             tracing::trace!(release_title, "rejected: movie/special on a TV entry");
             return false;
         }
         // How specifically the release names this entry: a full name, else
         // the short name - which needs this entry's season: the marker, or
         // season 1 for a release that has none.
-        let in_season = release_seasons.iter().any(|season| self.seasons.contains(season));
+        // A whole-series pack, or (when this entry's season is unknown) a
+        // multi-season pack, can't contradict the entry's season.
+        let whole = (release_seasons.is_empty() && names_whole_series(&haystack)) || (self.seasons.is_empty() && release_seasons.len() >= 2);
+        let in_season = release_seasons.iter().any(|season| self.seasons.contains(season)) || whole;
         let mut own = Self::longest_match(&haystack, &self.names);
         if own == 0 {
             let effective_ok = in_season || (release_seasons.is_empty() && self.seasons.contains(&1));
@@ -524,6 +533,13 @@ mod tests {
         assert!(!tv.matches("[Koten_Gars] Shokugeki no Souma - OADs [DVD]"));
         assert!(tv.matches("[Anitsu] Shokugeki no Souma S01 + OVA [BD 1080p]"));
         assert!(tv.matches("[Sokudo] Shokugeki no Souma S1-S5+OVA v2 [1080p BD]"));
+    }
+
+    #[test]
+    fn complete_series_packs_belong_to_every_season() {
+        let third = food_wars(true, "Food Wars! The Third Plate", "Shokugeki no Souma: San no Sara");
+        assert!(third.matches("[DB] Shokugeki no Souma | Food Wars! (Complete Series+OVAs) [Dual Audio 10bit BD1080p][HEVC-x265]"));
+        assert!(third.matches("[Anime Time] Food Wars! (Shokugeki no Soma) S1 - S5 [Full Series][BD][Dual Audio]"));
     }
 
     #[test]
