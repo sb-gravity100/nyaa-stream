@@ -523,10 +523,18 @@ function App() {
       // A title reaching "unknown" already means no season marker was
       // found in the text either, so season 1 here matches what
       // extractSeasonNumber's default would have produced anyway.
-      const label: EpisodeLabel =
-        parsed.kind === "unknown" && details[source.view_url]?.is_batch
-          ? { kind: "batch", season: 1, episodeRange: null }
-          : parsed;
+      let label: EpisodeLabel = parsed;
+      const scraped = details[source.view_url];
+      if (parsed.kind === "unknown" && scraped?.is_batch !== false) {
+        // A matched release whose title names no episode is a season batch of
+        // this entry (the matcher already tied it to the show). Once its view
+        // page's file list is known, the seasons its files carry decide: a
+        // release with none of this entry's season is another season's pack.
+        // (A single-file release stays unknown.)
+        const fileSeasons = scraped?.seasons ?? [];
+        if (fileSeasons.length > 0 && !fileSeasons.includes(currentAnimeSeason)) continue;
+        label = { kind: "batch", season: currentAnimeSeason, episodeRange: null };
+      }
 
       // See loadEpisodeOffset's doc comment - a release numbered
       // absolutely across the whole franchise (its episode number is too
