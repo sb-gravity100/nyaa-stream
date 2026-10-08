@@ -1,3 +1,6 @@
+### `4be1330` · 2026-10-08 · docs: make Binge Mode fully customizable in PLAN.md
+- `PLAN.md`
+
 ### `01df104` · 2026-10-08 · docs: franchise-aware matching in PLAN, FILE_INDEX, PHASES
 - `PLAN.md`
 - `FILE_INDEX.md`
