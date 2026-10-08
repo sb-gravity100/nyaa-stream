@@ -1,3 +1,6 @@
+### `44a1381` · 2026-10-08 · docs: v0.4.2 published
+- `PLAN.md`
+
 ### `8b44754` · 2026-10-08 · docs: sync PLAN and CLAUDE.md with release-parse, db import and What's new fix
 - `CLAUDE.md`
 - `PLAN.md`
