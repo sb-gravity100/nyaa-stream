@@ -145,7 +145,12 @@ full architecture; summary:
   never pin an untagged commit or commit a local `[patch]` - use
   `npm run dev:sbtl-local`. Update workflow: PLAN.md "sbtl versions and
   updates"
-- `crates/nyaa-client` — nyaa.si search via RSS
+- `crates/nyaa-client` — nyaa.si search (paginated HTML scrape), the
+  permanent SQLite release store (`store.rs`, importable from Settings),
+  and `EpisodeLabel` on every result
+- `crates/release-parse` — release title parser: MPL-2.0 port of anitopy
+  plus nyaa fixes (TITLE_ANALYSIS.md); its files stay MPL-2.0. Check a
+  parser change against `src-tauri/tests/fixtures/nyaa_titles/corpus.txt`
 - `crates/anilist-client` — AniList GraphQL metadata client
 - `crates/mpv-player` — in-process libmpv (`libmpv-2.dll`, runtime-loaded,
   bundled from `src-tauri/lib/`): `EmbeddedMpv` (playback) and headless
