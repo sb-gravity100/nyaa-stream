@@ -1,3 +1,6 @@
+### `88870e9` · 2026-10-08 · fix: an unmarked release is offered per episode only once its file list shows the episode's season
+- `src/App.tsx`
+
 ### `be4c053` · 2026-10-08 · feat(title_match): primary season falls back to the prequel chain (split cours count once)
 - `src-tauri/src/title_match.rs`
 
