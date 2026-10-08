@@ -46,6 +46,13 @@ pub struct TorrentDetails {
     pub submitter: String,
     pub is_batch: bool,
     pub file_count: usize,
+    /// Every file in the torrent, in listed order, with per-video season and
+    /// episode (see `files`). Empty for details cached before this existed.
+    #[serde(default)]
+    pub files: Vec<TorrentFile>,
+    /// Union of the video files' seasons, ascending.
+    #[serde(default)]
+    pub seasons: Vec<u32>,
 }
 
 /// nyaa.si's search categories, passed as the `c` query param.
@@ -530,11 +537,14 @@ impl NyaaClient {
         let file_count = document.select(&file_selector).count();
         let is_batch = file_count > 1;
 
-        tracing::debug!(view_url, submitter, file_count, is_batch, "parsed nyaa.si view page");
+        let (files, seasons) = files::build_files(files::scrape_files(&document));
+        tracing::debug!(view_url, submitter, file_count, is_batch, listed = files.len(), ?seasons, "parsed nyaa.si view page");
         Ok(TorrentDetails {
             submitter,
             is_batch,
             file_count,
+            files,
+            seasons,
         })
     }
 }

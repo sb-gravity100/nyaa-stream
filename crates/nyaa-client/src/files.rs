@@ -2,6 +2,7 @@
 //! file's season / episode read from its name (or, failing that, from the
 //! folder it sits in: `Season 2/[Reza] Food Wars - 03.mkv`).
 
+use scraper::{ElementRef, Html, Selector};
 use serde::{Deserialize, Serialize};
 
 /// Extensions treated as video (lowercase, no dot).
@@ -40,6 +41,67 @@ pub(crate) fn parse_size(text: &str) -> Option<u64> {
 
 fn is_video(name: &str) -> bool {
     name.rsplit_once('.').is_some_and(|(_, ext)| VIDEO_EXTENSIONS.contains(&ext.to_ascii_lowercase().as_str()))
+}
+
+/// Walks the view page's `.torrent-file-list` into `(path, size)` pairs in
+/// listed order. Markup (verified live): folders are
+/// `<li><a class="folder"><i class="fa-folder"></i>NAME</a><ul>...</ul></li>`,
+/// files `<li><i class="fa-file"></i>NAME <span class="file-size">(1.2 GiB)</span></li>`.
+pub(crate) fn scrape_files(document: &Html) -> Vec<(String, u64)> {
+    let list = Selector::parse(".torrent-file-list > ul").unwrap();
+    let mut out = Vec::new();
+    for ul in document.select(&list) {
+        walk(ul, &mut Vec::new(), &mut out);
+    }
+    tracing::debug!(count = out.len(), "scraped torrent file list");
+    out
+}
+
+fn child_elements(el: ElementRef<'_>) -> impl Iterator<Item = ElementRef<'_>> {
+    el.children().filter_map(ElementRef::wrap)
+}
+
+fn walk(ul: ElementRef<'_>, folders: &mut Vec<String>, out: &mut Vec<(String, u64)>) {
+    for li in child_elements(ul).filter(|el| el.value().name() == "li") {
+        let folder = child_elements(li).find(|el| el.value().name() == "a" && el.value().has_class("folder", scraper::CaseSensitivity::CaseSensitive));
+        if let Some(folder) = folder {
+            let name = folder.text().collect::<String>().trim().to_string();
+            folders.push(name);
+            for sub in child_elements(li).filter(|el| el.value().name() == "ul") {
+                walk(sub, folders, out);
+            }
+            folders.pop();
+            continue;
+        }
+        if !child_elements(li).any(|el| el.value().name() == "i" && el.value().has_class("fa-file", scraper::CaseSensitivity::CaseSensitive)) {
+            continue;
+        }
+        let mut name = String::new();
+        let mut size = 0;
+        for node in li.children() {
+            if let Some(el) = ElementRef::wrap(node) {
+                if el.value().has_class("file-size", scraper::CaseSensitivity::CaseSensitive) {
+                    let text = el.text().collect::<String>();
+                    size = parse_size(&text).unwrap_or_else(|| {
+                        tracing::warn!(text, "unreadable torrent file size");
+                        0
+                    });
+                }
+            } else if let Some(text) = node.value().as_text() {
+                name.push_str(text);
+            }
+        }
+        let name = name.trim();
+        if name.is_empty() {
+            continue;
+        }
+        let mut path = folders.join("/");
+        if !path.is_empty() {
+            path.push('/');
+        }
+        path.push_str(name);
+        out.push((path, size));
+    }
 }
 
 /// Builds the file list from `(path, size)` pairs in listed order, and the
@@ -92,6 +154,32 @@ mod tests {
         assert_eq!(parse_size("3 KiB"), Some(3072));
         assert_eq!(parse_size("1 TiB"), Some(1u64 << 40));
         assert_eq!(parse_size("lots"), None);
+    }
+
+    #[test]
+    fn scrapes_nested_file_list() {
+        let html = r#"<div class="torrent-file-list panel-body"><ul>
+            <li><a href="" class="folder"><i class="fa fa-folder-open"></i>[Reza] Food Wars</a>
+            <ul data-show="yes">
+              <li><a href="" class="folder"><i class="fa fa-folder"></i>Season 1</a><ul>
+                <li><i class="fa fa-file"></i>[Reza] Food Wars S01E01.mkv <span class="file-size">(2.0 GiB)</span></li>
+                <li><i class="fa fa-file"></i>cover.jpg <span class="file-size">(120.5 KiB)</span></li>
+              </ul></li>
+              <li><a href="" class="folder"><i class="fa fa-folder"></i>Season 2</a><ul>
+                <li><i class="fa fa-file"></i>[Reza] Food Wars S02E01.mkv <span class="file-size">(1.9 GiB)</span></li>
+              </ul></li>
+            </ul></li>
+            <li><i class="fa fa-file"></i>notes.txt <span class="file-size">(1 KiB)</span></li>
+        </ul></div>"#;
+        let raw = scrape_files(&Html::parse_document(html));
+        assert_eq!(raw.len(), 4);
+        assert_eq!(raw[0], ("[Reza] Food Wars/Season 1/[Reza] Food Wars S01E01.mkv".to_string(), 2 * 1024 * 1024 * 1024));
+        assert_eq!(raw[1].0, "[Reza] Food Wars/Season 1/cover.jpg");
+        assert_eq!(raw[2].0, "[Reza] Food Wars/Season 2/[Reza] Food Wars S02E01.mkv");
+        assert_eq!(raw[3], ("notes.txt".to_string(), 1024));
+        let (files, seasons) = build_files(raw);
+        assert_eq!(seasons, vec![1, 2]);
+        assert_eq!(files[2].season, Some(2));
     }
 
     fn one(path: &str) -> (Option<u32>, Option<u32>) {
