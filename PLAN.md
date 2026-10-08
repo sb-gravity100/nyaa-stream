@@ -1501,6 +1501,49 @@ metadata fallback already exists)
 - Risks: AniList rate limit (90/min) - batch the rows into few queries and
   cache; recommendations depend on the user's history size.
 
+## Binge Mode (idea, target v1.1.0 - minor: new feature; after v1.0.0)
+
+Idea recorded 2026-10-08; **rough sketch only, no phases yet** (user chose
+PLAN.md-only for now). Whole-series queue: pick a show once and the app
+builds an ordered episode queue and plays it through without the user
+choosing a release per episode.
+
+- **Entry point**: a "Binge" button on the media page (and a context-menu
+  item, v0.5.0). Starts from episode 1, or from the resume point when the
+  show is in Continue watching.
+- **Queue building**: reuse the season-aware matcher (`ShowMatcher`,
+  `EpisodeLabel`, season sets) to list the entry's episodes from the release
+  store/nyaa results. Per episode choose one release by preference: same
+  group and quality as the previous episode, then seeders; a season batch
+  torrent counts as one source for all its episodes (play files from it
+  rather than switching torrents). Selection is stored per queue so it stays
+  stable across sessions.
+- **Playback**: when an episode ends (or at the outro), the next one starts
+  automatically with a short cancellable "Next: Ep N" overlay; the queue
+  continues across seasons only if the user opts in (sequel entries via
+  AniList relations). Queue state (current index, chosen releases) persists
+  in the app database so closing the app resumes mid-queue.
+- **Look-ahead**: while episode N plays, warm episode N+1 using the existing
+  prefetch/resume-buffer machinery (download cache, "Fast playback start");
+  look-ahead depth is a setting and respects the cache size cap.
+- **Queue UI**: a panel in the player and on the media page showing upcoming
+  episodes with the chosen release; reorder/skip/swap release per episode;
+  episodes with no source are shown greyed and skipped.
+- **Settings**: auto-advance on/off, look-ahead depth, prefer same
+  group/quality, cross-season continuation, skip intro/outro (only if
+  chapter data exists in the file; no external skip-time service).
+
+Open questions (to decide before this becomes phases):
+1. Is skip intro/outro in scope, or just auto-advance?
+2. Cross-season continuation: default on or off?
+3. Missing episode: skip silently, or pause and ask?
+4. Does Binge Mode replace the existing "next episode" behaviour or sit
+   beside it as an explicit mode?
+
+Risks: inconsistent release groups mid-series (quality/audio jumps), torrents
+with no seeders stalling the queue (needs a timeout then fall back to the
+next-best release), look-ahead bandwidth/disk use.
+
 ## Dev build speed (tooling, no version bump)
 
 Measured 2026-09-29: a dev build writes `nyaa_stream.pdb` (488 MB) and
