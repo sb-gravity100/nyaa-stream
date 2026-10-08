@@ -114,6 +114,8 @@ pub fn write_release_database(path: &Path, releases: &[(String, NyaaResult)]) ->
         }
     }
     tx.commit()?;
+    // A single self-contained file to hand around (no -wal/-shm sidecars).
+    conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE); PRAGMA journal_mode = DELETE;")?;
     tracing::info!(path = %path.display(), written, "release database written");
     Ok(written)
 }
