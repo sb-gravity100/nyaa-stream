@@ -1,3 +1,8 @@
+### `4bada10` · 2026-10-08 · chore: release v0.4.2
+- `package.json`
+- `src-tauri/Cargo.toml`
+- `src-tauri/tauri.conf.json`
+
 ### `fe95c93` · 2026-10-08 · docs: v0.4.2 checklist done (PHASES)
 - `PHASES.md`
 
