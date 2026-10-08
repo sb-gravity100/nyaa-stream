@@ -1,3 +1,6 @@
+### `6a7210b` · 2026-10-08 · build(release): refuse a version without a CHANGELOG entry
+- `scripts/release.mjs`
+
 ### `1a5eb81` · 2026-10-08 · fix: What's new shows after updates to 0.4.x and manual installs
 - `PHASES.md`
 - `src/WhatsNew.tsx`
