@@ -1,3 +1,9 @@
+### `e2e7332` · 2026-10-08 · docs(phases): tick apostrophe normalization
+- `PHASES.md`
+
+### `465a84c` · 2026-10-08 · fix(title_match): remove apostrophes instead of splitting on them
+- `src-tauri/src/title_match.rs`
+
 ### `e1b8421` · 2026-10-08 · docs(phases): tick CHANGELOG/README tasks
 - `PHASES.md`
 
