@@ -937,7 +937,7 @@ async fn play_magnet(
         .map(|file| PlayFile {
             hls_url: state.torrent_engine.hls_playlist_url(&added.id, file.index),
             stream_url: state.torrent_engine.stream_url(&added.id, file.index),
-            label: nyaa_client::EpisodeLabel::of(file.name.rsplit(['/', '\\']).next().unwrap_or(&file.name)),
+            label: nyaa_client::EpisodeLabel::of_path(&file.name),
             file,
         })
         .collect();

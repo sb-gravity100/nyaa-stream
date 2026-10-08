@@ -53,6 +53,30 @@ impl EpisodeLabel {
     }
 }
 
+impl EpisodeLabel {
+    /// Labels a file inside a torrent from its path. The file name is parsed
+    /// as `of` does; an episode or batch whose name carries no season takes
+    /// the nearest parent folder that names one ("Season 2/[Group] Show -
+    /// 05.mkv"), as season packs are commonly laid out.
+    pub fn of_path(path: &str) -> EpisodeLabel {
+        let mut parts = path.rsplit(['/', '\\']);
+        let name = parts.next().unwrap_or(path);
+        let mut label = EpisodeLabel::of(name);
+        let (season, seasons) = match &mut label {
+            EpisodeLabel::Episode { season, seasons, .. } | EpisodeLabel::Batch { season, seasons, .. } => (season, seasons),
+            _ => return label,
+        };
+        if seasons.is_empty() {
+            if let Some(folder_season) = parts.find_map(|folder| release_parse::parse_release(folder).seasons.first().copied()) {
+                tracing::trace!(path, folder_season, "file season taken from its folder");
+                *season = folder_season;
+                *seasons = vec![folder_season];
+            }
+        }
+        label
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -65,5 +89,16 @@ mod tests {
         assert_eq!(json, serde_json::json!({"kind": "batch", "season": 1, "episodeRange": [1, 24], "seasons": []}));
         let json = serde_json::to_value(EpisodeLabel::of("[ASW] Shingeki no Kyojin Movie - The Last Attack [1080p]")).unwrap();
         assert_eq!(json, serde_json::json!({"kind": "movie"}));
+    }
+
+    #[test]
+    fn files_take_their_season_from_a_folder() {
+        let label = EpisodeLabel::of_path("[Reza] Food Wars/Season 2/[Reza] Food Wars - 05.mkv");
+        assert_eq!(label, EpisodeLabel::Episode { season: 2, number: 5, seasons: vec![2] });
+        // The file's own marker wins over its folder.
+        let label = EpisodeLabel::of_path("Pack/Season 2/Show S03E05.mkv");
+        assert_eq!(label, EpisodeLabel::Episode { season: 3, number: 5, seasons: vec![3] });
+        // No season anywhere: unchanged from `of`.
+        assert_eq!(EpisodeLabel::of_path("Pack/Show - 05.mkv"), EpisodeLabel::of("Show - 05.mkv"));
     }
 }
