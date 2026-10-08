@@ -125,7 +125,7 @@
         matching marker accepted
   - [x] TVDB season numbers: fetch + cache Fribb/anime-lists, entry
         season set
-  - [ ] Entry season fallback + sibling names from the AniList prequel
+  - [x] Entry season fallback + sibling names from the AniList prequel
         chain; longest-name-wins assignment, kinds (movie/OVA/special)
         routed to their own entries
   - [ ] `build_candidates`: strip synonyms (roman numerals too), base-name

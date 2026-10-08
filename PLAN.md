@@ -1866,9 +1866,18 @@ Title formats this must handle are surveyed in `TITLE_ANALYSIS.md`
     fetched at runtime and cached on disk, refreshed weekly, not bundled.
   - the number in its own AniList titles ("Season N", "Nth Season", "SN",
     a roman numeral II-X after the name).
-  - its position in the AniList TV prequel chain (fallback when it isn't
-    in the dataset or we're offline). That chain is already walked for the
-    absolute-episode offset.
+  - the AniList TV prequel chain, as a **first-season flag only**
+    (decided 2026-10-08): a TV entry with no TV/TV_SHORT prequel (walked
+    through OVAs/movies) is season 1. The prequel *count* is not used: split
+    cours ("Cour 2", "Part 2") are separate entries, so Mushoku Tensei III
+    sits behind four TV entries but is season 3, and a wrong number would
+    reject real releases. Entries with a prequel and no other source get no
+    season set and keep today's rules.
+  The chain walk is `AniListClient::franchise` (PREQUEL/SEQUEL chains, side
+  stories, spin-offs, alternatives; titles and formats), cached a week per
+  entry in `<cache>/nyaa-stream/franchise/<id>.json` (`franchise_cache.rs`);
+  the full search loads it while nyaa.si is queried, the local and
+  fansubber-only searches use a cached copy only.
 
   "Part/Cour N" entries share their season's number.
 - *Season markers in a release* (§2): `S03`, `S3`, `Season 3`, `3rd
