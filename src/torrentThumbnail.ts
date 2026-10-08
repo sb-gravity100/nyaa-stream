@@ -119,7 +119,7 @@ export async function fetchTorrentThumbnail(
         return null;
       }
       console.debug("[capture_torrent_thumbnail] resolving candidate release", { anilistId, episode });
-      const results = await invoke<NyaaResult[]>("search_torrents_for_anime", { title });
+      const results = await invoke<NyaaResult[]>("search_torrents_for_anime", { title, anilistId });
       const candidate = pickCandidate(results, episode);
       if (!candidate) {
         console.debug("[capture_torrent_thumbnail] no matching release found", { anilistId, episode });

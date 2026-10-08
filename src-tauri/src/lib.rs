@@ -1,3 +1,4 @@
+mod anime_lists;
 mod cache;
 mod download_cache;
 mod load_trace;
@@ -37,6 +38,8 @@ struct AppState {
     /// goes ahead if nothing bumped it since (see `stop_playback`).
     stop_generation: std::sync::atomic::AtomicU64,
     thumbnail_cache_dir: PathBuf,
+    /// TVDB season numbers per AniList entry (Fribb/anime-lists) for season matching.
+    anime_lists: anime_lists::AnimeLists,
     /// Set after AniList turns us away - see `metadata_fallback`.
     anilist_cooldown: metadata_fallback::AniListCooldown,
     /// One torrent capture at a time: each adds a scratch torrent and a
@@ -589,6 +592,7 @@ async fn search_torrents_for_anime(
     state: State<'_, Arc<AppState>>,
     title: AnimeTitle,
     synonyms: Option<Vec<String>>,
+    anilist_id: Option<i64>,
     fansubber: Option<String>,
 ) -> Result<Vec<NyaaResult>, String> {
     let synonyms = synonyms.unwrap_or_default();
@@ -643,7 +647,7 @@ async fn search_torrents_for_anime(
         }
     }
 
-    let matcher = title_match::ShowMatcher::new(title.english.as_deref(), title.romaji.as_deref(), &synonyms);
+    let matcher = title_match::ShowMatcher::new(title.english.as_deref(), title.romaji.as_deref(), &synonyms, anilist_id.and_then(|id| state.anime_lists.tvdb_season(id)));
     let before = merged.len();
     merged.retain(|result| matcher.matches(&result.title));
     tracing::info!(kept = merged.len(), dropped = before - merged.len(), "dropped releases that don't name the show");
@@ -670,6 +674,7 @@ async fn search_local_releases(
     state: State<'_, Arc<AppState>>,
     title: AnimeTitle,
     synonyms: Option<Vec<String>>,
+    anilist_id: Option<i64>,
 ) -> Result<Vec<NyaaResult>, String> {
     let synonyms = synonyms.unwrap_or_default();
     let candidates = title_match::build_candidates(title.english.as_deref(), title.romaji.as_deref(), &synonyms);
@@ -677,7 +682,7 @@ async fn search_local_releases(
     for candidate in &candidates {
         lists.push(state.nyaa.search_local(candidate, Category::AllAnime).await);
     }
-    let matcher = title_match::ShowMatcher::new(title.english.as_deref(), title.romaji.as_deref(), &synonyms);
+    let matcher = title_match::ShowMatcher::new(title.english.as_deref(), title.romaji.as_deref(), &synonyms, anilist_id.and_then(|id| state.anime_lists.tvdb_season(id)));
     let mut merged = merge_unique(lists);
     merged.retain(|result| matcher.matches(&result.title));
     tracing::info!(count = merged.len(), "local release search for the show");
@@ -695,6 +700,7 @@ async fn search_fansubber_releases(
     state: State<'_, Arc<AppState>>,
     title: AnimeTitle,
     synonyms: Option<Vec<String>>,
+    anilist_id: Option<i64>,
     fansubber: String,
 ) -> Result<Vec<NyaaResult>, String> {
     let Some(tag) = fansubber.split_whitespace().next() else { return Ok(Vec::new()) };
@@ -725,7 +731,7 @@ async fn search_fansubber_releases(
         .filter_map(|(_, outcome)| outcome.inspect_err(|err| tracing::warn!(%err, "uploader-only search failed")).ok())
         .collect();
 
-    let matcher = title_match::ShowMatcher::new(title.english.as_deref(), title.romaji.as_deref(), &synonyms);
+    let matcher = title_match::ShowMatcher::new(title.english.as_deref(), title.romaji.as_deref(), &synonyms, anilist_id.and_then(|id| state.anime_lists.tvdb_season(id)));
     let mut merged = merge_unique(lists);
     let tag_word = title_match::normalize(tag);
     merged.retain(|result| matcher.matches(&result.title) && (user.is_some() || title_match::normalize(&result.title).split(' ').any(|w| w == tag_word)));
@@ -1406,6 +1412,14 @@ pub fn run() {
             .join("thumbnails");
         tracing::debug!(?thumbnail_cache_dir, "torrent thumbnail cache dir");
 
+        let anime_lists = anime_lists::AnimeLists::load(
+            dirs::cache_dir().unwrap_or_else(std::env::temp_dir).join("nyaa-stream").join("anime_lists.json"),
+        );
+        {
+            let anime_lists = anime_lists.clone();
+            tauri::async_runtime::spawn(async move { anime_lists.refresh_if_stale().await });
+        }
+
         Arc::new(AppState {
             anilist: AniListClient::new(),
             kitsu: KitsuClient::new(),
@@ -1418,6 +1432,7 @@ pub fn run() {
             current_torrent: Mutex::new(None),
             stop_generation: Default::default(),
             thumbnail_cache_dir,
+            anime_lists,
             anilist_cooldown: Default::default(),
             thumbnail_captures: tokio::sync::Semaphore::new(1),
             download_cache,

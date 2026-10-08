@@ -277,7 +277,7 @@ function App() {
         setSourcesLoading(false);
       };
       const preferredFansubber = getSettingsSnapshot().preferredFansubber.trim();
-      const args = { title: anime.title, synonyms: anime.synonyms ?? [] };
+      const args = { title: anime.title, synonyms: anime.synonyms ?? [], anilistId: anime.id };
       if (isTauriAvailable()) {
         // 1) what the local database already holds (instant), 2) only the preferred fansubber's uploads (a few requests).
         void invoke<NyaaResult[]>("search_local_releases", args)

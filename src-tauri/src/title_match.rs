@@ -132,14 +132,15 @@ pub fn release_seasons(release_title: &str) -> Vec<u32> {
 
 /// Season numbers an AniList entry goes by, read from its own titles
 /// ("Season 3", "3rd Season", "Mushoku Tensei III", "Final Season").
-/// Titles that name no season add nothing; the TVDB and prequel-chain
-/// sources join this set in later steps.
-pub fn entry_seasons(english: Option<&str>, romaji: Option<&str>, synonyms: &[String]) -> BTreeSet<u32> {
+/// plus its TVDB season (`anime_lists`). Titles that name no season add
+/// nothing; the prequel-chain fallback joins this set in a later step.
+pub fn entry_seasons(english: Option<&str>, romaji: Option<&str>, synonyms: &[String], tvdb_season: Option<u32>) -> BTreeSet<u32> {
     let seasons: BTreeSet<u32> = [english, romaji]
         .into_iter()
         .flatten()
         .chain(synonyms.iter().map(String::as_str))
         .flat_map(release_seasons)
+        .chain(tvdb_season)
         .collect();
     tracing::debug!(?seasons, "entry seasons from titles");
     seasons
@@ -181,7 +182,7 @@ pub struct ShowMatcher {
 }
 
 impl ShowMatcher {
-    pub fn new(english: Option<&str>, romaji: Option<&str>, synonyms: &[String]) -> Self {
+    pub fn new(english: Option<&str>, romaji: Option<&str>, synonyms: &[String], tvdb_season: Option<u32>) -> Self {
         let titles = names(english, romaji, synonyms);
         let mut bases: Vec<String> = Vec::new();
         for title in [english, romaji].into_iter().flatten() {
@@ -194,7 +195,7 @@ impl ShowMatcher {
                 }
             }
         }
-        let matcher = ShowMatcher { names: titles.iter().map(|name| normalize(name)).collect(), bases, seasons: entry_seasons(english, romaji, synonyms) };
+        let matcher = ShowMatcher { names: titles.iter().map(|name| normalize(name)).collect(), bases, seasons: entry_seasons(english, romaji, synonyms, tvdb_season) };
         tracing::debug!(names = ?matcher.names, bases = ?matcher.bases, seasons = ?matcher.seasons, "show matcher built");
         matcher
     }
@@ -244,7 +245,7 @@ mod tests {
 
     #[test]
     fn apostrophe_titles_match_either_spelling() {
-        let matcher = ShowMatcher::new(Some("Frieren: Beyond Journey's End"), None, &[]);
+        let matcher = ShowMatcher::new(Some("Frieren: Beyond Journey's End"), None, &[], None);
         assert!(matcher.matches("[Group] Frieren Beyond Journeys End - 01 [1080p]"));
         assert!(matcher.matches("[Group] Frieren Beyond Journey's End - 01 [1080p]"));
     }
@@ -261,14 +262,25 @@ mod tests {
     #[test]
     fn entry_seasons_come_from_titles() {
         let s = |v: &[u32]| v.iter().copied().collect::<BTreeSet<u32>>();
-        assert_eq!(entry_seasons(Some("That Time I Got Reincarnated as a Slime Season 4"), Some("Tensei shitara Slime Datta Ken 4th Season"), &[]), s(&[4]));
-        assert_eq!(entry_seasons(Some("Mushoku Tensei: Jobless Reincarnation Season 3"), Some("Mushoku Tensei III: Isekai Ittara Honki Dasu"), &[]), s(&[3]));
-        assert_eq!(entry_seasons(Some("Frieren: Beyond Journey's End"), Some("Sousou no Frieren"), &[]), s(&[]));
+        assert_eq!(entry_seasons(Some("That Time I Got Reincarnated as a Slime Season 4"), Some("Tensei shitara Slime Datta Ken 4th Season"), &[], None), s(&[4]));
+        assert_eq!(entry_seasons(Some("Mushoku Tensei: Jobless Reincarnation Season 3"), Some("Mushoku Tensei III: Isekai Ittara Honki Dasu"), &[], None), s(&[3]));
+        assert_eq!(entry_seasons(Some("Frieren: Beyond Journey's End"), Some("Sousou no Frieren"), &[], None), s(&[]));
+    }
+
+    #[test]
+    fn tvdb_season_joins_the_title_seasons() {
+        let s = |v: &[u32]| v.iter().copied().collect::<BTreeSet<u32>>();
+        // Demon Slayer's Swordsmith Village: "Season 3" on Crunchyroll, S4 on TVDB.
+        assert_eq!(entry_seasons(Some("Demon Slayer: Kimetsu no Yaiba Swordsmith Village Arc"), None, &[], Some(3)), s(&[3]));
+        assert_eq!(entry_seasons(Some("Kimetsu no Yaiba Season 3"), None, &[], Some(4)), s(&[3, 4]));
+        let matcher = ShowMatcher::new(Some("Frieren: Beyond Journey's End"), Some("Sousou no Frieren"), &[], Some(1));
+        assert!(matcher.matches("[Group] Sousou no Frieren S01E05 [1080p]"));
+        assert!(!matcher.matches("[Group] Sousou no Frieren S02E01 [1080p]"));
     }
 
     #[test]
     fn rejects_releases_of_other_seasons() {
-        let matcher = ShowMatcher::new(Some("That Time I Got Reincarnated as a Slime Season 3"), Some("Tensei shitara Slime Datta Ken 3rd Season"), &[]);
+        let matcher = ShowMatcher::new(Some("That Time I Got Reincarnated as a Slime Season 3"), Some("Tensei shitara Slime Datta Ken 3rd Season"), &[], None);
         assert!(matcher.matches("[Group] Tensei shitara Slime Datta Ken S03E05 [1080p]"));
         assert!(matcher.matches("[Group] That Time I Got Reincarnated as a Slime - 05 (3rd Season)"));
         assert!(!matcher.matches("[ToonsHub] That Time I Got Reincarnated as a Slime S04E21 [1080p]"));
@@ -277,7 +289,7 @@ mod tests {
 
     #[test]
     fn short_name_with_season_marker_is_accepted() {
-        let matcher = ShowMatcher::new(Some("Mushoku Tensei: Jobless Reincarnation Season 3"), Some("Mushoku Tensei III: Isekai Ittara Honki Dasu"), &[]);
+        let matcher = ShowMatcher::new(Some("Mushoku Tensei: Jobless Reincarnation Season 3"), Some("Mushoku Tensei III: Isekai Ittara Honki Dasu"), &[], None);
         assert!(matcher.matches("[Breeze] Mushoku Tensei S03E12 [1080p]"));
         assert!(matcher.matches("[MiniMTBB] Mushoku Tensei S3 - 14 | Jobless Reincarnation"));
         assert!(matcher.matches("[DKB] Mushoku Tensei: Isekai Ittara Honki Dasu - S03E14"));
@@ -289,7 +301,7 @@ mod tests {
 
     #[test]
     fn unknown_entry_season_keeps_todays_rules() {
-        let matcher = ShowMatcher::new(Some("Frieren: Beyond Journey's End"), Some("Sousou no Frieren"), &[]);
+        let matcher = ShowMatcher::new(Some("Frieren: Beyond Journey's End"), Some("Sousou no Frieren"), &[], None);
         assert!(matcher.matches("[Group] Sousou no Frieren S02E01 [1080p]"));
         assert!(matcher.matches("[Group] Frieren Beyond Journeys End - 05"));
         assert!(!matcher.matches("[Group] Fate strange Fake - 05"));
@@ -330,7 +342,7 @@ mod tests {
 
     #[test]
     fn matches_show_needs_whole_word_name() {
-        let matcher = ShowMatcher::new(Some("Fate/strange Fake"), None, &[]);
+        let matcher = ShowMatcher::new(Some("Fate/strange Fake"), None, &[], None);
         assert!(matcher.matches("[Kaleido-subs] Fate strange Fake - 13 (S01E13)"));
         assert!(matcher.matches("[Erai-raws] Fate/Strange Fake - 13 [1080p]"));
         assert!(!matcher.matches("[SubsPlease] Fate Grand Order - 13 (1080p)"));
