@@ -592,6 +592,16 @@ billing-locked, 2026-09-29). `npm run release -- --notes "<text>"`
    `gh release create v<v> --verify-tag` with the five files; notes = the
    `--notes` text.
 
+**Line endings** (found publishing v0.4.2, 2026-10-08; tooling, no
+version bump). With `core.autocrlf=true`, the build rewrote
+`src-tauri/Cargo.toml` with LF and `git status --porcelain` reported it
+modified although the content (blob hash) was identical, so the preflight
+refused a clean tree. Fixed twice over: `.gitattributes` pins
+`* text=auto eol=lf` (`.bat`/`.cmd`/`.ps1` CRLF) and every working copy
+was converted to LF, so a tool's LF rewrite is a no-op; and the preflight's
+clean-tree check is content-based (`git diff --quiet`, `git diff --cached
+--quiet`, untracked files) instead of `git status --porcelain`.
+
 Flags: `--dry-run` (build + stage files, no push/publish; a missing release
 tag is only a warning, so the build can be tested before tagging), `--skip-build`
 (reuse existing bundle output). `release.yml` keeps only its manual
