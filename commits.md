@@ -1,3 +1,6 @@
+### `b6c32ab` · 2026-10-08 · docs: Binge Mode OP/ED rules and decisions in PLAN.md
+- `PLAN.md`
+
 ### `4be1330` · 2026-10-08 · docs: make Binge Mode fully customizable in PLAN.md
 - `PLAN.md`
 
