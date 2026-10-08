@@ -1597,13 +1597,19 @@ until a later stage; label normalisation and fingerprinting get designed
 then. The first Binge Mode release ships the header button, setup modal,
 queue, auto-advance, release choice and look-ahead without skipping.
 
+**Watch order (decided 2026-10-08)**: the compile step uses AniList
+prequel/sequel relations only: walk back to the root prequel, then forward,
+TV entries in that order and checked. Movies, OVAs, specials and recaps are
+listed at the end, unchecked, and the user can drag to reorder anything. No
+auto-placement of specials in broadcast order (needs a curated source; a
+wrong guess is worse than a visible "unchecked at the end"). To verify before
+writing phases: whether the Fribb `anime_lists` TVDB season/episode mapping
+orders split-cour shows better than AniList alone.
+
 Open questions (to decide before this becomes phases):
-1. "Compile what needs to be watched": is the franchise watch order from
-   AniList relations enough, or should recap episodes / specials be placed
-   in broadcast order too?
-2. Multi-series marathons: keep, or one series per binge for the first
+1. Multi-series marathons: keep, or one series per binge for the first
    release?
-3. Does a preset also hold per-show overrides, or only the global defaults?
+2. Does a preset also hold per-show overrides, or only the global defaults?
 
 Risks: inconsistent release groups mid-series (quality/audio jumps), torrents
 with no seeders stalling the queue (needs a timeout then fall back to the
