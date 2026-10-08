@@ -1,3 +1,56 @@
+### `33f0530` · 2026-10-08 · docs: v0.4.3 fixture check results, index title_match_fixture_tests
+- `FILE_INDEX.md`
+- `PHASES.md`
+- `PLAN.md`
+
+### `0192da7` · 2026-10-08 · fix(title_match): fixture-found misses - same-season siblings, shared franchise short names, extras, roman numerals
+- `src-tauri/src/lib.rs`
+- `src-tauri/src/title_match.rs`
+- `src-tauri/src/title_match_fixture_tests.rs`
+
+### `983b821` · 2026-10-08 · test(title_match): fixture-driven recall/precision per franchise entry
+- `src-tauri/src/lib.rs`
+- `src-tauri/src/title_match_fixture_tests.rs`
+
+### `2e7b1fd` · 2026-10-08 · docs: changelog entries for v0.4.3
+- `CHANGELOG.md`
+- `src/changelog.ts`
+
+### `0a17f0b` · 2026-10-08 · docs: tick v0.4.3 steps 6-8, index files.rs and of_path
+- `FILE_INDEX.md`
+- `PHASES.md`
+
+### `e531eec` · 2026-10-08 · feat: episode-less matched releases are season batches; file-list seasons resolve unsure ones
+- `src/App.tsx`
+
+### `82362c5` · 2026-10-08 · feat(player): among a pack's files with the same episode number, prefer the episode group's season
+- `src/HlsPlayerView.tsx`
+- `src/MediaPage.tsx`
+- `src/PlayerView.tsx`
+
+### `5aa0789` · 2026-10-08 · feat: play files take their season from a parent folder (EpisodeLabel::of_path)
+- `crates/nyaa-client/src/label.rs`
+- `src-tauri/src/lib.rs`
+
+### `3e97f4f` · 2026-10-08 · feat(title_match): strip synonyms and roman numerals in queries, base-name query for season 2+
+- `src-tauri/src/lib.rs`
+- `src-tauri/src/title_match.rs`
+
+### `fadda7d` · 2026-10-08 · feat: TorrentDetails type carries files and seasons
+- `src/types.ts`
+
+### `2daf3b0` · 2026-10-08 · feat(nyaa-client): keep scraped view pages permanently in the release database
+- `crates/nyaa-client/src/lib.rs`
+- `crates/nyaa-client/src/store.rs`
+
+### `4325881` · 2026-10-08 · feat(nyaa-client): TorrentDetails carries the scraped file list and seasons
+- `crates/nyaa-client/src/files.rs`
+- `crates/nyaa-client/src/lib.rs`
+
+### `685896d` · 2026-10-08 · feat(nyaa-client): parse a torrent's file list into per-file season/episode
+- `crates/nyaa-client/src/files.rs`
+- `crates/nyaa-client/src/lib.rs`
+
 ### `b2c6421` · 2026-10-08 · docs: Binge Mode watch order decision in PLAN.md
 - `PLAN.md`
 
