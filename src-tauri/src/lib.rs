@@ -596,6 +596,22 @@ async fn load_franchise(state: &AppState, anilist_id: Option<i64>, network: bool
     }
 }
 
+/// The season an AniList entry is filed under (TVDB, else its titles, else 1
+/// for a first season), for the season filter and the player's file pick.
+#[tauri::command]
+async fn get_entry_season(
+    state: State<'_, Arc<AppState>>,
+    title: AnimeTitle,
+    synonyms: Option<Vec<String>>,
+    anilist_id: i64,
+) -> Result<Option<u32>, String> {
+    let synonyms = synonyms.unwrap_or_default();
+    let franchise = load_franchise(&state, Some(anilist_id), true).await;
+    let season = show_matcher(&state, &title, &synonyms, Some(anilist_id), franchise.as_ref()).primary_season();
+    tracing::debug!(anilist_id, ?season, "get_entry_season");
+    Ok(season)
+}
+
 /// The matcher for one show: its names, its TVDB season and, when known,
 /// its franchise (see `title_match::ShowMatcher`).
 fn show_matcher(state: &AppState, title: &AnimeTitle, synonyms: &[String], anilist_id: Option<i64>, franchise: Option<&anilist_client::Franchise>) -> title_match::ShowMatcher {
@@ -1535,6 +1551,7 @@ pub fn run() {
             search_fansubber_releases,
             get_popular_fansubbers,
             get_torrent_details_batch,
+            get_entry_season,
             play_magnet,
             get_stream_stats,
             get_subtitle_tracks,

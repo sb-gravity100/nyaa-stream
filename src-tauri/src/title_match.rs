@@ -296,6 +296,9 @@ pub struct ShowMatcher {
     format: Option<String>,
     /// Normalized names of the franchise's other entries.
     siblings: Vec<Vec<String>>,
+    /// The one season the entry is filed under: TVDB's, else the one its
+    /// titles name, else 1 for a first season. None when unknown.
+    primary: Option<u32>,
 }
 
 impl ShowMatcher {
@@ -312,7 +315,7 @@ impl ShowMatcher {
                 }
             }
         }
-        let matcher = ShowMatcher { names: titles.iter().map(|name| normalize(name)).collect(), bases, seasons: entry_seasons(english, romaji, synonyms, tvdb_season), format: None, siblings: Vec::new() };
+        let matcher = ShowMatcher { names: titles.iter().map(|name| normalize(name)).collect(), bases, seasons: entry_seasons(english, romaji, synonyms, tvdb_season), format: None, siblings: Vec::new(), primary: tvdb_season.or_else(|| entry_seasons(english, romaji, synonyms, None).iter().next().copied()) };
         tracing::debug!(names = ?matcher.names, bases = ?matcher.bases, seasons = ?matcher.seasons, "show matcher built");
         matcher
     }
@@ -325,6 +328,7 @@ impl ShowMatcher {
         self.format = franchise.format.clone();
         if is_tv(self.format.as_deref()) && !franchise.has_tv_prequel {
             self.seasons.insert(1);
+            self.primary.get_or_insert(1);
         }
         for base in shared_bases(&self.names, franchise) {
             if !self.bases.contains(&base) {
@@ -352,6 +356,11 @@ impl ShowMatcher {
     /// Words in the longest of `names` found in `haystack` (0 = none).
     fn longest_match(haystack: &str, names: &[String]) -> usize {
         names.iter().filter(|name| haystack.contains(&format!(" {name} "))).map(|name| name.split(' ').count()).max().unwrap_or(0)
+    }
+
+    /// The season the entry is filed under (see `primary`).
+    pub fn primary_season(&self) -> Option<u32> {
+        self.primary
     }
 
     /// Whether `release_title` belongs to this entry.
