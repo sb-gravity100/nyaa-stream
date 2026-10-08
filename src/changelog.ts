@@ -10,6 +10,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.4.3",
+    date: "2026-10-08",
+    features: [
+      "Search now covers nyaa's whole anime category, not only English-translated releases.",
+      "Season packs without an episode number show up as that season's batch, and a pack covering several seasons plays the right season's episode.",
+      "Releases written with just the short name and a season, like \"Mushoku Tensei S03E12\", now appear on that season's page.",
+    ],
+    fixes: [
+      "A season's page no longer lists other seasons' releases (Slime season 3 showing season 4, for example).",
+      "Sequels with their own long names, like Food Wars' \"The Second Plate\", no longer appear on the first season's page.",
+      "Movies, OVAs and specials stay off a TV season's episode list; they have their own pages.",
+      "Titles with apostrophes, like Frieren: Beyond Journey's End, match releases written without them.",
+    ],
+  },
+  {
     version: "0.4.2",
     date: "2026-10-08",
     features: [

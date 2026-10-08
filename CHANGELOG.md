@@ -9,11 +9,20 @@ step when cutting a release.
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-10-08
+
 ### Added
 - Search defaults to nyaa's "all anime" category (`c=1_0`) instead of English-translated only.
+- Season-aware source matching: an entry's seasons come from its titles, TVDB (Fribb/anime-lists, cached weekly) and its AniList franchise (a TV entry with no TV prequel is season 1).
+- Releases written with just the short name and a season ("Mushoku Tensei S03E12") now match that season's entry; later-season entries also search the short base name.
+- Season packs without an episode number are batches of the matched season; a torrent's file list (scraped from its nyaa.si view page, kept permanently in the release database) decides the unclear ones.
+- Files inside a pack take their season from a parent folder ("Season 2/"), and the player prefers the episode group's season when a pack holds the same episode number in several seasons.
 
-### Planned
-- v0.4.3: season-aware source matching (see `PLAN.md`).
+### Fixed
+- A season's page no longer lists other seasons' releases.
+- Sequels with their own longer names ("Food Wars! The Second Plate") go to their own entry.
+- Movies, OVAs and specials stay off a TV season's episode list.
+- Titles with apostrophes ("Journey's End") match releases written without them.
 
 ## [0.4.2] - 2026-10-08
 
@@ -95,7 +104,8 @@ step when cutting a release.
 ### Added
 - First release: AniList/Kitsu metadata, nyaa.si search and ranking, torrent streaming, and an embedded libmpv player with an HLS fallback.
 
-[Unreleased]: https://github.com/sb-gravity100/nyaa-stream/compare/v0.4.2...HEAD
+[Unreleased]: https://github.com/sb-gravity100/nyaa-stream/compare/v0.4.3...HEAD
+[0.4.3]: https://github.com/sb-gravity100/nyaa-stream/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/sb-gravity100/nyaa-stream/compare/v0.4.0...v0.4.2
 [0.4.0]: https://github.com/sb-gravity100/nyaa-stream/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/sb-gravity100/nyaa-stream/compare/v0.3.1...v0.3.2
