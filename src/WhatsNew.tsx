@@ -1,6 +1,6 @@
 import { getVersion } from "@tauri-apps/api/app";
 import { useEffect, useRef, useState } from "preact/hooks";
-import { changesBetween, type ChangelogEntry } from "./changelog";
+import { changesBetween, compareVersions, type ChangelogEntry } from "./changelog";
 
 /** Set by `installUpdate` just before installing (see updater.ts). */
 export const UPDATED_FROM_KEY = "nyaa-stream:updatedFrom";
@@ -40,6 +40,17 @@ function bridgedMarker(running: string): UpdatedFrom | null {
   }
 }
 
+/** An update that didn't go through the in-app updater (e.g. the setup
+ * .exe run by hand): the last recorded launch was an older version. */
+function launchedOlder(running: string): UpdatedFrom | null {
+  try {
+    const last = localStorage.getItem(LAST_VERSION_KEY);
+    return last && compareVersions(last, running) < 0 ? { from: last, to: running } : null;
+  } catch {
+    return null;
+  }
+}
+
 function recordVersion(running: string) {
   try {
     localStorage.setItem(LAST_VERSION_KEY, running);
@@ -60,7 +71,8 @@ function clearMarker() {
  * entries between the old and the new version. Never on a fresh install or
  * a normal launch (no marker), and a marker from a failed install (its `to`
  * isn't the running version) is dropped silently. Updates from 0.3.1 and
- * older (no marker) are recognized by `bridgedMarker`. */
+ * older (no marker) are recognized by `bridgedMarker`, and updates installed
+ * outside the in-app updater by `launchedOlder`. */
 export function WhatsNew() {
   const [entries, setEntries] = useState<ChangelogEntry[]>([]);
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -69,7 +81,7 @@ export function WhatsNew() {
     if (!("__TAURI_INTERNALS__" in window)) return;
     void getVersion()
       .then((running) => {
-        const marker = readMarker() ?? bridgedMarker(running);
+        const marker = readMarker() ?? launchedOlder(running) ?? bridgedMarker(running);
         recordVersion(running);
         if (!marker) return;
         clearMarker();

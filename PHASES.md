@@ -96,6 +96,11 @@
   - [x] Dataset: `build_dataset` example builds a release database from
         crawl JSON (nyaasi_extractor output); the 2026-10-08 crawls compiled
         to `nyaa-dataset-2026-10-08.db` (11,148 releases, kept outside the repo)
+  - [x] What's new fix (found 2026-10-08): `CHANGELOG` had no 0.4.x
+        entries, so updates to 0.4.x showed nothing; entries for 0.4.0-0.4.2,
+        a last-launched-version fallback (updates installed outside the
+        in-app updater), and `release.mjs` refuses a version with no
+        `CHANGELOG` entry
   - [x] `chore: release v0.4.2` + tag (publish decision: see Release plan)
 - [ ] Season-aware source matching - v0.4.3 (patch: fix), see PLAN.md
       "Season-aware source matching". One commit each:
