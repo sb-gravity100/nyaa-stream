@@ -1,3 +1,7 @@
+### `79b3419` · 2026-10-08 · docs: plan the line-ending fix (PLAN, PHASES)
+- `PHASES.md`
+- `PLAN.md`
+
 ### `0ab8b9b` · 2026-10-08 · docs(plan): record c=1_0 main nyaa filter
 - `PLAN.md`
 
