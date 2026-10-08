@@ -107,6 +107,9 @@ interface Props {
    /** Episode number when the group is a numbered episode; used to find the
     * right file inside a batch torrent. */
    episode: number | null;
+   /** The episode group's season: among a pack's files with the same
+    * episode number, the ones of this season win. */
+   season?: number | null;
    releases: NyaaResult[];
    onClose: () => void;
    /** Present when there's a next episode to go to. */
@@ -212,6 +215,7 @@ function pickFile(
    files: PlayFile[],
    defaultIdx: number,
    episode: number | null,
+   season: number | null = null,
 ): { file: PlayFile; matched: boolean } | null {
    const videos = files.filter((f) => f.isVideo);
    if (videos.length > 1 && episode != null) {
@@ -220,7 +224,10 @@ function pickFile(
          return label.kind === "episode" && label.number === episode;
       });
       if (matches.length > 0) {
-         const pick = matches.reduce((a, b) => (b.length > a.length ? b : a));
+         // Several seasons in one pack: this entry's season first.
+         const inSeason = season == null ? [] : matches.filter((f) => labelOf(f.label, baseName(f.name)).kind === "episode" && (labelOf(f.label, baseName(f.name)) as { season: number }).season === season);
+         const candidates = inSeason.length > 0 ? inSeason : matches;
+         const pick = candidates.reduce((a, b) => (b.length > a.length ? b : a));
          console.info("[player] matched episode file in batch", {
             episode,
             file: pick.name,
@@ -269,6 +276,7 @@ function MpvPlayerView({
    episodeKey,
    progressKey,
    episode,
+   season = null,
    releases,
    onClose,
    onNext,
@@ -465,7 +473,7 @@ function MpvPlayerView({
             // default) - never an extra that happens to parse as "01".
             const picked = isMovie(anime)
                ? ((f) => (f ? { file: f, matched: true } : null))(session.files.find((f) => f.index === session.defaultFileIdx))
-               : pickFile(session.files, session.defaultFileIdx, episode);
+               : pickFile(session.files, session.defaultFileIdx, episode, season);
             const file = picked?.file ?? null;
             if (!picked || !file) {
                setError("This torrent has no playable video file.");
