@@ -102,6 +102,10 @@
         in-app updater), and `release.mjs` refuses a version with no
         `CHANGELOG` entry
   - [x] `chore: release v0.4.2` + tag (publish decision: see Release plan)
+  - [x] Published 2026-10-08
+  - [x] Line-ending fix (tooling, no bump; PLAN.md "Line endings"):
+        `.gitattributes` pins LF, working copies converted, release
+        preflight's clean-tree check content-based
 - [ ] Season-aware source matching - v0.4.3 (patch: fix), see PLAN.md
       "Season-aware source matching". One commit each:
   - [ ] `title_match.rs`: apostrophe-removing normalization
