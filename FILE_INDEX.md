@@ -11,6 +11,7 @@
 | `.githooks/pre-commit` | Non-blocking reminder to bump the version when code changed since the latest tag (enable: `git config core.hooksPath .githooks`) | config, release |
 | `scripts/fetch-native-deps.mjs` | `npm run setup`: downloads + checksum-verifies + extracts the prebuilt native libs (`native-deps-v1` release asset) into `vcpkg_installed/`, replacing a local vcpkg build | build-config, setup |
 | `scripts/make-installer-art.ps1`, `src-tauri/installer/{banner,dialog}.bmp` | Renders the MSI (WiX) banner + welcome-dialog artwork from the app icon and brand colors (System.Drawing); wired in via `bundle.windows.wix` in `tauri.conf.json` | config, release, installer |
+| `CHANGELOG.md` | Release history (Keep a Changelog), mirrors `src/changelog.ts` + `Unreleased` | docs |
 | `README.md` | Public overview: features, stack, build prerequisites, release steps | docs |
 | `PLAN.md` | Stack, architecture, data flow, known gaps | docs |
 | `PHASES.md` | Build order / task list | docs |

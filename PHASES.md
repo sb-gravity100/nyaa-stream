@@ -106,6 +106,14 @@
   - [x] Line-ending fix (tooling, no bump; PLAN.md "Line endings"):
         `.gitattributes` pins LF, working copies converted, release
         preflight's clean-tree check content-based
+- [ ] Docs: `CHANGELOG.md` + README refresh (docs only, no bump). One commit each:
+  - [ ] `CHANGELOG.md` (Keep a Changelog; 0.1.0-0.4.2 from `src/changelog.ts`
+        and the tag history, `Unreleased` above them)
+  - [ ] README refresh: status line, features since 0.3.x (download cache,
+        resume buffer, title bar/splash, release database import, Help),
+        `release-parse` in architecture/layout, Releasing steps match
+        `scripts/release.mjs`, link to `CHANGELOG.md`
+  - [ ] PLAN.md/FILE_INDEX.md sync
 - [ ] Season-aware source matching - v0.4.3 (patch: fix), see PLAN.md
       "Season-aware source matching". One commit each:
   - [ ] `title_match.rs`: apostrophe-removing normalization

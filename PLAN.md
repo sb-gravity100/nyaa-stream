@@ -956,6 +956,9 @@ never on a fresh install or a normal launch.
   written for 0.4.0/0.4.1, so updating to 0.4.x showed nothing - the
   dialog has nothing to list). `release.mjs`'s preflight now refuses a
   version without one.
+- **`CHANGELOG.md`** (2026-10-08) is the developer-facing mirror of
+  `src/changelog.ts` (Keep a Changelog format, plus an `Unreleased`
+  section). Add the entry to both when a release is cut.
 
 **Splash screen** (user request 2026-09-29, "startup was pretty slow"). The
 log of that launch: the Rust side was ready 0.5s in, but the page's first
