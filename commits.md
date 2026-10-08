@@ -1,3 +1,17 @@
+### `e1b8421` · 2026-10-08 · docs(phases): tick CHANGELOG/README tasks
+- `PHASES.md`
+
+### `9fed59a` · 2026-10-08 · docs(readme): refresh for v0.4.x and link CHANGELOG.md
+- `README.md`
+
+### `b96f966` · 2026-10-08 · docs: add CHANGELOG.md
+- `CHANGELOG.md`
+
+### `395780b` · 2026-10-08 · docs(plan): CHANGELOG.md and README refresh
+- `PHASES.md`
+- `PLAN.md`
+- `FILE_INDEX.md`
+
 ### `79b3419` · 2026-10-08 · docs: plan the line-ending fix (PLAN, PHASES)
 - `PHASES.md`
 - `PLAN.md`
