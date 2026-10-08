@@ -510,7 +510,7 @@ function App() {
   const groupedSources = useMemo(() => {
     if (selectedAnime && isMovie(selectedAnime)) return movieSources(sources);
     const groups = new Map<string, { label: EpisodeLabel; releases: NyaaResult[] }>();
-    const packs: { source: NyaaResult; label: Extract<EpisodeLabel, { kind: "batch" }> }[] = [];
+    const packs: { source: NyaaResult; label: Extract<EpisodeLabel, { kind: "batch" }>; explicit: boolean }[] = [];
     const addToGroup = (label: EpisodeLabel, source: NyaaResult) => {
       const key = episodeLabelText(label);
       const bucket = groups.get(key) ?? { label, releases: [] };
@@ -622,7 +622,8 @@ function App() {
         continue;
       }
 
-      if (label.kind === "batch") packs.push({ source, label });
+      // `explicit`: the title itself says it is a pack (not a guess for an unmarked release).
+      if (label.kind === "batch") packs.push({ source, label, explicit: parsed.kind === "batch" });
       addToGroup(label, source);
     }
     // A pack with no episode range (a season pack, "S1-S5", "Complete
@@ -633,7 +634,7 @@ function App() {
     for (const group of groups.values()) {
       if (group.label.kind !== "episode") continue;
       const { season, number } = group.label;
-      for (const { source, label } of packs) {
+      for (const { source, label, explicit } of packs) {
         if (label.episodeRange !== null || group.releases.includes(source)) continue;
         const files = details[source.view_url]?.files ?? [];
         // A file with no season anywhere takes its pack's single named
@@ -644,7 +645,7 @@ function App() {
         const covers =
           files.length > 0
             ? files.some((f) => f.episode === number && (f.season ?? unmarkedSeason) === season)
-            : label.season === season || (label.seasons ?? []).includes(season);
+            : explicit && (label.season === season || (label.seasons ?? []).includes(season));
         if (covers) group.releases.push(source);
       }
     }
