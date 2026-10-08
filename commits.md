@@ -1,3 +1,9 @@
+### `69d2363` · 2026-10-08 · fix(title_match): complete-series packs and multi-season packs on entries of unknown season
+- `src-tauri/src/title_match.rs`
+
+### `89aa7ce` · 2026-10-08 · fix: multi-season and complete-series packs show on every season they cover
+- `src/App.tsx`
+
 ### `33f0530` · 2026-10-08 · docs: v0.4.3 fixture check results, index title_match_fixture_tests
 - `FILE_INDEX.md`
 - `PHASES.md`
