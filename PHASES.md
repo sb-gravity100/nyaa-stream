@@ -79,7 +79,7 @@
 - [x] Per-anime preferred fansub group memory (`releases.ts`): remembered
       once a release actually starts playing, preferred by the auto-pick
       when reasonably seeded, then preferred resolution, then seeders
-- [ ] Release parsing + nyaa.si database import - v0.4.2 (patch: fix),
+- [x] Release parsing + nyaa.si database import - v0.4.2 (patch: fix),
       see PLAN.md "Season-aware source matching" (scope split 2026-10-06)
   - [x] Fixtures: crawled titles + expected entry/season
         (`src-tauri/tests/fixtures/nyaa_titles/`), 10,151-title corpus
@@ -90,12 +90,13 @@
   - [x] `EpisodeLabel` on `NyaaResult` and play files; frontend uses it
         (`labelOf`), `episodeParser.ts` parsing only as the browser
         preview fallback; movie/special groups
-  - [ ] nyaa.si database import: `Store::import` (ATTACH, releases only,
+  - [x] nyaa.si database import: `Store::import` (ATTACH, releases only,
         fresher row wins, `words` recomputed), `import_nyaa_database`
         command, Settings button
-  - [ ] Dataset: `build_dataset` example builds a release database from
-        crawl JSON (nyaasi_extractor output); today's crawls compiled
-  - [ ] `chore: release v0.4.2` + tag (publish decision: see Release plan)
+  - [x] Dataset: `build_dataset` example builds a release database from
+        crawl JSON (nyaasi_extractor output); the 2026-10-08 crawls compiled
+        to `nyaa-dataset-2026-10-08.db` (11,148 releases, kept outside the repo)
+  - [x] `chore: release v0.4.2` + tag (publish decision: see Release plan)
 - [ ] Season-aware source matching - v0.4.3 (patch: fix), see PLAN.md
       "Season-aware source matching". One commit each:
   - [ ] `title_match.rs`: apostrophe-removing normalization
