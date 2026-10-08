@@ -1534,8 +1534,25 @@ choosing a release per episode.
   Settings → Binge Mode and a per-show override saved with the queue
   (set from the Binge button's options popover):
   - Auto-advance: on / ask each time / off; overlay countdown length.
-  - Skip intro/outro: off / auto-skip / show a skip button (only when the
-    file has chapter data; no external skip-time service).
+  - Skip intro/outro: off / auto-skip / show a skip button. OP and ED are
+    separate switches, plus these opt-in exceptions (all optional, all off
+    by default):
+    - *Keep first OP*: never skip the OP of the series' first episode.
+    - *Keep last ED*: never skip the ED of the series' last episode.
+    - *Season-aware*: on seasoned series, play the OP the first time it is
+      seen in a season (episode 1 of that season) and play the ED only at
+      the very end of the season; skip them everywhere else.
+    - *OP/ED change tracking* (WIP, best-effort): long-running series swap
+      their OP/ED every cour. Each distinct OP/ED is treated as its own
+      "theme" so "first time" / "last time" apply per theme, not per series:
+      the first episode using a new OP plays it, the rest skip it, and the
+      last episode of a theme's run can keep its ED. A theme is identified
+      by chapter titles (`OP`, `ED`, `Opening 2`...) when the file has them,
+      else by a repeated-segment fingerprint across the queue's episodes
+      (audio/video match of the same span in consecutive episodes). It is
+      not deterministic yet: when detection is unsure it falls back to
+      "don't skip" and never cuts story content. No external skip-time
+      service.
   - Release choice: prefer same group / same quality / most seeders / smallest
     size; preferred groups, resolution, audio and sub language lists.
   - Season batches: allow or avoid them as a source.
@@ -1548,11 +1565,16 @@ choosing a release per episode.
   Defaults are conservative (auto-advance on, same group/quality, no
   cross-season, ask on missing episode, look-ahead 1).
 
+Decided 2026-10-08: Binge Mode is an **explicit mode** (the existing "next
+episode" behaviour stays as is, untouched); settings are saved as **named
+presets** (e.g. "Dub marathon"), possibly - a later stage, not blocking the
+first release of Binge Mode.
+
 Open questions (to decide before this becomes phases):
-1. Does Binge Mode replace the existing "next episode" behaviour or sit
-   beside it as an explicit mode (leaning: explicit mode, and its
-   auto-advance setting subsumes the old one)?
-2. Should settings be shareable as named presets (e.g. "Dub marathon")?
+1. OP/ED detection: chapter titles only for the first release, with
+   fingerprinting as a later stage? (Fingerprinting is the hard part and
+   what makes theme tracking deterministic.)
+2. Does a preset also hold per-show overrides, or only the global defaults?
 
 Risks: inconsistent release groups mid-series (quality/audio jumps), torrents
 with no seeders stalling the queue (needs a timeout then fall back to the
