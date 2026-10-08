@@ -1,3 +1,14 @@
+### `5e8190f` · 2026-10-08 · docs: sync FILE_INDEX and PHASES for anime_lists
+- `FILE_INDEX.md`
+- `PHASES.md`
+
+### `5605d3d` · 2026-10-08 · feat: TVDB season numbers from Fribb/anime-lists join the entry season set
+- `src-tauri/src/anime_lists.rs`
+- `src-tauri/src/lib.rs`
+- `src-tauri/src/title_match.rs`
+- `src/App.tsx`
+- `src/torrentThumbnail.ts`
+
 ### `e74ed39` · 2026-10-08 · docs: sync FILE_INDEX and PHASES for ShowMatcher
 - `FILE_INDEX.md`
 - `PHASES.md`
