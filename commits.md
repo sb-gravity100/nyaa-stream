@@ -1,3 +1,6 @@
+### `319b37a` · 2026-10-08 · docs: Binge Mode header button and setup modal in PLAN.md
+- `PLAN.md`
+
 ### `b6c32ab` · 2026-10-08 · docs: Binge Mode OP/ED rules and decisions in PLAN.md
 - `PLAN.md`
 
