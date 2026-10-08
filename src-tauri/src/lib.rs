@@ -9,6 +9,8 @@ mod metadata_fallback;
 mod player;
 pub(crate) mod resume;
 mod title_match;
+#[cfg(test)]
+mod title_match_fixture_tests;
 
 use std::path::PathBuf;
 use std::sync::Arc;
