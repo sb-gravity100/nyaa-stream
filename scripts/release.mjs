@@ -85,6 +85,10 @@ function preflight(args) {
   if (v.pkg !== v.conf || v.pkg !== v.cargo) fail(`versions out of lockstep: ${JSON.stringify(v)}`);
   const version = v.pkg;
   const tag = `v${version}`;
+  // The What's new dialog shows nothing for a version missing here.
+  if (!readFileSync("src/changelog.ts", "utf8").includes(`version: "${version}"`)) {
+    fail(`src/changelog.ts has no CHANGELOG entry for ${version} - the What's new dialog would show nothing`);
+  }
 
   if (run("git", ["status", "--porcelain"]).out) fail("working tree is not clean");
   const headTags = run("git", ["tag", "--points-at", "HEAD"]).out.split(/\s+/);
