@@ -189,7 +189,8 @@ nyaa_stream/
   crates/
     sbtl-engine/             torrent engine over sbtl: torrents, readers, stats, trackers, idle removal
     torrent-engine/          local streaming/HLS HTTP server over sbtl-engine
-    nyaa-client/              nyaa.si search client (paginated HTML scrape)
+    nyaa-client/              nyaa.si search client (paginated HTML scrape, SQLite release store, EpisodeLabel)
+    release-parse/           release title parser: MPL-2.0 port of anitopy + nyaa fixes
     anilist-client/          AniList GraphQL client
     kitsu-client/            Kitsu API client (backdrop + episode thumbnails)
     mpv-player/                 in-process libmpv: embedded (playback) + headless (thumbnail capture)
@@ -235,9 +236,13 @@ nyaa_stream/
    `get_anime_details` lazily fetches the fuller AniList record (synopsis,
    `streamingEpisodes` thumbnails) that the lightweight dropdown search
    doesn't request.
-3. Each nyaa.si result is parsed by `episodeParser.ts` into season/episode
-   or batch (deterministic regex, not fuzzy matching — verified against a
-   150-title real-world scrape). Batches with an explicit episode range in
+3. Each nyaa.si result is parsed in the backend by `crates/release-parse`
+   (MPL-2.0 anitopy port + nyaa fixes, since v0.4.2 - see "Season-aware
+   source matching") into an `EpisodeLabel` (episode / batch / movie /
+   special / unknown) carried on the `NyaaResult` and on play files; the
+   frontend reads it via `labelOf`, and `episodeParser.ts`'s regex parser
+   remains only as the browser-preview fallback (until v0.4.2 it was the
+   parser, verified against a 150-title scrape). Batches with an explicit episode range in
    the title are spread across the specific episodes they cover; ambiguous
    titles fall back to `get_torrent_details_batch`, which scrapes each
    torrent's own nyaa.si view page for its real file count (batch or not)
@@ -556,6 +561,11 @@ then again after merging `sbtl-backend`. With libtorrent removed there is
 no engine to fall back to: an sbtl problem in v0.4.0 is fixed forward in
 a published **v0.4.x** patch release (the one exception to the three
 releases above).
+
+**v0.4.2** (release parsing, nyaa.si database import, What's new fix) is
+bumped and tagged locally; whether to publish it - it isn't an sbtl fix,
+so it falls outside the exception above - is the user's call (asked
+2026-10-08).
 
 **Local release script** (GitHub Actions is unavailable: the account is
 billing-locked, 2026-09-29). `npm run release -- --notes "<text>"`
@@ -924,6 +934,13 @@ never on a fresh install or a normal launch.
   launch records `nyaa-stream:lastVersion`; with no record yet but existing
   `nyaa-stream:*` user data, the launch counts as an update from 0.3.1. A
   fresh install has no data and shows nothing.
+- **Updates outside the in-app updater** (v0.4.2): no marker, but a
+  recorded `lastVersion` older than the running one counts as an update
+  from it (the setup .exe run by hand).
+- **Every release needs a `CHANGELOG` entry** (found 2026-10-08: none were
+  written for 0.4.0/0.4.1, so updating to 0.4.x showed nothing - the
+  dialog has nothing to list). `release.mjs`'s preflight now refuses a
+  version without one.
 
 **Splash screen** (user request 2026-09-29, "startup was pretty slow"). The
 log of that launch: the Rust side was ready 0.5s in, but the page's first
@@ -1749,7 +1766,9 @@ Python and run offline):
    is labelled season 1 (roman numerals aren't read); `S02E00-E06` and
    `S00E02-E03` are labelled single episodes, not ranges.
 
-**Fix** (`src-tauri/src/title_match.rs` + `episodeParser.ts`):
+**Fix** (`src-tauri/src/title_match.rs` + the parser - done in
+`crates/release-parse` in v0.4.2, which replaced `episodeParser.ts`'s
+parsing; the parser bullets below are implemented there):
 
 **Parser design: anitopy-style, in Rust** (decided 2026-10-06). Release
 titles are parsed by one Rust crate (`crates/release-parse`, a fork/port of
@@ -1876,7 +1895,10 @@ says 3) still mis-assign unless the name or file names say otherwise.
 **Test data**: titles (+ sizes) from the crawls are committed as fixtures
 (`src-tauri/tests/fixtures/nyaa_titles/`), with expected entry/season per
 title for the Mushoku Tensei, Slime and Food Wars franchises. They're used
-by `title_match.rs` unit tests and an `episodeParser` check script.
+by `title_match.rs` unit tests. `corpus.txt` (10,151 unlabelled titles) is
+the whole-corpus regression set for `release-parse`: diff
+`examples/parse_lines.rs` / `examples/labels.rs` output before and after a
+parser change and review every changed title.
 
 ## Known gaps / not yet implemented
 
