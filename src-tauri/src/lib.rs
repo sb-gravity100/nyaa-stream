@@ -609,7 +609,7 @@ async fn search_torrents_for_anime(
     fansubber: Option<String>,
 ) -> Result<Vec<NyaaResult>, String> {
     let synonyms = synonyms.unwrap_or_default();
-    let candidates = title_match::build_candidates(title.english.as_deref(), title.romaji.as_deref(), &synonyms);
+    let candidates = title_match::build_candidates(title.english.as_deref(), title.romaji.as_deref(), &synonyms, anilist_id.and_then(|id| state.anime_lists.tvdb_season(id)));
     if candidates.is_empty() {
         tracing::warn!("search_torrents_for_anime called with no usable title");
         return Ok(Vec::new());
@@ -699,7 +699,7 @@ async fn search_local_releases(
     anilist_id: Option<i64>,
 ) -> Result<Vec<NyaaResult>, String> {
     let synonyms = synonyms.unwrap_or_default();
-    let candidates = title_match::build_candidates(title.english.as_deref(), title.romaji.as_deref(), &synonyms);
+    let candidates = title_match::build_candidates(title.english.as_deref(), title.romaji.as_deref(), &synonyms, anilist_id.and_then(|id| state.anime_lists.tvdb_season(id)));
     let mut lists = Vec::new();
     for candidate in &candidates {
         lists.push(state.nyaa.search_local(candidate, Category::AllAnime).await);
@@ -732,7 +732,7 @@ async fn search_fansubber_releases(
     let Some(tag) = fansubber.split_whitespace().next() else { return Ok(Vec::new()) };
     let user = state.nyaa.resolve_fansubber(tag).await;
     let synonyms = synonyms.unwrap_or_default();
-    let candidates = title_match::build_candidates(title.english.as_deref(), title.romaji.as_deref(), &synonyms);
+    let candidates = title_match::build_candidates(title.english.as_deref(), title.romaji.as_deref(), &synonyms, anilist_id.and_then(|id| state.anime_lists.tvdb_season(id)));
 
     let mut searches = tokio::task::JoinSet::new();
     for (order, candidate) in candidates.into_iter().enumerate() {

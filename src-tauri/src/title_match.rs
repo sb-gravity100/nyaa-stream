@@ -86,18 +86,35 @@ pub fn strip_season_suffix(title: &str) -> Option<String> {
     None
 }
 
+/// Drops a trailing roman-numeral season ("Mob Psycho 100 III" -> "Mob
+/// Psycho 100"). None when there is none, or it would leave a single word
+/// ("Rocky V" is not season five of "Rocky").
+fn strip_roman_suffix(title: &str) -> Option<String> {
+    let words: Vec<&str> = title.split_whitespace().collect();
+    let last = words.last()?.trim_end_matches(|c: char| !c.is_alphanumeric()).to_lowercase();
+    (words.len() > 2 && is_roman_numeral(&last)).then(|| words[..words.len() - 1].join(" "))
+}
+
+/// `title` plus its forms without a season qualifier or roman numeral
+/// ("... 3rd Season", "... III"), because groups write the bare name.
+fn season_free_variants(title: &str) -> Vec<String> {
+    let mut variants = vec![title.to_string()];
+    variants.extend(strip_season_suffix(title));
+    let romans: Vec<String> = variants.iter().filter_map(|v| strip_roman_suffix(v)).collect();
+    variants.extend(romans);
+    variants
+}
+
 /// Every name a release of this show might carry: full titles, with the
 /// season qualifier stripped, and Latin-script synonyms. Subtitles are kept:
 /// they tell sibling entries apart ("Fate/strange Fake" vs its "Whispers of
 /// Dawn" special), which a stripped query would merge.
 fn names(english: Option<&str>, romaji: Option<&str>, synonyms: &[String]) -> Vec<String> {
     let mut all: Vec<String> = Vec::new();
-    for base in [english, romaji].into_iter().flatten() {
-        all.push(base.to_string());
-        let unseasoned = strip_season_suffix(base);
-        all.extend(unseasoned);
+    let latin_synonyms = synonyms.iter().filter(|s| is_latin(s) && normalize(s).len() >= MIN_SYNONYM_LEN);
+    for title in [english, romaji].into_iter().flatten().chain(latin_synonyms.map(String::as_str)) {
+        all.extend(season_free_variants(title));
     }
-    all.extend(synonyms.iter().filter(|s| is_latin(s) && normalize(s).len() >= MIN_SYNONYM_LEN).cloned());
     let mut seen = BTreeSet::new();
     all.retain(|name| {
         let key = normalize(name);
@@ -109,8 +126,20 @@ fn names(english: Option<&str>, romaji: Option<&str>, synonyms: &[String]) -> Ve
 /// The nyaa.si queries to run: the show's names minus any whose words are a
 /// superset of another's (see the module comment), fewest words first,
 /// capped at `MAX_CANDIDATES`.
-pub fn build_candidates(english: Option<&str>, romaji: Option<&str>, synonyms: &[String]) -> Vec<String> {
-    let all = names(english, romaji, synonyms);
+///
+/// For a season 2+ entry the short base name ("Mushoku Tensei") joins the
+/// names: groups write it with a season marker, and its words are a subset of
+/// the full names', so those are dropped and the query count doesn't grow.
+pub fn build_candidates(english: Option<&str>, romaji: Option<&str>, synonyms: &[String], tvdb_season: Option<u32>) -> Vec<String> {
+    let mut all = names(english, romaji, synonyms);
+    if entry_seasons(english, romaji, synonyms, tvdb_season).iter().any(|season| *season >= 2) {
+        for title in [english, romaji].into_iter().flatten() {
+            let unseasoned = strip_season_suffix(title);
+            all.extend(unseasoned.as_deref().into_iter().chain(std::iter::once(title)).filter_map(base_title));
+        }
+        let mut seen = BTreeSet::new();
+        all.retain(|name| seen.insert(normalize(name)));
+    }
     let token_sets: Vec<BTreeSet<String>> = all.iter().map(|name| tokens(name)).collect();
     let mut kept: Vec<(usize, &String)> = all
         .iter()
@@ -172,14 +201,19 @@ fn is_roman_numeral(word: &str) -> bool {
 /// III: Isekai Ittara Honki Dasu" -> "mushoku tensei"). None when it is under
 /// 2 words or 5 characters, because shorter names match unrelated shows.
 fn base_name(title: &str) -> Option<String> {
+    base_title(title).map(|base| normalize(&base))
+}
+
+/// `base_name` in the title's own spelling, usable as a search query.
+fn base_title(title: &str) -> Option<String> {
     let head = title.split(':').next().unwrap_or(title);
-    let normalized = normalize(head);
-    let mut words: Vec<&str> = normalized.split(' ').collect();
-    if words.len() > 1 && words.last().is_some_and(|w| is_roman_numeral(w)) {
+    let mut words: Vec<&str> = head.split_whitespace().collect();
+    if words.len() > 1 && words.last().is_some_and(|w| is_roman_numeral(&normalize(w))) {
         words.pop();
     }
     let base = words.join(" ");
-    (words.len() >= 2 && base.len() >= MIN_BASE_NAME_LEN).then_some(base)
+    let normalized = normalize(&base);
+    (normalized.split(' ').count() >= 2 && normalized.len() >= MIN_BASE_NAME_LEN).then_some(base)
 }
 
 /// Decides which returned releases belong to one AniList entry: its names
@@ -431,16 +465,37 @@ mod tests {
             Some("That Time I Got Reincarnated as a Slime Season 4"),
             Some("Tensei shitara Slime Datta Ken 4th Season"),
             &["Tensura".to_string(), "\u{8EE2}\u{751F}".to_string()],
+            None,
         );
         assert_eq!(candidates, vec!["Tensura", "Tensei shitara Slime Datta Ken", "That Time I Got Reincarnated as a Slime"]);
     }
 
     #[test]
+    fn synonyms_and_roman_numerals_are_stripped_in_queries() {
+        let candidates = build_candidates(Some("Mob Psycho 100 III"), Some("Mob Psycho 100 III"), &["Mob Psycho 100 3rd Season".to_string()], None);
+        assert_eq!(candidates, vec!["Mob Psycho 100"]);
+        assert_eq!(strip_roman_suffix("Rocky V"), None);
+        assert_eq!(strip_roman_suffix("Mob Psycho 100 III").as_deref(), Some("Mob Psycho 100"));
+    }
+
+    #[test]
+    fn later_seasons_query_the_short_base_name() {
+        let candidates = build_candidates(Some("Mushoku Tensei: Jobless Reincarnation Season 3"), Some("Mushoku Tensei III: Isekai Ittara Honki Dasu"), &[], None);
+        assert_eq!(candidates, vec!["Mushoku Tensei"]);
+        // Season 1 keeps its full names.
+        let first = build_candidates(Some("Mushoku Tensei: Jobless Reincarnation"), Some("Mushoku Tensei: Isekai Ittara Honki Dasu"), &[], Some(1));
+        assert_eq!(first, vec!["Mushoku Tensei: Jobless Reincarnation", "Mushoku Tensei: Isekai Ittara Honki Dasu"]);
+        // A TVDB season >= 2 alone is enough.
+        let tvdb = build_candidates(Some("Kimetsu no Yaiba: Yuukaku-hen"), None, &[], Some(2));
+        assert_eq!(tvdb, vec!["Kimetsu no Yaiba"]);
+    }
+
+    #[test]
     fn fate_strange_fake_collapses_to_one_query() {
-        let candidates = build_candidates(Some("Fate/strange Fake"), Some("Fate/strange Fake"), &[]);
+        let candidates = build_candidates(Some("Fate/strange Fake"), Some("Fate/strange Fake"), &[], None);
         assert_eq!(candidates, vec!["Fate/strange Fake"]);
         // The subtitle tells the special apart from the TV series: kept.
-        let candidates = build_candidates(Some("Fate/strange Fake: Whispers of Dawn"), Some("Fate/strange Fake: Whispers of Dawn"), &[]);
+        let candidates = build_candidates(Some("Fate/strange Fake: Whispers of Dawn"), Some("Fate/strange Fake: Whispers of Dawn"), &[], None);
         assert_eq!(candidates, vec!["Fate/strange Fake: Whispers of Dawn"]);
     }
 
