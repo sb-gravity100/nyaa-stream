@@ -1,3 +1,17 @@
+### `01df104` · 2026-10-08 · docs: franchise-aware matching in PLAN, FILE_INDEX, PHASES
+- `PLAN.md`
+- `FILE_INDEX.md`
+- `PHASES.md`
+
+### `0094b79` · 2026-10-08 · feat: franchise-aware matching - first-season flag, sibling routing, movies/specials off TV entries
+- `src-tauri/src/title_match.rs`
+- `src-tauri/src/franchise_cache.rs`
+- `src-tauri/src/lib.rs`
+
+### `48a841e` · 2026-10-08 · feat(anilist-client): franchise() - prequel/sequel chains, side stories, first-season flag
+- `crates/anilist-client/src/lib.rs`
+- `crates/anilist-client/examples/franchise_debug.rs`
+
 ### `4caabf5` · 2026-10-08 · docs: add Binge Mode idea to PLAN.md (v1.1.0)
 - `PLAN.md`
 
