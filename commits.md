@@ -1,3 +1,6 @@
+### `4caabf5` · 2026-10-08 · docs: add Binge Mode idea to PLAN.md (v1.1.0)
+- `PLAN.md`
+
 ### `5e8190f` · 2026-10-08 · docs: sync FILE_INDEX and PHASES for anime_lists
 - `FILE_INDEX.md`
 - `PHASES.md`
