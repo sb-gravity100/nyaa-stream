@@ -1,3 +1,7 @@
+### `8b44754` · 2026-10-08 · docs: sync PLAN and CLAUDE.md with release-parse, db import and What's new fix
+- `CLAUDE.md`
+- `PLAN.md`
+
 ### `6a7210b` · 2026-10-08 · build(release): refuse a version without a CHANGELOG entry
 - `scripts/release.mjs`
 
