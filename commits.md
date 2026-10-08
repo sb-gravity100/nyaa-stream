@@ -1,3 +1,6 @@
+### `b3847e5` · 2026-10-08 · build(release): content-based clean-tree check
+- `scripts/release.mjs`
+
 ### `308157f` · 2026-10-08 · build: .gitattributes pins LF line endings
 - `.gitattributes`
 
