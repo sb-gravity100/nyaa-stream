@@ -1,3 +1,6 @@
+### `308157f` · 2026-10-08 · build: .gitattributes pins LF line endings
+- `.gitattributes`
+
 ### `44a1381` · 2026-10-08 · docs: v0.4.2 published
 - `PLAN.md`
 
