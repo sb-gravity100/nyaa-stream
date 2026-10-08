@@ -1,3 +1,7 @@
+### `ed03291` · 2026-10-08 · feat(search): default nyaa filter to all anime (c=1_0)
+- `src-tauri/src/lib.rs`
+- `src/browserFallback.ts`
+
 ### `b3847e5` · 2026-10-08 · build(release): content-based clean-tree check
 - `scripts/release.mjs`
 
