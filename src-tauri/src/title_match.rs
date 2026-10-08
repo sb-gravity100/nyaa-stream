@@ -118,6 +118,31 @@ pub fn build_candidates(english: Option<&str>, romaji: Option<&str>, synonyms: &
     kept.into_iter().take(MAX_CANDIDATES).map(|(_, name)| name.clone()).collect()
 }
 
+/// Seasons a release title names (ascending; empty = no season marker). An
+/// `SxxEyy` marker outranks other markers and multi-season packs give every
+/// season: both are `release-parse` rules, so the matcher and the frontend
+/// labels can't disagree.
+pub fn release_seasons(release_title: &str) -> Vec<u32> {
+    let seasons = release_parse::parse_release(release_title).seasons;
+    tracing::trace!(release_title, ?seasons, "release seasons");
+    seasons
+}
+
+/// Season numbers an AniList entry goes by, read from its own titles
+/// ("Season 3", "3rd Season", "Mushoku Tensei III", "Final Season").
+/// Titles that name no season add nothing; the TVDB and prequel-chain
+/// sources join this set in later steps.
+pub fn entry_seasons(english: Option<&str>, romaji: Option<&str>, synonyms: &[String]) -> BTreeSet<u32> {
+    let seasons: BTreeSet<u32> = [english, romaji]
+        .into_iter()
+        .flatten()
+        .chain(synonyms.iter().map(String::as_str))
+        .flat_map(release_seasons)
+        .collect();
+    tracing::debug!(?seasons, "entry seasons from titles");
+    seasons
+}
+
 /// Whether a release title contains one of the show's names as whole words.
 /// `names` are the output of `match_names`.
 pub fn matches_show(release_title: &str, names: &[String]) -> bool {
@@ -152,6 +177,23 @@ mod tests {
         let names = match_names(Some("Frieren: Beyond Journey's End"), None, &[]);
         assert!(matches_show("[Group] Frieren Beyond Journeys End - 01 [1080p]", &names));
         assert!(matches_show("[Group] Frieren Beyond Journey's End - 01 [1080p]", &names));
+    }
+
+    #[test]
+    fn release_seasons_follow_release_parse() {
+        assert_eq!(release_seasons("[Breeze] Mushoku Tensei S03E12 [1080p]"), vec![3]);
+        assert_eq!(release_seasons("[MiniMTBB] Mushoku Tensei S3 - 14 | Jobless Reincarnation"), vec![3]);
+        assert_eq!(release_seasons("[Anime Time] Mushoku Tensei S01-S04 [BD]"), vec![1, 2, 3, 4]);
+        assert_eq!(release_seasons("[VARYG] Tensei shitara Slime S04E03 (That Time I Got Reincarnated as a Slime 3rd Season)"), vec![4]);
+        assert!(release_seasons("[SubsPlease] Frieren - 01 (1080p)").is_empty());
+    }
+
+    #[test]
+    fn entry_seasons_come_from_titles() {
+        let s = |v: &[u32]| v.iter().copied().collect::<BTreeSet<u32>>();
+        assert_eq!(entry_seasons(Some("That Time I Got Reincarnated as a Slime Season 4"), Some("Tensei shitara Slime Datta Ken 4th Season"), &[]), s(&[4]));
+        assert_eq!(entry_seasons(Some("Mushoku Tensei: Jobless Reincarnation Season 3"), Some("Mushoku Tensei III: Isekai Ittara Honki Dasu"), &[]), s(&[3]));
+        assert_eq!(entry_seasons(Some("Frieren: Beyond Journey's End"), Some("Sousou no Frieren"), &[]), s(&[]));
     }
 
     #[test]

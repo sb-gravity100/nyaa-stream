@@ -36,6 +36,7 @@ tracing-appender = "0.2"
 torrent-engine = { path = "../crates/torrent-engine" }
 nyaa-client = { path = "../crates/nyaa-client" }
 anilist-client = { path = "../crates/anilist-client" }
+release-parse = { path = "../crates/release-parse" }
 kitsu-client = { path = "../crates/kitsu-client" }
 mpv-player = { path = "../crates/mpv-player" }
 # Native clipboard for the player's Ctrl+C frame copy: the WebView's async
