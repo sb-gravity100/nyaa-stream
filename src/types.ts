@@ -44,10 +44,26 @@ export interface NyaaResult {
   label?: EpisodeLabel;
 }
 
+/** One file of a torrent, from its nyaa.si view page. */
+export interface TorrentFile {
+  /** Folders and file name joined with `/`. */
+  path: string;
+  size: number;
+  /** Position among all files, in listed order. */
+  index: number;
+  /** Video files only; null = no season marker anywhere (unknown). */
+  season: number | null;
+  episode: number | null;
+}
+
 export interface TorrentDetails {
   submitter: string;
   is_batch: boolean;
   file_count: number;
+  /** Absent in the browser preview and in details cached before v0.4.3. */
+  files?: TorrentFile[];
+  /** Union of the video files' seasons, ascending. */
+  seasons?: number[];
 }
 
 export interface AiringMedia {
