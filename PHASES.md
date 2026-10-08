@@ -121,7 +121,7 @@
         multi-season packs, `SxxEyy` precedence) + entry season numbers
         from titles; matcher also checks the whole title (mixed-script
         titles like `路人超能 100 第三季 / Mob Psycho 100 III`)
-  - [ ] `title_match.rs`: reject other-season releases; base name +
+  - [x] `title_match.rs`: reject other-season releases; base name +
         matching marker accepted
   - [ ] TVDB season numbers: fetch + cache Fribb/anime-lists, entry
         season set
