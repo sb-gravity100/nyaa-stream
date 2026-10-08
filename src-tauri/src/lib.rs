@@ -1,6 +1,7 @@
 mod anime_lists;
 mod cache;
 mod download_cache;
+mod franchise_cache;
 mod load_trace;
 mod logs_export;
 mod media_keys;
@@ -40,6 +41,8 @@ struct AppState {
     thumbnail_cache_dir: PathBuf,
     /// TVDB season numbers per AniList entry (Fribb/anime-lists) for season matching.
     anime_lists: anime_lists::AnimeLists,
+    /// Prequel/sequel neighbours per AniList entry - see `franchise_cache`.
+    franchise_cache: franchise_cache::FranchiseCache,
     /// Set after AniList turns us away - see `metadata_fallback`.
     anilist_cooldown: metadata_fallback::AniListCooldown,
     /// One torrent capture at a time: each adds a scratch torrent and a
@@ -573,6 +576,16 @@ async fn search_torrents(state: State<'_, Arc<AppState>>, query: String) -> Resu
     }
 }
 
+/// The matcher for one show: its names, its TVDB season and, when known,
+/// its franchise (see `title_match::ShowMatcher`).
+fn show_matcher(state: &AppState, title: &AnimeTitle, synonyms: &[String], anilist_id: Option<i64>, franchise: Option<&anilist_client::Franchise>) -> title_match::ShowMatcher {
+    let matcher = title_match::ShowMatcher::new(title.english.as_deref(), title.romaji.as_deref(), synonyms, anilist_id.and_then(|id| state.anime_lists.tvdb_season(id)));
+    match franchise {
+        Some(franchise) => matcher.with_franchise(franchise),
+        None => matcher,
+    }
+}
+
 /// Searches nyaa.si for an AniList anime and merges the results
 /// (deduplicated by view URL).
 ///
@@ -602,6 +615,11 @@ async fn search_torrents_for_anime(
         return Ok(Vec::new());
     }
     tracing::debug!(?candidates, "search_torrents_for_anime invoked");
+    // The franchise (sibling names, first-season flag) loads while nyaa.si is searched.
+    let franchise_task = anilist_id.map(|id| {
+        let app = state.inner().clone();
+        tokio::spawn(async move { app.franchise_cache.get(&app.anilist, id).await })
+    });
 
     let mut searches = tokio::task::JoinSet::new();
     for (order, candidate) in candidates.into_iter().enumerate() {
@@ -647,7 +665,11 @@ async fn search_torrents_for_anime(
         }
     }
 
-    let matcher = title_match::ShowMatcher::new(title.english.as_deref(), title.romaji.as_deref(), &synonyms, anilist_id.and_then(|id| state.anime_lists.tvdb_season(id)));
+    let franchise = match franchise_task {
+        Some(task) => task.await.ok().flatten(),
+        None => None,
+    };
+    let matcher = show_matcher(&state, &title, &synonyms, anilist_id, franchise.as_ref());
     let before = merged.len();
     merged.retain(|result| matcher.matches(&result.title));
     tracing::info!(kept = merged.len(), dropped = before - merged.len(), "dropped releases that don't name the show");
@@ -682,7 +704,11 @@ async fn search_local_releases(
     for candidate in &candidates {
         lists.push(state.nyaa.search_local(candidate, Category::AllAnime).await);
     }
-    let matcher = title_match::ShowMatcher::new(title.english.as_deref(), title.romaji.as_deref(), &synonyms, anilist_id.and_then(|id| state.anime_lists.tvdb_season(id)));
+    let franchise = match anilist_id {
+        Some(id) => state.franchise_cache.cached(id).await,
+        None => None,
+    };
+    let matcher = show_matcher(&state, &title, &synonyms, anilist_id, franchise.as_ref());
     let mut merged = merge_unique(lists);
     merged.retain(|result| matcher.matches(&result.title));
     tracing::info!(count = merged.len(), "local release search for the show");
@@ -731,7 +757,11 @@ async fn search_fansubber_releases(
         .filter_map(|(_, outcome)| outcome.inspect_err(|err| tracing::warn!(%err, "uploader-only search failed")).ok())
         .collect();
 
-    let matcher = title_match::ShowMatcher::new(title.english.as_deref(), title.romaji.as_deref(), &synonyms, anilist_id.and_then(|id| state.anime_lists.tvdb_season(id)));
+    let franchise = match anilist_id {
+        Some(id) => state.franchise_cache.cached(id).await,
+        None => None,
+    };
+    let matcher = show_matcher(&state, &title, &synonyms, anilist_id, franchise.as_ref());
     let mut merged = merge_unique(lists);
     let tag_word = title_match::normalize(tag);
     merged.retain(|result| matcher.matches(&result.title) && (user.is_some() || title_match::normalize(&result.title).split(' ').any(|w| w == tag_word)));
@@ -1433,6 +1463,7 @@ pub fn run() {
             stop_generation: Default::default(),
             thumbnail_cache_dir,
             anime_lists,
+            franchise_cache: franchise_cache::FranchiseCache::new(dirs::cache_dir().unwrap_or_else(std::env::temp_dir).join("nyaa-stream").join("franchise")),
             anilist_cooldown: Default::default(),
             thumbnail_captures: tokio::sync::Semaphore::new(1),
             download_cache,

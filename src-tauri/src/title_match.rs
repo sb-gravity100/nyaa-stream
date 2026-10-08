@@ -12,6 +12,9 @@
 
 use std::collections::BTreeSet;
 
+use anilist_client::Franchise;
+use release_parse::Kind;
+
 /// Most queries sent per show - each is at least one nyaa.si request.
 const MAX_CANDIDATES: usize = 4;
 /// Shortest normalized synonym worth its own query: short aliases match far
@@ -152,6 +155,14 @@ fn haystack(text: &str) -> String {
     format!(" {} ", normalize(text))
 }
 
+fn is_tv(format: Option<&str>) -> bool {
+    matches!(format, Some("TV" | "TV_SHORT"))
+}
+
+fn parse_kind(release_title: &str) -> Kind {
+    release_parse::parse_release(release_title).kind
+}
+
 fn is_roman_numeral(word: &str) -> bool {
     matches!(word, "ii" | "iii" | "iv" | "v" | "vi" | "vii" | "viii" | "ix" | "x")
 }
@@ -179,6 +190,10 @@ pub struct ShowMatcher {
     names: Vec<String>,
     bases: Vec<String>,
     seasons: BTreeSet<u32>,
+    /// The entry's AniList format (TV, MOVIE, OVA, ...), once known.
+    format: Option<String>,
+    /// Normalized names of the franchise's other entries.
+    siblings: Vec<Vec<String>>,
 }
 
 impl ShowMatcher {
@@ -195,9 +210,32 @@ impl ShowMatcher {
                 }
             }
         }
-        let matcher = ShowMatcher { names: titles.iter().map(|name| normalize(name)).collect(), bases, seasons: entry_seasons(english, romaji, synonyms, tvdb_season) };
+        let matcher = ShowMatcher { names: titles.iter().map(|name| normalize(name)).collect(), bases, seasons: entry_seasons(english, romaji, synonyms, tvdb_season), format: None, siblings: Vec::new() };
         tracing::debug!(names = ?matcher.names, bases = ?matcher.bases, seasons = ?matcher.seasons, "show matcher built");
         matcher
+    }
+
+    /// Adds what the franchise says: a TV entry with no TV prequel is season
+    /// 1, the entry's format keeps movies/OVAs/specials off a TV season's
+    /// list, and the other entries' names let a release that names a sibling
+    /// more specifically go to it.
+    pub fn with_franchise(mut self, franchise: &Franchise) -> Self {
+        self.format = franchise.format.clone();
+        if is_tv(self.format.as_deref()) && !franchise.has_tv_prequel {
+            self.seasons.insert(1);
+        }
+        self.siblings = franchise
+            .relatives
+            .iter()
+            .map(|relative| names(relative.title.english.as_deref(), relative.title.romaji.as_deref(), &relative.synonyms).iter().map(|name| normalize(name)).collect())
+            .collect();
+        tracing::debug!(format = ?self.format, seasons = ?self.seasons, siblings = self.siblings.len(), "show matcher given its franchise");
+        self
+    }
+
+    /// Words in the longest of `names` found in `haystack` (0 = none).
+    fn longest_match(haystack: &str, names: &[String]) -> usize {
+        names.iter().filter(|name| haystack.contains(&format!(" {name} "))).map(|name| name.split(' ').count()).max().unwrap_or(0)
     }
 
     /// Whether `release_title` belongs to this entry.
@@ -211,7 +249,21 @@ impl ShowMatcher {
             tracing::trace!(release_title, ?release_seasons, entry_seasons = ?self.seasons, "rejected: other season");
             return false;
         }
-        if self.names.iter().any(|name| haystack.contains(&format!(" {name} "))) {
+        // Movies, OVAs and specials are filed under their own entry, not
+        // a TV season's episode list.
+        if is_tv(self.format.as_deref()) && matches!(parse_kind(release_title), Kind::Movie | Kind::Special) {
+            tracing::trace!(release_title, "rejected: movie/special on a TV entry");
+            return false;
+        }
+        let own = Self::longest_match(&haystack, &self.names);
+        if own > 0 {
+            // A sibling's longer, more specific name wins ("Food Wars! The
+            // Second Plate" is not the first season's).
+            let sibling = self.siblings.iter().map(|names| Self::longest_match(&haystack, names)).max().unwrap_or(0);
+            if sibling > own {
+                tracing::trace!(release_title, own, sibling, "rejected: names a sibling more specifically");
+                return false;
+            }
             return true;
         }
         // The short name needs this entry's season: the marker, or season 1
@@ -276,6 +328,58 @@ mod tests {
         let matcher = ShowMatcher::new(Some("Frieren: Beyond Journey's End"), Some("Sousou no Frieren"), &[], Some(1));
         assert!(matcher.matches("[Group] Sousou no Frieren S01E05 [1080p]"));
         assert!(!matcher.matches("[Group] Sousou no Frieren S02E01 [1080p]"));
+    }
+
+    fn relative(english: &str, romaji: &str, relation: &str, format: &str) -> anilist_client::Relative {
+        anilist_client::Relative {
+            id: 1,
+            title: anilist_client::AnimeTitle { english: Some(english.into()), romaji: Some(romaji.into()), native: None },
+            synonyms: Vec::new(),
+            format: Some(format.into()),
+            relation: relation.into(),
+        }
+    }
+
+    fn food_wars(has_tv_prequel: bool, english: &str, romaji: &str) -> ShowMatcher {
+        let franchise = Franchise {
+            format: Some("TV".into()),
+            has_tv_prequel,
+            relatives: vec![
+                relative("Food Wars! The Second Plate", "Shokugeki no Souma: Ni no Sara", "SEQUEL", "TV"),
+                relative("Food Wars! Shokugeki no Soma OVA", "Shokugeki no Souma OVA", "SIDE_STORY", "OVA"),
+            ],
+        };
+        ShowMatcher::new(Some(english), Some(romaji), &[], None).with_franchise(&franchise)
+    }
+
+    #[test]
+    fn sibling_with_a_longer_name_takes_its_release() {
+        let first = food_wars(false, "Food Wars! Shokugeki no Soma", "Shokugeki no Souma");
+        assert!(first.matches("[Group] Food Wars! Shokugeki no Soma - 05 [1080p]"));
+        assert!(!first.matches("[Reza] Food Wars! The Second Plate [BDRip 1080p]"));
+        // Same words as the sibling's -> the entry itself, not the sibling.
+        let second = ShowMatcher::new(Some("Food Wars! The Second Plate"), Some("Shokugeki no Souma: Ni no Sara"), &[], None);
+        assert!(second.matches("[Reza] Food Wars! The Second Plate [BDRip 1080p]"));
+    }
+
+    #[test]
+    fn first_season_flag_adds_season_one() {
+        let first = food_wars(false, "Food Wars! Shokugeki no Soma", "Shokugeki no Souma");
+        assert!(!first.matches("[Group] Shokugeki no Souma S02E05 [1080p]"));
+        assert!(first.matches("[Group] Shokugeki no Souma S01E05 [1080p]"));
+        // A sequel's chain has a TV prequel: no season is assumed.
+        let later = food_wars(true, "Food Wars! Shokugeki no Soma", "Shokugeki no Souma");
+        assert!(later.matches("[Group] Shokugeki no Souma S02E05 [1080p]"));
+    }
+
+    #[test]
+    fn movies_and_specials_stay_off_a_tv_entry() {
+        let tv = food_wars(false, "Food Wars! Shokugeki no Soma", "Shokugeki no Souma");
+        assert!(!tv.matches("[Group] Shokugeki no Souma OVA [BD 1080p]"));
+        assert!(!tv.matches("[Group] Shokugeki no Souma Movie [BD 1080p]"));
+        let ova = ShowMatcher::new(Some("Food Wars! Shokugeki no Soma OVA"), Some("Shokugeki no Souma OVA"), &[], None)
+            .with_franchise(&Franchise { format: Some("OVA".into()), has_tv_prequel: false, relatives: Vec::new() });
+        assert!(ova.matches("[Group] Shokugeki no Souma OVA [BD 1080p]"));
     }
 
     #[test]
