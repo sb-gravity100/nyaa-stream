@@ -151,12 +151,20 @@
 
 - [ ] AnimeTosho dataset - v0.4.4 (minor feature, see PLAN.md "AnimeTosho
       dataset"). One commit each:
-  - [ ] T0 (done last: T1-T8 build and test on the local `database-dump.7z`,
-        so no download is needed during development) in-app download of `database-dump.7z` only (2.74 GB of the 1.01 TB
-        `at-data.torrent`): one sequential sbtl reader on that file into
-        `<data>/tosho/`, progress event, resume/cancel, size + disk-space
-        confirm, then build + import, offer to delete the archive; spike
-        first: no 1 TB pre-allocation, resume, 7z reader
+  - [ ] T0 "Import Tosho Data" button (PLAN.md): download only
+        `database-dump.7z` (2.74 GB of the 1.01 TB `at-data.torrent`) via
+        sbtl, compile the dataset in-app, import, offer to delete the
+        archive. One commit each:
+    - [ ] D1 spike: sbtl downloads one file of the 1 TB torrent (no
+          pre-allocation, resume, piece-map memory), fetch `at-data.torrent`
+    - [ ] D2 spike: pure-Rust streaming 7z reader for the two SQL entries
+          (speed vs `7z e -so`); fallback bundle `7zr.exe`
+    - [ ] D3 `tosho_import` pipeline in `src-tauri` (confirm data, download,
+          build from the archive stream, import, cleanup; resumable phases;
+          progress event; cancel)
+    - [ ] D4 Settings UI: **Import Tosho Data** button + confirm dialog +
+          progress + cancel; ".db" picker kept as "Import from file"
+    - [ ] D5 docs/CHANGELOG/FILE_INDEX
   - [x] T1 `build_tosho` example (parser `nyaa-client/src/tosho.rs`; results in PLAN.md "Measured"; no size cut needed): streaming INSERT parser over `7z e -so`,
         `--stats` mode counts rows per table, `toto_toto` aid coverage and
         `resolveapproved` split, file-list size; decide the size cut

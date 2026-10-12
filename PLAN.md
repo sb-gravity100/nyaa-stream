@@ -2179,6 +2179,32 @@ them.
 Importing it into the app store (T3, `Store::import_tosho`) took 40 s for the
 500 MB file and grows the store to about 570 MB.
 
+**"Import Tosho Data" button (T0 refined, user 2026-10-13).** Most users have
+no `tosho-dataset.db`, so Settings > AnimeTosho dataset gets a primary
+**Import Tosho Data** button that does the whole pipeline in one click; the
+existing ".db" picker stays as "Import from file" (advanced). Phases, each
+with its own progress line and cancel:
+1. *Confirm:* dialog with the download size (2.74 GB), the dataset size
+   (~500 MB, ~1.2 GB of disk during the build), and the free-space check.
+2. *Download:* fetch `at-data.torrent`, download only `database-dump.7z`
+   through sbtl-engine (see above) into `<data>/tosho/`; resumable.
+3. *Build:* compile the dataset (`tosho_build::build`) straight from the
+   archive stream, no external tools: users do not have `7z` installed, so
+   the archive is read by a pure-Rust 7z decoder (spike D2: `sevenz-rust2`
+   or equivalent; must stream LZMA2 entries `data\toto_repl.sql` and
+   `data\arcscrape.sql` without unpacking to disk, at a speed comparable to
+   `7z e -so`, ~2 min total; if no crate qualifies, bundle `7zr.exe`
+   (LGPL, ~600 KB) from `src-tauri/lib/` and spawn it). The build writes
+   `<data>/tosho/tosho-dataset-<date>.db`.
+4. *Import:* `Store::import_tosho` as today.
+5. *Clean up:* offer to delete the 2.74 GB archive (default yes), keep the
+   dataset db for a re-import. A failed phase keeps the previous phase's
+   output so a retry resumes (downloaded archive, built db).
+Progress events: `tosho-import-progress {phase, done, total, speed, message}`
+shown inline in the Settings row; the button becomes Cancel while running.
+Never starts without the confirm dialog; offline or tracker failure shows a
+clear error and the manual ".db" path still works.
+
 **Stem mapper (T9, decided 2026-10-13: static, trained only on the dump;
 newly collected data never feeds back).** Releases newer than the dump have
 no `aid`. The mapper generalises the dump's ground truth to them:
