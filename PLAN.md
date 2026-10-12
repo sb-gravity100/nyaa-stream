@@ -2108,6 +2108,28 @@ GB are never unpacked to disk). Tables: `meta(key,value)`, `release_aid`,
 Target size under 500 MB; if `release_files` alone is too big it is limited
 to batches of the last N years (measure first, phase T1).
 
+**In-app download (T0, user request 2026-10-13).** The dump is distributed
+as a torrent (`https://animetosho.org/at-data.torrent`), so Settings gets a
+"Download AnimeTosho data" action instead of the manual `database-dump.7z`:
+1. Fetch the `.torrent` over HTTP (it is metadata only), add it to the
+   existing `sbtl-engine` into `<data>/tosho/` (its own download dir, not the
+   streaming cache; never auto-evicted by idle removal), report progress
+   (percent, speed, peers) to Settings through a Tauri event.
+2. When complete, run the builder (T1/T2) on the downloaded archive and
+   import the result (T3). The builder lives in `nyaa-client`
+   (`tosho::build`) so the app and the `build_tosho` example share it;
+   decoding streams the archive (a Rust 7z reader such as `sevenz-rust2`,
+   falling back to an external `7z` when present) so the 11.7 GB are never
+   unpacked. Spike first: confirm the reader handles the dump's 7z method
+   and its streaming speed, and list the torrent's files (it may hold more
+   than `database-dump.7z`; only the SQL parts we read are required).
+3. After a successful import, offer to delete the archive (keep the small
+   dataset); resumable: a partial download continues, a finished one skips
+   straight to the build. Cancel stops the torrent and keeps partial data.
+Rules: explicit user click only (2.9 GB), shows size before starting, disk
+space check (archive + dataset), no automatic updates. The dump is a snapshot;
+re-downloading replaces the dataset (`meta.dump_date`).
+
 **Freshness.** The dump ends 2026-05-09. Newer releases have no `aid`, so
 title matching stays the fallback and must not regress. A later milestone can
 add the live AnimeTosho feed (`feed.animetosho.org/json?aid=`) for the gap;

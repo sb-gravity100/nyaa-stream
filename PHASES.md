@@ -151,6 +151,10 @@
 
 - [ ] AnimeTosho dataset - v0.4.4 (minor feature, see PLAN.md "AnimeTosho
       dataset"). One commit each:
+  - [ ] T0 in-app download of `at-data.torrent` (sbtl-engine into
+        `<data>/tosho/`, progress event, resume/cancel, size + disk-space
+        confirm, then build + import, offer to delete the archive); spike the
+        7z reader and the torrent's file list first
   - [ ] T1 `build_tosho` example: streaming INSERT parser over `7z e -so`,
         `--stats` mode counts rows per table, `toto_toto` aid coverage and
         `resolveapproved` split, file-list size; decide the size cut
