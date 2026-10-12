@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { open as pickFolder, open as pickFile } from "@tauri-apps/plugin-dialog";
 import type { JSX } from "preact";
 import { DEFAULT_SUBTITLE_STYLE, resetSettings, updateSettings, useSettings, type PreferredResolution, type SubtitleStyle } from "./settings";
@@ -305,19 +306,275 @@ function BackupSection() {
           </button>
         </span>
       </div>
+      <ToshoRow tosho={tosho} setTosho={setTosho} busy={busy} run={run} setMessage={setMessage} />
+      {message && <div class="setting-hint">{message}</div>}
+    </section>
+  );
+}
+
+interface ToshoPlan {
+  download_bytes: number;
+  dataset_bytes: number;
+  needs_bytes: number;
+  free_bytes: number;
+  archive_present: boolean;
+  dataset_present: boolean;
+}
+
+interface ToshoProgress {
+  phase: "download" | "build" | "import" | "cleanup" | "done" | "error" | "cancelled";
+  done: number;
+  total: number;
+  /** Bytes per second. */
+  speed: number;
+  peers: number;
+  message: string;
+}
+
+const TOSHO_PHASE_LABELS: Record<string, string> = {
+  download: "Downloading",
+  build: "Building dataset",
+  import: "Importing",
+  cleanup: "Cleaning up",
+};
+
+function isTerminalPhase(phase: ToshoProgress["phase"]): boolean {
+  return phase === "done" || phase === "error" || phase === "cancelled";
+}
+
+function errorText(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+function toshoProgressLabel(p: ToshoProgress): string {
+  const label = TOSHO_PHASE_LABELS[p.phase] ?? p.phase;
+  if (p.phase === "download") {
+    const parts = [`${label} ${formatBytes(p.done)} of ${formatBytes(p.total)}`];
+    if (p.speed > 0) parts.push(`${(p.speed / 1024 ** 2).toFixed(1)} MB/s`);
+    parts.push(`${p.peers} ${p.peers === 1 ? "peer" : "peers"}`);
+    return parts.join(" · ");
+  }
+  if (p.total > 0) return `${label} · ${Math.round((p.done / p.total) * 100)}%`;
+  return `${label}…`;
+}
+
+/** Confirm step before the AnimeTosho download; Start is blocked when the disk is too full. */
+function ToshoConfirm({
+  plan,
+  deleteArchive,
+  onDeleteArchive,
+  onStart,
+  onCancel,
+}: {
+  plan: ToshoPlan;
+  deleteArchive: boolean;
+  onDeleteArchive: (v: boolean) => void;
+  onStart: () => void;
+  onCancel: () => void;
+}) {
+  const short = plan.free_bytes < plan.needs_bytes;
+  return (
+    <div
+      class="export-backdrop"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onCancel();
+      }}
+    >
+      <div
+        class="export-dialog tosho-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Import AnimeTosho data"
+        onKeyDown={(e) => {
+          if (e.key === "Escape") onCancel();
+        }}
+      >
+        <h2 class="export-title">Import AnimeTosho data</h2>
+        <p class="setting-hint">
+          Download {formatBytes(plan.download_bytes)} from the AnimeTosho torrent, build the dataset (about {formatBytes(plan.dataset_bytes)}) and import it
+        </p>
+        {plan.archive_present && <p class="setting-hint">The archive is already downloaded, so the download is skipped.</p>}
+        <p class="setting-hint">
+          Needs {formatBytes(plan.needs_bytes)} free; {formatBytes(plan.free_bytes)} available
+        </p>
+        {short && (
+          <p class="tosho-short" role="alert">
+            Not enough disk space: free up {formatBytes(plan.needs_bytes - plan.free_bytes)} to start
+          </p>
+        )}
+        <label class="setting-hint tosho-check">
+          <input type="checkbox" checked={deleteArchive} onChange={(e) => onDeleteArchive((e.target as HTMLInputElement).checked)} />
+          Delete the downloaded archive afterwards
+        </label>
+        <div class="export-actions">
+          <button class="button button-quiet" onClick={onCancel}>
+            Cancel
+          </button>
+          <button class="button button-primary" disabled={short} onClick={onStart}>
+            Start
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** The AnimeTosho dataset row: Import Tosho Data (download + build + import, with a live progress line) and the old .db file picker. */
+function ToshoRow({
+  tosho,
+  setTosho,
+  busy,
+  run,
+  setMessage,
+}: {
+  tosho: ToshoInfo | null;
+  setTosho: (info: ToshoInfo | null) => void;
+  busy: boolean;
+  run: (action: () => Promise<string>) => Promise<void>;
+  setMessage: (message: string | null) => void;
+}) {
+  const [progress, setProgress] = useState<ToshoProgress | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [plan, setPlan] = useState<ToshoPlan | null>(null);
+  const [planning, setPlanning] = useState(false);
+  const [deleteArchive, setDeleteArchive] = useState(true);
+
+  // Only setters and invoke are used inside, so the listener registered on mount stays valid.
+  function handleProgress(p: ToshoProgress) {
+    console.info("[settings] AnimeTosho import progress", { phase: p.phase, done: p.done, total: p.total });
+    if (p.phase === "done") {
+      setProgress(null);
+      setFailed(false);
+      setMessage(p.message);
+      invoke<ToshoInfo | null>("tosho_info")
+        .then(setTosho)
+        .catch((err) => console.warn("[settings] reading the AnimeTosho dataset info failed", err));
+    } else if (p.phase === "error") {
+      console.warn("[settings] AnimeTosho import failed", { message: p.message });
+      setProgress(null);
+      setFailed(true);
+      setMessage(p.message);
+    } else if (p.phase === "cancelled") {
+      setProgress(null);
+      setFailed(false);
+      setMessage(p.message || "Import cancelled - the partial download is kept, so the next import resumes where it stopped");
+    } else {
+      setFailed(false);
+      setProgress(p);
+    }
+  }
+
+  useEffect(() => {
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+    listen<ToshoProgress>("tosho-import-progress", (event) => {
+      if (!disposed) handleProgress(event.payload);
+    })
+      .then((fn) => {
+        if (disposed) fn();
+        else unlisten = fn;
+      })
+      .catch((err) => console.warn("[settings] listening for AnimeTosho import progress failed", err));
+    // A run that is still going (or failed) when the modal reopens is shown live; finished runs are not replayed.
+    invoke<ToshoProgress | null>("tosho_import_status")
+      .then((p) => {
+        if (disposed || !p) return;
+        if (!isTerminalPhase(p.phase)) handleProgress(p);
+        else if (p.phase === "error") {
+          setFailed(true);
+          setMessage(p.message);
+        }
+      })
+      .catch((err) => console.warn("[settings] reading the AnimeTosho import status failed", err));
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, []);
+
+  async function openPlan() {
+    console.info("[settings] planning AnimeTosho import");
+    setPlanning(true);
+    setMessage(null);
+    try {
+      const next = await invoke<ToshoPlan>("tosho_import_plan");
+      console.info("[settings] AnimeTosho import plan", next);
+      setPlan(next);
+    } catch (err) {
+      console.warn("[settings] planning the AnimeTosho import failed", err);
+      setMessage(errorText(err));
+    }
+    setPlanning(false);
+  }
+
+  async function startImport() {
+    if (!plan) return;
+    console.info("[settings] starting AnimeTosho import", { deleteArchive });
+    setPlan(null);
+    setFailed(false);
+    setMessage(null);
+    try {
+      await invoke("tosho_import_start", { deleteArchive });
+      const status = await invoke<ToshoProgress | null>("tosho_import_status");
+      if (status && !isTerminalPhase(status.phase)) handleProgress(status);
+    } catch (err) {
+      console.warn("[settings] starting the AnimeTosho import failed", err);
+      setFailed(true);
+      setMessage(errorText(err));
+    }
+  }
+
+  async function cancelImport() {
+    console.info("[settings] cancelling AnimeTosho import");
+    try {
+      await invoke("tosho_import_cancel");
+    } catch (err) {
+      console.warn("[settings] cancelling the AnimeTosho import failed", err);
+      setMessage(errorText(err));
+    }
+  }
+
+  const running = progress !== null;
+  const unknownTotal = !progress || progress.total <= 0;
+  const percent = progress && !unknownTotal ? Math.min(100, (progress.done / progress.total) * 100) : 0;
+  const mainLabel = running ? "Cancel" : failed ? "Retry" : "Import Tosho Data";
+
+  return (
+    <>
       <div class="setting-row">
         <span class="setting-text">
           <span class="setting-label">AnimeTosho dataset</span>
           <span class="setting-hint">
             {tosho
               ? `Dump of ${tosho.dump_date}: ${tosho.release_aid.toLocaleString()} releases matched to AniDB, ${tosho.release_files.toLocaleString()} batch files, ${tosho.anidb_tvdb.toLocaleString()} TVDB mappings`
-              : "Import a tosho-dataset .db built with build_tosho - exact release-to-show matching, batch file lists and season maps, offline"}
+              : "Download the AnimeTosho torrent and build the dataset in-app - exact release-to-show matching, batch file lists and season maps, offline"}
           </span>
+          {progress && (
+            <>
+              <span class="setting-hint">{toshoProgressLabel(progress)}</span>
+              <span
+                class={`tosho-progress${unknownTotal ? " is-indeterminate" : ""}`}
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={unknownTotal ? undefined : Math.round(percent)}
+              >
+                <span style={unknownTotal ? undefined : { width: `${percent}%` }} />
+              </span>
+            </>
+          )}
         </span>
         <span class="setting-control">
           <button
+            class={running ? "button button-quiet" : "button button-primary"}
+            disabled={!running && (busy || planning)}
+            onClick={() => (running ? void cancelImport() : void openPlan())}
+          >
+            {mainLabel}
+          </button>
+          <button
             class="button button-quiet"
-            disabled={busy}
+            disabled={busy || running || planning}
             onClick={() =>
               void run(async () => {
                 const path = await pickFile({ multiple: false, directory: false, filters: [{ name: "AnimeTosho dataset", extensions: ["db", "sqlite", "sqlite3"] }] });
@@ -333,12 +590,20 @@ function BackupSection() {
               })
             }
           >
-            Import
+            Import from file
           </button>
         </span>
       </div>
-      {message && <div class="setting-hint">{message}</div>}
-    </section>
+      {plan && (
+        <ToshoConfirm
+          plan={plan}
+          deleteArchive={deleteArchive}
+          onDeleteArchive={setDeleteArchive}
+          onStart={() => void startImport()}
+          onCancel={() => setPlan(null)}
+        />
+      )}
+    </>
   );
 }
 

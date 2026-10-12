@@ -1729,6 +1729,50 @@ html.mpv-active .titlebar {
   flex: none;
 }
 
+/* AnimeTosho import progress (SettingsPanel.tsx ToshoRow). */
+.tosho-progress {
+  display: block;
+  height: 4px;
+  margin-top: 6px;
+  border-radius: 2px;
+  background: rgba(236, 234, 246, 0.12);
+  overflow: hidden;
+}
+
+.tosho-progress > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.3s var(--ease-out);
+}
+
+.tosho-progress.is-indeterminate > span {
+  width: 30%;
+  animation: tosho-slide 1.2s ease-in-out infinite;
+}
+
+@keyframes tosho-slide {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(340%);
+  }
+}
+
+.tosho-short {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--danger);
+}
+
+.tosho-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
 .settings-panel select {
   height: 34px;
   padding: 0 10px;

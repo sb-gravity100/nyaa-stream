@@ -162,7 +162,7 @@
     - [ ] D3 `tosho_import` pipeline in `src-tauri` (confirm data, download,
           build from the archive stream, import, cleanup; resumable phases;
           progress event; cancel)
-    - [ ] D4 Settings UI: **Import Tosho Data** button + confirm dialog +
+    - [x] D4 Settings UI: **Import Tosho Data** button + confirm dialog +
           progress + cancel; ".db" picker kept as "Import from file"
     - [ ] D5 docs/CHANGELOG/FILE_INDEX
   - [x] T1 `build_tosho` example (parser `nyaa-client/src/tosho.rs`; results in PLAN.md "Measured"; no size cut needed): streaming INSERT parser over `7z e -so`,
