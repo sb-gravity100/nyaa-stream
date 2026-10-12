@@ -227,3 +227,7 @@ fn title_match_fixture_candidate_queries() {
 /// T8 verification harness over a built AnimeTosho dataset (`#[ignore]`, env-driven).
 #[path = "tosho_verify_tests.rs"]
 mod tosho_verify;
+
+/// Offline reproduction of the Mushoku Tensei Season 3 report (`#[ignore]`, env-driven).
+#[path = "mushoku_s3_tests.rs"]
+mod mushoku_s3;
