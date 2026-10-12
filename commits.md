@@ -1,3 +1,7 @@
+### `fd42596` · 2026-10-13 · docs(plan): custom magnet in the search bar (v0.4.5)
+- `PLAN.md`
+- `PHASES.md`
+
 ### `a56cb01` · 2026-10-13 · feat(nyaa-client): build_tosho --stats measures the AnimeTosho dump (v0.4.4 T1)
 - `crates/nyaa-client/examples/build_tosho.rs`
 - `PLAN.md`
