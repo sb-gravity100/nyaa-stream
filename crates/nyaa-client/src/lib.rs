@@ -8,6 +8,7 @@ mod files;
 mod store;
 mod throttle;
 pub mod tosho;
+pub mod tosho_build;
 use cache::DiskCache;
 use store::Store;
 use throttle::Throttle;

@@ -7,25 +7,88 @@
 //! and the size of the batch file lists.
 //!
 //! Default inner files: `data\toto_repl.sql`.
+//!
+//! `cargo run --release -p nyaa-client --example build_tosho -- <database-dump.7z> <out.db | out-dir> [--dump-date YYYY-MM-DD] [--no-archive]`
+//! builds the dataset (`tosho-dataset-<YYYYMMDD>.db` inside `out-dir`, or
+//! exactly `out.db`): `toto_repl.sql` first, then `arcscrape.sql` (nyaa.si
+//! archive rows the first one lacks) unless `--no-archive`. The dump date
+//! defaults to the modified date of `data\toto_repl.sql` in the archive.
 
 use std::collections::{BTreeMap, HashSet};
 use std::io::BufReader;
-use std::process::{Command, Stdio};
+use std::path::PathBuf;
+use std::process::{Child, Command, Stdio};
 
 use nyaa_client::tosho::InsertReader;
+use nyaa_client::tosho_build::{dataset_file_name, ToshoBuilder};
 
 fn main() -> anyhow::Result<()> {
     let mut args: Vec<String> = std::env::args().skip(1).collect();
     let stats = args.first().map(String::as_str) == Some("--stats");
     if stats {
         args.remove(0);
+        anyhow::ensure!(!args.is_empty(), "usage: build_tosho --stats <database-dump.7z> [inner.sql ...]");
+        let archive = args.remove(0);
+        let inner = if args.is_empty() { vec![r"data\toto_repl.sql".to_string()] } else { args };
+        for file in inner {
+            stats_for(&archive, &file)?;
+        }
+        return Ok(());
     }
-    anyhow::ensure!(stats && !args.is_empty(), "usage: build_tosho --stats <database-dump.7z> [inner\\path.sql ...]");
-    let archive = args.remove(0);
-    let inner = if args.is_empty() { vec!["data\\toto_repl.sql".to_string()] } else { args };
-    for file in inner {
-        stats_for(&archive, &file)?;
+    build(args)
+}
+
+fn spawn_7z(archive: &str, inner: &str) -> anyhow::Result<Child> {
+    Ok(Command::new("7z").args(["e", "-so", archive, inner]).stdout(Stdio::piped()).stderr(Stdio::null()).spawn()?)
+}
+
+/// `YYYY-MM-DD` of `inner` in the archive, from `7z l`.
+fn dump_date_of(archive: &str, inner: &str) -> anyhow::Result<String> {
+    let listing = Command::new("7z").args(["l", archive, inner]).output()?;
+    let text = String::from_utf8_lossy(&listing.stdout);
+    text.lines()
+        .find(|l| l.contains(inner))
+        .and_then(|l| l.get(..10))
+        .filter(|d| d.len() == 10 && d.as_bytes()[4] == b'-')
+        .map(str::to_string)
+        .ok_or_else(|| anyhow::anyhow!("could not read the date of {inner} from `7z l`; pass --dump-date"))
+}
+
+fn build(mut args: Vec<String>) -> anyhow::Result<()> {
+    let mut date = None;
+    if let Some(i) = args.iter().position(|a| a == "--dump-date") {
+        anyhow::ensure!(i + 1 < args.len(), "--dump-date needs a value");
+        date = Some(args.remove(i + 1));
+        args.remove(i);
     }
+    let archive_too = if let Some(i) = args.iter().position(|a| a == "--no-archive") {
+        args.remove(i);
+        false
+    } else {
+        true
+    };
+    anyhow::ensure!(args.len() == 2, "usage: build_tosho <database-dump.7z> <out.db | out-dir> [--dump-date YYYY-MM-DD] [--no-archive]  |  build_tosho --stats <database-dump.7z> [inner.sql ...]");
+    let (archive, out) = (args.remove(0), PathBuf::from(args.remove(0)));
+    let date = match date {
+        Some(d) => d,
+        None => dump_date_of(&archive, r"data\toto_repl.sql")?,
+    };
+    let out = if out.is_dir() || out.extension().is_none() { out.join(dataset_file_name(&date)) } else { out };
+    let started = std::time::Instant::now();
+    let mut builder = ToshoBuilder::create(&out, &date)?;
+
+    let mut child = spawn_7z(&archive, r"data\toto_repl.sql")?;
+    builder.read_toto(BufReader::with_capacity(1 << 20, child.stdout.take().expect("piped stdout")))?;
+    let _ = child.wait();
+    println!("toto_repl.sql done after {:.0}s", started.elapsed().as_secs_f64());
+    if archive_too {
+        let mut child = spawn_7z(&archive, r"data\arcscrape.sql")?;
+        builder.read_archive(BufReader::with_capacity(1 << 20, child.stdout.take().expect("piped stdout")))?;
+        let _ = child.wait();
+        println!("arcscrape.sql done after {:.0}s", started.elapsed().as_secs_f64());
+    }
+    let counts = builder.finish()?;
+    println!("wrote {} ({:.0} MB) in {:.0}s: {counts:?}", out.display(), std::fs::metadata(&out)?.len() as f64 / 1e6, started.elapsed().as_secs_f64());
     Ok(())
 }
 
@@ -44,7 +107,7 @@ struct TotoStats {
 
 fn stats_for(archive: &str, inner: &str) -> anyhow::Result<()> {
     println!("== {inner}");
-    let mut child = Command::new("7z").args(["e", "-so", archive, inner]).stdout(Stdio::piped()).stderr(Stdio::null()).spawn()?;
+    let mut child = spawn_7z(archive, inner)?;
     let mut reader = InsertReader::new(BufReader::with_capacity(1 << 20, child.stdout.take().expect("piped stdout")));
     let started = std::time::Instant::now();
 

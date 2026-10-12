@@ -45,9 +45,12 @@ fn padded_words(text: &str) -> String {
 const RELEASE_COLUMNS: &[&str] =
     &["id", "category", "title", "magnet", "torrent_url", "view_url", "size", "published", "seeders", "leechers", "first_seen", "updated_at"];
 
-const SCHEMA: &str = "PRAGMA journal_mode = WAL;
-     PRAGMA synchronous = NORMAL;
-     CREATE TABLE IF NOT EXISTS releases (
+const PRAGMAS: &str = "PRAGMA journal_mode = WAL;
+     PRAGMA synchronous = NORMAL;";
+
+/// The tables of a release database (also the `releases` part of a AnimeTosho
+/// dataset, see `tosho_build`).
+pub(crate) const RELEASE_TABLES: &str = "CREATE TABLE IF NOT EXISTS releases (
          id INTEGER PRIMARY KEY,
          category TEXT NOT NULL,
          title TEXT NOT NULL,
@@ -76,6 +79,11 @@ const SCHEMA: &str = "PRAGMA journal_mode = WAL;
          json TEXT NOT NULL,
          fetched_at INTEGER NOT NULL
      );";
+
+/// Insert a release unless its id is already stored (dataset building). The
+/// `words` column is left empty: `import` recomputes it.
+pub(crate) const INSERT_RELEASE_IF_NEW: &str = "INSERT OR IGNORE INTO releases (id, category, title, words, magnet, torrent_url, view_url, size, published, seeders, leechers, first_seen, updated_at)
+     VALUES (?1, ?2, ?3, '', ?4, ?5, ?6, ?7, ?8, 0, 0, ?9, ?9)";
 
 const UPSERT: &str = "INSERT INTO releases (id, category, title, words, magnet, torrent_url, view_url, size, published, seeders, leechers, first_seen, updated_at)
      VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?12)
@@ -106,7 +114,8 @@ pub struct ImportStats {
 /// `path` (created if missing) - for building importable datasets.
 pub fn write_release_database(path: &Path, releases: &[(String, NyaaResult)]) -> anyhow::Result<usize> {
     let mut conn = Connection::open(path)?;
-    conn.execute_batch(SCHEMA)?;
+    conn.execute_batch(PRAGMAS)?;
+    conn.execute_batch(RELEASE_TABLES)?;
     let tx = conn.transaction()?;
     let stamp = now();
     let mut written = 0;
@@ -146,7 +155,8 @@ impl Store {
             std::fs::create_dir_all(dir)?;
         }
         let conn = Connection::open(path)?;
-        conn.execute_batch(SCHEMA)?;
+        conn.execute_batch(PRAGMAS)?;
+        conn.execute_batch(RELEASE_TABLES)?;
         tracing::info!(path = %path.display(), "nyaa release database opened");
         Ok(Self { conn: Arc::new(Mutex::new(conn)) })
     }

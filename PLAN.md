@@ -2153,6 +2153,19 @@ Open question for T2: 56% of resolved rows are `resolveapproved = 0`
 (AnimeTosho's unconfirmed guesses); decide in T8 by checking them against
 `franchises.json` whether they are trusted or only a hint.
 
+**Built (T2, 2026-10-13, `build_tosho <dump.7z> <out>` = both SQL files, 109 s,
+release build).** `tosho-dataset-20260509.db` is 500 MB: `releases` 986,012
+(593,161 from `toto_toto` - nyaa.si, not deleted, with a 20-byte btih - plus
+392,851 anime rows only `arcscrape.sql` has; `--no-archive` skips that pass),
+`release_aid` 531,419 (nyaa.si, `aid` > 0, not deleted, not a dupe),
+`release_files` 596,166 rows for 44,621 multi-file releases, `anidb_tvdb`
+8,597 (1,250 with no numeric season). Releases store `words` empty
+(`Store::import` recomputes it) and `updated_at` = the dump date, so rows the
+app scraped itself win. AnimeTosho's `nyaa_cat` mixes nyaa.si codes with
+nyaa.se's legacy ones; the builder maps `1_37`/empty -> `1_2`, `1_11` ->
+`1_3`, `1_38` -> `1_4`, `1_32` -> `1_1` so the app's category searches find
+them.
+
 **Freshness.** The dump ends 2026-05-09. Newer releases have no `aid`, so
 title matching stays the fallback and must not regress. A later milestone can
 add the live AnimeTosho feed (`feed.animetosho.org/json?aid=`) for the gap;
