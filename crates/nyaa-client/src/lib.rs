@@ -5,6 +5,7 @@ mod label;
 mod cache;
 mod fansubbers;
 mod files;
+pub mod stem;
 mod store;
 mod throttle;
 pub mod tosho;
@@ -16,6 +17,7 @@ use throttle::Throttle;
 pub use fansubbers::group_tag;
 pub use files::TorrentFile;
 pub use label::EpisodeLabel;
+pub use stem::stem_of;
 pub use store::{release_id, write_release_database, AnidbTvdb, ImportStats, ToshoImportStats, ToshoInfo, ToshoRelease};
 
 const NYAA_BASE_URL: &str = "https://nyaa.si";

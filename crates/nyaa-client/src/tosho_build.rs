@@ -4,13 +4,15 @@
 //! Output schema (other code is written against it):
 //! - `meta(key, value)`: `kind = 'tosho'`, `dump_date` (YYYY-MM-DD),
 //!   `built_at` (unix seconds), row counts (`releases`, `release_aid`,
-//!   `release_files`, `release_files_torrents`, `anidb_tvdb`).
+//!   `release_files`, `release_files_torrents`, `anidb_tvdb`, `stem_aid`).
 //! - `release_aid(nyaa_id, aid, eid, approved)`: nyaa.si anime releases
 //!   AnimeTosho resolved to AniDB ids; `approved` is `resolveapproved`
 //!   (0 = AnimeTosho's unconfirmed guess, 1/2/3 trusted).
 //! - `release_files(nyaa_id, idx, path, size)`: file lists of those
 //!   releases that hold more than one file.
 //! - `anidb_tvdb(anidb_id, tvdb_id, season, episode_offset, mapping)`.
+//! - `stem_aid(stem, aid, votes)`: the static stem mapper trained on the
+//!   dump's own releases (`stem.rs`, PLAN.md T9).
 //! - `releases` (+ the empty query-cache tables): the same schema and row
 //!   shape as `store.rs`, so `Store::import` merges it like any release
 //!   database; `category` is nyaa.si's code (legacy `1_37`/`1_11`/`1_38`/`1_32`
@@ -25,6 +27,7 @@ use std::path::{Path, PathBuf};
 
 use rusqlite::{params, Connection};
 
+use crate::stem::{self, TrainConfig};
 use crate::store::{INSERT_RELEASE_IF_NEW, RELEASE_TABLES};
 use crate::tosho::{Header, InsertReader, Value};
 
@@ -48,6 +51,11 @@ const DATASET_TABLES: &str = "CREATE TABLE meta (key TEXT PRIMARY KEY, value TEX
          season INTEGER,
          episode_offset INTEGER NOT NULL,
          mapping TEXT
+     );
+     CREATE TABLE stem_aid (
+         stem TEXT PRIMARY KEY,
+         aid INTEGER NOT NULL,
+         votes INTEGER NOT NULL
      );";
 
 /// Row counts of a finished build.
@@ -61,6 +69,8 @@ pub struct BuildStats {
     /// Releases that have a file list.
     pub release_files_torrents: u64,
     pub anidb_tvdb: u64,
+    /// Rows of the trained `stem_aid` table.
+    pub stem_aid: u64,
 }
 
 /// Writes the dataset into a new database file. Feed it `read_toto` (and
@@ -72,6 +82,7 @@ pub struct ToshoBuilder {
     dump_date: String,
     dump_unix: i64,
     stats: BuildStats,
+    stem_config: TrainConfig,
 }
 
 fn num(v: &Value) -> i64 {
@@ -202,7 +213,12 @@ impl ToshoBuilder {
              CREATE TABLE stage.files (toto_id INTEGER NOT NULL, filename TEXT NOT NULL, size INTEGER NOT NULL);
              CREATE TABLE stage.wanted (toto_id INTEGER PRIMARY KEY, nyaa_id INTEGER NOT NULL);",
         )?;
-        Ok(Self { conn, out: out.to_path_buf(), stage, dump_date: dump_date.to_string(), dump_unix, stats: BuildStats::default() })
+        Ok(Self { conn, out: out.to_path_buf(), stage, dump_date: dump_date.to_string(), dump_unix, stats: BuildStats::default(), stem_config: TrainConfig::default() })
+    }
+
+    /// Vote thresholds for the `stem_aid` table written by `finish`.
+    pub fn set_stem_config(&mut self, config: TrainConfig) {
+        self.stem_config = config;
     }
 
     /// Reads `toto_repl.sql`: `toto_files`, `toto_toto` and `toto_anidb_tvdb`
@@ -383,6 +399,8 @@ impl ToshoBuilder {
             self.conn.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?1, ?2)", params![key, value])?;
         }
         self.conn.execute_batch("COMMIT; DETACH DATABASE stage;")?;
+        self.stats.stem_aid = stem::train_dataset(&self.conn, self.stem_config)?;
+        self.conn.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('stem_aid', ?1)", params![self.stats.stem_aid.to_string()])?;
         let Self { conn, out, stage, stats, .. } = self;
         drop(conn);
         if let Err(err) = std::fs::remove_file(&stage) {
@@ -435,7 +453,7 @@ INSERT INTO `toto_trackers` (`id`) VALUES (1),(2);
         assert!(!out.with_extension("stage.tmp").exists());
         assert_eq!(
             stats,
-            BuildStats { releases: 5, archive_releases: 1, release_aid: 2, release_files: 2, release_files_torrents: 1, anidb_tvdb: 2 }
+            BuildStats { releases: 5, archive_releases: 1, release_aid: 2, release_files: 2, release_files_torrents: 1, anidb_tvdb: 2, stem_aid: 0 }
         );
 
         let db = Connection::open(&out).unwrap();
