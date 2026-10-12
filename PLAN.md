@@ -2173,6 +2173,29 @@ them.
 Importing it into the app store (T3, `Store::import_tosho`) took 40 s for the
 500 MB file and grows the store to about 570 MB.
 
+**Stem mapper (T9, decided 2026-10-13: static, trained only on the dump;
+newly collected data never feeds back).** Releases newer than the dump have
+no `aid`. The mapper generalises the dump's ground truth to them:
+- *Training (offline, in `build_tosho`):* for every dataset release with a
+  trusted `aid` (`approved` 1-3, plus 0 only when consistent with its
+  group), parse the title (`release-parse`), normalise the show name (the
+  same `normalize` as `title_match.rs`, season markers and episode numbers
+  removed) into a **stem**, and count `stem -> aid` votes. Keep a stem only
+  when one `aid` holds at least 90% of its votes and at least 3 releases (or
+  2 groups); conflicting stems are dropped, not guessed. Table
+  `stem_aid(stem TEXT PRIMARY KEY, aid INTEGER, votes INTEGER)` in the
+  dataset, imported with it (wholesale replace like the other tables).
+- *Use:* a release with no dataset `aid` looks up its stem; a hit gives an
+  `aid` with `approved = 0` weight (a hint under the T5 rule), a miss uses the
+  title rules. Nothing is written back: the table changes only when a newer
+  dump is built and imported, so there is no feedback loop.
+- *Evaluation (holdout):* train on releases before 2025-01-01, test on the
+  releases after it (they all have true `aid`s): report coverage (share of
+  test releases the stems resolve) and precision (share correct); ship only
+  if precision >= 99% on resolved releases, otherwise raise the vote
+  thresholds. Series that debuted after the dump have no stems and fall to
+  title rules by design.
+
 **Freshness.** The dump ends 2026-05-09. Newer releases have no `aid`, so
 title matching stays the fallback and must not regress. A later milestone can
 add the live AnimeTosho feed (`feed.animetosho.org/json?aid=`) for the gap;

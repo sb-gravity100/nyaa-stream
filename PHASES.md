@@ -171,6 +171,10 @@
   - [ ] T8 verify on `franchises.json` (AniDB ground truth), Symphogear XV
         crawl (`download (1).json`) and the Food Wars / Mushoku / Slime
         entries; no regression for post-dump releases
+  - [ ] T9 static stem mapper trained on the dump (`stem_aid` table, built by
+        `build_tosho`, holdout eval pre/post 2025-01-01, precision >= 99%,
+        used as a T5 hint for releases without a dataset `aid`; never
+        updated from new data)
   - [ ] FILE_INDEX.md/PLAN.md sync, CHANGELOG, `npm run bump -- minor`... or
         patch per the Release plan, tag
 
