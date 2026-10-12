@@ -131,6 +131,9 @@
   - [x] `build_candidates`: strip synonyms (roman numerals too), base-name
         query for season ≥2
   - [x] No-episode matched release → season batch of the matched entry
+  - [x] Mushoku S3 report (PLAN.md "Mushoku S3 report"): roman-numeral season
+        in the label, `season_ambiguous` flag + `groupedSources` drop of unconfirmed
+        unmarked releases, offline harness `mushoku_s3_tests.rs`
   - [x] `TorrentDetails` file list (paths, folders, sizes) + per-release
         cache in `store.rs`
   - [x] Unsure releases resolved from their file names (season union,

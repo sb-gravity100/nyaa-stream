@@ -2060,6 +2060,45 @@ the whole-corpus regression set for `release-parse`: diff
 `examples/parse_lines.rs` / `examples/labels.rs` output before and after a
 parser change and review every changed title.
 
+**Mushoku S3 report (2026-10-13, v0.5.0).** Report: the Season 3 page
+(AniList 178789) shows fewer sources than a manual nyaa crawl ("mushoku tensei
+s03e01", 24 releases) and 14 stray season-1 "Episode N" rows next to the
+"Season 3 Episode N" rows. Reproduced offline on a copy of `nyaa.db` with the
+`#[ignore]` harness `src-tauri/src/mushoku_s3_tests.rs` (`NYAA_DB_COPY`,
+`MUSHOKU_CRAWL`; it opens the copy through `NyaaClient::with_storage`, rebuilds the
+`ShowMatcher` the way `show_matcher` does and mirrors `groupedSources`):
+- *Nothing was missing.* All 24 ids are in the 1000 results nyaa.si served
+  for "mushoku tensei" (`search_hits`; the oldest is id 1834436, a Season 1
+  release, so the 1000-result cap does not reach Season 3), all 24 are kept by
+  the title rules (no dataset row: all post-dump) and all land in
+  "Season 3 Episode 1" (the E01-E14 batch in "Season 3 Batch", spread over
+  the episodes). Category 1_3/1_4 are searched (`Category::AllAnime`).
+  Two Season 3 releases the store holds (Breeze E12, E13) are absent from the
+  1000 hits though inside the id range: unexplained, noted only.
+- *The "Episode N" rows* were 49 kept releases (45 episodes, 4 batches) the title cannot place:
+  (a) Season 3's own WEB/TS releases named "Mushoku Tensei III Isekai Ittara
+  Honki Dasu - 07" (Diogo4D-NF93, shincaps; `release-parse` does not read a
+  numeral after a name, so the label said season 1); (b) Season 1/2 BDs and
+  batches named "Mushoku Tensei Isekai Ittara Honki Dasu - 07" (Diogo4D BD,
+  `[EA]` 01-11 / 2nd 01-12, ReinForce batch) that match because the entry's
+  synonym "... Isekai Ittara Honki Dasu 3rd Season" is season-stripped to
+  Season 1's romaji. The bare-franchise "[Erai-raws] Mushoku Tensei - 01" is
+  already dropped by the matcher; commit b056c24 (unmarked releases are kept on
+  later-season entries) only made (a) and (b) visible.
+- *Fix.* `filter_for_show` puts `ShowMatcher::roman_season_of` into the label
+  of title-decided releases (a, now "Season 3 Episode N", ranges spread), and
+  sets `NyaaResult.season_ambiguous` (`ShowMatcher::season_ambiguous`: later-season
+  entry, no season marker or numeral, every entry name found in the title is also a
+  name of a TV prequel; not set when the dataset decided). `groupedSources` drops an
+  ambiguous unmarked episode/batch unless an absolute episode number resolves it,
+  the AniDB id is trusted, or the scraped file list names the entry's season (the
+  batch path for titles with no episode is unchanged). Page after the fix (harness): no
+  "Episode N" / "Batch" rows; 14 of the 49 (S1/S2 BDs and batches) are dropped, the
+  rest joined the Season 3 rows (49-65 releases per episode).
+- *1000-result cap.* No extra "<base> S03" query: no id was lost to the cap.
+  If it starts cutting Season 3 (oldest returned id newer than the season's first
+  release), merge `search_local` into the remote answer or add the targeted query.
+
 
 ## AnimeTosho dataset (v0.5.0, was v0.4.4 - minor feature)
 
