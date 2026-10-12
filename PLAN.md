@@ -2215,6 +2215,38 @@ detection and the "Play this magnet" row; M3 `custom_sources` table + store
 API; M4 attach picker and merge into `groupedSources`; M5 docs, CHANGELOG,
 FILE_INDEX, version.
 
+**Batches and packs.** A pasted magnet is often a batch, and nothing in the
+magnet says so (only `dn`). Rules:
+- *Kind detection:* the `dn` label (`EpisodeLabel::kind`: batch / range /
+  episode / unknown) is only a hint. The truth is the file list: after the
+  torrent's metadata arrives (the engine already fetches it on play), count
+  video files (skip `EXTRA_FILE` names), and treat 2+ as a pack. The
+  attach picker shows the detected kind and lets the user override it
+  ("single episode" / "batch"). The metadata fetch for an attach that is not
+  playing goes through the same sbtl metadata-only path as `fetch_details`
+  (no piece downloads); the file list is stored on the `custom_sources` row.
+- *Play directly:* a pack opens in the player with the file menu listing all
+  videos; with a parsed episode in the query context (attached from an
+  episode row) `pickFile` chooses that episode's file, otherwise the first
+  episode file (lowest season/episode, extras last), never an OVA/NCOP.
+- *Attach, single episode:* `custom_sources` row with `kind = episode`,
+  explicit season + episode.
+- *Attach, batch:* the picker offers "whole pack for <media>" (default) or
+  a range. The row stores `kind = pack`, `season` (the entry's season by
+  default, from `get_entry_season`), optional `episode_from/episode_to`,
+  and the file list. `groupedSources` offers it on every covered episode
+  row with `explicit = true` (the user chose it, so no file-list
+  confirmation or season guessing is needed), and the player picks that
+  episode's file by season and number with the existing `pickFile` logic
+  (`TorrentDetails.seasons` per file, parent-folder season fallback). Files
+  of other seasons in a multi-season pack stay unselected unless the
+  entry's season matches.
+- *Pack with unknown numbering* (no usable numbers in file names): the
+  attach picker warns, and the pack stays on a "Batch" row for the media
+  instead of per-episode rows.
+- *Edits:* an attached pack can be re-attached to another media/season, and
+  removing it removes it from all its episode rows.
+
 **Rules.** No network lookup for a pasted magnet beyond what playback does;
 a magnet from the clipboard is untrusted input: only `btih`, `dn`, `tr` are
 read and everything is length-capped.

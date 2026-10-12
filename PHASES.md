@@ -178,8 +178,13 @@
       "Custom magnet in the search bar"). One commit each:
   - [ ] M1 `parse_magnet` (`src-tauri/src/magnet.rs`) + command + tests
   - [ ] M2 search-bar detection, "Play this magnet" row, invalid hint
-  - [ ] M3 `custom_sources` store table + API
-  - [ ] M4 "Attach to episode..." picker, merged into `groupedSources`
+  - [ ] M3 `custom_sources` store table + API (`kind` episode|pack, season,
+        optional episode range, stored file list)
+  - [ ] M4 "Attach to episode..." picker (single episode / whole pack /
+        range, detected kind with override, metadata-only file list),
+        merged into `groupedSources` as explicit packs
+  - [ ] M4b pack playback: `pickFile` by season + episode, extras skipped,
+        unknown-numbering packs stay on a Batch row
   - [ ] M5 FILE_INDEX/CHANGELOG/version bump, tag
 
 ## Phase 3 — Playback quality of life
