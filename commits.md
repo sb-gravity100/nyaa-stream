@@ -1,3 +1,7 @@
+### `3b42841` · 2026-10-13 · docs(plan): static stem mapper trained on the AnimeTosho dump (v0.4.4 T9)
+- `PLAN.md`
+- `PHASES.md`
+
 ### `d902a01` · 2026-10-13 · docs(plan): custom magnet handles batches and packs (v0.4.5)
 - `PLAN.md`
 - `PHASES.md`
