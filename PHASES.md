@@ -159,7 +159,7 @@
           pre-allocation, resume, piece-map memory), fetch `at-data.torrent`
     - [ ] D2 spike: pure-Rust streaming 7z reader for the two SQL entries
           (speed vs `7z e -so`); fallback bundle `7zr.exe`
-    - [ ] D3 `tosho_import` pipeline in `src-tauri` (confirm data, download,
+    - [x] D3 `tosho_import` pipeline in `src-tauri` (confirm data, download,
           build from the archive stream, import, cleanup; resumable phases;
           progress event; cancel)
     - [x] D4 Settings UI: **Import Tosho Data** button + confirm dialog +

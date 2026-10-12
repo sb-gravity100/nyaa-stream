@@ -9,6 +9,7 @@ mod metadata_fallback;
 mod player;
 pub(crate) mod resume;
 mod title_match;
+mod tosho_import;
 #[cfg(test)]
 mod title_match_fixture_tests;
 
@@ -1593,6 +1594,7 @@ pub fn run() {
         .manage(app_state.clone())
         .manage(player::PlayerState::default())
         .manage(load_trace::LoadTraces::default())
+        .manage(tosho_import::ImportState::default())
         .setup(|app| {
             // A broken page must not leave the app invisible: show the main
             // window anyway if app_ready never arrives.
@@ -1625,6 +1627,10 @@ pub fn run() {
             import_nyaa_database,
             import_tosho_dataset,
             tosho_info,
+            tosho_import::tosho_import_plan,
+            tosho_import::tosho_import_start,
+            tosho_import::tosho_import_cancel,
+            tosho_import::tosho_import_status,
             log_frontend,
             search_anime,
             get_anime_details,

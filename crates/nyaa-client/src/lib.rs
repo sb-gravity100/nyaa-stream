@@ -8,6 +8,7 @@ mod files;
 pub mod stem;
 mod store;
 mod throttle;
+pub mod tosho_pipeline;
 pub mod tosho;
 pub mod tosho_build;
 use cache::DiskCache;

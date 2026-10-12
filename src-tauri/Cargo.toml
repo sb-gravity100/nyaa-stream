@@ -34,6 +34,7 @@ tracing-subscriber = { workspace = true }
 # Rolling daily log file (release builds have no console, see lib.rs `init_logging`).
 tracing-appender = "0.2"
 torrent-engine = { path = "../crates/torrent-engine" }
+sbtl-engine = { path = "../crates/sbtl-engine" }
 nyaa-client = { path = "../crates/nyaa-client" }
 anilist-client = { path = "../crates/anilist-client" }
 release-parse = { path = "../crates/release-parse" }
