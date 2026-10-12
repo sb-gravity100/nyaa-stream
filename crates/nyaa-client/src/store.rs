@@ -299,7 +299,8 @@ impl Store {
         let category = category.to_string();
         self.run(move |conn| {
             let mut sql = String::from(
-                "SELECT title, magnet, torrent_url, view_url, size, seeders, leechers, published FROM releases WHERE category = ?1",
+                // "1_0" is nyaa.si's "all anime": every 1_x subcategory, not an equal match.
+                "SELECT title, magnet, torrent_url, view_url, size, seeders, leechers, published FROM releases WHERE (category = ?1 OR (?1 = '1_0' AND category IN ('1_1', '1_2', '1_3', '1_4')))",
             );
             for i in 0..words.len() {
                 sql.push_str(&format!(" AND words LIKE ?{}", i + 2));
@@ -768,6 +769,17 @@ INSERT INTO `toto_anidb_tvdb` (`anidbid`, `tvdbid`, `defaulttvdbseason`, `episod
         assert_eq!(release_id("https://nyaa.si/view/2012345"), Some(2012345));
         assert_eq!(release_id("https://nyaa.si/view/99#comments"), Some(99));
         assert_eq!(release_id("https://nyaa.si/user/x"), None);
+    }
+
+    #[tokio::test]
+    async fn all_anime_category_covers_every_anime_subcategory() {
+        let store = Store::open(&temp_db("all-anime")).unwrap();
+        store.save_search("1_2|k", "1_2", &[release(1, "[A] Kaiju - 01", 1)]).await.unwrap();
+        store.save_search("1_4|k", "1_4", &[release(2, "[B] Kaiju - 01 raw", 1)]).await.unwrap();
+        store.save_search("1_3|k", "1_3", &[release(3, "[C] Kaiju - 01 non-english", 1)]).await.unwrap();
+        store.save_search("3_1|k", "3_1", &[release(4, "[D] Kaiju - 01 manga", 1)]).await.unwrap();
+        assert_eq!(store.search_local("1_0", "kaiju", 50).await.unwrap().len(), 3, "1_0 = all anime subcategories, not manga");
+        assert_eq!(store.search_local("1_2", "kaiju", 50).await.unwrap().len(), 1, "a concrete category still matches by equality");
     }
 
     #[tokio::test]
