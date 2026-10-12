@@ -600,8 +600,13 @@ function App() {
       // confident belong to a different season of the same franchise
       // rather than this anime's own episodes.
       // (A multi-season pack - "S1-S5" - belongs to every season it names.)
+      // Only an explicit season marker counts: a release with none ("Symphogear
+      // XV - 06") parses as season 1 by default and belongs to the entry (the
+      // matcher already tied it to the show).
+      const marked = label.kind === "episode" || label.kind === "batch" ? (label.seasons ? label.seasons.length > 0 : label.season !== 1) : false;
       if (
         currentAnimeSeason !== 1 &&
+        marked &&
         (label.kind === "episode" || label.kind === "batch") &&
         label.season !== currentAnimeSeason &&
         !(label.seasons ?? []).includes(currentAnimeSeason)
@@ -633,7 +638,9 @@ function App() {
     // name the season itself.
     for (const group of groups.values()) {
       if (group.label.kind !== "episode") continue;
-      const { season, number } = group.label;
+      const { number } = group.label;
+      // Every group on an entry's page is one of its episodes: the entry's season.
+      const season = currentAnimeSeason;
       for (const { source, label, explicit } of packs) {
         if (label.episodeRange !== null || group.releases.includes(source)) continue;
         const files = details[source.view_url]?.files ?? [];
