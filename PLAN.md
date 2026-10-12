@@ -2431,6 +2431,19 @@ magnet says so (only `dn`). Rules:
 a magnet from the clipboard is untrusted input: only `btih`, `dn`, `tr` are
 read and everything is length-capped.
 
+## Settings as a centered modal (v0.4.4 - UI change, ships with the dataset work)
+
+The Settings panel (`src/SettingsPanel.tsx`, styles in `src/App.css`
+"Settings") was a right-edge drawer (full height, slides in from the right).
+It becomes a centered modal dialog: dimmed + blurred backdrop, the panel
+centered with rounded corners, width `min(640px, 92vw)` (the AnimeTosho
+import row and its progress need more room than the 460px drawer), height
+`min(82vh, 780px)`, header/footer fixed and the body scrolling. Opens with a
+short scale+fade pop instead of the slide. Behaviour unchanged: same
+`role="dialog"`/`aria-modal`, Esc and backdrop click close it, focus is
+trapped as before. Phone-width windows (<600px) fall back to full-screen.
+CSS only; no component logic change.
+
 ## Known gaps / not yet implemented
 
 - (HLS fallback player only - mpv reads the file's real duration.) The

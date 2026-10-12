@@ -187,6 +187,7 @@
         (`aid_for_stem`); holdout precision is 38% (season carry-over), so
         the T5 hint is deliberately NOT enabled - see PLAN.md "Stem mapper
         result"
+  - [ ] Settings panel as a centered modal instead of a right drawer (PLAN.md "Settings as a centered modal"; CSS only)
   - [ ] FILE_INDEX.md/PLAN.md sync, CHANGELOG, `npm run bump -- minor`... or
         patch per the Release plan, tag
 
