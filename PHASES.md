@@ -157,7 +157,7 @@
         `<data>/tosho/`, progress event, resume/cancel, size + disk-space
         confirm, then build + import, offer to delete the archive; spike
         first: no 1 TB pre-allocation, resume, 7z reader
-  - [ ] T1 `build_tosho` example: streaming INSERT parser over `7z e -so`,
+  - [x] T1 `build_tosho` example (parser `nyaa-client/src/tosho.rs`; results in PLAN.md "Measured"; no size cut needed): streaming INSERT parser over `7z e -so`,
         `--stats` mode counts rows per table, `toto_toto` aid coverage and
         `resolveapproved` split, file-list size; decide the size cut
   - [ ] T2 dataset schema + builder writing `tosho-dataset-<date>.db`

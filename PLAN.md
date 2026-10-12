@@ -2141,6 +2141,18 @@ Rules: explicit user click only (2.9 GB), shows size before starting, disk
 space check (archive + dataset), no automatic updates. The dump is a snapshot;
 re-downloading replaces the dataset (`meta.dump_date`).
 
+**Measured (T1, 2026-10-13, `build_tosho --stats`).** `toto_repl.sql` streams
+in 67 s (release build, `7z e -so`). `toto_toto` 763,361 rows: 609,805 on
+nyaa.si (+491 sukebei), 682,819 with an `aid` (561,350 of them on nyaa.si),
+20,910 deleted, 99,712 dupes; `resolveapproved` among rows with an `aid`:
+0 = 381,709 (56%), 1 = 250,901, 2 = 101, 3 = 50,108; 66,917 nyaa.si batches
+with a known `aid` and more than one file. `toto_files` 1,376,362 rows,
+about 99 MB of names and sizes for ALL torrents, so no size cut: keep every
+file list of an anime (`aid` > 0) release. `toto_anidb_tvdb` 8,597 rows.
+Open question for T2: 56% of resolved rows are `resolveapproved = 0`
+(AnimeTosho's unconfirmed guesses); decide in T8 by checking them against
+`franchises.json` whether they are trusted or only a hint.
+
 **Freshness.** The dump ends 2026-05-09. Newer releases have no `aid`, so
 title matching stays the fallback and must not regress. A later milestone can
 add the live AnimeTosho feed (`feed.animetosho.org/json?aid=`) for the gap;
