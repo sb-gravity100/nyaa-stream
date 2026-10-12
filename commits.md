@@ -1,3 +1,33 @@
+### `6325af3` · 2026-10-13 · feat(matching): a known AniDB id decides which entry a release belongs to (v0.4.4 T5)
+- `src-tauri/src/title_match.rs`
+- `src-tauri/src/lib.rs`
+- `src/App.tsx`
+- `src/releases.ts`
+- `src/types.ts`
+- `PLAN.md`
+
+### `790ace9` · 2026-10-13 · feat: entry season and episode offset from the AnimeTosho AniDB-TVDB map (v0.4.4 T7)
+- `src-tauri/src/anime_lists.rs`
+- `src-tauri/src/lib.rs`
+- `src/App.tsx`
+
+### `e097f2a` · 2026-10-13 · feat(nyaa-client): torrent details fall back to the dataset file list (v0.4.4 T6)
+- `crates/nyaa-client/src/lib.rs`
+
+### `8d51a89` · 2026-10-13 · feat(nyaa-client): import the AnimeTosho dataset into the store (v0.4.4 T3)
+- `crates/nyaa-client/src/store.rs`
+- `crates/nyaa-client/src/lib.rs`
+- `src-tauri/src/lib.rs`
+- `src/SettingsPanel.tsx`
+
+### `92a74e0` · 2026-10-13 · feat(nyaa-client): AnimeTosho dataset builder (v0.4.4 T2)
+- `crates/nyaa-client/src/tosho_build.rs`
+- `crates/nyaa-client/examples/build_tosho.rs`
+- `crates/nyaa-client/src/store.rs`
+
+### `f2a3381` · 2026-10-13 · feat(anime-lists): AniList <-> AniDB id sets from Fribb, cache format v2 (v0.4.4 T4)
+- `src-tauri/src/anime_lists.rs`
+
 ### `3b42841` · 2026-10-13 · docs(plan): static stem mapper trained on the AnimeTosho dump (v0.4.4 T9)
 - `PLAN.md`
 - `PHASES.md`
