@@ -2178,6 +2178,47 @@ use title rules. `resolveapproved` = 0 rows are guesses by AnimeTosho's own
 matcher: only 1, 2, 3 are trusted. The dump is third-party data; the dataset
 is a local derived file, never bundled in the installer.
 
+## Custom magnet in the search bar (planned, v0.4.5 - minor feature, after v0.4.4)
+
+**Request** (2026-10-13): paste a magnet URL into the search bar. Decided
+(user): both play it directly **and** let it be attached to an episode.
+
+**Detection.** `src/App.tsx` search input (`placeholder="Search anime"`): a
+trimmed value starting `magnet:?` with an `xt=urn:btih:<40 hex | 32 base32>`
+is a magnet, never sent to nyaa search or AniList. A bare 40-hex info hash is
+accepted too (turned into a magnet). Anything else searches as before.
+Invalid magnets (no btih) show an inline "not a valid magnet" hint.
+
+**Play directly.** The bar shows one row "Play this magnet" with the `dn=`
+name (or the info hash), the parsed `EpisodeLabel` of that name, and the
+trackers count. Enter or click calls `play_magnet` (`src/playback.ts`) with
+`title` = `dn`, `episode` = the label's episode if any; the player's file
+menu picks the file (its `pickFile` already handles packs), so a magnet
+without episode info still plays. A shared `parse_magnet` helper lives in
+Rust (`src-tauri/src/magnet.rs`, command `parse_magnet(text) ->
+ParsedMagnet{info_hash, name, trackers, label}`) so the frontend does not
+re-implement base32/percent decoding; unit tests cover hex/base32 hashes,
+`dn` decoding, repeated `tr`, and rejects.
+
+**Attach to an episode.** While it plays (and from the "Play this magnet"
+row's menu) an "Attach to episode..." action opens a picker: search the
+anime (existing search), choose the media and episode. The attachment is a
+row in the permanent store, `custom_sources(info_hash, magnet, name,
+anilist_id, season, episode, added_at)`, not a nyaa release; the episode's
+source list merges `custom_sources` for that media/episode (marked "custom",
+removable from its row's menu). Attached sources bypass title matching (user
+chose the episode); a pack attaches to the media and is offered per episode
+via the file-list check like other packs.
+
+**Tasks** (one commit each): M1 `parse_magnet` + tests; M2 search-bar
+detection and the "Play this magnet" row; M3 `custom_sources` table + store
+API; M4 attach picker and merge into `groupedSources`; M5 docs, CHANGELOG,
+FILE_INDEX, version.
+
+**Rules.** No network lookup for a pasted magnet beyond what playback does;
+a magnet from the clipboard is untrusted input: only `btih`, `dn`, `tr` are
+read and everything is length-capped.
+
 ## Known gaps / not yet implemented
 
 - (HLS fallback player only - mpv reads the file's real duration.) The

@@ -174,6 +174,14 @@
   - [ ] FILE_INDEX.md/PLAN.md sync, CHANGELOG, `npm run bump -- minor`... or
         patch per the Release plan, tag
 
+- [ ] Custom magnet in the search bar - v0.4.5 (minor feature, see PLAN.md
+      "Custom magnet in the search bar"). One commit each:
+  - [ ] M1 `parse_magnet` (`src-tauri/src/magnet.rs`) + command + tests
+  - [ ] M2 search-bar detection, "Play this magnet" row, invalid hint
+  - [ ] M3 `custom_sources` store table + API
+  - [ ] M4 "Attach to episode..." picker, merged into `groupedSources`
+  - [ ] M5 FILE_INDEX/CHANGELOG/version bump, tag
+
 ## Phase 3 — Playback quality of life
 - [x] Wire a video player to the media page: play button per episode row
       calls `play_magnet`, auto-picking the release with the most seeders
