@@ -1,3 +1,10 @@
+### `3f58c13` · 2026-10-13 · docs: this release is v0.5.0 (merges 0.4.3-0.4.5); old v0.5.0 context menus merge into v0.6.0
+- `PLAN.md`
+- `PHASES.md`
+- `CLAUDE.md`
+- `CHANGELOG.md`
+- `src/changelog.ts`
+
 ### `68f8cad` · 2026-10-13 · docs(plan): Import Tosho Data button - download, compile and import in one click (v0.4.4 T0)
 - `PLAN.md`
 - `PHASES.md`
