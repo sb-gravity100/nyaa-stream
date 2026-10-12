@@ -1,3 +1,13 @@
+### `a56cb01` · 2026-10-13 · feat(nyaa-client): build_tosho --stats measures the AnimeTosho dump (v0.4.4 T1)
+- `crates/nyaa-client/examples/build_tosho.rs`
+- `PLAN.md`
+- `PHASES.md`
+- `FILE_INDEX.md`
+
+### `252d28f` · 2026-10-13 · feat(nyaa-client): streaming reader for the AnimeTosho mysqldump (INSERT parser)
+- `crates/nyaa-client/src/tosho.rs`
+- `crates/nyaa-client/src/lib.rs`
+
 ### `003ef7e` · 2026-10-13 · docs(plan): AnimeTosho T0 runs last, dev uses the local dump
 - `PHASES.md`
 
