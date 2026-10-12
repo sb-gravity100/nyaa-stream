@@ -1,3 +1,8 @@
+### `6f56cef` · 2026-10-13 · docs: custom magnet paste on hold, not in v0.5.0
+- `PLAN.md`
+- `PHASES.md`
+- `CLAUDE.md`
+
 ### `63cbe42` · 2026-10-13 · docs: D2 spike result - sevenz-rust2 in-process 7z reader, no 7zr.exe bundle (v0.4.4)
 - `PLAN.md`
 - `PHASES.md`
