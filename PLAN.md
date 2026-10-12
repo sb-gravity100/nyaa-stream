@@ -2202,6 +2202,34 @@ no `aid`. The mapper generalises the dump's ground truth to them:
   thresholds. Series that debuted after the dump have no stems and fall to
   title rules by design.
 
+**Stem mapper result (T9, measured 2026-10-13 on the real dump).** Built:
+`nyaa-client/src/stem.rs` (`parse_stem`/`stem_of` = `release-parse` show name
+through a copy of `normalize`, `train`, `evaluate`, `holdout`),
+`ToshoBuilder::finish` writes `stem_aid` (10,284 stems from 531,419 aid rows;
+dataset still 500 MB, build 118 s), `Store::import_tosho` replaces `stem_aid`
+(older datasets without the table import and clear it), `NyaaClient::
+aid_for_stem` / `aids_for_stems`. `build_tosho ... --holdout 2025-01-01` (and
+`--holdout-only <dataset.db> <date>` on a built dataset) prints the evaluation;
+`--stem-share/--stem-releases/--stem-groups` set the thresholds (default 0.90 /
+3 releases / 2 groups). A guess (`approved` 0) votes only when every release
+of its group for that stem agrees on one `aid`.
+- Holdout (train < 2025-01-01: 449,946 releases, 9,040 stems; test = 47,366
+  trusted releases from 2025-01-01): coverage 18.99%, **precision 38.3%**
+  (8,994 resolved, 3,446 correct). Of the 5,548 wrong, 5,395 name another
+  AniDB entry of the *same TVDB show* (a returning series' new season/cour has
+  a new `aid`, the stem still maps to the old one); only 153 are another show.
+  Counting a same-show answer as right gives 98.3%, still under 99%.
+- Raising the thresholds makes it worse, not better: share 0.99 / 20 releases
+  / 4 groups gives 16.9% coverage, 36.3% precision; share 1.0 / 50 / 6 gives
+  12.7%, 22.3%. Strict thresholds favour long-running stems, which are exactly
+  the ones that gain new seasons. Cutoff 2024-07-01: 17.7%, 32.4%.
+- **Verdict: the hook is NOT enabled.** The 99% gate cannot be met by vote
+  thresholds because the error is structural (a stem cannot name a season).
+  `filter_for_show` / `ShowMatcher::decide` are unchanged, nothing reads
+  `stem_aid` yet, and the table ships unused. Possible later fixes, each
+  needing its own plan entry: stems only for shows whose TVDB group has a
+  single AniDB entry, or season-aware stems (stem + season marker).
+
 **Matching rule (T5).** `ShowMatcher::decide(title, known, entry_aids)` ->
 `Accept | Reject | UseTitleRules`; `entry_aids` = `AnimeLists::anidb_ids` of
 the entry's AniList id, `known` = `NyaaClient::aids_of` for the result ids
