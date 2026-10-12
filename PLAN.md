@@ -2248,11 +2248,77 @@ the entry's AniList id, `known` = `NyaaClient::aids_of` for the result ids
   episode takes the number its same-eid siblings agree on
   (`episodeNumbersByGroup`, groups with disagreeing numbers are ignored), as an
   episode of the entry's season; releases that parsed an episode are untouched.
-- The frontend season filters in `groupedSources` still run after the
-  backend, so a trusted-aid release with an explicit other-season marker can
-  still be dropped there (T8 decides whether they get an aid-based bypass).
+- `NyaaResult.aid_trusted` = `true` when `decide` returned Accept on a trusted
+  (`approved` 1-3) aid. `groupedSources` files such a release under the entry's
+  season when its title names only other seasons (season 0 excepted), instead
+  of letting the frontend season filters drop it (T8, below).
 - `title_match_fixture_tests.rs` has no release ids and keeps measuring the
   title rules only.
+
+**Verification (T8, 2026-10-13, real dump 2026-05-09, Fribb map fetched the same
+day).** Harness: `src-tauri/src/tosho_verify_tests.rs`, `#[ignore]`, run with
+`TOSHO_DATASET=<db> TOSHO_SCRATCH=<dir> [SYMPHO_CRAWL=<json>] cargo test -p
+nyaa-stream --lib tosho_verify -- --ignored --nocapture` (imports the dataset
+through `NyaaClient::import_tosho`, so the app's own lookups are measured; needs
+network for Fribb and AniList; datasets are not committed). `franchises.json`
+has no AniDB ids: the ground truth for seasons is its hand-labelled entry
+season, the AniDB ids come from Fribb.
+1. *Season truth* (23 TV entries: Food Wars S1-S5 incl. the Totsuki Train
+   entry, Mushoku S1-S3 incl. Cour 2 / Season 2 Part 2, Slime S1-S4,
+   Symphogear S1-S5 incl. XV). `decide_entry_season` = expected for **23/23**.
+   The dataset decided 19 (every one right, 0 disagreements with Fribb); 4 fell
+   back (Mushoku S3 `178789`: its `anidb_tvdb` row has no numeric season;
+   `217434` and Slime `217331`: no Fribb AniDB mapping at all), all right
+   through the title logic. Fribb alone is right on 21/23 (absent for those
+   two). No case of the dataset overriding a right Fribb/title season; the
+   1,250 dataset rows without a numeric season keep the fallback.
+2. *Release attribution* (dataset releases whose trusted aid (`approved` 1-3)
+   is in the franchise's aid set or whose title has the franchise words:
+   3,116 trusted, 3,449 hint, 5,818 without an aid; 15,927 entry x release
+   pairs). Trusted aid is the truth. Title rules alone: recall 85.2% (1,716 of
+   2,015), precision 36.4% (3,004 wrongly kept, 299 wrongly dropped - the
+   absolute-numbered / unmarked releases the title rules keep on every season
+   on purpose, split cours, "Shokugeki no Soma S3" for Totsuki Train, HorribleSubs
+   "Shokugeki no Soma - 01"). `decide` + title fallback: 100% / 100% by
+   construction (an Accept/Reject on the trusted aid), so it cannot regress on
+   trusted releases unless the aid itself is wrong; per entry the gain is in
+   the output of the harness. Hint rows (`approved` 0, aid in the entry's set,
+   2,602 pairs): 199 (7.6%) accepted beyond the title rules (HorribleSubs "Shokugeki
+   no Soma S2 - 04", OVAs and specials of the same aid), 32 left to the title
+   rules because they name only other seasons.
+   *Independent check against the hand labels* (the fixture titles that the
+   dataset knows by exact title: 226 of 1,275, 103 trusted): title rules alone
+   recall 97.4% / precision 94.0%, `decide` + title 96.1% / 96.4%; on trusted
+   rows only 100% / 93.6% -> 96.2% / 99.2%. The aid changed 16 decisions: 10
+   fixed, 6 "regressions", and all 6 are on the split cour: Erai-raws "Mushoku
+   Tensei - 01 ~ 11" (cour 1, aid 14758) is now rejected on the Cour 2 page
+   (the hand label groups both cours as season 1; this is the "split cours" gap
+   under "Not covered" above, now closed for dataset releases), and Erai-raws
+   "... 2nd Season - 01 ~ 12" (2021-12-21, trusted aid 15954 = Cour 2) is
+   hand-labelled season 2 in the fixture, which is wrong (it aired as cour 2 in
+   Oct-Dec 2021), so the aid is right and the label is not. Not a code
+   regression; the fixture is left as it is (it measures the title rules).
+3. *Frontend filters.* Emulating `groupedSources`' season filters on the 2,015
+   trusted accepts: 40 (2.0%) would be dropped, all of them Erai-raws "2nd
+   Season" releases of the Mushoku Cour 2 entry (season 1). Fixed:
+   `NyaaResult.aid_trusted` (set by `filter_for_show`, `src/types.ts`) and
+   `groupedSources` snaps such a release to the entry's season before the
+   filters.
+4. *Symphogear XV crawl* (`download (1).json`, 75 results, 48 known to the
+   dataset): XV entry (`21673`, aid 11959) keeps 72 of 75, the same 72 the title
+   rules alone keep: episodes 1-13 all present, 10 batches (VCB S5, Kirika S05,
+   PMR S05, Punisher S05, Erai 01 ~ 13 x2, the `S01-05 + Specials` pack, Commie
+   unofficial batch, BDMV vol.1-6). The 3 dropped are the "Symphogear + G + GX +
+   AXZ + XV" packs with no season marker, which dataset aid 8709 (season 1, hint)
+   does not vouch for; the title rules drop them too (a pre-existing gap, not
+   a regression). Six non-video items (Bonus CD, ED single) pass on the title rules
+   as before. The frontend keeps them all (unmarked titles are not season
+   filtered).
+5. *`search_local(.., Category::AllAnime)`.* Confirmed: `1_0` was compared by
+   equality, so it matched nothing. Now `1_0` means `1_1`..`1_4` (test
+   `all_anime_category_covers_every_anime_subcategory`; manga `3_1` stays out).
+   Post-dump releases are untouched by any of this: without a `known` row
+   `decide` returns `UseTitleRules`.
 
 **Freshness.** The dump ends 2026-05-09. Newer releases have no `aid`, so
 title matching stays the fallback and must not regress. A later milestone can
