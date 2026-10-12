@@ -20,7 +20,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Releases written with just the short name and a season, like \"Mushoku Tensei S03E12\", now appear on that season's page.",
     ],
     fixes: [
-      "Season 3 of a long-running show no longer lists stray season 1 and 2 episode rows, and "Mushoku Tensei III - 07"-style releases join the right season.",
+      "Season 3 of a long-running show no longer lists stray season 1 and 2 episode rows, and \"Mushoku Tensei III - 07\"-style releases join the right season.",
       "A season's page no longer lists other seasons' releases (Slime season 3 showing season 4, for example).",
       "Sequels with their own long names, like Food Wars' \"The Second Plate\", no longer appear on the first season's page.",
       "Movies, OVAs and specials stay off a TV season's episode list; they have their own pages.",
