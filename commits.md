@@ -1,3 +1,7 @@
+### `3f6d07c` · 2026-10-13 · docs(plan): AnimeTosho T0 downloads only database-dump.7z from the 1 TB torrent
+- `PLAN.md`
+- `PHASES.md`
+
 ### `10688d2` · 2026-10-13 · docs(plan): in-app AnimeTosho dump download (v0.4.4 T0)
 - `PLAN.md`
 - `PHASES.md`
