@@ -1,3 +1,7 @@
+### `40f732e` · 2026-10-13 · docs: custom magnet paste is planned for v0.6.0
+- `PLAN.md`
+- `PHASES.md`
+
 ### `6f56cef` · 2026-10-13 · docs: custom magnet paste on hold, not in v0.5.0
 - `PLAN.md`
 - `PHASES.md`
