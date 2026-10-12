@@ -1,3 +1,6 @@
+### `003ef7e` · 2026-10-13 · docs(plan): AnimeTosho T0 runs last, dev uses the local dump
+- `PHASES.md`
+
 ### `3f6d07c` · 2026-10-13 · docs(plan): AnimeTosho T0 downloads only database-dump.7z from the 1 TB torrent
 - `PLAN.md`
 - `PHASES.md`
