@@ -2200,6 +2200,25 @@ with its own progress line and cancel:
    `7z e -so`, ~2 min total; if no crate qualifies, bundle `7zr.exe`
    (LGPL, ~600 KB) from `src-tauri/lib/` and spawn it). The build writes
    `<data>/tosho/tosho-dataset-<date>.db`.
+   **D2 result (2026-10-13): pure-Rust `sevenz-rust2` 0.24 qualifies; no
+   `7zr.exe` needed.** `nyaa_client::sevenz_stream::open_entry(archive,
+   entry)` returns a `BufRead` fed by a decoder thread (1 MiB chunks, 4
+   queued) and `entry_date` replaces `7z l`. The dump is 4 LZMA2 blocks
+   (`arcscrape`, `toto`, `toto_repl`, schema+timebase), so only the block of
+   the wanted entry is decoded and reaching `arcscrape.sql` costs nothing
+   extra. Measured (release, same machine, installed 7-Zip): `--stats toto_repl`
+   78 s vs 64 s with `7z e -so` (1.2x), peak 102 MB; full build 148 s vs
+   125 s (toto_repl at 81 s, +50 s arcscrape vs +34 s), peak 406 MB for both
+   (the builder); identical row counts (toto_toto 763,361, toto_files
+   1,376,362, toto_anidb_tvdb 8,597) and identical dataset tables. Decoding
+   must stay single-threaded: sevenz-rust2's multi-threaded LZMA2 reader
+   queues compressed input without a bound and ran out of memory (4.5 GB
+   working set, then OOM); `SEVENZ_THREADS=n` exists only for experiments.
+   Licences: sevenz-rust2 and lzma-rust2 are Apache-2.0, crc32fast
+   MIT/Apache; no C code or system deps (`default-features = false` drops
+   AES/bzip2/ppmd/writer), so 32-bit Windows builds like any pure-Rust
+   crate (not compiled here: no i686 target installed). `build_tosho`
+   uses it by default; `--external-7z` keeps the `7z` path.
 4. *Import:* `Store::import_tosho` as today.
 5. *Clean up:* offer to delete the 2.74 GB archive (default yes), keep the
    dataset db for a re-import. A failed phase keeps the previous phase's

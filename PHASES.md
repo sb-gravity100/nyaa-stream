@@ -157,8 +157,11 @@
         archive. One commit each:
     - [ ] D1 spike: sbtl downloads one file of the 1 TB torrent (no
           pre-allocation, resume, piece-map memory), fetch `at-data.torrent`
-    - [ ] D2 spike: pure-Rust streaming 7z reader for the two SQL entries
-          (speed vs `7z e -so`); fallback bundle `7zr.exe`
+    - [x] D2 spike: pure-Rust streaming 7z reader for the two SQL entries
+          (speed vs `7z e -so`); fallback bundle `7zr.exe` - decision:
+          `sevenz-rust2` (`nyaa-client/src/sevenz_stream.rs`), 1.2x of 7z
+          (148 s vs 125 s full build), 406 MB peak, identical output; no
+          `7zr.exe` bundle (PLAN.md "D2 result")
     - [x] D3 `tosho_import` pipeline in `src-tauri` (confirm data, download,
           build from the archive stream, import, cleanup; resumable phases;
           progress event; cancel)
