@@ -19,6 +19,27 @@ function loadGroups(): Record<string, string> {
   }
 }
 
+/** eid -> the one episode number the releases of that AniDB episode parse to.
+ * A group whose parsed releases disagree (an absolute-numbered one next to a
+ * season-relative one) is left out, so nothing is guessed from it. */
+export function episodeNumbersByGroup(releases: NyaaResult[]): Map<number, number> {
+  const seen = new Map<number, Set<number>>();
+  for (const release of releases) {
+    const eid = release.episode_group;
+    if (!eid) continue;
+    const label = labelOf(release.label, release.title);
+    if (label.kind !== "episode") continue;
+    const numbers = seen.get(eid) ?? new Set<number>();
+    numbers.add(label.number);
+    seen.set(eid, numbers);
+  }
+  const out = new Map<number, number>();
+  for (const [eid, numbers] of seen) {
+    if (numbers.size === 1) out.set(eid, [...numbers][0]);
+  }
+  return out;
+}
+
 export function releaseGroup(release: NyaaResult): string | null {
   return parseSubmitterFromTitle(release.title);
 }

@@ -2202,6 +2202,30 @@ no `aid`. The mapper generalises the dump's ground truth to them:
   thresholds. Series that debuted after the dump have no stems and fall to
   title rules by design.
 
+**Matching rule (T5).** `ShowMatcher::decide(title, known, entry_aids)` ->
+`Accept | Reject | UseTitleRules`; `entry_aids` = `AnimeLists::anidb_ids` of
+the entry's AniList id, `known` = `NyaaClient::aids_of` for the result ids
+(one batch query per search; commands `search_torrents_for_anime`,
+`search_local_releases`, `search_fansubber_releases` via `filter_for_show`).
+- No `known` row, `aid` = 0, or the entry has no AniDB mapping: title rules,
+  unchanged (post-dump releases and unmapped entries do not regress).
+- `approved` 1/2/3 (trusted): `aid` in the entry's set -> Accept, else Reject,
+  whatever the title says (season markers, sibling rules, missing names).
+- `approved` 0 (AnimeTosho's guess) is only a hint, never overriding both
+  ways: `aid` in the set -> Accept unless the title explicitly names only
+  other seasons than the entry's (then the title rules decide); `aid` not in
+  the set -> title rules decide (a guess never rejects by itself).
+- `NyaaResult.episode_group` = the `eid` (when non-zero) of kept releases the
+  dataset knows. `src/App.tsx` `groupedSources`: a release that parsed no
+  episode takes the number its same-eid siblings agree on
+  (`episodeNumbersByGroup`, groups with disagreeing numbers are ignored), as an
+  episode of the entry's season; releases that parsed an episode are untouched.
+- The frontend season filters in `groupedSources` still run after the
+  backend, so a trusted-aid release with an explicit other-season marker can
+  still be dropped there (T8 decides whether they get an aid-based bypass).
+- `title_match_fixture_tests.rs` has no release ids and keeps measuring the
+  title rules only.
+
 **Freshness.** The dump ends 2026-05-09. Newer releases have no `aid`, so
 title matching stays the fallback and must not regress. A later milestone can
 add the live AnimeTosho feed (`feed.animetosho.org/json?aid=`) for the gap;

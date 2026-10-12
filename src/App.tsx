@@ -19,6 +19,7 @@ import { addToLibrary, getLibrary, isInLibrary, removeFromLibrary } from "./libr
 import { addRecentSearch, clearRecentSearches, getRecentSearches, removeRecentSearch } from "./recentSearches";
 import { fetchKitsuMetadata, kitsuSnapshot } from "./kitsu";
 import { cachedTorrentThumbnail, fetchTorrentThumbnail } from "./torrentThumbnail";
+import { episodeNumbersByGroup } from "./releases";
 import { MediaPage } from "./MediaPage";
 import { HomePage } from "./HomePage";
 import { SettingsPanel } from "./SettingsPanel";
@@ -532,6 +533,7 @@ function App() {
       const label = labelOf(source.label, source.title);
       if (label.kind === "episode" && label.season === 1) seasonOneNumbers.add(label.number);
     }
+    const groupNumbers = episodeNumbersByGroup(sources);
     for (const source of sources) {
       const parsed = labelOf(source.label, source.title);
       // The title-regex parser can't tell a batch apart from a genuinely
@@ -542,7 +544,12 @@ function App() {
       // extractSeasonNumber's default would have produced anyway.
       let label: EpisodeLabel = parsed;
       const scraped = details[source.view_url];
-      if (parsed.kind === "unknown" && scraped?.is_batch !== false) {
+      // AnimeTosho's AniDB episode id: a release that parsed no episode takes
+      // the number its sibling releases of the same episode agree on.
+      const grouped = parsed.kind === "unknown" && source.episode_group ? groupNumbers.get(source.episode_group) : undefined;
+      if (grouped !== undefined) {
+        label = { kind: "episode", season: currentAnimeSeason, number: grouped };
+      } else if (parsed.kind === "unknown" && scraped?.is_batch !== false) {
         // A matched release whose title names no episode is a season batch of
         // this entry (the matcher already tied it to the show). Once its view
         // page's file list is known, the seasons its files carry decide: a

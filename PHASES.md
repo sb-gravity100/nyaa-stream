@@ -164,8 +164,8 @@
   - [x] T3 `Store::import_tosho` (releases, release_aid, release_files,
         anidb_tvdb), Settings import button, refuses non-tosho files
   - [x] T4 `anime_lists.rs`: AniList -> AniDB id set from Fribb
-  - [ ] T5 `ShowMatcher`: known `aid` decides, title rules for the rest;
-        `eid` episode groups
+  - [x] T5 `ShowMatcher`: known `aid` decides, title rules for the rest;
+        `eid` episode groups (rules in PLAN.md "Matching rule (T5)")
   - [x] T6 `TorrentDetails.files` falls back to `release_files` (`NyaaClient::fetch_details`: stored scrape, then cache, then dataset, then scrape)
   - [x] T7 `get_entry_season` uses `anidb_tvdb.season` (`anime_lists::decide_entry_season`); `get_entry_episode_offset` command, offset stored in App.tsx (not applied yet)
   - [ ] T8 verify on `franchises.json` (AniDB ground truth), Symphogear XV

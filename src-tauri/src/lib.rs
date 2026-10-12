@@ -750,7 +750,7 @@ async fn search_torrents_for_anime(
 
     let matcher = show_matcher(&state, &title, &synonyms, anilist_id, franchise.as_ref());
     let before = merged.len();
-    merged.retain(|result| matcher.matches(&result.title));
+    filter_for_show(&state, &matcher, anilist_id, &mut merged, |_| true).await;
     tracing::info!(kept = merged.len(), dropped = before - merged.len(), "dropped releases that don't name the show");
 
     // A preferred fansubber whose nyaa.si account isn't known yet: learn it
@@ -786,7 +786,7 @@ async fn search_local_releases(
     }
     let matcher = show_matcher(&state, &title, &synonyms, anilist_id, franchise.as_ref());
     let mut merged = merge_unique(lists);
-    merged.retain(|result| matcher.matches(&result.title));
+    filter_for_show(&state, &matcher, anilist_id, &mut merged, |_| true).await;
     tracing::info!(count = merged.len(), "local release search for the show");
     Ok(merged)
 }
@@ -837,7 +837,7 @@ async fn search_fansubber_releases(
     let matcher = show_matcher(&state, &title, &synonyms, anilist_id, franchise.as_ref());
     let mut merged = merge_unique(lists);
     let tag_word = title_match::normalize(tag);
-    merged.retain(|result| matcher.matches(&result.title) && (user.is_some() || title_match::normalize(&result.title).split(' ').any(|w| w == tag_word)));
+    filter_for_show(&state, &matcher, anilist_id, &mut merged, |result| user.is_some() || title_match::normalize(&result.title).split(' ').any(|w| w == tag_word)).await;
     tracing::info!(?user, count = merged.len(), "fansubber-only release search");
     Ok(merged)
 }
@@ -846,6 +846,44 @@ async fn search_fansubber_releases(
 #[tauri::command]
 async fn get_popular_fansubbers(state: State<'_, Arc<AppState>>) -> Result<Vec<String>, String> {
     Ok(state.nyaa.popular_fansubbers(40).await)
+}
+
+/// Keeps the `results` that belong to the show and satisfy `extra`. A release
+/// the AnimeTosho dataset knows by AniDB id is decided by it (see
+/// `ShowMatcher::decide`); the rest by the title rules. The ids are looked up
+/// in one batch query, and each kept release gets its `episode_group` (eid).
+async fn filter_for_show(state: &AppState, matcher: &title_match::ShowMatcher, anilist_id: Option<i64>, results: &mut Vec<NyaaResult>, extra: impl Fn(&NyaaResult) -> bool) {
+    let entry_aids: Vec<u32> = anilist_id.and_then(|id| u32::try_from(id).ok()).map(|id| state.anime_lists.anidb_ids(id)).unwrap_or_default();
+    let known = if entry_aids.is_empty() || results.is_empty() {
+        std::collections::HashMap::new()
+    } else {
+        let ids: Vec<i64> = results.iter().filter_map(|r| nyaa_client::release_id(&r.view_url)).collect();
+        state.nyaa.aids_of(&ids).await
+    };
+    let (mut by_id, mut by_title) = (0usize, 0usize);
+    results.retain_mut(|result| {
+        let tosho = nyaa_client::release_id(&result.view_url).and_then(|id| known.get(&id));
+        let keep = match matcher.decide(&result.title, tosho, &entry_aids) {
+            title_match::Decision::Accept => {
+                by_id += 1;
+                true
+            }
+            title_match::Decision::Reject => {
+                by_id += 1;
+                false
+            }
+            title_match::Decision::UseTitleRules => {
+                by_title += 1;
+                matcher.matches(&result.title)
+            }
+        };
+        let keep = keep && extra(result);
+        if keep {
+            result.episode_group = tosho.map(|t| t.eid).filter(|eid| *eid != 0);
+        }
+        keep
+    });
+    tracing::info!(entry_aids = entry_aids.len(), known = known.len(), by_id, by_title, kept = results.len(), "filtered releases for the show");
 }
 
 /// `lists` flattened, one entry per nyaa.si release (by view URL), first

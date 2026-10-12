@@ -13,7 +13,19 @@
 use std::collections::BTreeSet;
 
 use anilist_client::Franchise;
+use nyaa_client::ToshoRelease;
 use release_parse::Kind;
+
+/// What the dataset's AniDB id says about a release for one entry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Decision {
+    /// Belongs to the entry whatever its title says.
+    Accept,
+    /// Belongs to another entry whatever its title says.
+    Reject,
+    /// No usable id: the title rules decide.
+    UseTitleRules,
+}
 
 /// Most queries sent per show - each is at least one nyaa.si request.
 const MAX_CANDIDATES: usize = 4;
@@ -390,19 +402,72 @@ impl ShowMatcher {
         self.primary
     }
 
-    /// Whether `release_title` belongs to this entry.
-    pub fn matches(&self, release_title: &str) -> bool {
-        let haystack = haystack(release_title);
+    /// The season numbers `release_title` names (explicit markers, else a
+    /// roman numeral right after a known short name).
+    fn named_seasons(&self, release_title: &str, haystack: &str) -> Vec<u32> {
         let mut release_seasons = release_seasons(release_title);
         // "Mushoku Tensei II Isekai ..." - a roman numeral right after a
         // known short name is its season (release-parse can't know names).
         if release_seasons.is_empty() {
-            release_seasons.extend(self.roman_season(&haystack));
+            release_seasons.extend(self.roman_season(haystack));
         }
+        release_seasons
+    }
+
+    /// Whether the release's explicit season markers name only other seasons
+    /// than this entry's (never with no season known for the entry).
+    fn names_only_other_seasons(&self, release_seasons: &[u32]) -> bool {
+        !self.seasons.is_empty() && !release_seasons.is_empty() && !release_seasons.iter().any(|season| self.seasons.contains(season))
+    }
+
+    /// The decision for a release whose AniDB id may be known (see
+    /// `Decision` and PLAN.md "AnimeTosho dataset"). `entry_aids` is the
+    /// entry's AniDB id set; empty (unmapped entry) never decides.
+    pub fn decide(&self, release_title: &str, known: Option<&ToshoRelease>, entry_aids: &[u32]) -> Decision {
+        let Some(known) = known.filter(|k| k.aid != 0) else { return Decision::UseTitleRules };
+        if entry_aids.is_empty() {
+            return Decision::UseTitleRules;
+        }
+        let ours = entry_aids.contains(&known.aid);
+        let decision = match (known.approved, ours) {
+            (1..=u8::MAX, true) => Decision::Accept,
+            (1..=u8::MAX, false) => Decision::Reject,
+            // AnimeTosho's own guess: a hint only. It vouches for the release
+            // unless the title explicitly names only other seasons; it never
+            // rejects on its own.
+            (0, true) => {
+                let hay = haystack(release_title);
+                if self.names_only_other_seasons(&self.named_seasons(release_title, &hay)) {
+                    Decision::UseTitleRules
+                } else {
+                    Decision::Accept
+                }
+            }
+            (0, false) => Decision::UseTitleRules,
+        };
+        tracing::trace!(release_title, aid = known.aid, approved = known.approved, ours, ?decision, "aid decision");
+        decision
+    }
+
+    /// `matches`, with the dataset's AniDB id deciding where it can
+    /// (`filter_for_show` in lib.rs does the same per result).
+    #[cfg(test)]
+    pub fn matches_with_aid(&self, release_title: &str, known: Option<&ToshoRelease>, entry_aids: &[u32]) -> bool {
+        match self.decide(release_title, known, entry_aids) {
+            Decision::Accept => true,
+            Decision::Reject => false,
+            Decision::UseTitleRules => self.matches(release_title),
+        }
+    }
+
+    /// Whether `release_title` belongs to this entry.
+    pub fn matches(&self, release_title: &str) -> bool {
+        let haystack = haystack(release_title);
+        let release_seasons = self.named_seasons(release_title, &haystack);
         // Markers that name only other seasons rule the release out, even
         // when a full name matches ("Slime" names every season). With no
         // season known for the entry nothing is ruled out.
-        if !self.seasons.is_empty() && !release_seasons.is_empty() && !release_seasons.iter().any(|season| self.seasons.contains(season)) {
+        if self.names_only_other_seasons(&release_seasons) {
             tracing::trace!(release_title, ?release_seasons, entry_seasons = ?self.seasons, "rejected: other season");
             return false;
         }
@@ -651,6 +716,56 @@ mod tests {
         assert!(matcher.matches("[Group] Sousou no Frieren S02E01 [1080p]"));
         assert!(matcher.matches("[Group] Frieren Beyond Journeys End - 05"));
         assert!(!matcher.matches("[Group] Fate strange Fake - 05"));
+    }
+
+    fn tosho(aid: u32, approved: u8) -> ToshoRelease {
+        ToshoRelease { aid, eid: 7, approved }
+    }
+
+    #[test]
+    fn trusted_aid_decides_both_ways_over_the_title() {
+        let matcher = ShowMatcher::new(Some("That Time I Got Reincarnated as a Slime Season 3"), Some("Tensei shitara Slime Datta Ken 3rd Season"), &[], None);
+        let ours = [111, 112];
+        // A season marker for another season does not matter: the id wins.
+        let other_season = "[ToonsHub] That Time I Got Reincarnated as a Slime S04E21 [1080p]";
+        assert!(!matcher.matches(other_season));
+        for approved in [1, 2, 3] {
+            assert_eq!(matcher.decide(other_season, Some(&tosho(112, approved)), &ours), Decision::Accept);
+            assert!(matcher.matches_with_aid(other_season, Some(&tosho(112, approved)), &ours));
+            // A matching title is still another entry's when the id says so.
+            assert_eq!(matcher.decide("[Group] Tensei shitara Slime Datta Ken S03E05", Some(&tosho(999, approved)), &ours), Decision::Reject);
+            assert!(!matcher.matches_with_aid("[Group] Tensei shitara Slime Datta Ken S03E05", Some(&tosho(999, approved)), &ours));
+        }
+    }
+
+    #[test]
+    fn guessed_aid_is_only_a_hint() {
+        let matcher = ShowMatcher::new(Some("That Time I Got Reincarnated as a Slime Season 3"), Some("Tensei shitara Slime Datta Ken 3rd Season"), &[], None);
+        let ours = [111];
+        // Right entry, nothing against it in the title: accepted even though the title rules would say no.
+        let nameless = "[Group] Something Else Entirely - 05";
+        assert!(!matcher.matches(nameless));
+        assert_eq!(matcher.decide(nameless, Some(&tosho(111, 0)), &ours), Decision::Accept);
+        // Right entry but the title names only another season: title rules decide (reject).
+        let other_season = "[ToonsHub] That Time I Got Reincarnated as a Slime S04E21 [1080p]";
+        assert_eq!(matcher.decide(other_season, Some(&tosho(111, 0)), &ours), Decision::UseTitleRules);
+        assert!(!matcher.matches_with_aid(other_season, Some(&tosho(111, 0)), &ours));
+        // Another entry's guess never rejects by itself.
+        let ok = "[Group] Tensei shitara Slime Datta Ken S03E05 [1080p]";
+        assert_eq!(matcher.decide(ok, Some(&tosho(999, 0)), &ours), Decision::UseTitleRules);
+        assert!(matcher.matches_with_aid(ok, Some(&tosho(999, 0)), &ours));
+    }
+
+    #[test]
+    fn no_usable_aid_keeps_the_title_rules() {
+        let matcher = ShowMatcher::new(Some("Frieren: Beyond Journey's End"), None, &[], None);
+        let title = "[Group] Frieren Beyond Journeys End - 05";
+        assert_eq!(matcher.decide(title, None, &[1]), Decision::UseTitleRules);
+        assert_eq!(matcher.decide(title, Some(&tosho(0, 3)), &[1]), Decision::UseTitleRules);
+        // Entry with no AniDB mapping: nothing to compare against.
+        assert_eq!(matcher.decide(title, Some(&tosho(5, 3)), &[]), Decision::UseTitleRules);
+        assert!(matcher.matches_with_aid(title, None, &[1]));
+        assert!(!matcher.matches_with_aid("[Group] Fate strange Fake - 05", None, &[1]));
     }
 
     #[test]

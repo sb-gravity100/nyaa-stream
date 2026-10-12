@@ -42,6 +42,9 @@ export interface NyaaResult {
   published: string;
   /** Parsed by the backend (release-parse); absent in the browser preview. */
   label?: EpisodeLabel;
+  /** AnimeTosho's AniDB episode id (eid): releases sharing it are the same
+   * episode. Set when the dataset knows the release; absent otherwise. */
+  episode_group?: number | null;
 }
 
 /** One file of a torrent, from its nyaa.si view page. */

@@ -58,6 +58,7 @@ fn main() -> anyhow::Result<()> {
                 seeders: count("seeders"),
                 leechers: count("leechers"),
                 published: text(item, "date"),
+                episode_group: None,
             };
             releases.push((category, release));
         }
