@@ -1,3 +1,12 @@
+### `f3b5a19` · 2026-10-13 · chore: release v0.5.0
+- `package.json`
+- `src-tauri/Cargo.toml`
+- `src-tauri/tauri.conf.json`
+
+### `56bd953` · 2026-10-13 · docs: changelog for v0.5.0
+- `CHANGELOG.md`
+- `src/changelog.ts`
+
 ### `bbb7a07` · 2026-10-13 · docs: Mushoku S3 report, season_ambiguous rule (v0.5.0)
 - `PLAN.md`
 - `PHASES.md`

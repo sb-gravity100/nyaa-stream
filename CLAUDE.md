@@ -73,6 +73,9 @@ After every commit, **prepend** a new entry to `commits.md`:
 ```
 `commits.md` itself gets its own commit: `docs: update commits.md`.
 
+### No AI attribution
+Never add `Co-Authored-By: Claude`, "Generated with Claude Code" or any other AI attribution to commits, PR descriptions or release notes (decided 2026-10-13; history was rewritten to strip the old trailers). Plain commit messages only.
+
 ### Commit granularity
 Every distinguishable change gets its own commit. Never bundle unrelated changes. If you need "and" in the commit message, it should be two commits.
 
