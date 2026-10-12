@@ -1,3 +1,28 @@
+### `63cbe42` · 2026-10-13 · docs: D2 spike result - sevenz-rust2 in-process 7z reader, no 7zr.exe bundle (v0.4.4)
+- `PLAN.md`
+- `PHASES.md`
+- `FILE_INDEX.md`
+
+### `3627847` · 2026-10-13 · feat(nyaa-client): build_tosho reads the 7z in-process, --external-7z keeps 7z e -so (v0.4.4 D2)
+- `crates/nyaa-client/examples/build_tosho.rs`
+
+### `fda3c65` · 2026-10-13 · feat(nyaa-client): in-process streaming 7z entry reader (sevenz-rust2) (v0.4.4 D2)
+- `crates/nyaa-client/src/sevenz_stream.rs`
+- `crates/nyaa-client/Cargo.toml`
+- `crates/nyaa-client/src/lib.rs`
+
+### `5558194` · 2026-10-13 · feat(tosho): import pipeline backend (download, build, import, cleanup) with progress event and cancel (D3)
+- `src-tauri/src/tosho_import.rs`
+- `crates/nyaa-client/src/tosho_pipeline.rs`
+- `src-tauri/src/lib.rs`
+
+### `a3aa4ee` · 2026-10-13 · feat(settings): Import Tosho Data button with confirm dialog and live progress (D4)
+- `src/SettingsPanel.tsx`
+- `src/App.css`
+
+### `62c34b4` · 2026-10-13 · feat(sbtl-engine): fetch_one_file example, D1 spike of one-file download from the 1 TB at-data torrent
+- `crates/sbtl-engine/examples/fetch_one_file.rs`
+
 ### `5ad75a3` · 2026-10-13 · feat(ui): Settings opens as a centered modal instead of a right drawer
 - `src/App.css`
 
