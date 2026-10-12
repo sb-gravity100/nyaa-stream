@@ -167,7 +167,7 @@
   - [ ] T5 `ShowMatcher`: known `aid` decides, title rules for the rest;
         `eid` episode groups
   - [x] T6 `TorrentDetails.files` falls back to `release_files` (`NyaaClient::fetch_details`: stored scrape, then cache, then dataset, then scrape)
-  - [ ] T7 `get_entry_season` and episode offsets from `anidb_tvdb`
+  - [x] T7 `get_entry_season` uses `anidb_tvdb.season` (`anime_lists::decide_entry_season`); `get_entry_episode_offset` command, offset stored in App.tsx (not applied yet)
   - [ ] T8 verify on `franchises.json` (AniDB ground truth), Symphogear XV
         crawl (`download (1).json`) and the Food Wars / Mushoku / Slime
         entries; no regression for post-dump releases

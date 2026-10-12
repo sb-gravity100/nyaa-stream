@@ -625,9 +625,42 @@ async fn get_entry_season(
 ) -> Result<Option<u32>, String> {
     let synonyms = synonyms.unwrap_or_default();
     let franchise = load_franchise(&state, Some(anilist_id), true).await;
-    let season = show_matcher(&state, &title, &synonyms, Some(anilist_id), franchise.as_ref()).primary_season();
-    tracing::debug!(anilist_id, ?season, "get_entry_season");
+    let fallback = show_matcher(&state, &title, &synonyms, Some(anilist_id), franchise.as_ref()).primary_season();
+    // The dataset's AniDB -> TVDB season, when one of the entry's aids has a numeric one, replaces the Fribb/title season.
+    let mut tosho = None;
+    for aid in entry_anidb_ids(&state, anilist_id) {
+        match state.nyaa.anidb_tvdb(aid).await {
+            Some(row) if row.season.is_some_and(|s| s > 0) => {
+                tosho = Some(row);
+                break;
+            }
+            _ => {}
+        }
+    }
+    let (season, source) = anime_lists::decide_entry_season(tosho.as_ref(), fallback);
+    tracing::debug!(anilist_id, ?season, ?source, ?fallback, "get_entry_season");
     Ok(season)
+}
+
+/// The AniDB ids of an AniList entry (empty for ids outside u32 or unknown).
+fn entry_anidb_ids(state: &AppState, anilist_id: i64) -> Vec<u32> {
+    u32::try_from(anilist_id).map(|id| state.anime_lists.anidb_ids(id)).unwrap_or_default()
+}
+
+/// The episode offset of an AniList entry from the dataset's AniDB -> TVDB
+/// mapping (first of its AniDB ids that has a row): add it to an AniDB
+/// episode number to get the TVDB one. Only stored for now; converting
+/// absolute numbers with it is a follow-up.
+#[tauri::command]
+async fn get_entry_episode_offset(state: State<'_, Arc<AppState>>, anilist_id: i64) -> Result<Option<i32>, String> {
+    for aid in entry_anidb_ids(&state, anilist_id) {
+        if let Some(row) = state.nyaa.anidb_tvdb(aid).await {
+            tracing::debug!(anilist_id, aid, offset = row.episode_offset, "get_entry_episode_offset");
+            return Ok(Some(row.episode_offset));
+        }
+    }
+    tracing::debug!(anilist_id, "get_entry_episode_offset: no dataset row");
+    Ok(None)
 }
 
 /// The matcher for one show: its names, its TVDB season and, when known,
@@ -1572,6 +1605,7 @@ pub fn run() {
             get_popular_fansubbers,
             get_torrent_details_batch,
             get_entry_season,
+            get_entry_episode_offset,
             play_magnet,
             get_stream_stats,
             get_subtitle_tracks,

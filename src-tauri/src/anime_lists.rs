@@ -229,9 +229,39 @@ impl AnimeLists {
     }
 }
 
+/// Where `decide_entry_season` took the season from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SeasonSource {
+    /// The AnimeTosho dataset's AniDB -> TVDB `defaulttvdbseason`.
+    Dataset,
+    /// The Fribb season map plus title logic (`ShowMatcher::primary_season`).
+    Fallback,
+}
+
+/// The season an entry is filed under: the dataset's AniDB -> TVDB season
+/// when it has a usable one (a positive number - 0 is TVDB's specials and
+/// negatives mean "none"), otherwise `fallback`.
+pub fn decide_entry_season(tosho: Option<&nyaa_client::AnidbTvdb>, fallback: Option<u32>) -> (Option<u32>, SeasonSource) {
+    match tosho.and_then(|t| t.season).filter(|s| *s > 0) {
+        Some(season) => (Some(season as u32), SeasonSource::Dataset),
+        None => (fallback, SeasonSource::Fallback),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn dataset_season_replaces_the_fallback_when_numeric() {
+        let row = |season| nyaa_client::AnidbTvdb { tvdb_id: 1, season, episode_offset: 0, mapping: None };
+        assert_eq!(decide_entry_season(Some(&row(Some(3))), Some(1)), (Some(3), SeasonSource::Dataset));
+        assert_eq!(decide_entry_season(Some(&row(Some(2))), None), (Some(2), SeasonSource::Dataset));
+        assert_eq!(decide_entry_season(Some(&row(None)), Some(4)), (Some(4), SeasonSource::Fallback));
+        assert_eq!(decide_entry_season(Some(&row(Some(0))), Some(4)), (Some(4), SeasonSource::Fallback));
+        assert_eq!(decide_entry_season(Some(&row(Some(-1))), None), (None, SeasonSource::Fallback));
+        assert_eq!(decide_entry_season(None, Some(2)), (Some(2), SeasonSource::Fallback));
+    }
 
     #[test]
     fn dataset_reduces_to_anilist_id_and_tvdb_season() {

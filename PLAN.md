@@ -2101,6 +2101,12 @@ dataset imported from Settings, like the nyaa.si database import:
 3. **Season and episode offsets.** `anidb_tvdb` kept whole: `season`,
    `episode_offset`, mapping list. Used by `get_entry_season` and for
    absolute-number conversion; replaces the Fribb season map where present.
+   Done (T7): `get_entry_season` takes the first of the entry's AniDB ids with a
+   positive numeric `season` (NULL, 0 or negative fall back to the Fribb/title
+   season; the log names the source). `get_entry_episode_offset(anilist_id)`
+   returns `episode_offset` of the first aid with a row; `App.tsx` stores it per
+   entry next to `entrySeasonByMedia`. Converting absolute numbers with the
+   offset is a follow-up, no behaviour change yet.
 4. **Bulk nyaa history.** `nyaasi_torrents` rows (id, info hash, name, size,
    flags, created) into the existing permanent `releases` table through
    `Store::import`'s rules (a stored row wins unless fresher).

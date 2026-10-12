@@ -98,6 +98,8 @@ function App() {
   const [sourcesLoading, setSourcesLoading] = useState(false);
   /** The backend's season per entry (TVDB, else titles, else first season): titles alone call "The Second Plate" season 1. */
   const [entrySeasonByMedia, setEntrySeasonByMedia] = useState<Record<number, number>>({});
+  // AniDB -> TVDB episode offset per entry (from the AnimeTosho dataset); stored only, not applied yet.
+  const [, setEntryEpisodeOffsetByMedia] = useState<Record<number, number>>({});
   const [details, setDetails] = useState<Record<string, TorrentDetails>>({});
   // Session-lifetime cache of both the nyaa.si search and the per-torrent
   // view-page scrape (see loadDetails), keyed by AniList id - same
@@ -286,6 +288,11 @@ function App() {
             if (season != null) setEntrySeasonByMedia((current) => ({ ...current, [anime.id]: season }));
           })
           .catch((err) => console.warn("[get_entry_season] failed", { err }));
+        void invoke<number | null>("get_entry_episode_offset", { anilistId: anime.id })
+          .then((offset) => {
+            if (offset != null) setEntryEpisodeOffsetByMedia((current) => ({ ...current, [anime.id]: offset }));
+          })
+          .catch((err) => console.warn("[get_entry_episode_offset] failed", { err }));
         // 1) what the local database already holds (instant), 2) only the preferred fansubber's uploads (a few requests).
         void invoke<NyaaResult[]>("search_local_releases", args)
           .then((local) => showEarly("search_local_releases", local))
