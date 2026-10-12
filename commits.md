@@ -1,3 +1,6 @@
+### `b056c24` · 2026-10-12 · fix: releases with no season marker are kept on later-season entries (only explicit other-season markers are dropped)
+- `src/App.tsx`
+
 ### `88870e9` · 2026-10-08 · fix: an unmarked release is offered per episode only once its file list shows the episode's season
 - `src/App.tsx`
 
