@@ -2093,6 +2093,11 @@ dataset imported from Settings, like the nyaa.si database import:
 2. **Torrent file lists.** `release_files(nyaa_id, idx, path, size)` for
    batches (`torrentfiles` > 1) of anime releases, so season packs resolve
    without a view-page scrape (`TorrentDetails.files` falls back to it).
+   Done (T6): `fetch_details` order is stored scrape (`details` table), disk
+   cache, dataset `release_files`, network scrape. Dataset-built details are
+   returned only (never written to `details`), carry submitter "Anonymous"
+   (the dataset has none), and seasons from `build_files`. About 22k of the
+   66,917 known-aid batches have no file rows and still scrape.
 3. **Season and episode offsets.** `anidb_tvdb` kept whole: `season`,
    `episode_offset`, mapping list. Used by `get_entry_season` and for
    absolute-number conversion; replaces the Fribb season map where present.

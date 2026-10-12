@@ -166,7 +166,7 @@
   - [x] T4 `anime_lists.rs`: AniList -> AniDB id set from Fribb
   - [ ] T5 `ShowMatcher`: known `aid` decides, title rules for the rest;
         `eid` episode groups
-  - [ ] T6 `TorrentDetails.files` falls back to `release_files`
+  - [x] T6 `TorrentDetails.files` falls back to `release_files` (`NyaaClient::fetch_details`: stored scrape, then cache, then dataset, then scrape)
   - [ ] T7 `get_entry_season` and episode offsets from `anidb_tvdb`
   - [ ] T8 verify on `franchises.json` (AniDB ground truth), Symphogear XV
         crawl (`download (1).json`) and the Food Wars / Mushoku / Slime

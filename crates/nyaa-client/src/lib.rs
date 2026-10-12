@@ -34,6 +34,11 @@ pub struct NyaaResult {
     /// once here so the frontend doesn't re-parse titles.
     #[serde(default)]
     pub label: EpisodeLabel,
+    /// AnimeTosho's AniDB episode id (`eid`) when the dataset knows the
+    /// release: releases sharing it are the same episode. Filled by the
+    /// show search commands, `None` otherwise.
+    #[serde(default)]
+    pub episode_group: Option<u32>,
 }
 
 /// Ground-truth batch/submitter info scraped from a torrent's nyaa.si view
@@ -461,6 +466,7 @@ impl NyaaClient {
                 seeders,
                 leechers,
                 published,
+                episode_group: None,
                 label: EpisodeLabel::of(&title),
                 title,
             });
@@ -575,6 +581,15 @@ impl NyaaClient {
                 tracing::debug!(view_url, "cached torrent details predate the file list, refetching");
             }
         }
+        // The imported AnimeTosho dataset knows many multi-file releases' file lists:
+        // answer from it without a request. Read-only - never written to `details`,
+        // so a later scrape (which also knows the submitter) can still replace it.
+        if let Some(id) = id {
+            if let Some(details) = self.dataset_details(id).await {
+                tracing::debug!(view_url, id, files = details.files.len(), "torrent details built from the AnimeTosho dataset");
+                return Ok(details);
+            }
+        }
         let details = self.fetch_details_uncached(view_url).await?;
         if let Some(cache) = &self.cache {
             cache.put("details", view_url, &details).await;
@@ -586,6 +601,21 @@ impl NyaaClient {
             }
         }
         Ok(details)
+    }
+
+    /// `TorrentDetails` built from the dataset's file list of release `id`
+    /// (`None` when the dataset has none). The dataset doesn't carry the
+    /// submitter, so it reads "Anonymous".
+    async fn dataset_details(&self, id: i64) -> Option<TorrentDetails> {
+        let files = self.release_files(id).await;
+        if files.is_empty() {
+            return None;
+        }
+        let mut seasons: Vec<u32> = files.iter().filter_map(|f| f.season).collect();
+        seasons.sort_unstable();
+        seasons.dedup();
+        let file_count = files.len();
+        Some(TorrentDetails { submitter: "Anonymous".to_string(), is_batch: file_count > 1, file_count, files, seasons })
     }
 
     async fn fetch_details_uncached(&self, view_url: &str) -> anyhow::Result<TorrentDetails> {
@@ -630,5 +660,43 @@ impl NyaaClient {
             files,
             seasons,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const SQL: &str = "INSERT INTO `toto_files` (`id`, `toto_id`, `filename`, `filesize`) VALUES (1,10,'Show/Season 1/Show - 01.mkv',1000),(2,10,'Show/Season 2/Show - 01.mkv',2000),(3,10,'Show/cover.jpg',5);
+INSERT INTO `toto_toto` (`id`, `nyaa_id`, `nyaa_subdom`, `name`, `btih`, `totalsize`, `dateline`, `torrentfiles`, `nyaa_cat`, `deleted`, `isdupe`, `aid`, `eid`, `resolveapproved`) VALUES (10,100,'','[G] Show - Batch',0x0102030405060708090a0b0c0d0e0f1011121314,3000,1700000000,3,'1_37',0,0,55,7,3),(12,200,'','[G] Show - Other',0x0102030405060708090a0b0c0d0e0f1011121316,3000,1700000000,3,'1_37',0,0,55,7,3);
+";
+
+    fn temp(name: &str) -> std::path::PathBuf {
+        let path = std::env::temp_dir().join(format!("nyaa-client-test-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_file(&path);
+        path
+    }
+
+    #[tokio::test]
+    async fn details_come_from_the_dataset_without_a_request() {
+        let src = temp("details-src.db");
+        tosho_build::build(SQL.as_bytes(), &src, "2026-05-09").unwrap();
+        let client = NyaaClient::with_storage(std::env::temp_dir().join(format!("nyaa-client-test-cache-{}", std::process::id())), &temp("details-dst.db"));
+        client.import_tosho(&src).await.unwrap();
+
+        // Unknown to the store, known to the dataset: built offline.
+        let details = client.fetch_details("https://nyaa.si/view/100").await.unwrap();
+        assert_eq!((details.is_batch, details.file_count, details.seasons.clone()), (true, 3, vec![1, 2]));
+        assert_eq!(details.files[1].path, "Show/Season 2/Show - 01.mkv");
+        assert_eq!((details.files[0].season, details.files[0].episode), (Some(1), Some(1)));
+        assert_eq!(details.files[2].season, None);
+        // Not written to the permanent details table.
+        assert!(client.store.as_ref().unwrap().details(100).await.unwrap().is_none());
+
+        // A stored scrape wins over the dataset.
+        let scraped = TorrentDetails { submitter: "Reza".into(), is_batch: true, file_count: 2, files: Vec::new(), seasons: vec![3] };
+        client.store.as_ref().unwrap().save_details(200, &scraped).await.unwrap();
+        let details = client.fetch_details("https://nyaa.si/view/200").await.unwrap();
+        assert_eq!((details.submitter.as_str(), details.seasons), ("Reza", vec![3]));
     }
 }
