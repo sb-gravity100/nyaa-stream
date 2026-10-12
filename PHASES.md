@@ -114,7 +114,7 @@
         `release-parse` in architecture/layout, Releasing steps match
         `scripts/release.mjs`, link to `CHANGELOG.md`
   - [x] PLAN.md/FILE_INDEX.md sync
-- [ ] Season-aware source matching - v0.5.0 (was v0.4.3), see PLAN.md
+- [x] Season-aware source matching - v0.5.0 (was v0.4.3), see PLAN.md
       "Season-aware source matching". One commit each:
   - [x] `title_match.rs`: apostrophe-removing normalization
   - [x] `title_match.rs`: release seasons from `release-parse` (incl.
@@ -150,15 +150,15 @@
         (TVDB, else title, else first-season flag); the page filter and the
         player use it, and `pickFile` skips OVA/OAD/NCOP-style files when an
         episode is requested
-  - [ ] (release happens once with the rest of v0.5.0 below)
+  - [x] (released once as v0.5.0, see below)
 
-- [ ] AnimeTosho dataset - v0.5.0 (was v0.4.4; minor feature, see PLAN.md "AnimeTosho
+- [x] AnimeTosho dataset - v0.5.0 (published 2026-10-13; was v0.4.4; minor feature, see PLAN.md "AnimeTosho
       dataset"). One commit each:
-  - [ ] T0 "Import Tosho Data" button (PLAN.md): download only
+  - [x] T0 "Import Tosho Data" button (PLAN.md): download only
         `database-dump.7z` (2.74 GB of the 1.01 TB `at-data.torrent`) via
         sbtl, compile the dataset in-app, import, offer to delete the
         archive. One commit each:
-    - [ ] D1 spike: sbtl downloads one file of the 1 TB torrent (no
+    - [x] D1 spike: sbtl downloads one file of the 1 TB torrent (no
           pre-allocation, resume, piece-map memory), fetch `at-data.torrent`
     - [x] D2 spike: pure-Rust streaming 7z reader for the two SQL entries
           (speed vs `7z e -so`); fallback bundle `7zr.exe` - decision:
@@ -170,7 +170,8 @@
           progress event; cancel)
     - [x] D4 Settings UI: **Import Tosho Data** button + confirm dialog +
           progress + cancel; ".db" picker kept as "Import from file"
-    - [ ] D5 docs/CHANGELOG/FILE_INDEX
+    - [x] D5 docs/CHANGELOG/FILE_INDEX
+    - [ ] Live check still open after v0.5.0: a full Import Tosho Data run (download 2.7 GB -> in-app build -> import -> cleanup). Verified live so far: download progress and cancel (stopped at 636 MB), the dataset import from file; not yet: resume after cancel, the in-app 7z build, delete-archive cleanup (Windows file locks)
   - [x] T1 `build_tosho` example (parser `nyaa-client/src/tosho.rs`; results in PLAN.md "Measured"; no size cut needed): streaming INSERT parser over `7z e -so`,
         `--stats` mode counts rows per table, `toto_toto` aid coverage and
         `resolveapproved` split, file-list size; decide the size cut
@@ -194,7 +195,7 @@
         the T5 hint is deliberately NOT enabled - see PLAN.md "Stem mapper
         result"
   - [x] Settings panel as a centered modal instead of a right drawer (PLAN.md "Settings as a centered modal"; CSS only)
-  - [ ] FILE_INDEX.md/PLAN.md sync, CHANGELOG, `npm run bump -- minor`... or
+  - [x] FILE_INDEX.md/PLAN.md sync, CHANGELOG, `npm run bump -- minor`, tag v0.5.0, published (T9 stem mapper stays built but unused: holdout precision 38%, see PLAN.md; not shipped as a feature) or
         patch per the Release plan, tag
 
 - [ ] Custom magnet in the search bar - v0.6.0 (user 2026-10-13; was v0.4.5; minor feature, see PLAN.md
