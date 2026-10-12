@@ -149,6 +149,25 @@
         episode is requested
   - [ ] `chore: release v0.4.3` + tag
 
+- [ ] AnimeTosho dataset - v0.4.4 (minor feature, see PLAN.md "AnimeTosho
+      dataset"). One commit each:
+  - [ ] T1 `build_tosho` example: streaming INSERT parser over `7z e -so`,
+        `--stats` mode counts rows per table, `toto_toto` aid coverage and
+        `resolveapproved` split, file-list size; decide the size cut
+  - [ ] T2 dataset schema + builder writing `tosho-dataset-<date>.db`
+  - [ ] T3 `Store::import_tosho` (releases, release_aid, release_files,
+        anidb_tvdb), Settings import button, refuses non-tosho files
+  - [ ] T4 `anime_lists.rs`: AniList -> AniDB id set from Fribb
+  - [ ] T5 `ShowMatcher`: known `aid` decides, title rules for the rest;
+        `eid` episode groups
+  - [ ] T6 `TorrentDetails.files` falls back to `release_files`
+  - [ ] T7 `get_entry_season` and episode offsets from `anidb_tvdb`
+  - [ ] T8 verify on `franchises.json` (AniDB ground truth), Symphogear XV
+        crawl (`download (1).json`) and the Food Wars / Mushoku / Slime
+        entries; no regression for post-dump releases
+  - [ ] FILE_INDEX.md/PLAN.md sync, CHANGELOG, `npm run bump -- minor`... or
+        patch per the Release plan, tag
+
 ## Phase 3 — Playback quality of life
 - [x] Wire a video player to the media page: play button per episode row
       calls `play_magnet`, auto-picking the release with the most seeders

@@ -2056,6 +2056,70 @@ the whole-corpus regression set for `release-parse`: diff
 `examples/parse_lines.rs` / `examples/labels.rs` output before and after a
 parser change and review every changed title.
 
+
+## AnimeTosho dataset (v0.4.4 - minor feature, after v0.4.3)
+
+**What it is** (2026-10-12, user request: "see what we can do with anime
+tosho's dump"). `database-dump.7z` (2.9 GB, 11.7 GB unpacked, taken
+2026-05-09, gitignored, never committed) is a MariaDB `mysqldump` of
+AnimeTosho's database: extended `INSERT INTO ... VALUES (...),(...)` per
+table, three files:
+- `toto_repl.sql` (5.5 GB): `toto_toto` (every release: `nyaa_id`,
+  `nyaa_subdom`, `name`, `btih`, `totalsize`, `dateline`, **`aid`/`eid`/`fid`**
+  = AniDB anime/episode/file ids, `resolveapproved`, `deleted`, `isdupe`,
+  `torrentfiles`), `toto_files` (per-torrent file names and sizes),
+  `toto_anidb_tvdb` (AniDB -> TVDB id, `defaulttvdbseason`,
+  `episodeoffset`, `mapping-list`), plus tracker/attachment tables we skip.
+- `toto.sql` (1 GB): queues and caches, and `toto_adb_aniname_map` /
+  `toto_adb_aniname_alias` (AniDB title aliases).
+- `arcscrape.sql` (5.1 GB): archive scrapes of nyaa.si (`nyaasi_torrents`),
+  AniDex, nekoBT and tosho.
+
+**Why it matters.** Title matching (`title_match.rs`) guesses which release
+belongs to which show. AnimeTosho already resolved most releases to AniDB
+ids, which are ground truth. The dump can replace guessing with an id lookup
+for everything up to May 2026, keep title matching for newer releases, and
+give per-torrent file lists and season/offset maps offline.
+
+**Decisions** (user, 2026-10-12): build all four uses, delivered as a compact
+dataset imported from Settings, like the nyaa.si database import:
+1. **Exact release matching.** `release_aid(nyaa_id, aid, eid)`; AniList ->
+   AniDB through Fribb's `anidb_id` (already downloaded by `anime_lists.rs`,
+   extend its reduced map). A release whose `aid` is known belongs to the
+   entry with that `aid` and to no other, whatever its title says; releases
+   with no `aid` keep the title rules. `eid` groups releases of the same
+   episode, so an episode's number can be taken from the group's parsed
+   numbers even for absolute-numbered releases.
+2. **Torrent file lists.** `release_files(nyaa_id, idx, path, size)` for
+   batches (`torrentfiles` > 1) of anime releases, so season packs resolve
+   without a view-page scrape (`TorrentDetails.files` falls back to it).
+3. **Season and episode offsets.** `anidb_tvdb` kept whole: `season`,
+   `episode_offset`, mapping list. Used by `get_entry_season` and for
+   absolute-number conversion; replaces the Fribb season map where present.
+4. **Bulk nyaa history.** `nyaasi_torrents` rows (id, info hash, name, size,
+   flags, created) into the existing permanent `releases` table through
+   `Store::import`'s rules (a stored row wins unless fresher).
+
+**Dataset file** (`tosho-dataset-<date>.db`, SQLite, built offline by
+`cargo run -p nyaa-client --example build_tosho -- <dump.7z> <out.db>`; the
+tool streams `7z e -so` through a purpose-written INSERT parser, so the 11.7
+GB are never unpacked to disk). Tables: `meta(key,value)`, `release_aid`,
+`release_files`, `anidb_tvdb`, `releases` (same schema as `store.rs`).
+Target size under 500 MB; if `release_files` alone is too big it is limited
+to batches of the last N years (measure first, phase T1).
+
+**Freshness.** The dump ends 2026-05-09. Newer releases have no `aid`, so
+title matching stays the fallback and must not regress. A later milestone can
+add the live AnimeTosho feed (`feed.animetosho.org/json?aid=`) for the gap;
+not in v0.4.4.
+
+**Risks.** AniDB splits entries differently from AniList (one AniList entry
+can span several AniDB entries, e.g. split cours): AniList -> AniDB is one to
+many, so an entry's `aid` is a set. Fribb covers ~80% of entries; the rest
+use title rules. `resolveapproved` = 0 rows are guesses by AnimeTosho's own
+matcher: only 1, 2, 3 are trusted. The dump is third-party data; the dataset
+is a local derived file, never bundled in the installer.
+
 ## Known gaps / not yet implemented
 
 - (HLS fallback player only - mpv reads the file's real duration.) The
