@@ -863,9 +863,11 @@ async fn filter_for_show(state: &AppState, matcher: &title_match::ShowMatcher, a
     let (mut by_id, mut by_title) = (0usize, 0usize);
     results.retain_mut(|result| {
         let tosho = nyaa_client::release_id(&result.view_url).and_then(|id| known.get(&id));
+        let mut trusted = false;
         let keep = match matcher.decide(&result.title, tosho, &entry_aids) {
             title_match::Decision::Accept => {
                 by_id += 1;
+                trusted = tosho.is_some_and(|t| t.approved > 0);
                 true
             }
             title_match::Decision::Reject => {
@@ -880,6 +882,7 @@ async fn filter_for_show(state: &AppState, matcher: &title_match::ShowMatcher, a
         let keep = keep && extra(result);
         if keep {
             result.episode_group = tosho.map(|t| t.eid).filter(|eid| *eid != 0);
+            result.aid_trusted = trusted.then_some(true);
         }
         keep
     });

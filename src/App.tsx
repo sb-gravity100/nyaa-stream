@@ -588,6 +588,21 @@ function App() {
         }
       }
 
+      // The dataset's trusted AniDB id already put this release on this entry,
+      // whatever season number its title carries (Erai-raws files a split
+      // cour as "2nd Season"; a sequel numbered "S02E13"): file it under the
+      // entry's season instead of letting the filters below drop it. Season 0
+      // (specials) stays out.
+      if (
+        source.aid_trusted &&
+        (label.kind === "episode" || label.kind === "batch") &&
+        label.season !== 0 &&
+        label.season !== currentAnimeSeason &&
+        !(label.seasons ?? []).includes(currentAnimeSeason)
+      ) {
+        label = { ...label, season: currentAnimeSeason, seasons: [currentAnimeSeason] };
+      }
+
       // Season 0 is a franchise's specials/movies, which are their own
       // AniList entries with their own pages - not episodes of a TV series
       // (e.g. Fate/strange Fake's "S00E01 Whispers of Dawn").

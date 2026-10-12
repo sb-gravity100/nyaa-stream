@@ -41,6 +41,13 @@ pub struct NyaaResult {
     /// show search commands, `None` otherwise.
     #[serde(default)]
     pub episode_group: Option<u32>,
+    /// `Some(true)` when the dataset's trusted AniDB id (`approved` 1-3)
+    /// put the release on the show it was searched for: the frontend's
+    /// season filters then do not second-guess it (its title may name
+    /// another season's number, e.g. Erai-raws' "2nd Season" for a split
+    /// cour). `None` otherwise.
+    #[serde(default)]
+    pub aid_trusted: Option<bool>,
 }
 
 /// Ground-truth batch/submitter info scraped from a torrent's nyaa.si view
@@ -488,6 +495,7 @@ impl NyaaClient {
                 leechers,
                 published,
                 episode_group: None,
+                aid_trusted: None,
                 label: EpisodeLabel::of(&title),
                 title,
             });

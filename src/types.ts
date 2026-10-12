@@ -45,6 +45,9 @@ export interface NyaaResult {
   /** AnimeTosho's AniDB episode id (eid): releases sharing it are the same
    * episode. Set when the dataset knows the release; absent otherwise. */
   episode_group?: number | null;
+  /** True when the dataset's trusted AniDB id put the release on this show:
+   * the season filters in `groupedSources` then keep it. */
+  aid_trusted?: boolean | null;
 }
 
 /** One file of a torrent, from its nyaa.si view page. */

@@ -628,6 +628,7 @@ fn row_to_result(row: &rusqlite::Row<'_>) -> rusqlite::Result<NyaaResult> {
         leechers: row.get(6)?,
         published: row.get(7)?,
         episode_group: None,
+        aid_trusted: None,
     })
 }
 
@@ -647,6 +648,7 @@ mod tests {
             published: "2026-01-01".into(),
             label: Default::default(),
             episode_group: None,
+            aid_trusted: None,
         }
     }
 

@@ -59,6 +59,7 @@ fn main() -> anyhow::Result<()> {
                 leechers: count("leechers"),
                 published: text(item, "date"),
                 episode_group: None,
+                aid_trusted: None,
             };
             releases.push((category, release));
         }
