@@ -513,7 +513,7 @@ nyaa_stream/
    can't map are dropped. Other AniList calls (airing feed, relations
    offset) still just fail soft.
 
-## Context menus (planned, v0.5.0 - minor: new feature)
+## Context menus (planned, v0.6.0 - minor: new feature; was v0.5.0, moved 2026-10-13)
 
 WebView2's default right-click menu (Back/Reload/Print/Inspect) is replaced
 by an app-styled HTML menu whose items depend on what was right-clicked.
@@ -548,8 +548,12 @@ by an app-styled HTML menu whose items depend on what was right-clicked.
 Three published releases: **v0.3.2** (the playback fixes) as soon as it
 passes a live test, **v0.4.0** (splash/title bar, download cache, resume
 buffer, contact and send logs, and the sbtl torrent engine), then **v1.0.0** (the stable Windows release
-after v0.8.0). The milestones in between - v0.5.0 (context menus) → v0.6.0
-(build thumbnails) → v0.7.0 (HD banners) → v0.8.0 (seek preview) → v0.9.0
+after v0.8.0). **v0.5.0 is also published** (decided 2026-10-13: it bundles the
+unreleased v0.4.3 season-aware matching, the v0.4.4 AnimeTosho dataset /
+Import Tosho Data / Settings modal and the v0.4.5 custom magnet paste, so
+the old 0.4.3-0.4.5 numbers are never released; the old v0.5.0 context-menu
+milestone merged into v0.6.0). The milestones in between - v0.6.0 (context
+menus + build thumbnails) → v0.7.0 (HD banners) → v0.8.0 (seek preview) → v0.9.0
 (navigation/home rehaul) → v0.9.1 (Discover) - are each
 bumped (`npm run bump`) and tagged **locally only**, never pushed. Commits
 are pushed with plain `git push` (no tags); `npm run release` pushes only
@@ -956,7 +960,7 @@ never on a fresh install or a normal launch.
   written for 0.4.0/0.4.1, so updating to 0.4.x showed nothing - the
   dialog has nothing to list). `release.mjs`'s preflight now refuses a
   version without one.
-- **Fixture check of v0.4.3 matching** (2026-10-08,
+- **Fixture check of v0.4.3 matching** (now part of v0.5.0) (2026-10-08,
   `title_match_fixture_tests.rs`, `cargo test -p nyaa-stream
   title_match_fixture -- --nocapture`). Recall per entry with the TVDB
   season: Mushoku 100% on S3 (375/375), 100% on Cour 2, 86-100% elsewhere;
@@ -1511,7 +1515,7 @@ metadata fallback already exists)
 - **Airing schedule**: weekly calendar (local time) from AniList
   `airingSchedules`, library/watching shows highlighted, day and "now"
   jump; clicking opens the media page.
-- Context menus (v0.5.0) apply to Discover cards; adult content follows the
+- Context menus (v0.6.0) apply to Discover cards; adult content follows the
   existing setting (default hidden).
 - Risks: AniList rate limit (90/min) - batch the rows into few queries and
   cache; recommendations depend on the user's history size.
@@ -1526,7 +1530,7 @@ choosing a release per episode.
 - **Entry point (decided 2026-10-08)**: a "Binge" button in the app header
   (title bar / top chrome, visible on every page except the player) that
   opens a **setup modal**. The media-page button and context-menu item
-  (v0.5.0) are secondary shortcuts that open the same modal with the show
+  (v0.6.0) are secondary shortcuts that open the same modal with the show
   preselected.
 - **Setup modal** (`src/BingeModal.tsx`), a short wizard:
   1. *Pick series*: search box (AniList, same search as the app) with
@@ -1860,7 +1864,7 @@ Found and fixed meanwhile: resume buffers never survived a save (a
 libtorrent-era partial download (Ep 3/7) reopened on sbtl, and a
 resume served from a resume buffer.
 
-## Season-aware source matching (v0.4.2 parsing + db import; v0.4.3 matching - patch: fix)
+## Season-aware source matching (v0.4.2 parsing + db import; matching ships in v0.5.0, was v0.4.3 - patch: fix)
 
 **Scope split (2026-10-06).** v0.4.2 ships the parsing half: the
 `release-parse` crate (below), `EpisodeLabel` on every search result and
@@ -2057,7 +2061,7 @@ the whole-corpus regression set for `release-parse`: diff
 parser change and review every changed title.
 
 
-## AnimeTosho dataset (v0.4.4 - minor feature, after v0.4.3)
+## AnimeTosho dataset (v0.5.0, was v0.4.4 - minor feature)
 
 **What it is** (2026-10-12, user request: "see what we can do with anime
 tosho's dump"). `database-dump.7z` (2.9 GB, 11.7 GB unpacked, taken
@@ -2349,7 +2353,7 @@ season, the AniDB ids come from Fribb.
 **Freshness.** The dump ends 2026-05-09. Newer releases have no `aid`, so
 title matching stays the fallback and must not regress. A later milestone can
 add the live AnimeTosho feed (`feed.animetosho.org/json?aid=`) for the gap;
-not in v0.4.4.
+not in v0.5.0.
 
 **Risks.** AniDB splits entries differently from AniList (one AniList entry
 can span several AniDB entries, e.g. split cours): AniList -> AniDB is one to
@@ -2358,7 +2362,7 @@ use title rules. `resolveapproved` = 0 rows are guesses by AnimeTosho's own
 matcher: only 1, 2, 3 are trusted. The dump is third-party data; the dataset
 is a local derived file, never bundled in the installer.
 
-## Custom magnet in the search bar (planned, v0.4.5 - minor feature, after v0.4.4)
+## Custom magnet in the search bar (planned, v0.5.0, was v0.4.5 - minor feature)
 
 **Request** (2026-10-13): paste a magnet URL into the search bar. Decided
 (user): both play it directly **and** let it be attached to an episode.
@@ -2431,7 +2435,7 @@ magnet says so (only `dn`). Rules:
 a magnet from the clipboard is untrusted input: only `btih`, `dn`, `tr` are
 read and everything is length-capped.
 
-## Settings as a centered modal (v0.4.4 - UI change, ships with the dataset work)
+## Settings as a centered modal (v0.5.0, was v0.4.4 - UI change, ships with the dataset work)
 
 The Settings panel (`src/SettingsPanel.tsx`, styles in `src/App.css`
 "Settings") was a right-edge drawer (full height, slides in from the right).

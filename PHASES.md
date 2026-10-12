@@ -114,7 +114,7 @@
         `release-parse` in architecture/layout, Releasing steps match
         `scripts/release.mjs`, link to `CHANGELOG.md`
   - [x] PLAN.md/FILE_INDEX.md sync
-- [ ] Season-aware source matching - v0.4.3 (patch: fix), see PLAN.md
+- [ ] Season-aware source matching - v0.5.0 (was v0.4.3), see PLAN.md
       "Season-aware source matching". One commit each:
   - [x] `title_match.rs`: apostrophe-removing normalization
   - [x] `title_match.rs`: release seasons from `release-parse` (incl.
@@ -147,9 +147,9 @@
         (TVDB, else title, else first-season flag); the page filter and the
         player use it, and `pickFile` skips OVA/OAD/NCOP-style files when an
         episode is requested
-  - [ ] `chore: release v0.4.3` + tag
+  - [ ] (release happens once with the rest of v0.5.0 below)
 
-- [ ] AnimeTosho dataset - v0.4.4 (minor feature, see PLAN.md "AnimeTosho
+- [ ] AnimeTosho dataset - v0.5.0 (was v0.4.4; minor feature, see PLAN.md "AnimeTosho
       dataset"). One commit each:
   - [ ] T0 "Import Tosho Data" button (PLAN.md): download only
         `database-dump.7z` (2.74 GB of the 1.01 TB `at-data.torrent`) via
@@ -191,7 +191,7 @@
   - [ ] FILE_INDEX.md/PLAN.md sync, CHANGELOG, `npm run bump -- minor`... or
         patch per the Release plan, tag
 
-- [ ] Custom magnet in the search bar - v0.4.5 (minor feature, see PLAN.md
+- [ ] Custom magnet in the search bar - v0.5.0 (was v0.4.5; minor feature, see PLAN.md
       "Custom magnet in the search bar"). One commit each:
   - [ ] M1 `parse_magnet` (`src-tauri/src/magnet.rs`) + command + tests
   - [ ] M2 search-bar detection, "Play this magnet" row, invalid hint
@@ -584,7 +584,7 @@
             `v0.4.0`, push the tag, build + publish the release (see PLAN.md
             "Release plan") - published 2026-10-04; notes fixed up after npm
             cut them to one line (`release.mjs --notes-file` since)
-- [ ] Context menus (v0.5.0, see PLAN.md "Context menus"): one commit each -
+- [ ] Context menus (v0.6.0, was v0.5.0, see PLAN.md "Context menus"): one commit each -
       - [ ] `tauri-plugin-clipboard-manager` (Rust, capability, JS)
       - [ ] `contextMenu.ts` store + `ContextMenu.tsx` component
       - [ ] Global listener: block native menu (dev Shift+right-click
@@ -593,7 +593,7 @@
       - [ ] Episode rows + source/torrent rows
       - [ ] Player surface (flat, no Subtitles/Speed)
       - [ ] FILE_INDEX.md/PLAN.md sync, `npm run bump -- minor`, tag
-            `v0.5.0` locally (not pushed/published - see PLAN.md "Release plan")
+            `v0.6.0` locally (not pushed/published - see PLAN.md "Release plan")
 - [ ] Build thumbnails button (v0.6.0, see PLAN.md "Build thumbnails
       button"): one commit each -
       - [ ] nyaa view-page scrape collects description image URLs

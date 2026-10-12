@@ -10,7 +10,7 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "0.4.3",
+    version: "0.5.0",
     date: "2026-10-08",
     features: [
       "Search now covers nyaa's whole anime category, not only English-translated releases.",
