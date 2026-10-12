@@ -1,24 +1,26 @@
 //! AnimeTosho dump tool.
 //!
 //! `cargo run --release -p nyaa-client --example build_tosho -- --stats <database-dump.7z> [inner\path.sql ...]`
-//! streams each SQL file out of the archive with `7z e -so` (never unpacked
-//! to disk) and prints row counts per table plus the figures that decide the
+//! streams each SQL file out of the archive (never unpacked to disk) with the
+//! in-process reader `nyaa_client::sevenz_stream`, or with `7z e -so` when
+//! `--external-7z` is given and prints row counts per table plus the figures that decide the
 //! dataset's size cut: `toto_toto` aid coverage and `resolveapproved` split,
 //! and the size of the batch file lists.
 //!
 //! Default inner files: `data\toto_repl.sql`.
 //!
-//! `cargo run --release -p nyaa-client --example build_tosho -- <database-dump.7z> <out.db | out-dir> [--dump-date YYYY-MM-DD] [--no-archive]`
+//! `cargo run --release -p nyaa-client --example build_tosho -- <database-dump.7z> <out.db | out-dir> [--dump-date YYYY-MM-DD] [--no-archive] [--external-7z]`
 //! builds the dataset (`tosho-dataset-<YYYYMMDD>.db` inside `out-dir`, or
 //! exactly `out.db`): `toto_repl.sql` first, then `arcscrape.sql` (nyaa.si
 //! archive rows the first one lacks) unless `--no-archive`. The dump date
 //! defaults to the modified date of `data\toto_repl.sql` in the archive.
 
 use std::collections::{BTreeMap, HashSet};
-use std::io::BufReader;
+use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 
+use nyaa_client::sevenz_stream;
 use nyaa_client::stem::{self, TrainConfig};
 use nyaa_client::tosho::InsertReader;
 use nyaa_client::tosho_build::{dataset_file_name, ToshoBuilder};
@@ -31,11 +33,12 @@ fn main() -> anyhow::Result<()> {
     let stats = args.first().map(String::as_str) == Some("--stats");
     if stats {
         args.remove(0);
-        anyhow::ensure!(!args.is_empty(), "usage: build_tosho --stats <database-dump.7z> [inner.sql ...]");
+        anyhow::ensure!(!args.is_empty(), "usage: build_tosho --stats [--external-7z] <database-dump.7z> [inner.sql ...]");
+        let external = take_switch(&mut args, "--external-7z");
         let archive = args.remove(0);
         let inner = if args.is_empty() { vec![r"data\toto_repl.sql".to_string()] } else { args };
         for file in inner {
-            stats_for(&archive, &file)?;
+            stats_for(&archive, &file, external)?;
         }
         return Ok(());
     }
@@ -46,6 +49,15 @@ fn main() -> anyhow::Result<()> {
         return holdout(&PathBuf::from(&args[0]), &args[1], config);
     }
     build(args)
+}
+
+/// Removes the bare switch `name` from `args`, true if it was there.
+fn take_switch(args: &mut Vec<String>, name: &str) -> bool {
+    let found = args.iter().position(|a| a == name);
+    if let Some(i) = found {
+        args.remove(i);
+    }
+    found.is_some()
 }
 
 /// Removes `--name value` from `args`.
@@ -87,8 +99,37 @@ fn spawn_7z(archive: &str, inner: &str) -> anyhow::Result<Child> {
     Ok(Command::new("7z").args(["e", "-so", archive, inner]).stdout(Stdio::piped()).stderr(Stdio::null()).spawn()?)
 }
 
-/// `YYYY-MM-DD` of `inner` in the archive, from `7z l`.
-fn dump_date_of(archive: &str, inner: &str) -> anyhow::Result<String> {
+/// One SQL file of the archive as a buffered stream: in-process by default,
+/// the external `7z` when `external` (kept so the two can be compared).
+struct Source {
+    reader: Box<dyn BufRead>,
+    child: Option<Child>,
+}
+
+impl Source {
+    fn open(archive: &str, inner: &str, external: bool) -> anyhow::Result<Self> {
+        if external {
+            let mut child = spawn_7z(archive, inner)?;
+            let reader = Box::new(BufReader::with_capacity(1 << 20, child.stdout.take().expect("piped stdout")));
+            Ok(Self { reader, child: Some(child) })
+        } else {
+            Ok(Self { reader: Box::new(sevenz_stream::open_entry(std::path::Path::new(archive), inner)?), child: None })
+        }
+    }
+
+    fn finish(self) {
+        drop(self.reader);
+        if let Some(mut c) = self.child {
+            let _ = c.wait();
+        }
+    }
+}
+
+/// `YYYY-MM-DD` of `inner` in the archive (`7z l` when `external`).
+fn dump_date_of(archive: &str, inner: &str, external: bool) -> anyhow::Result<String> {
+    if !external {
+        return Ok(sevenz_stream::entry_date(std::path::Path::new(archive), inner)?);
+    }
     let listing = Command::new("7z").args(["l", archive, inner]).output()?;
     let text = String::from_utf8_lossy(&listing.stdout);
     text.lines()
@@ -106,6 +147,7 @@ fn build(mut args: Vec<String>) -> anyhow::Result<()> {
         date = Some(args.remove(i + 1));
         args.remove(i);
     }
+    let external = take_switch(&mut args, "--external-7z");
     let archive_too = if let Some(i) = args.iter().position(|a| a == "--no-archive") {
         args.remove(i);
         false
@@ -114,25 +156,25 @@ fn build(mut args: Vec<String>) -> anyhow::Result<()> {
     };
     let holdout_date = take_flag(&mut args, "--holdout")?;
     let config = stem_config(&mut args)?;
-    anyhow::ensure!(args.len() == 2, "usage: build_tosho <database-dump.7z> <out.db | out-dir> [--dump-date YYYY-MM-DD] [--no-archive] [--holdout YYYY-MM-DD] [--stem-share F] [--stem-releases N] [--stem-groups N]  |  build_tosho --stats <database-dump.7z> [inner.sql ...]");
+    anyhow::ensure!(args.len() == 2, "usage: build_tosho <database-dump.7z> <out.db | out-dir> [--dump-date YYYY-MM-DD] [--no-archive] [--external-7z] [--holdout YYYY-MM-DD] [--stem-share F] [--stem-releases N] [--stem-groups N]  |  build_tosho --stats [--external-7z] <database-dump.7z> [inner.sql ...]");
     let (archive, out) = (args.remove(0), PathBuf::from(args.remove(0)));
     let date = match date {
         Some(d) => d,
-        None => dump_date_of(&archive, r"data\toto_repl.sql")?,
+        None => dump_date_of(&archive, r"data\toto_repl.sql", external)?,
     };
     let out = if out.is_dir() || out.extension().is_none() { out.join(dataset_file_name(&date)) } else { out };
     let started = std::time::Instant::now();
     let mut builder = ToshoBuilder::create(&out, &date)?;
     builder.set_stem_config(config);
 
-    let mut child = spawn_7z(&archive, r"data\toto_repl.sql")?;
-    builder.read_toto(BufReader::with_capacity(1 << 20, child.stdout.take().expect("piped stdout")))?;
-    let _ = child.wait();
+    let mut src = Source::open(&archive, r"data\toto_repl.sql", external)?;
+    builder.read_toto(&mut src.reader)?;
+    src.finish();
     println!("toto_repl.sql done after {:.0}s", started.elapsed().as_secs_f64());
     if archive_too {
-        let mut child = spawn_7z(&archive, r"data\arcscrape.sql")?;
-        builder.read_archive(BufReader::with_capacity(1 << 20, child.stdout.take().expect("piped stdout")))?;
-        let _ = child.wait();
+        let mut src = Source::open(&archive, r"data\arcscrape.sql", external)?;
+        builder.read_archive(&mut src.reader)?;
+        src.finish();
         println!("arcscrape.sql done after {:.0}s", started.elapsed().as_secs_f64());
     }
     let counts = builder.finish()?;
@@ -156,10 +198,10 @@ struct TotoStats {
     resolve: BTreeMap<i64, u64>,
 }
 
-fn stats_for(archive: &str, inner: &str) -> anyhow::Result<()> {
+fn stats_for(archive: &str, inner: &str, external: bool) -> anyhow::Result<()> {
     println!("== {inner}");
-    let mut child = spawn_7z(archive, inner)?;
-    let mut reader = InsertReader::new(BufReader::with_capacity(1 << 20, child.stdout.take().expect("piped stdout")));
+    let mut src = Source::open(archive, inner, external)?;
+    let mut reader = InsertReader::new(&mut src.reader);
     let started = std::time::Instant::now();
 
     let mut tables: BTreeMap<String, u64> = BTreeMap::new();
@@ -243,7 +285,8 @@ fn stats_for(archive: &str, inner: &str) -> anyhow::Result<()> {
             }
         }
     }
-    let _ = child.wait();
+    drop(reader);
+    src.finish();
 
     println!("took {:.0}s", started.elapsed().as_secs_f64());
     println!("rows parsed per table: {tables:#?}");
