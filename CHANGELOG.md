@@ -9,9 +9,11 @@ step when cutting a release.
 
 ## [Unreleased]
 
-## [0.5.0] - unreleased
+## [0.5.0] - 2026-10-13
 
 ### Added
+- AnimeTosho dataset: Settings → AnimeTosho dataset → **Import Tosho Data** downloads AnimeTosho's database dump from its torrent (only the 2.7 GB file, resumable, cancellable), builds a local dataset in-app and imports it. It adds ~1M releases offline, exact release-to-show matching through AniDB ids, batch file lists and AniDB→TVDB season maps. **Import from file** loads a prebuilt dataset.
+- Settings opens as a centered modal.
 - Search defaults to nyaa's "all anime" category (`c=1_0`) instead of English-translated only.
 - Season-aware source matching: an entry's seasons come from its titles, TVDB (Fribb/anime-lists, cached weekly) and its AniList franchise (a TV entry with no TV prequel is season 1).
 - Releases written with just the short name and a season ("Mushoku Tensei S03E12") now match that season's entry; later-season entries also search the short base name.
@@ -19,6 +21,8 @@ step when cutting a release.
 - Files inside a pack take their season from a parent folder ("Season 2/"), and the player prefers the episode group's season when a pack holds the same episode number in several seasons.
 
 ### Fixed
+- Season 3 of a long-running show no longer lists stray season 1 and 2 episode rows; releases that write the season as a numeral ("Mushoku Tensei III - 07") join the right season.
+- Searching local releases in "all anime" now includes every anime subcategory.
 - A season's page no longer lists other seasons' releases.
 - Sequels with their own longer names ("Food Wars! The Second Plate") go to their own entry.
 - Movies, OVAs and specials stay off a TV season's episode list.

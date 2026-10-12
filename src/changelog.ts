@@ -11,13 +11,16 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     version: "0.5.0",
-    date: "2026-10-08",
+    date: "2026-10-13",
     features: [
+      "Import Tosho Data (Settings): downloads AnimeTosho's database, builds it on your PC and adds about a million releases offline, with exact matching of releases to shows, batch file lists and season maps.",
+      "Settings now opens as a centered window.",
       "Search now covers nyaa's whole anime category, not only English-translated releases.",
       "Season packs without an episode number show up as that season's batch, and a pack covering several seasons plays the right season's episode.",
       "Releases written with just the short name and a season, like \"Mushoku Tensei S03E12\", now appear on that season's page.",
     ],
     fixes: [
+      "Season 3 of a long-running show no longer lists stray season 1 and 2 episode rows, and "Mushoku Tensei III - 07"-style releases join the right season.",
       "A season's page no longer lists other seasons' releases (Slime season 3 showing season 4, for example).",
       "Sequels with their own long names, like Food Wars' \"The Second Plate\", no longer appear on the first season's page.",
       "Movies, OVAs and specials stay off a TV season's episode list; they have their own pages.",
