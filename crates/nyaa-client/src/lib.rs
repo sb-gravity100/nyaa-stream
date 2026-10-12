@@ -232,6 +232,25 @@ impl NyaaClient {
         })
     }
 
+    /// The AniDB id the static stem mapper gives `stem` (see `stem::stem_of`);
+    /// `None` when the stem is unknown or no dataset with stems is imported.
+    pub async fn aid_for_stem(&self, stem: &str) -> Option<u32> {
+        let store = self.store.as_ref()?;
+        store.aid_for_stem(stem).await.unwrap_or_else(|err| {
+            tracing::warn!(stem, %err, "stem lookup failed");
+            None
+        })
+    }
+
+    /// `aid_for_stem` for many stems (unknown stems are absent from the map).
+    pub async fn aids_for_stems(&self, stems: &[String]) -> std::collections::HashMap<String, u32> {
+        let Some(store) = &self.store else { return Default::default() };
+        store.aids_for_stems(stems).await.unwrap_or_else(|err| {
+            tracing::warn!(count = stems.len(), %err, "stem batch lookup failed");
+            Default::default()
+        })
+    }
+
     /// The dataset's file list of nyaa.si release `nyaa_id` (multi-file
     /// releases only; empty when unknown).
     pub async fn release_files(&self, nyaa_id: i64) -> Vec<TorrentFile> {

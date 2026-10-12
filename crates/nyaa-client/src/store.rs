@@ -102,6 +102,11 @@ const TOSHO_TABLES: &str = "CREATE TABLE IF NOT EXISTS release_aid (
          episode_offset INTEGER NOT NULL,
          mapping TEXT
      );
+     CREATE TABLE IF NOT EXISTS stem_aid (
+         stem TEXT PRIMARY KEY,
+         aid INTEGER NOT NULL,
+         votes INTEGER NOT NULL
+     );
      CREATE TABLE IF NOT EXISTS tosho_meta (key TEXT PRIMARY KEY, value TEXT);";
 
 /// Insert a release unless its id is already stored (dataset building). The
@@ -142,6 +147,8 @@ pub struct ToshoImportStats {
     pub release_aid: u64,
     pub release_files: u64,
     pub anidb_tvdb: u64,
+    /// Rows of the static stem mapper (0 for datasets built before it).
+    pub stem_aid: u64,
     pub dump_date: String,
 }
 
@@ -364,10 +371,18 @@ impl Store {
                      DELETE FROM main.release_files;
                      INSERT INTO main.release_files (nyaa_id, idx, path, size) SELECT nyaa_id, idx, path, size FROM src.release_files ORDER BY nyaa_id, idx;
                      DELETE FROM main.anidb_tvdb;
-                     INSERT INTO main.anidb_tvdb (anidb_id, tvdb_id, season, episode_offset, mapping) SELECT anidb_id, tvdb_id, season, episode_offset, mapping FROM src.anidb_tvdb;",
+                     INSERT INTO main.anidb_tvdb (anidb_id, tvdb_id, season, episode_offset, mapping) SELECT anidb_id, tvdb_id, season, episode_offset, mapping FROM src.anidb_tvdb;
+                     DELETE FROM main.stem_aid;",
                 )?;
+                // Older datasets have no stem table: they import, with no stems.
+                let has_stems: i64 = tx.query_row("SELECT COUNT(*) FROM src.sqlite_master WHERE type = 'table' AND name = 'stem_aid'", [], |row| row.get(0))?;
+                if has_stems > 0 {
+                    tx.execute_batch("INSERT INTO main.stem_aid (stem, aid, votes) SELECT stem, aid, votes FROM src.stem_aid;")?;
+                } else {
+                    tracing::info!("dataset has no stem_aid table, stems cleared");
+                }
                 let count = |table: &str| -> rusqlite::Result<u64> { tx.query_row(&format!("SELECT COUNT(*) FROM main.{table}"), [], |row| row.get::<_, i64>(0)).map(|n| n.max(0) as u64) };
-                let stats = ToshoImportStats { releases, release_aid: count("release_aid")?, release_files: count("release_files")?, anidb_tvdb: count("anidb_tvdb")?, dump_date };
+                let stats = ToshoImportStats { releases, release_aid: count("release_aid")?, release_files: count("release_files")?, anidb_tvdb: count("anidb_tvdb")?, stem_aid: count("stem_aid")?, dump_date };
                 tx.execute_batch("DELETE FROM main.tosho_meta;")?;
                 {
                     let mut set = tx.prepare("INSERT OR REPLACE INTO main.tosho_meta (key, value) VALUES (?1, ?2)")?;
@@ -377,6 +392,7 @@ impl Store {
                         ("release_aid", stats.release_aid.to_string()),
                         ("release_files", stats.release_files.to_string()),
                         ("anidb_tvdb", stats.anidb_tvdb.to_string()),
+                        ("stem_aid", stats.stem_aid.to_string()),
                     ] {
                         set.execute(params![key, value])?;
                     }
@@ -430,6 +446,38 @@ impl Store {
                 match stmt.query_row(params![id], row_to_tosho_release) {
                     Ok(r) => {
                         found.insert(id, r);
+                    }
+                    Err(rusqlite::Error::QueryReturnedNoRows) => {}
+                    Err(err) => return Err(err),
+                }
+            }
+            Ok(found)
+        })
+        .await
+    }
+
+    /// The AniDB id the static stem mapper gives `stem` (`stem::stem_of`), if
+    /// the imported dataset's `stem_aid` holds it.
+    pub(crate) async fn aid_for_stem(&self, stem: &str) -> anyhow::Result<Option<u32>> {
+        let stem = stem.to_string();
+        self.run(move |conn| match conn.prepare_cached("SELECT aid FROM stem_aid WHERE stem = ?1")?.query_row(params![stem], |row| row.get::<_, i64>(0)) {
+            Ok(aid) => Ok(Some(aid.max(0) as u32)),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(err) => Err(err),
+        })
+        .await
+    }
+
+    /// `aid_for_stem` for many stems (unknown stems are absent from the map).
+    pub(crate) async fn aids_for_stems(&self, stems: &[String]) -> anyhow::Result<std::collections::HashMap<String, u32>> {
+        let stems = stems.to_vec();
+        self.run(move |conn| {
+            let mut stmt = conn.prepare_cached("SELECT aid FROM stem_aid WHERE stem = ?1")?;
+            let mut found = std::collections::HashMap::new();
+            for stem in stems {
+                match stmt.query_row(params![stem], |row| row.get::<_, i64>(0)) {
+                    Ok(aid) => {
+                        found.insert(stem, aid.max(0) as u32);
                     }
                     Err(rusqlite::Error::QueryReturnedNoRows) => {}
                     Err(err) => return Err(err),
@@ -635,6 +683,8 @@ INSERT INTO `toto_anidb_tvdb` (`anidbid`, `tvdbid`, `defaulttvdbseason`, `episod
         let stats = store.import_tosho(&src).await.unwrap();
         assert_eq!((stats.releases.total, stats.releases.added, stats.release_aid, stats.release_files, stats.anidb_tvdb), (2, 1, 2, 2, 1));
         assert_eq!(stats.dump_date, "2026-05-09");
+        assert_eq!(stats.stem_aid, 0);
+        assert_eq!(store.aid_for_stem("show").await.unwrap(), None);
         assert_eq!(store.aid_of(100).await.unwrap(), Some(ToshoRelease { aid: 55, eid: 7, approved: 3 }));
         assert_eq!(store.aid_of(999).await.unwrap(), None);
         assert_eq!(store.aids_of(&[100, 101, 999]).await.unwrap().len(), 2);
@@ -662,6 +712,25 @@ INSERT INTO `toto_anidb_tvdb` (`anidbid`, `tvdbid`, `defaulttvdbseason`, `episod
         let bad = temp_db("tosho-bad");
         rusqlite::Connection::open(&bad).unwrap().execute_batch("CREATE TABLE meta (key TEXT, value TEXT); CREATE TABLE other (x)").unwrap();
         assert!(store.import_tosho(&bad).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn imports_stems_and_clears_them_for_older_datasets() {
+        let src = temp_db("stem-src");
+        crate::tosho_build::build(TOSHO_SQL.as_bytes(), &src, "2026-05-09").unwrap();
+        rusqlite::Connection::open(&src).unwrap().execute_batch("INSERT INTO stem_aid VALUES ('frieren', 17617, 40), ('one piece', 69, 900);").unwrap();
+        let store = Store::open(&temp_db("stem-dst")).unwrap();
+        let stats = store.import_tosho(&src).await.unwrap();
+        assert_eq!(stats.stem_aid, 2);
+        assert_eq!(store.aid_for_stem("frieren").await.unwrap(), Some(17617));
+        assert_eq!(store.aid_for_stem("unknown show").await.unwrap(), None);
+        let found = store.aids_for_stems(&["one piece".into(), "frieren".into(), "nope".into()]).await.unwrap();
+        assert_eq!((found.len(), found["one piece"], found["frieren"]), (2, 69, 17617));
+        // Re-importing replaces: a dataset without the table (built before T9) clears the stems.
+        rusqlite::Connection::open(&src).unwrap().execute_batch("DROP TABLE stem_aid;").unwrap();
+        let old = store.import_tosho(&src).await.unwrap();
+        assert_eq!(old.stem_aid, 0);
+        assert!(store.aids_for_stems(&["frieren".into()]).await.unwrap().is_empty());
     }
 
     fn temp_db(name: &str) -> std::path::PathBuf {
