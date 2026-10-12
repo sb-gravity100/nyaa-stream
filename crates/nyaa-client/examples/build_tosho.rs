@@ -24,6 +24,9 @@ use nyaa_client::tosho::InsertReader;
 use nyaa_client::tosho_build::{dataset_file_name, ToshoBuilder};
 
 fn main() -> anyhow::Result<()> {
+    if std::env::var_os("RUST_LOG").is_some() {
+        tracing_subscriber::fmt().with_env_filter(tracing_subscriber::EnvFilter::from_default_env()).init();
+    }
     let mut args: Vec<String> = std::env::args().skip(1).collect();
     let stats = args.first().map(String::as_str) == Some("--stats");
     if stats {
@@ -75,6 +78,7 @@ fn holdout(dataset: &std::path::Path, cutoff: &str, config: TrainConfig) -> anyh
     println!("stem holdout (train < {cutoff}, test = trusted releases from {cutoff}), {config:?}");
     println!("  stems kept {stems}; test releases {}; resolved {}; correct {}", e.test, e.resolved, e.correct);
     println!("  coverage {:.2}% (of series seen in training: {:.2}% of {}); precision {:.3}%", e.coverage() * 100.0, e.known_series_coverage() * 100.0, e.known_series, e.precision() * 100.0);
+    println!("  wrong resolutions {}; of them same TVDB show (season carry-over) {}", e.resolved - e.correct, e.wrong_same_show);
     println!("  took {:.0}s", started.elapsed().as_secs_f64());
     Ok(())
 }

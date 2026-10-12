@@ -129,6 +129,10 @@ pub struct Evaluation {
     /// the table could know; newer series have no stems by design).
     pub known_series: u64,
     pub known_series_resolved: u64,
+    /// Of the wrong resolutions, how many named another AniDB entry of the
+    /// same TVDB show as the true one (a season carry-over, not a different
+    /// show). Filled by `holdout` when the dataset has `anidb_tvdb`.
+    pub wrong_same_show: u64,
 }
 
 impl Evaluation {
@@ -220,7 +224,24 @@ pub fn holdout(conn: &Connection, cutoff: &str, config: TrainConfig) -> anyhow::
     let test: Vec<Sample> = after.into_iter().map(|(_, s)| s).filter(|s| s.approved >= 1).collect();
     let table = train(&train_set, config);
     let aids: BTreeSet<u32> = train_set.iter().map(|s| s.aid).collect();
-    let eval = evaluate(&table, &aids, &test);
+    let mut eval = evaluate(&table, &aids, &test);
+    let tvdb: HashMap<u32, i64> = conn
+        .prepare("SELECT anidb_id, tvdb_id FROM anidb_tvdb WHERE tvdb_id > 0")
+        .and_then(|mut stmt| stmt.query_map([], |r| Ok((r.get::<_, i64>(0)? as u32, r.get::<_, i64>(1)?)))?.collect::<rusqlite::Result<_>>())
+        .unwrap_or_default();
+    let mut shown = 0;
+    for s in &test {
+        let Some((aid, _)) = table.get(&s.stem) else { continue };
+        if *aid == s.aid {
+            continue;
+        }
+        let same = tvdb.get(aid).is_some_and(|t| tvdb.get(&s.aid) == Some(t));
+        eval.wrong_same_show += u64::from(same);
+        if shown < 12 && !same {
+            shown += 1;
+            tracing::info!(stem = %s.stem, predicted = aid, truth = s.aid, "wrong stem (different show)");
+        }
+    }
     tracing::info!(cutoff, train = train_set.len(), stems = table.len(), ?eval, "stem holdout evaluated");
     Ok((table.len(), eval))
 }
