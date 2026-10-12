@@ -2111,10 +2111,21 @@ to batches of the last N years (measure first, phase T1).
 **In-app download (T0, user request 2026-10-13).** The dump is distributed
 as a torrent (`https://animetosho.org/at-data.torrent`), so Settings gets a
 "Download AnimeTosho data" action instead of the manual `database-dump.7z`:
-1. Fetch the `.torrent` over HTTP (it is metadata only), add it to the
-   existing `sbtl-engine` into `<data>/tosho/` (its own download dir, not the
-   streaming cache; never auto-evicted by idle removal), report progress
-   (percent, speed, peers) to Settings through a Tauri event.
+1. Fetch the `.torrent` over HTTP (it is metadata only). The torrent is
+   **1.01 TB** (`Anime Tosho Data/`: `anidex_archive` 26.6 GB, `attachments`
+   145 GB, **`database-dump.7z` 2.74 GB**, `nekobt_archive` 465 MB,
+   `nyaasi_archive` 44.6 GB, `nyaasis_archive` 104 GB, `nzb` 24.1 GB,
+   `sframes` 666 GB, `sshots` 2.56 GB, `torrents` 18.2 GB), so the app
+   downloads **only `database-dump.7z`** (match the file by name/size, never
+   rely on index order) and every other file stays untouched; nothing may be
+   pre-allocated or fetched for them. sbtl is stream-driven (it fetches only
+   pieces a reader asks for), so the download is one sequential reader over
+   that file (SEQ_AHEAD) that writes the bytes to
+   `<data>/tosho/database-dump.7z` (its own dir, not the streaming cache, so
+   idle removal never touches it) and reports progress (percent, speed,
+   peers) to Settings through a Tauri event. Spike must confirm: sbtl's
+   storage does not pre-allocate the 1 TB layout, a resumed run skips pieces
+   already on disk, and a 1 TB piece map is cheap in memory.
 2. When complete, run the builder (T1/T2) on the downloaded archive and
    import the result (T3). The builder lives in `nyaa-client`
    (`tosho::build`) so the app and the `build_tosho` example share it;
