@@ -1,3 +1,6 @@
+### `d15dba0` · 2026-10-13 · docs: tick v0.5.0 in PHASES.md, note the open live check of the full Tosho import
+- `PHASES.md`
+
 ### `f3b5a19` · 2026-10-13 · chore: release v0.5.0
 - `package.json`
 - `src-tauri/Cargo.toml`
