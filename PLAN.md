@@ -550,10 +550,10 @@ passes a live test, **v0.4.0** (splash/title bar, download cache, resume
 buffer, contact and send logs, and the sbtl torrent engine), then **v1.0.0** (the stable Windows release
 after v0.8.0). **v0.5.0 is also published** (decided 2026-10-13: it bundles the
 unreleased v0.4.3 season-aware matching and the v0.4.4 AnimeTosho dataset /
-Import Tosho Data / Settings modal (the v0.4.5 custom magnet paste was put
-on hold the same day), so the old 0.4.3-0.4.5 numbers are never released; the old v0.5.0 context-menu
+Import Tosho Data / Settings modal (the v0.4.5 custom magnet paste moved to
+v0.6.0 the same day), so the old 0.4.3-0.4.5 numbers are never released; the old v0.5.0 context-menu
 milestone merged into v0.6.0). The milestones in between - v0.6.0 (context
-menus + build thumbnails) → v0.7.0 (HD banners) → v0.8.0 (seek preview) → v0.9.0
+menus + custom magnet paste + build thumbnails) → v0.7.0 (HD banners) → v0.8.0 (seek preview) → v0.9.0
 (navigation/home rehaul) → v0.9.1 (Discover) - are each
 bumped (`npm run bump`) and tagged **locally only**, never pushed. Commits
 are pushed with plain `git push` (no tags); `npm run release` pushes only
@@ -2381,7 +2381,7 @@ use title rules. `resolveapproved` = 0 rows are guesses by AnimeTosho's own
 matcher: only 1, 2, 3 are trusted. The dump is third-party data; the dataset
 is a local derived file, never bundled in the installer.
 
-## Custom magnet in the search bar (ON HOLD, user 2026-10-13; not in v0.5.0, version to be set when resumed)
+## Custom magnet in the search bar (planned, v0.6.0 - minor feature; was v0.4.5, held out of v0.5.0 on 2026-10-13)
 
 **Request** (2026-10-13): paste a magnet URL into the search bar. Decided
 (user): both play it directly **and** let it be attached to an episode.
