@@ -1,3 +1,42 @@
+### `907530d` · 2026-10-13 · docs: T8 verification results, aid_trusted rule, harness in FILE_INDEX (v0.4.4)
+- `PLAN.md`
+- `PHASES.md`
+- `FILE_INDEX.md`
+
+### `e5468f6` · 2026-10-13 · feat: trusted-aid releases bypass the frontend season filters (v0.4.4 T8)
+- `src-tauri/src/lib.rs`
+- `src/App.tsx`
+- `src/types.ts`
+- `crates/nyaa-client/src/lib.rs`
+
+### `b6d3e01` · 2026-10-13 · test(tosho): ignored T8 verification harness over a built dataset (v0.4.4 T8)
+- `src-tauri/src/tosho_verify_tests.rs`
+- `src-tauri/Cargo.toml`
+
+### `c48cf5c` · 2026-10-13 · fix(nyaa-client): search_local treats category 1_0 as all anime subcategories (v0.4.4 T8)
+- `crates/nyaa-client/src/store.rs`
+
+### `202dc96` · 2026-10-13 · docs: stem mapper holdout result, hook not enabled (v0.4.4 T9)
+- `PLAN.md`
+- `PHASES.md`
+- `FILE_INDEX.md`
+
+### `a74740a` · 2026-10-13 · test(title_match): nyaa-client's stem normalisation agrees with normalize (v0.4.4 T9)
+- `src-tauri/src/title_match.rs`
+
+### `a8941d8` · 2026-10-13 · feat(nyaa-client): import stem_aid with the dataset; aid_for_stem/aids_for_stems (v0.4.4 T9)
+- `crates/nyaa-client/src/store.rs`
+- `crates/nyaa-client/src/lib.rs`
+
+### `ace0aab` · 2026-10-13 · feat(nyaa-client): holdout reports season carry-over among wrong stems (v0.4.4 T9)
+- `crates/nyaa-client/src/stem.rs`
+- `crates/nyaa-client/examples/build_tosho.rs`
+
+### `9450c59` · 2026-10-13 · feat(nyaa-client): static stem->aid mapper trained on the dump, holdout eval (v0.4.4 T9)
+- `crates/nyaa-client/src/stem.rs`
+- `crates/nyaa-client/examples/build_tosho.rs`
+- `crates/nyaa-client/src/tosho_build.rs`
+
 ### `6325af3` · 2026-10-13 · feat(matching): a known AniDB id decides which entry a release belongs to (v0.4.4 T5)
 - `src-tauri/src/title_match.rs`
 - `src-tauri/src/lib.rs`
