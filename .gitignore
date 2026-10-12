@@ -39,3 +39,6 @@ vcpkg_installed/
 
 # libmpv-2.dll for the embedded player (see src-tauri/lib/README.md)
 src-tauri/lib/*.dll
+
+# third-party data dumps (multi-GB, never committed)
+database-dump.7z
