@@ -7,6 +7,7 @@ mod fansubbers;
 mod files;
 mod store;
 mod throttle;
+pub mod tosho;
 use cache::DiskCache;
 use store::Store;
 use throttle::Throttle;
