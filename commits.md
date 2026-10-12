@@ -1,3 +1,18 @@
+### `bbb7a07` · 2026-10-13 · docs: Mushoku S3 report, season_ambiguous rule (v0.5.0)
+- `PLAN.md`
+- `PHASES.md`
+- `FILE_INDEX.md`
+
+### `7e7bc72` · 2026-10-13 · test: ignored offline harness for the Mushoku S3 page (v0.5.0)
+- `src-tauri/src/mushoku_s3_tests.rs`
+
+### `b7c734e` · 2026-10-13 · fix: roman-numeral season labels and season_ambiguous drops stray prequel releases on later-season entries (v0.5.0)
+- `src-tauri/src/title_match.rs`
+- `src-tauri/src/lib.rs`
+- `crates/nyaa-client/src/lib.rs`
+- `src/App.tsx`
+- `src/types.ts`
+
 ### `40f732e` · 2026-10-13 · docs: custom magnet paste is planned for v0.6.0
 - `PLAN.md`
 - `PHASES.md`
