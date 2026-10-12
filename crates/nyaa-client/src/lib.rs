@@ -16,7 +16,7 @@ use throttle::Throttle;
 pub use fansubbers::group_tag;
 pub use files::TorrentFile;
 pub use label::EpisodeLabel;
-pub use store::{release_id, write_release_database, ImportStats};
+pub use store::{release_id, write_release_database, AnidbTvdb, ImportStats, ToshoImportStats, ToshoInfo, ToshoRelease};
 
 const NYAA_BASE_URL: &str = "https://nyaa.si";
 
@@ -187,6 +187,61 @@ impl NyaaClient {
         let stats = store.import(path).await?;
         tracing::info!(?stats, "nyaa release database imported");
         Ok(stats)
+    }
+
+    /// Imports an AnimeTosho dataset file (see `Store::import_tosho`).
+    pub async fn import_tosho(&self, path: &std::path::Path) -> anyhow::Result<ToshoImportStats> {
+        let Some(store) = &self.store else { anyhow::bail!("the release database isn't open") };
+        tracing::info!(path = %path.display(), "importing AnimeTosho dataset");
+        let stats = store.import_tosho(path).await.inspect_err(|err| tracing::error!(path = %path.display(), %err, "AnimeTosho dataset import failed"))?;
+        tracing::info!(?stats, "AnimeTosho dataset imported");
+        Ok(stats)
+    }
+
+    /// Date and counts of the imported AnimeTosho dataset; `None` before an import.
+    pub async fn tosho_info(&self) -> Option<ToshoInfo> {
+        let store = self.store.as_ref()?;
+        store.tosho_info().await.unwrap_or_else(|err| {
+            tracing::warn!(%err, "reading the AnimeTosho dataset info failed");
+            None
+        })
+    }
+
+    /// AnimeTosho's AniDB resolution of nyaa.si release `nyaa_id` (see `Store::aid_of`).
+    pub async fn aid_of(&self, nyaa_id: i64) -> Option<ToshoRelease> {
+        let store = self.store.as_ref()?;
+        store.aid_of(nyaa_id).await.unwrap_or_else(|err| {
+            tracing::warn!(nyaa_id, %err, "AniDB lookup failed");
+            None
+        })
+    }
+
+    /// `aid_of` for many releases (unknown ids are absent from the map).
+    pub async fn aids_of(&self, nyaa_ids: &[i64]) -> std::collections::HashMap<i64, ToshoRelease> {
+        let Some(store) = &self.store else { return Default::default() };
+        store.aids_of(nyaa_ids).await.unwrap_or_else(|err| {
+            tracing::warn!(count = nyaa_ids.len(), %err, "AniDB batch lookup failed");
+            Default::default()
+        })
+    }
+
+    /// The dataset's file list of nyaa.si release `nyaa_id` (multi-file
+    /// releases only; empty when unknown).
+    pub async fn release_files(&self, nyaa_id: i64) -> Vec<TorrentFile> {
+        let Some(store) = &self.store else { return Vec::new() };
+        store.release_files(nyaa_id).await.unwrap_or_else(|err| {
+            tracing::warn!(nyaa_id, %err, "reading the dataset file list failed");
+            Vec::new()
+        })
+    }
+
+    /// The dataset's AniDB -> TVDB mapping of anime `aid`.
+    pub async fn anidb_tvdb(&self, aid: u32) -> Option<AnidbTvdb> {
+        let store = self.store.as_ref()?;
+        store.anidb_tvdb(aid).await.unwrap_or_else(|err| {
+            tracing::warn!(aid, %err, "AniDB -> TVDB lookup failed");
+            None
+        })
     }
 
     /// Releases already in the local database whose titles contain every word

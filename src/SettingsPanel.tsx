@@ -225,9 +225,23 @@ function UpdateSection() {
 
 /** Library, progress and settings <-> a file in Documents, since they live
  * in webview storage that a data clear would take with it. */
+interface ToshoInfo {
+  dump_date: string;
+  release_aid: number;
+  release_files: number;
+  anidb_tvdb: number;
+}
+
 function BackupSection() {
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [tosho, setTosho] = useState<ToshoInfo | null>(null);
+
+  useEffect(() => {
+    invoke<ToshoInfo | null>("tosho_info")
+      .then(setTosho)
+      .catch((err) => console.warn("[settings] reading the AnimeTosho dataset info failed", err));
+  }, []);
 
   async function run(action: () => Promise<string>) {
     setBusy(true);
@@ -284,6 +298,38 @@ function BackupSection() {
                 const stats = await invoke<{ total: number; added: number; updated: number }>("import_nyaa_database", { path });
                 console.info("[settings] nyaa release database imported", stats);
                 return `Imported ${stats.total} releases: ${stats.added} new, ${stats.updated} updated`;
+              })
+            }
+          >
+            Import
+          </button>
+        </span>
+      </div>
+      <div class="setting-row">
+        <span class="setting-text">
+          <span class="setting-label">AnimeTosho dataset</span>
+          <span class="setting-hint">
+            {tosho
+              ? `Dump of ${tosho.dump_date}: ${tosho.release_aid.toLocaleString()} releases matched to AniDB, ${tosho.release_files.toLocaleString()} batch files, ${tosho.anidb_tvdb.toLocaleString()} TVDB mappings`
+              : "Import a tosho-dataset .db built with build_tosho - exact release-to-show matching, batch file lists and season maps, offline"}
+          </span>
+        </span>
+        <span class="setting-control">
+          <button
+            class="button button-quiet"
+            disabled={busy}
+            onClick={() =>
+              void run(async () => {
+                const path = await pickFile({ multiple: false, directory: false, filters: [{ name: "AnimeTosho dataset", extensions: ["db", "sqlite", "sqlite3"] }] });
+                if (typeof path !== "string") return "Import cancelled";
+                console.info("[settings] importing AnimeTosho dataset", { path });
+                const stats = await invoke<{ releases: { total: number; added: number; updated: number }; release_aid: number; release_files: number; anidb_tvdb: number; dump_date: string }>(
+                  "import_tosho_dataset",
+                  { path },
+                );
+                console.info("[settings] AnimeTosho dataset imported", stats);
+                setTosho(await invoke<ToshoInfo | null>("tosho_info"));
+                return `Imported the ${stats.dump_date} dataset: ${stats.releases.added} new releases, ${stats.release_aid} AniDB matches`;
               })
             }
           >

@@ -161,7 +161,7 @@
         `--stats` mode counts rows per table, `toto_toto` aid coverage and
         `resolveapproved` split, file-list size; decide the size cut
   - [x] T2 dataset schema + builder writing `tosho-dataset-<date>.db` (`nyaa-client/src/tosho_build.rs`; real build 986,012 releases, 500 MB, 109 s)
-  - [ ] T3 `Store::import_tosho` (releases, release_aid, release_files,
+  - [x] T3 `Store::import_tosho` (releases, release_aid, release_files,
         anidb_tvdb), Settings import button, refuses non-tosho files
   - [x] T4 `anime_lists.rs`: AniList -> AniDB id set from Fribb
   - [ ] T5 `ShowMatcher`: known `aid` decides, title rules for the rest;

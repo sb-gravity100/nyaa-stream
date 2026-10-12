@@ -2165,6 +2165,8 @@ app scraped itself win. AnimeTosho's `nyaa_cat` mixes nyaa.si codes with
 nyaa.se's legacy ones; the builder maps `1_37`/empty -> `1_2`, `1_11` ->
 `1_3`, `1_38` -> `1_4`, `1_32` -> `1_1` so the app's category searches find
 them.
+Importing it into the app store (T3, `Store::import_tosho`) took 40 s for the
+500 MB file and grows the store to about 570 MB.
 
 **Freshness.** The dump ends 2026-05-09. Newer releases have no `aid`, so
 title matching stays the fallback and must not regress. A later milestone can
