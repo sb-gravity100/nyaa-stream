@@ -1,3 +1,7 @@
+### `10688d2` · 2026-10-13 · docs(plan): in-app AnimeTosho dump download (v0.4.4 T0)
+- `PLAN.md`
+- `PHASES.md`
+
 ### `b056c24` · 2026-10-12 · fix: releases with no season marker are kept on later-season entries (only explicit other-season markers are dropped)
 - `src/App.tsx`
 
