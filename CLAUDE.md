@@ -95,7 +95,7 @@ All planning docs must stay consistent with each other at all times.
 updater only offers builds with a higher version than the installed one.
 
 - **Current exception (PLAN.md "Release plan"):** only v0.3.2, v0.4.0, v0.5.0
-  (matching + AnimeTosho dataset + magnet paste) and v1.0.0 are published;
+  (matching + AnimeTosho dataset) and v1.0.0 are published;
   milestones v0.6.0-v0.9.1 are bumped and tagged locally only -
   never push those tags or use `git push --tags`/`--follow-tags`.
 - Bump with `npm run bump -- patch|minor|major` (keeps `package.json`,

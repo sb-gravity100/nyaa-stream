@@ -194,7 +194,7 @@
   - [ ] FILE_INDEX.md/PLAN.md sync, CHANGELOG, `npm run bump -- minor`... or
         patch per the Release plan, tag
 
-- [ ] Custom magnet in the search bar - v0.5.0 (was v0.4.5; minor feature, see PLAN.md
+- [ ] Custom magnet in the search bar - ON HOLD (user 2026-10-13; was v0.4.5, not in v0.5.0; minor feature, see PLAN.md
       "Custom magnet in the search bar"). One commit each:
   - [ ] M1 `parse_magnet` (`src-tauri/src/magnet.rs`) + command + tests
   - [ ] M2 search-bar detection, "Play this magnet" row, invalid hint
