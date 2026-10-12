@@ -1,3 +1,7 @@
+### `68f8cad` · 2026-10-13 · docs(plan): Import Tosho Data button - download, compile and import in one click (v0.4.4 T0)
+- `PLAN.md`
+- `PHASES.md`
+
 ### `907530d` · 2026-10-13 · docs: T8 verification results, aid_trusted rule, harness in FILE_INDEX (v0.4.4)
 - `PLAN.md`
 - `PHASES.md`
