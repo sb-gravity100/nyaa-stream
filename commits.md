@@ -1,3 +1,6 @@
+### `5ad75a3` · 2026-10-13 · feat(ui): Settings opens as a centered modal instead of a right drawer
+- `src/App.css`
+
 ### `3f58c13` · 2026-10-13 · docs: this release is v0.5.0 (merges 0.4.3-0.4.5); old v0.5.0 context menus merge into v0.6.0
 - `PLAN.md`
 - `PHASES.md`
