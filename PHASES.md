@@ -163,7 +163,7 @@
   - [ ] T2 dataset schema + builder writing `tosho-dataset-<date>.db`
   - [ ] T3 `Store::import_tosho` (releases, release_aid, release_files,
         anidb_tvdb), Settings import button, refuses non-tosho files
-  - [ ] T4 `anime_lists.rs`: AniList -> AniDB id set from Fribb
+  - [x] T4 `anime_lists.rs`: AniList -> AniDB id set from Fribb
   - [ ] T5 `ShowMatcher`: known `aid` decides, title rules for the rest;
         `eid` episode groups
   - [ ] T6 `TorrentDetails.files` falls back to `release_files`
