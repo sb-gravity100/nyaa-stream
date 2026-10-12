@@ -223,3 +223,7 @@ fn title_match_fixture_candidate_queries() {
         }
     }
 }
+
+/// T8 verification harness over a built AnimeTosho dataset (`#[ignore]`, env-driven).
+#[path = "tosho_verify_tests.rs"]
+mod tosho_verify;

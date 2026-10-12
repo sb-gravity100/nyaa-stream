@@ -52,3 +52,7 @@ tauri-plugin-process = "2"
 [target.'cfg(windows)'.dependencies]
 # Finding mpv's child window and pushing it below the webview (player.rs).
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_UI_WindowsAndMessaging"] }
+
+[dev-dependencies]
+# T8 harness (tosho_verify_tests.rs) reads a built dataset directly.
+rusqlite = { version = "0.40.2", features = ["bundled"] }
