@@ -519,6 +519,14 @@ mod tests {
     }
 
     #[test]
+    fn stem_normalisation_matches_normalize() {
+        // nyaa-client keeps a copy of `normalize` for the stem mapper; they must agree.
+        for text in ["Fate/strange Fake", "God's Blessing!", "Re:Zero \u{2019}s \u{2606} Ⅱ", "  Mixed   CASE-title "] {
+            assert_eq!(nyaa_client::stem::normalize_stem(text), normalize(text));
+        }
+    }
+
+    #[test]
     fn normalize_removes_apostrophes() {
         assert_eq!(normalize("Frieren: Beyond Journey's End"), "frieren beyond journeys end");
         assert_eq!(normalize("Frieren Beyond Journeys End"), "frieren beyond journeys end");
