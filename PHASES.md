@@ -151,7 +151,8 @@
 
 - [ ] AnimeTosho dataset - v0.4.4 (minor feature, see PLAN.md "AnimeTosho
       dataset"). One commit each:
-  - [ ] T0 in-app download of `database-dump.7z` only (2.74 GB of the 1.01 TB
+  - [ ] T0 (done last: T1-T8 build and test on the local `database-dump.7z`,
+        so no download is needed during development) in-app download of `database-dump.7z` only (2.74 GB of the 1.01 TB
         `at-data.torrent`): one sequential sbtl reader on that file into
         `<data>/tosho/`, progress event, resume/cancel, size + disk-space
         confirm, then build + import, offer to delete the archive; spike
