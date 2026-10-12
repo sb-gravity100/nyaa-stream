@@ -865,6 +865,7 @@ async fn filter_for_show(state: &AppState, matcher: &title_match::ShowMatcher, a
     results.retain_mut(|result| {
         let tosho = nyaa_client::release_id(&result.view_url).and_then(|id| known.get(&id));
         let mut trusted = false;
+        let mut by_title_decided = false;
         let keep = match matcher.decide(&result.title, tosho, &entry_aids) {
             title_match::Decision::Accept => {
                 by_id += 1;
@@ -877,6 +878,7 @@ async fn filter_for_show(state: &AppState, matcher: &title_match::ShowMatcher, a
             }
             title_match::Decision::UseTitleRules => {
                 by_title += 1;
+                by_title_decided = true;
                 matcher.matches(&result.title)
             }
         };
@@ -884,10 +886,31 @@ async fn filter_for_show(state: &AppState, matcher: &title_match::ShowMatcher, a
         if keep {
             result.episode_group = tosho.map(|t| t.eid).filter(|eid| *eid != 0);
             result.aid_trusted = trusted.then_some(true);
+            if by_title_decided {
+                annotate_title_decided(matcher, result);
+            }
         }
         keep
     });
     tracing::info!(entry_aids = entry_aids.len(), known = known.len(), by_id, by_title, kept = results.len(), "filtered releases for the show");
+}
+
+/// What the title rules know about a kept release that its label and flags
+/// do not say yet: a roman season after the entry's name ("Mushoku Tensei III
+/// - 01": `release-parse` cannot read it, the matcher can) goes into the
+/// label, and `season_ambiguous` is set for an unmarked release that names the
+/// show only by what its earlier seasons share.
+pub(crate) fn annotate_title_decided(matcher: &title_match::ShowMatcher, result: &mut NyaaResult) {
+    if let Some(season) = matcher.roman_season_of(&result.title) {
+        if let nyaa_client::EpisodeLabel::Episode { season: s, seasons, .. } | nyaa_client::EpisodeLabel::Batch { season: s, seasons, .. } = &mut result.label {
+            if seasons.is_empty() {
+                tracing::debug!(title = result.title, season, "label season from the roman numeral after the show's name");
+                *s = season;
+                *seasons = vec![season];
+            }
+        }
+    }
+    result.season_ambiguous = matcher.season_ambiguous(&result.title).then_some(true);
 }
 
 /// `lists` flattened, one entry per nyaa.si release (by view URL), first

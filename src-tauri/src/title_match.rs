@@ -323,6 +323,9 @@ pub struct ShowMatcher {
     format: Option<String>,
     /// Normalized names of the franchise's other entries.
     siblings: Vec<Vec<String>>,
+    /// Normalized names of the entries before this one (TV prequels): a
+    /// release that names only what these also carry could be theirs.
+    earlier: Vec<Vec<String>>,
     /// The one season the entry is filed under: TVDB's, else the one its
     /// titles name, else 1 for a first season. None when unknown.
     primary: Option<u32>,
@@ -342,7 +345,7 @@ impl ShowMatcher {
                 }
             }
         }
-        let matcher = ShowMatcher { names: titles.iter().map(|name| normalize(name)).collect(), bases, seasons: entry_seasons(english, romaji, synonyms, tvdb_season), format: None, siblings: Vec::new(), primary: tvdb_season.or_else(|| entry_seasons(english, romaji, synonyms, None).iter().next().copied()) };
+        let matcher = ShowMatcher { names: titles.iter().map(|name| normalize(name)).collect(), bases, seasons: entry_seasons(english, romaji, synonyms, tvdb_season), format: None, siblings: Vec::new(), earlier: Vec::new(), primary: tvdb_season.or_else(|| entry_seasons(english, romaji, synonyms, None).iter().next().copied()) };
         tracing::debug!(names = ?matcher.names, bases = ?matcher.bases, seasons = ?matcher.seasons, "show matcher built");
         matcher
     }
@@ -379,7 +382,13 @@ impl ShowMatcher {
             .iter()
             .map(|relative| names(relative.title.english.as_deref(), relative.title.romaji.as_deref(), &relative.synonyms).iter().map(|name| normalize(name)).collect())
             .collect();
-        tracing::debug!(format = ?self.format, seasons = ?self.seasons, siblings = self.siblings.len(), "show matcher given its franchise");
+        self.earlier = franchise
+            .relatives
+            .iter()
+            .filter(|relative| relative.relation == "PREQUEL" && is_tv(relative.format.as_deref()))
+            .map(|relative| names(relative.title.english.as_deref(), relative.title.romaji.as_deref(), &relative.synonyms).iter().map(|name| normalize(name)).collect())
+            .collect();
+        tracing::debug!(format = ?self.format, seasons = ?self.seasons, siblings = self.siblings.len(), earlier = self.earlier.len(), "show matcher given its franchise");
         self
     }
 
@@ -400,6 +409,45 @@ impl ShowMatcher {
     /// The season the entry is filed under (see `primary`).
     pub fn primary_season(&self) -> Option<u32> {
         self.primary
+    }
+
+    /// The season a roman numeral after this entry's short name gives an
+    /// otherwise unmarked release ("Mushoku Tensei III - 01" -> 3). `release-parse`
+    /// cannot know names, so its label says season 1 for these; the caller
+    /// corrects the label with this. None when the title has a season marker
+    /// of its own or no such numeral.
+    pub fn roman_season_of(&self, release_title: &str) -> Option<u32> {
+        if !release_seasons(release_title).is_empty() {
+            return None;
+        }
+        self.roman_season(&haystack(release_title))
+    }
+
+    /// Whether an unmarked release only names what this entry's *earlier*
+    /// seasons also go by, so it may as well be theirs: a later-season entry
+    /// (the season set lacks 1), no season marker or numeral in the title,
+    /// and every one of the entry's names found in it is also a name of a TV
+    /// prequel ("Mushoku Tensei: Jobless Reincarnation - 01" is the first
+    /// season's; the third season's own romaji "Mushoku Tensei III: ..." is
+    /// not shared, and "Symphogear XV - 06" is not either). The release is
+    /// still kept by the title rules (absolute-numbered releases depend on
+    /// it); the frontend files it under this season only when something
+    /// confirms it (see `NyaaResult.season_ambiguous`).
+    pub fn season_ambiguous(&self, release_title: &str) -> bool {
+        if self.seasons.is_empty() || self.seasons.contains(&1) || self.earlier.is_empty() {
+            return false;
+        }
+        let haystack = haystack(release_title);
+        if !self.named_seasons(release_title, &haystack).is_empty() {
+            return false;
+        }
+        let mut found = self.names.iter().filter(|name| haystack.contains(&format!(" {name} "))).peekable();
+        if found.peek().is_none() {
+            return false;
+        }
+        let ambiguous = found.all(|name| self.earlier.iter().any(|names| names.contains(name)));
+        tracing::trace!(release_title, ambiguous, "unmarked release on a later-season entry");
+        ambiguous
     }
 
     /// The season numbers `release_title` names (explicit markers, else a
@@ -615,6 +663,66 @@ mod tests {
         let matcher = ShowMatcher::new(english, romaji, &[], Some(3)).with_franchise(&third);
         assert!(matcher.matches("[crane0922] Food Wars! Season 3 (BD 1080p HEVC Opus) [Dual Audio]"));
         assert!(!matcher.matches("[crane0922] Food Wars! Season 4 (BD 1080p HEVC Opus) [Dual Audio]"));
+    }
+
+    /// Mushoku Tensei Season 3 (AniList 178789) with its prequels, as in the franchise cache.
+    fn mushoku_s3() -> ShowMatcher {
+        let franchise = Franchise {
+            format: Some("TV".into()),
+            has_tv_prequel: true,
+            relatives: vec![
+                relative("Mushoku Tensei: Jobless Reincarnation Season 2 Part 2", "Mushoku Tensei II: Isekai Ittara Honki Dasu Part 2", "PREQUEL", "TV"),
+                relative("Mushoku Tensei: Jobless Reincarnation Season 2", "Mushoku Tensei II: Isekai Ittara Honki Dasu", "PREQUEL", "TV"),
+                relative("Mushoku Tensei: Jobless Reincarnation Cour 2", "Mushoku Tensei: Isekai Ittara Honki Dasu Part 2", "PREQUEL", "TV"),
+                relative("Mushoku Tensei: Jobless Reincarnation", "Mushoku Tensei: Isekai Ittara Honki Dasu", "PREQUEL", "TV"),
+                relative("", "Mushoku Tensei III: Isekai Ittara Honki Dasu Part 2", "SEQUEL", "TV"),
+            ],
+        };
+        let synonyms = ["Mushoku Tensei: Isekai Ittara Honki Dasu 3rd Season".to_string()];
+        ShowMatcher::new(Some("Mushoku Tensei: Jobless Reincarnation Season 3"), Some("Mushoku Tensei III: Isekai Ittara Honki Dasu"), &synonyms, Some(3)).with_franchise(&franchise)
+    }
+
+    #[test]
+    fn unmarked_release_naming_only_what_earlier_seasons_share_is_ambiguous() {
+        let m = mushoku_s3();
+        // Season 1's BD and TV releases: kept by the title rules, but they may be the first season's.
+        for title in [
+            "[Diogo4D-NF93] [BD][1080p] Mushoku Tensei Isekai Ittara Honki Dasu - 01 [127C0B18].mkv",
+            "[SubsPlease] Mushoku Tensei: Jobless Reincarnation - 03 (1080p)",
+            "[EA]Mushoku_Tensei_-_Isekai_Ittara_Honki_Dasu_01-11_End_[1920x1080][BDRIP][HEVC][Flac]",
+        ] {
+            assert!(m.matches(title), "{title}");
+            assert!(m.season_ambiguous(title), "{title}");
+        }
+        // Naming the entry itself, or carrying a season marker: not ambiguous.
+        for title in [
+            "[Diogo4D-NF93] [WEB][1080p] Mushoku Tensei III Isekai Ittara Honki Dasu - 01 [ABBEC7B2].mkv",
+            "[shincaps] Mushoku Tensei III ~Isekai Ittara Honki Dasu~ - 01-02 (AT-X 1440x1080 MPEG2 AAC).ts",
+            "[Breeze] Mushoku Tensei S03E12 [1080p AV1] | Jobless Reincarnation (weekly)",
+            "[Judas] Mushoku Tensei (Jobless Reincarnation) - S03E01 [1080p]",
+            "[DKB] Mushoku Tensei: Isekai Ittara Honki Dasu - S03E01 [1080p]",
+        ] {
+            assert!(m.matches(title), "{title}");
+            assert!(!m.season_ambiguous(title), "{title}");
+        }
+        // The franchise base alone is not kept at all (this entry is not season 1).
+        assert!(!m.matches("[Erai-raws] Mushoku Tensei - 01 [1080p]"));
+    }
+
+    #[test]
+    fn roman_numeral_after_the_name_gives_the_label_season() {
+        let m = mushoku_s3();
+        assert_eq!(m.roman_season_of("[Diogo4D-NF93] [WEB][1080p] Mushoku Tensei III Isekai Ittara Honki Dasu - 01 [ABBEC7B2].mkv"), Some(3));
+        assert_eq!(m.roman_season_of("[shincaps] Mushoku Tensei III ~Isekai Ittara Honki Dasu~ - 14 (BS11).ts"), Some(3));
+        assert_eq!(m.roman_season_of("[Judas] Mushoku Tensei (Jobless Reincarnation) - S03E01"), None);
+        assert_eq!(m.roman_season_of("[BD] Mushoku Tensei Isekai Ittara Honki Dasu - 01"), None);
+    }
+
+    #[test]
+    fn first_season_entries_never_flag_unmarked_releases() {
+        let franchise = Franchise { format: Some("TV".into()), has_tv_prequel: false, relatives: vec![relative("Mushoku Tensei: Jobless Reincarnation Season 2", "Mushoku Tensei II: Isekai Ittara Honki Dasu", "SEQUEL", "TV")] };
+        let first = ShowMatcher::new(Some("Mushoku Tensei: Jobless Reincarnation"), Some("Mushoku Tensei: Isekai Ittara Honki Dasu"), &[], None).with_franchise(&franchise);
+        assert!(!first.season_ambiguous("[SubsPlease] Mushoku Tensei: Jobless Reincarnation - 03 (1080p)"));
     }
 
     #[test]

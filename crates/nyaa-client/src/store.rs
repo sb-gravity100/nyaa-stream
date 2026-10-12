@@ -629,6 +629,7 @@ fn row_to_result(row: &rusqlite::Row<'_>) -> rusqlite::Result<NyaaResult> {
         published: row.get(7)?,
         episode_group: None,
         aid_trusted: None,
+        season_ambiguous: None,
     })
 }
 
@@ -649,6 +650,7 @@ mod tests {
             label: Default::default(),
             episode_group: None,
             aid_trusted: None,
+        season_ambiguous: None,
         }
     }
 

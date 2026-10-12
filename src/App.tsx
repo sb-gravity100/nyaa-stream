@@ -575,6 +575,7 @@ function App() {
       // 93 = Season 4's episode 21, offset 72). Once the math confirms it
       // belongs to the currently-browsed season, snap label.season to match
       // so the filter below doesn't then drop it anyway.
+      let absoluteNumber = false;
       if (
         label.kind === "episode" &&
         currentEpisodeOffset > 0 &&
@@ -585,7 +586,29 @@ function App() {
         if (relative >= 1 && relative <= selectedAnime.episodes) {
           label.number = relative;
           label.season = currentAnimeSeason;
+          absoluteNumber = true;
         }
+      }
+
+      // A release with no season marker that names the show only by what its
+      // earlier seasons share ("Mushoku Tensei Isekai Ittara Honki Dasu - 01"
+      // on Season 3's page - Season 1's BD) is as likely an earlier season's.
+      // On a later-season entry it needs confirming - an absolute episode
+      // number (above), the dataset's trusted AniDB id, or its file list -
+      // else it would sit in a stray season-1 "Episode N" row. (Releases that
+      // name the entry itself - "Symphogear XV - 06", "Mushoku Tensei III - 01" -
+      // are not flagged by the backend, and unparseable titles go through the
+      // batch path above.)
+      if (
+        source.season_ambiguous &&
+        !source.aid_trusted &&
+        !absoluteNumber &&
+        currentAnimeSeason !== 1 &&
+        (parsed.kind === "episode" || parsed.kind === "batch") &&
+        !(parsed.seasons ? parsed.seasons.length > 0 : parsed.season !== 1) &&
+        !(scraped?.seasons ?? []).includes(currentAnimeSeason)
+      ) {
+        continue;
       }
 
       // The dataset's trusted AniDB id already put this release on this entry,

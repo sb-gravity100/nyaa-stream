@@ -50,6 +50,14 @@ pub struct NyaaResult {
     /// cour). `None` otherwise.
     #[serde(default)]
     pub aid_trusted: Option<bool>,
+    /// `Some(true)` when the release has no season marker and names the
+    /// show only by what its earlier seasons also go by (a later-season
+    /// entry's search returned "Show - 01", which is as likely season 1's
+    /// episode): the frontend files it under the entry only when an absolute
+    /// episode number, the dataset or the torrent's file list confirm it.
+    /// Set by the show search commands, `None` otherwise.
+    #[serde(default)]
+    pub season_ambiguous: Option<bool>,
 }
 
 /// Ground-truth batch/submitter info scraped from a torrent's nyaa.si view
@@ -498,6 +506,7 @@ impl NyaaClient {
                 published,
                 episode_group: None,
                 aid_trusted: None,
+                season_ambiguous: None,
                 label: EpisodeLabel::of(&title),
                 title,
             });

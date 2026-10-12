@@ -60,6 +60,7 @@ fn main() -> anyhow::Result<()> {
                 published: text(item, "date"),
                 episode_group: None,
                 aid_trusted: None,
+                season_ambiguous: None,
             };
             releases.push((category, release));
         }
