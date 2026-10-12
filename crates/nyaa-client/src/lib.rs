@@ -8,6 +8,7 @@ mod files;
 pub mod stem;
 mod store;
 mod throttle;
+pub mod sevenz_stream;
 pub mod tosho_pipeline;
 pub mod tosho;
 pub mod tosho_build;
