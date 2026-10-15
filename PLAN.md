@@ -2537,9 +2537,32 @@ episode (`Link Click S04E11` vs `第三季 第11话`); movie subtitles
 (`~Soukai no Namida-hen~`). 30 of the 75 were one uploader's Sonic X dump, so
 the sample is skewed; repeat on several days before using it as a rate.
 
-**Model.** Gradient-boosted trees or logistic regression, exported to a plain
-format and scored in Rust (tiny, no runtime weight). No shipped LLM: size,
-latency, and online dependency; an LLM is at most an offline auditor.
+**Model (decided 2026-10-15, user): XGBoost, trained in Python, scored in
+Rust.** Binary classifier (`binary:logistic`) over (entry, release) pair
+features; offline Python + `xgboost` trains on the Tosho dataset (scratch
+`ml/` scripts, never shipped, no Python at runtime). The booster is exported
+with `Booster.save_model("model.json")` (XGBoost's JSON tree dump) and a small
+Rust evaluator in `crates/nyaa-client` walks the trees (sum leaf values, add
+the base score, sigmoid), so the app carries only the model file (tens to
+hundreds of KB), no native ML dependency. A parity test pins the Rust scores to
+the Python `predict` output on a fixture of pairs (tolerance 1e-6). Missing
+features are NaN and follow each tree's default direction, same as XGBoost.
+Probability is calibrated on the 2025+ split before the abstain threshold is
+chosen. No shipped LLM: size, latency, and online dependency; an LLM is at most
+an offline auditor.
+
+**Pipeline** (what the user asked for: new anime data + nyaa sources -> model
+trained on old trusted matches -> new anime data with the correct sources):
+1. *Training (offline):* trusted dataset rows -> pairs + features -> XGBoost ->
+   `model.json` (+ threshold, feature order, version) written next to the
+   dataset and imported with it.
+2. *Inference (in app):* for an anime entry (new season included), candidate
+   releases come from the usual nyaa search / local release database; each
+   pair is featurised and scored; releases above the threshold are the entry's
+   sources, below it the title rules decide as today. A trusted `aid` always
+   wins.
+3. *Retraining:* when a newer dump is imported, or when the user's reviewed
+   rows (gold sets) are added; the model is replaced wholesale, never patched.
 
 **Evaluation and gate.** Time split: train on releases before 2025-01-01, test
 on 2025-01-01 onward; also a held-out set of entries (whole shows unseen in

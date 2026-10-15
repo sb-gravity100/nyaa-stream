@@ -216,7 +216,8 @@
       One commit each:
   - [ ] L1 Python prototype on the real dump (scratch, not committed): build
         trusted (entry, release) pairs via Fribb, sibling + other-show
-        negatives, features, GBDT/logistic; report pre-2025 -> 2025+ holdout
+        negatives, features, XGBoost (`binary:logistic`, scratch `ml/`
+        scripts; decided 2026-10-15); report pre-2025 -> 2025+ holdout
         precision/coverage sliced by year and group size. Stop here if
         precision < 99% on answered pairs
   - [ ] L1b gold set: the user-reviewed Mushoku crawl (1,000 rows, verdict per
@@ -233,10 +234,12 @@
         explained (no entry / not anime / unparsed)
   - [ ] L2 held-out-entries test (whole shows unseen) incl. a new-season case
         (Mushoku Tensei S3 EP9 crawl as a smoke check)
-  - [ ] L3 Rust feature extraction + scorer (`crates/nyaa-client`), exported
-        model file, parity test against the prototype's scores
-  - [ ] L4 train step in `build_tosho` (or a dev script) that writes the model
-        next to the dataset; imported with it
+  - [ ] L3 Rust feature extraction + XGBoost JSON tree evaluator
+        (`crates/nyaa-client`), exported `model.json`, parity test against
+        Python `predict` (1e-6, NaN default directions)
+  - [ ] L4 Python train + export script (`ml/train.py`: pairs CSV -> model.json
+        + threshold + feature order) that writes the model next to the
+        dataset; imported with it; Rust dev tool dumps the pairs CSV
   - [ ] L5 hook into `filter_for_show` after trusted `aid`s (abstain -> title
         rules); fixtures show no regression on `title_match_fixture_tests`
   - [ ] L6 FILE_INDEX/CHANGELOG/version bump (minor), tag locally
