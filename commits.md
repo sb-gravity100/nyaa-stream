@@ -1,3 +1,6 @@
+### `798db24` · 2026-10-15 · docs: record that the AnimeTosho live feed cannot fill the post-dump gap
+- `PLAN.md`
+
 ### `d4eb8cc` · 2026-10-15 · docs: record L1c peer consistency results (not enabled)
 - `PLAN.md`
 - `PHASES.md`
