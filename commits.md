@@ -1,3 +1,6 @@
+### `a81db51` · 2026-10-15 · test: file-level labeller coverage over tosho torrents with file lists (ignored, env-driven)
+- `src-tauri/src/tosho_verify_tests.rs`
+
 ### `bd73ac7` · 2026-10-15 · docs: v0.6.1 baseline, gold set and peer-consistency feature from the Mushoku crawl
 - `PLAN.md`
 - `PHASES.md`
