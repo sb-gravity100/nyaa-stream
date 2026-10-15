@@ -180,3 +180,47 @@ fn report_rows(rows: &[&NyaaResult], decide: &dyn Fn(&NyaaResult) -> (bool, Deci
         }
     }
 }
+
+/// Title-only pass over a full nyaa listing crawl (`{"items":[{id,date,title,..}]}`), no store
+/// copy needed: runs the app's `EpisodeLabel::of` and `ShowMatcher` on every title for the
+/// Season 3 entry and writes one TSV row each (id, date, keep, decision, label, title) to
+/// `MUSHOKU_OUT`. Used to find naming styles the rules miss (PLAN.md "Learned release-to-entry matcher").
+///
+/// ```text
+/// MUSHOKU_CRAWL=<nyaa-crawl-mushoku_tensei-14pages.json> MUSHOKU_OUT=<out.tsv> \
+///   cargo test -p nyaa-stream --lib mushoku_crawl_titles -- --ignored --nocapture
+/// ```
+#[tokio::test]
+#[ignore = "needs MUSHOKU_CRAWL and MUSHOKU_OUT"]
+async fn mushoku_crawl_titles() {
+    let crawl = env_path("MUSHOKU_CRAWL").expect("MUSHOKU_CRAWL");
+    let out = env_path("MUSHOKU_OUT").expect("MUSHOKU_OUT");
+    let franchise_path = env_path("FRANCHISE_JSON").unwrap_or_else(|| cache("franchise").join("178789.json"));
+    let franchise: Franchise = serde_json::from_slice(&std::fs::read(franchise_path).expect("franchise json")).expect("franchise parse");
+    let lists = AnimeLists::load(env_path("ANIME_LISTS").unwrap_or_else(|| cache("anime_lists.json")));
+    let tvdb = lists.tvdb_season(ENTRY);
+    let entry_aids = lists.anidb_ids(ENTRY as u32);
+    let synonyms: Vec<String> = match AniListClient::new().get_by_id(ENTRY).await {
+        Ok(media) => media.synonyms,
+        Err(err) => {
+            println!("AniList unavailable ({err}), no synonyms");
+            Vec::new()
+        }
+    };
+    let matcher = ShowMatcher::new(Some(ENGLISH), Some(ROMAJI), &synonyms, tvdb).with_franchise(&franchise);
+    println!("tvdb season {tvdb:?}, entry aids {entry_aids:?}, primary season {:?}", matcher.primary_season());
+    let json: serde_json::Value = serde_json::from_slice(&std::fs::read(crawl).unwrap()).unwrap();
+    let mut tsv = String::from("id\tdate\tkeep\tdecision\tlabel\ttitle\n");
+    for item in json["items"].as_array().unwrap() {
+        let title = item["title"].as_str().unwrap();
+        let d = matcher.decide(title, None, &entry_aids);
+        let keep = match d {
+            Decision::Accept => true,
+            Decision::Reject => false,
+            Decision::UseTitleRules => matcher.matches(title),
+        };
+        let label = EpisodeLabel::of(title);
+        tsv.push_str(&format!("{}\t{}\t{keep}\t{d:?}\t{label:?}\t{}\n", item["id"], item["date"].as_str().unwrap_or(""), title.replace('\t', " ")));
+    }
+    std::fs::write(out, tsv).unwrap();
+}
