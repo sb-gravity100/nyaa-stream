@@ -1,3 +1,10 @@
+### `c7964e5` · 2026-10-15 · test: file coverage harness also writes duplicate-numbered files (DUPS_OUT)
+- `src-tauri/src/tosho_verify_tests.rs`
+
+### `c47c3e6` · 2026-10-15 · docs: plan L1d-L1f file-name coverage, batch self-check and RSS mapping check
+- `PLAN.md`
+- `PHASES.md`
+
 ### `a81db51` · 2026-10-15 · test: file-level labeller coverage over tosho torrents with file lists (ignored, env-driven)
 - `src-tauri/src/tosho_verify_tests.rs`
 
