@@ -1,3 +1,7 @@
+### `195e512` · 2026-10-15 · docs: record L1f live RSS mapping check
+- `PLAN.md`
+- `PHASES.md`
+
 ### `3bd2153` · 2026-10-15 · docs: record L1d file-name coverage results
 - `PLAN.md`
 - `PHASES.md`
