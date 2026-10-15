@@ -1,3 +1,9 @@
+### `110d0de` · 2026-10-15 · feat: batch self-check of a release's file list against its title range
+- `crates/nyaa-client/src/batch_check.rs`
+- `crates/nyaa-client/src/lib.rs`
+- `crates/nyaa-client/src/files.rs`
+- `FILE_INDEX.md`
+
 ### `195e512` · 2026-10-15 · docs: record L1f live RSS mapping check
 - `PLAN.md`
 - `PHASES.md`
