@@ -460,3 +460,49 @@ async fn tosho_verify() {
         }
     }
 }
+
+/// Labeller coverage over the dataset's trusted releases (`approved` 1-3) whose AniDB entry has a
+/// plain TVDB season (> 0, no `mapping` rules): writes one TSV row per release - TVDB season,
+/// episode offset, what `EpisodeLabel::of` read - to `LABEL_OUT`, so the season/episode misses can
+/// be counted by naming style (PLAN.md "Learned release-to-entry matcher", L1).
+///
+/// ```text
+/// TOSHO_DATASET=<tosho-dataset-*.db> LABEL_OUT=<out.tsv> \
+///   cargo test -p nyaa-stream --lib tosho_label_coverage -- --ignored --nocapture
+/// ```
+#[test]
+#[ignore = "needs TOSHO_DATASET and LABEL_OUT"]
+fn tosho_label_coverage() {
+    let db = env_path("TOSHO_DATASET").expect("TOSHO_DATASET");
+    let out = env_path("LABEL_OUT").expect("LABEL_OUT");
+    let conn = Connection::open_with_flags(&db, OpenFlags::SQLITE_OPEN_READ_ONLY).unwrap();
+    let mut stmt = conn
+        .prepare(
+            "SELECT r.id, r.published, a.aid, a.eid, t.season, t.episode_offset, r.title \
+             FROM releases r JOIN release_aid a ON a.nyaa_id = r.id \
+             JOIN anidb_tvdb t ON t.anidb_id = a.aid \
+             WHERE a.approved > 0 AND t.season > 0 AND t.mapping IS NULL",
+        )
+        .unwrap();
+    let mut tsv = String::from("id\tpublished\taid\teid\ttvdb_season\toffset\tkind\tlabel_season\tmarked\tnumber\ttitle\n");
+    let mut n = 0u32;
+    let rows = stmt
+        .query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?, r.get::<_, i64>(2)?, r.get::<_, i64>(3)?, r.get::<_, i64>(4)?, r.get::<_, i64>(5)?, r.get::<_, String>(6)?)))
+        .unwrap();
+    for row in rows {
+        let (id, published, aid, eid, season, offset, title) = row.unwrap();
+        let (kind, ls, marked, number) = match EpisodeLabel::of(&title) {
+            EpisodeLabel::Episode { season, number, seasons } => ("episode", season as i64, !seasons.is_empty(), number as i64),
+            EpisodeLabel::Batch { season, episode_range, seasons, .. } => ("batch", season as i64, !seasons.is_empty(), episode_range.map(|r| r[0] as i64).unwrap_or(-1)),
+            EpisodeLabel::Movie => ("movie", -1, false, -1),
+            EpisodeLabel::Special => ("special", -1, false, -1),
+            EpisodeLabel::Unknown => ("unknown", -1, false, -1),
+            #[allow(unreachable_patterns)]
+            _ => ("other", -1, false, -1),
+        };
+        tsv.push_str(&format!("{id}\t{published}\t{aid}\t{eid}\t{season}\t{offset}\t{kind}\t{ls}\t{marked}\t{number}\t{}\n", title.replace('\t', " ")));
+        n += 1;
+    }
+    std::fs::write(out, tsv).unwrap();
+    println!("labelled {n} trusted releases");
+}
