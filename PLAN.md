@@ -2610,6 +2610,31 @@ negatives; (4) labels are Tosho trusted rows, which skew toward groups it
 resolves well. Next: add no-match negatives and the Mushoku S3 gold set (L1b),
 then the slices.
 
+**L1 hardening run (2026-10-16, same split; pool widened to all 9,028 dataset
+entries incl. ones with no trusted rows; 8% "true entry removed" groups added to
+training).** At p>=0.95, margin>=0.3: present-entry coverage 88.6%, precision
+99.97%; with the true entry removed from the pool the model wrongly answered
+0.06% (4,686 releases); on 87 non-anime releases (category not 1_x, since 2021)
+it wrongly answered **17%** (small sample, weak); mixed precision 99.92%.
+Held-out entries 99.6% top-1. Probabilities never reach 0.98 (no coverage at
+0.98/0.99), so the 0.95 threshold is the top usable one. Slices: precision stays
+>= 99.8% everywhere, but coverage is the cost: episodes 89.9%, batches 24%,
+movies 5%, specials 1%, unknown kind 17%, groups with <50 training releases 54%
+and releases outside the entry's air window 0.4% (top-1 there only 68%): the
+model leans on "release date inside the air window" (top gain feature) and
+abstains on late BD/batch releases, where title rules still decide. Jujutsu
+Kaisen (1,602 releases with no `aid`): 1,223 answered (S1 721, S2 313, S3 190),
+379 abstained (batches, `Vol.` BD sets, 2160p S01 packs); against Tosho's guess
+rows it agrees on 790 of 803 answered, and the 13 it changes are S2 titles the
+guess had put on S1 (guess accuracy ~95.7%, see the Haiku sample). Mushoku
+Tensei crawl (1,000): only 123 answered, all S2 Part 2 (the S2 ones); the S3
+releases score ~0.003 and abstain **because the S3 entry is not in the pool**
+(the pool is built from the dump, which ends 2026-05-09; S3 has no dataset rows).
+That is the production case: the pool must come from AniList/Fribb, not from the
+dump. Next (L1b): pool = all Fribb anime entries with AniList metadata, then
+re-run the Mushoku crawl against the S3 entry; the crawl has no stored per-row
+verdicts, so it is compared with the app's rules, not graded.
+
 **Risks.** Fribb covers ~80% of entries (labels exist only for those); trusted
 rows skew old; new-season entries are exactly the low-signal case, so the entry
 hold-out is the real test; the model must never reject a release a trusted
