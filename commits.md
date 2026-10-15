@@ -1,3 +1,8 @@
+### `796f1c2` · 2026-10-16 · feat: score a live nyaa search against a franchise with the L1 model (ml/score_search.py)
+- `ml/score_search.py`
+- `crates/nyaa-client/examples/search_json.rs`
+- `FILE_INDEX.md`
+
 ### `af2f779` · 2026-10-16 · feat: harden the L1 matcher prototype (no-match cases, slices, JJK and Mushoku runs)
 - `ml/train.py`
 - `ml/export_extra.py`
