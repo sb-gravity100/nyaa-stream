@@ -2521,6 +2521,23 @@ range (`01,02,05,07-13`, `41+48+50-52`), `x365` read as episode 365
 (Hidamari Sketch x365), `20.5-21` read as 5-21. Verified batches need no
 manual review; flagged ones are the review/training queue.
 
+**Peer consistency (L1c, measured 2026-10-15; NOT enabled).**
+`nyaa_client::peer_seasons` gives an unmarked release the season that *other*
+groups' marked releases of the same show stem use in the same airing window
+(>= 3 marked releases from >= 2 groups, window +-14 days, episode number at most
+3 past the window's highest marked episode). A first, within-one-group version
+barely fired (158 of 172k unmarked; a group's template is consistent:
+SubsPlease always marks, HorribleSubs never does). Cross-group, on the 217,738
+trusted Tosho rows (`tosho_peer_season`): 20,609 propagations, but 19,484 of
+them only confirm season 1, which unmarked titles default to anyway. The cases
+that matter, propagations to season 2+: **1,071, 93.2% precision**, fixing
+998 of the 21,966 unmarked-on-S2+ releases (4.5% recall); errors are season-1
+tails overlapping a season-2 run (Diogo4D `Magi 18-25`, `Aldnoah Zero - 14`).
+On the Mushoku crawl it changed one release, wrongly (`[ReinForce] Mushoku
+Tensei ... batch`, an S1 Blu-ray, -> season 2), and none of the 36 `III`
+releases. Fails the 99% gate and the recall is too low to matter: the code and
+harnesses stay for the model (as a feature, not a rule), nothing calls it.
+
 **Live RSS check (L1f, 2026-10-15, `nyaa.si/?page=rss&c=1_0`, 75 items).**
 Every item but one has a real AniList entry (`我是不白吃 第1092话`, a Chinese
 web short, has none). A naive release -> AniList mapper (release-parse title +

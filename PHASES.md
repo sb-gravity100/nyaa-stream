@@ -223,7 +223,8 @@
   - [ ] L1b gold set: the user-reviewed Mushoku crawl (1,000 rows, verdict per
         row) as a fixture; score the current rules and the prototype on it
         (baseline 36 mislabelled S3, 17 false keeps; see PLAN.md)
-  - [ ] L1c peer-consistency feature (group + naming template propagates a
+  - [x] L1c peer-consistency feature (measured, not enabled: 93.2% precision
+        / 4.5% recall on season 2+; kept as a model feature, see PLAN.md) (group + naming template propagates a
         confirmed season to its unmarked releases)
   - [x] L1d file-name coverage (PLAN.md "File-name coverage"): extras with
         numbers stay extras; `S##E##-Title`; leading number in a file name;
