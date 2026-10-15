@@ -553,7 +553,7 @@ unreleased v0.4.3 season-aware matching and the v0.4.4 AnimeTosho dataset /
 Import Tosho Data / Settings modal (the v0.4.5 custom magnet paste moved to
 v0.6.0 the same day), so the old 0.4.3-0.4.5 numbers are never released; the old v0.5.0 context-menu
 milestone merged into v0.6.0). The milestones in between - v0.6.0 (context
-menus + custom magnet paste + build thumbnails) → v0.7.0 (HD banners) → v0.8.0 (seek preview) → v0.9.0
+menus + custom magnet paste + build thumbnails) → v0.6.1 (learned release-to-entry matcher) → v0.7.0 (HD banners) → v0.8.0 (seek preview) → v0.9.0
 (navigation/home rehaul) → v0.9.1 (Discover) - are each
 bumped (`npm run bump`) and tagged **locally only**, never pushed. Commits
 are pushed with plain `git push` (no tags); `npm run release` pushes only
@@ -2419,6 +2419,57 @@ many, so an entry's `aid` is a set. Fribb covers ~80% of entries; the rest
 use title rules. `resolveapproved` = 0 rows are guesses by AnimeTosho's own
 matcher: only 1, 2, 3 are trusted. The dump is third-party data; the dataset
 is a local derived file, never bundled in the installer.
+
+## Learned release-to-entry matcher (planned, v0.6.1 - minor feature; user 2026-10-15)
+
+**Request** (2026-10-15): map releases newer than the AnimeTosho dump to their
+anime entry without an `aid`, using rules learned from the dump's ground truth.
+Replaces the stem route (T9: 38.3% precision, structural - a stem cannot name a
+season; see "Stem mapper result"). Slots after the v0.6.0 magnet milestone.
+
+**IPO.**
+- *Input:* an anime entry (AniList/AniDB/Fribb data: titles + synonyms, season,
+  format, episode count, air window, `anidb_tvdb` season/offset/mapping, entry
+  aid set) and unmapped nyaa releases (title, publish date, size, file list,
+  group).
+- *Process:* a small model trained offline on the dump scores each (entry,
+  release) pair as "belongs to this entry". The entry is an input, so an entry
+  the dump never saw (a new season) is scored like any other. Below a
+  confidence threshold it abstains and `ShowMatcher::decide` title rules
+  decide, as today.
+- *Output:* per entry, its releases with a score, an episode number and a
+  pack/episode label; feeds `filter_for_show` as one more signal after trusted
+  `aid`s (a trusted `aid` still wins).
+
+**Training data (trusted rows only, user 2026-10-15).** Positives: dataset
+releases with `approved` 1-3, `aid` -> AniList entry through Fribb. Negatives:
+the same release against (a) sibling entries of the same TVDB show (other
+seasons/cours - the case that sank the stems) and (b) other shows, both built
+from trusted rows only; an `approved` 0 guess is never a positive or a negative.
+~224k trusted rows. The pre-2017 / big-group skew of trusted rows is accepted
+for training (user), but evaluation is sliced by year and group size.
+
+**Features** (all relative, never identity): best title/synonym similarity
+(normalised string, optionally an embedding score for CJK/Russian names);
+season marker equals the entry's season; publish date inside the air window;
+episode number inside range after `anidb_tvdb` offset; batch vs single;
+file-count vs episode count; group's agreement history. Not features: `aid`,
+stem, show id (the model must not memorise ids).
+
+**Model.** Gradient-boosted trees or logistic regression, exported to a plain
+format and scored in Rust (tiny, no runtime weight). No shipped LLM: size,
+latency, and online dependency; an LLM is at most an offline auditor.
+
+**Evaluation and gate.** Time split: train on releases before 2025-01-01, test
+on 2025-01-01 onward; also a held-out set of entries (whole shows unseen in
+training) to prove new-entry generalisation. Report precision/coverage overall
+and by year, group size, and sibling-vs-other-show negatives. Ship only if
+precision >= 99% on answered pairs; abstain below the threshold.
+
+**Risks.** Fribb covers ~80% of entries (labels exist only for those); trusted
+rows skew old; new-season entries are exactly the low-signal case, so the entry
+hold-out is the real test; the model must never reject a release a trusted
+`aid` accepts.
 
 ## Custom magnet in the search bar (planned, v0.6.0 - minor feature; was v0.4.5, held out of v0.5.0 on 2026-10-13)
 

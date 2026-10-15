@@ -211,6 +211,24 @@
         unknown-numbering packs stay on a Batch row
   - [ ] M5 FILE_INDEX/CHANGELOG/version bump, tag
 
+- [ ] Learned release-to-entry matcher - v0.6.1 (user 2026-10-15; see PLAN.md
+      "Learned release-to-entry matcher"; replaces the unused stem mapper).
+      One commit each:
+  - [ ] L1 Python prototype on the real dump (scratch, not committed): build
+        trusted (entry, release) pairs via Fribb, sibling + other-show
+        negatives, features, GBDT/logistic; report pre-2025 -> 2025+ holdout
+        precision/coverage sliced by year and group size. Stop here if
+        precision < 99% on answered pairs
+  - [ ] L2 held-out-entries test (whole shows unseen) incl. a new-season case
+        (Mushoku Tensei S3 EP9 crawl as a smoke check)
+  - [ ] L3 Rust feature extraction + scorer (`crates/nyaa-client`), exported
+        model file, parity test against the prototype's scores
+  - [ ] L4 train step in `build_tosho` (or a dev script) that writes the model
+        next to the dataset; imported with it
+  - [ ] L5 hook into `filter_for_show` after trusted `aid`s (abstain -> title
+        rules); fixtures show no regression on `title_match_fixture_tests`
+  - [ ] L6 FILE_INDEX/CHANGELOG/version bump (minor), tag locally
+
 ## Phase 3 — Playback quality of life
 - [x] Wire a video player to the media page: play button per episode row
       calls `play_magnet`, auto-picking the release with the most seeders
