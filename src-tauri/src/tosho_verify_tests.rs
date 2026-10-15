@@ -510,7 +510,8 @@ fn tosho_label_coverage() {
 /// Multi-file torrents the labeller cannot fully map: runs `EpisodeLabel::of_path` on every video
 /// file of every dataset torrent that has a stored file list, and counts torrents whose files are
 /// all mapped, partly mapped, or not mapped, plus duplicate (season, episode) numbers. Writes the
-/// unmapped video paths to `FILES_OUT` (TSV: nyaa_id, path) to find the naming styles behind them.
+/// unmapped video paths to `FILES_OUT` (TSV: nyaa_id, path) to find the naming styles behind them,
+/// and, when `DUPS_OUT` is set, every file sharing a (season, episode) with another file of its torrent.
 ///
 /// ```text
 /// TOSHO_DATASET=<tosho-dataset-*.db> FILES_OUT=<out.tsv> \
@@ -528,6 +529,7 @@ fn tosho_file_label_coverage() {
         [".mkv", ".mp4", ".avi", ".ts", ".m2ts", ".webm", ".wmv", ".mov", ".flv", ".ogm"].iter().any(|e| l.ends_with(e))
     };
     let mut tsv = String::from("nyaa_id\tpath\n");
+    let mut dups = String::from("nyaa_id\tseason\tnumber\tpath\n");
     let (mut torrents, mut no_video) = (0u32, 0u32);
     let (mut all_mapped, mut partly, mut none_mapped, mut dup_numbers) = (0u32, 0u32, 0u32, 0u32);
     let (mut files_total, mut files_unknown) = (0u64, 0u64);
@@ -542,7 +544,7 @@ fn tosho_file_label_coverage() {
             return;
         }
         let mut unknown = 0u32;
-        let mut seen: BTreeMap<(u32, u32), u32> = BTreeMap::new();
+        let mut seen: BTreeMap<(u32, u32), Vec<&String>> = BTreeMap::new();
         for p in &video {
             files_total += 1;
             match EpisodeLabel::of_path(p) {
@@ -551,7 +553,7 @@ fn tosho_file_label_coverage() {
                     files_unknown += 1;
                     tsv.push_str(&format!("{id}\t{}\n", p.replace('\t', " ")));
                 }
-                EpisodeLabel::Episode { season, number, .. } => *seen.entry((season, number)).or_default() += 1,
+                EpisodeLabel::Episode { season, number, .. } => seen.entry((season, number)).or_default().push(p),
                 _ => {}
             }
         }
@@ -562,8 +564,13 @@ fn tosho_file_label_coverage() {
         } else {
             none_mapped += 1;
         }
-        if seen.values().any(|&c| c > 1) {
+        if seen.values().any(|v| v.len() > 1) {
             dup_numbers += 1;
+            for ((season, number), ps) in seen.iter().filter(|(_, v)| v.len() > 1) {
+                for p in ps {
+                    dups.push_str(&format!("{id}\t{season}\t{number}\t{}\n", p.replace('\t', " ")));
+                }
+            }
         }
         paths.clear();
     };
@@ -582,6 +589,9 @@ fn tosho_file_label_coverage() {
         flush(prev, &mut paths, &mut tsv);
     }
     std::fs::write(out, tsv).unwrap();
+    if let Some(dups_out) = env_path("DUPS_OUT") {
+        std::fs::write(dups_out, dups).unwrap();
+    }
     println!("torrents with file lists: {torrents} (no video file: {no_video})");
     println!("all video files mapped: {all_mapped}; partly unmapped: {partly}; none mapped: {none_mapped}");
     println!("torrents with duplicate (season, episode) numbers: {dup_numbers}");
