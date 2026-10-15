@@ -1,3 +1,16 @@
+### `d4eb8cc` · 2026-10-15 · docs: record L1c peer consistency results (not enabled)
+- `PLAN.md`
+- `PHASES.md`
+
+### `1f72c94` · 2026-10-15 · test: peer-season harnesses over tosho and the Mushoku crawl (ignored, env-driven)
+- `src-tauri/src/tosho_verify_tests.rs`
+- `src-tauri/src/mushoku_s3_tests.rs`
+
+### `342e097` · 2026-10-15 · feat: peer-consistent season for unmarked releases (measured, not enabled)
+- `crates/nyaa-client/src/peer_season.rs`
+- `crates/nyaa-client/src/lib.rs`
+- `FILE_INDEX.md`
+
 ### `8e2e186` · 2026-10-15 · docs: plan XGBoost for the learned release matcher (Python train, Rust score)
 - `PLAN.md`
 - `PHASES.md`
