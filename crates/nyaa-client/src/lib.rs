@@ -2,6 +2,7 @@ use scraper::{Html, Selector};
 use serde::{Deserialize, Serialize};
 
 mod label;
+mod batch_check;
 mod cache;
 mod fansubbers;
 mod file_name;
@@ -17,6 +18,7 @@ use cache::DiskCache;
 use store::Store;
 use throttle::Throttle;
 
+pub use batch_check::{check_batch, BatchCheck, BatchIssue};
 pub use fansubbers::group_tag;
 pub use files::TorrentFile;
 pub use label::EpisodeLabel;

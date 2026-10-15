@@ -39,7 +39,7 @@ pub(crate) fn parse_size(text: &str) -> Option<u64> {
     Some((number * factor).round() as u64)
 }
 
-fn is_video(name: &str) -> bool {
+pub(crate) fn is_video(name: &str) -> bool {
     name.rsplit_once('.').is_some_and(|(_, ext)| VIDEO_EXTENSIONS.contains(&ext.to_ascii_lowercase().as_str()))
 }
 
