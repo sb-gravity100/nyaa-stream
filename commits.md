@@ -1,3 +1,7 @@
+### `8e2e186` · 2026-10-15 · docs: plan XGBoost for the learned release matcher (Python train, Rust score)
+- `PLAN.md`
+- `PHASES.md`
+
 ### `68cd908` · 2026-10-15 · docs: record L1e batch self-check results
 - `PLAN.md`
 - `PHASES.md`
