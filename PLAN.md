@@ -2506,6 +2506,21 @@ with a number are extras, never episodes; (2) `S##E##-Title`; (3) a leading
 self-verification: a batch whose files read as a gap-free run matching its
 title range is accepted without review, anything else is flagged.
 
+**Batch self-check (L1e, done 2026-10-15).** `nyaa_client::check_batch(title,
+file_paths)`: a batch title's episode range against its files'
+`EpisodeLabel::of_path` numbers (extras ignored); verified when the files are
+exactly that run, each once, none unread; a later-season pack numbered from 01
+verifies with an offset (`Naruto Shippuden 219-231`, files 01-13). Harness
+`tosho_batch_check` over the 44,620 Tosho releases with file lists: 9,754 have
+a title range; **8,216 verify automatically (84%)** (19 of them with an
+offset); 1,538 are flagged (Missing 1,033, Unread 457, OutOfRange 278,
+Duplicates 241; several per release possible). Flags checked by hand are real
+(`Kuroko no Basket 1-25` holds both `- 01` and `- 1`; `Psycho Pass 1-3` two
+releases of ep 2). Known title-side false flags: episode lists read as one
+range (`01,02,05,07-13`, `41+48+50-52`), `x365` read as episode 365
+(Hidamari Sketch x365), `20.5-21` read as 5-21. Verified batches need no
+manual review; flagged ones are the review/training queue.
+
 **Live RSS check (L1f, 2026-10-15, `nyaa.si/?page=rss&c=1_0`, 75 items).**
 Every item but one has a real AniList entry (`我是不白吃 第1092话`, a Chinese
 web short, has none). A naive release -> AniList mapper (release-parse title +

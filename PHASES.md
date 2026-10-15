@@ -228,7 +228,7 @@
         numbers stay extras; `S##E##-Title`; leading number in a file name;
         `Ep`/`Episode` prefixes; corpus.txt diff; re-run
         `tosho_file_label_coverage` before/after
-  - [ ] L1e batch self-verification (title range vs gap-free parsed files)
+  - [x] L1e batch self-verification (title range vs gap-free parsed files)
   - [x] L1f live nyaa RSS check: every item mapped to an anime entry or
         explained (no entry / not anime / unparsed)
   - [ ] L2 held-out-entries test (whole shows unseen) incl. a new-season case
