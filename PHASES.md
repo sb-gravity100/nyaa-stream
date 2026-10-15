@@ -224,7 +224,7 @@
         (baseline 36 mislabelled S3, 17 false keeps; see PLAN.md)
   - [ ] L1c peer-consistency feature (group + naming template propagates a
         confirmed season to its unmarked releases)
-  - [ ] L1d file-name coverage (PLAN.md "File-name coverage"): extras with
+  - [x] L1d file-name coverage (PLAN.md "File-name coverage"): extras with
         numbers stay extras; `S##E##-Title`; leading number in a file name;
         `Ep`/`Episode` prefixes; corpus.txt diff; re-run
         `tosho_file_label_coverage` before/after

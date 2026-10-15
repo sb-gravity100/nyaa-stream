@@ -2486,7 +2486,20 @@ read as episodes (`NCOP03`, `NCED 4`, `OP01`, `Menu 2`, `SP10`, `Mini Ep11`
 -> episode N), then franchise packs whose folders are different shows
 (Oregairu / Zoku, Haruhi 2006 / 2009) and dub/sub or TV/BD duplicates.
 Fixes, in release-parse (file names only where noted) and checked against
-`corpus.txt` for title regressions: (1) creditless/menu/preview/SP tokens
+`corpus.txt` for title regressions. **Done (L1d, 2026-10-15):** the rules live
+in `nyaa-client/src/file_name.rs` and apply to file paths only (`of_path`,
+`build_files`), so release-title parsing (`EpisodeLabel::of`) is unchanged and
+the corpus needs no diff. Re-measured: torrents fully read 34,421 -> 40,068
+(79% -> 92%), partly 6,141 -> 2,281, none 2,983 -> 1,196; unread video files
+50,900 -> 10,655 (0 newly unread); torrents with a duplicate (season, episode)
+4,618 -> 1,828. ~29k files now read as episodes (a 40-file random sample: all
+numbers right), ~11k extras now `Special`. False positives fixed during the
+pass: CRC tags (`[5B1F11ED]` read as "ED"), `[OP_HNK]` group tags, titles
+with the word ("Makes Me OP Even", "SP Professional"). The remaining
+duplicates are mostly franchise packs whose folders are different shows
+(Seitokai Yakuindomo / Bleep, Gundam Zeta / ZZ, Oregairu / Zoku): no file-name
+rule fixes those; they need the per-file show name matched to an entry. Rules
+planned: (1) creditless/menu/preview/SP tokens
 with a number are extras, never episodes; (2) `S##E##-Title`; (3) a leading
 1-4 digit number in a *file name* is the episode (`12 - Title`, `12. Title`,
 `21.mkv`, `001 Title`); (4) `Ep`/`EP`/`Episode` + number; (5) batch
