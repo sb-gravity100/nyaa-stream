@@ -17,7 +17,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::path::PathBuf;
 
 use anilist_client::{AniListClient, Franchise};
-use nyaa_client::{EpisodeLabel, NyaaClient, ToshoRelease};
+use nyaa_client::{check_batch, BatchIssue, EpisodeLabel, NyaaClient, ToshoRelease};
 use rusqlite::{Connection, OpenFlags};
 
 use super::{franchise_of, is_tv, load, Entry};
@@ -596,4 +596,92 @@ fn tosho_file_label_coverage() {
     println!("all video files mapped: {all_mapped}; partly unmapped: {partly}; none mapped: {none_mapped}");
     println!("torrents with duplicate (season, episode) numbers: {dup_numbers}");
     println!("video files: {files_total}, unmapped: {files_unknown}");
+}
+
+/// Running counts for `tosho_batch_check`, one `add` per release.
+#[derive(Default)]
+struct BatchTally {
+    tsv: String,
+    releases: u32,
+    no_range: u32,
+    checked: u32,
+    verified_offset0: u32,
+    verified_offset: u32,
+    flagged: u32,
+    missing: u32,
+    out_of_range: u32,
+    duplicates: u32,
+    unread: u32,
+}
+
+impl BatchTally {
+    fn add(&mut self, id: i64, title: &str, paths: &[String]) {
+        self.releases += 1;
+        let refs: Vec<&str> = paths.iter().map(String::as_str).collect();
+        let check = check_batch(title, &refs);
+        if check.issues == [BatchIssue::NoTitleRange] {
+            self.no_range += 1;
+            return;
+        }
+        self.checked += 1;
+        match (check.verified, check.offset) {
+            (true, 0) => self.verified_offset0 += 1,
+            (true, _) => self.verified_offset += 1,
+            (false, _) => self.flagged += 1,
+        }
+        for issue in &check.issues {
+            match issue {
+                BatchIssue::Missing(_) => self.missing += 1,
+                BatchIssue::OutOfRange(_) => self.out_of_range += 1,
+                BatchIssue::Duplicates(_) => self.duplicates += 1,
+                BatchIssue::Unread(_) => self.unread += 1,
+                BatchIssue::NoTitleRange => {}
+            }
+        }
+        self.tsv.push_str(&format!("{id}\t{}\t{}\t{:?}\t{}\n", check.verified, check.offset, check.issues, title.replace('\t', " ")));
+    }
+}
+
+/// Runs `nyaa_client::check_batch` over every release of the dataset that has a stored file list,
+/// using the release title and its file paths in listed order. Prints the verdict counts and writes
+/// one TSV row per checked (titled-range) release to `BATCH_OUT`: id, verified, offset, issues, title.
+///
+/// ```text
+/// TOSHO_DATASET=<tosho-dataset-*.db> BATCH_OUT=<out.tsv> \
+///   cargo test -p nyaa-stream --lib tosho_batch_check -- --ignored --nocapture
+/// ```
+#[test]
+#[ignore = "needs TOSHO_DATASET and BATCH_OUT"]
+fn tosho_batch_check() {
+    let db = env_path("TOSHO_DATASET").expect("TOSHO_DATASET");
+    let out = env_path("BATCH_OUT").expect("BATCH_OUT");
+    let conn = Connection::open_with_flags(&db, OpenFlags::SQLITE_OPEN_READ_ONLY).unwrap();
+    let mut stmt = conn.prepare("SELECT r.id, r.title, f.path FROM releases r JOIN release_files f ON f.nyaa_id = r.id ORDER BY r.id, f.idx").unwrap();
+    let rows = stmt.query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?, r.get::<_, String>(2)?))).unwrap();
+
+    let mut tally = BatchTally { tsv: String::from("id\tverified\toffset\tissues\ttitle\n"), ..Default::default() };
+    let mut group: Option<(i64, String, Vec<String>)> = None;
+    for row in rows {
+        let (id, title, path) = row.unwrap();
+        match &mut group {
+            Some((gid, _, paths)) if *gid == id => paths.push(path),
+            _ => {
+                if let Some((gid, gtitle, paths)) = group.take() {
+                    tally.add(gid, &gtitle, &paths);
+                }
+                group = Some((id, title, vec![path]));
+            }
+        }
+    }
+    if let Some((gid, gtitle, paths)) = group.take() {
+        tally.add(gid, &gtitle, &paths);
+    }
+
+    std::fs::write(out, &tally.tsv).unwrap();
+    println!("releases with file lists: {}", tally.releases);
+    println!("no title range (NoTitleRange): {}", tally.no_range);
+    println!("checked (title has a range): {}", tally.checked);
+    println!("verified offset 0: {}; verified offset > 0: {}", tally.verified_offset0, tally.verified_offset);
+    println!("flagged: {}", tally.flagged);
+    println!("flagged by issue kind (a release may count in several): Missing {}, OutOfRange {}, Duplicates {}, Unread {}", tally.missing, tally.out_of_range, tally.duplicates, tally.unread);
 }
