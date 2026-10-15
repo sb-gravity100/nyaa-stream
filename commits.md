@@ -1,3 +1,15 @@
+### `3bd2153` · 2026-10-15 · docs: record L1d file-name coverage results
+- `PLAN.md`
+- `PHASES.md`
+
+### `a823829` · 2026-10-15 · fix: read episode numbers and extras in torrent file names
+- `crates/nyaa-client/src/file_name.rs`
+- `crates/nyaa-client/src/label.rs`
+- `crates/nyaa-client/src/files.rs`
+- `crates/nyaa-client/src/lib.rs`
+- `crates/nyaa-client/Cargo.toml`
+- `FILE_INDEX.md`
+
 ### `c7964e5` · 2026-10-15 · test: file coverage harness also writes duplicate-numbered files (DUPS_OUT)
 - `src-tauri/src/tosho_verify_tests.rs`
 
