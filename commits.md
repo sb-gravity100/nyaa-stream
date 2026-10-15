@@ -1,3 +1,7 @@
+### `6b8b34f` · 2026-10-15 · docs: plan v0.6.1 learned release-to-entry matcher (trusted rows only)
+- `PLAN.md`
+- `PHASES.md`
+
 ### `d15dba0` · 2026-10-13 · docs: tick v0.5.0 in PHASES.md, note the open live check of the full Tosho import
 - `PHASES.md`
 
