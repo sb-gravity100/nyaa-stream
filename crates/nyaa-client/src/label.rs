@@ -54,14 +54,27 @@ impl EpisodeLabel {
 }
 
 impl EpisodeLabel {
-    /// Labels a file inside a torrent from its path. The file name is parsed
-    /// as `of` does; an episode or batch whose name carries no season takes
-    /// the nearest parent folder that names one ("Season 2/[Group] Show -
-    /// 05.mkv"), as season packs are commonly laid out.
+    /// Labels a file inside a torrent from its path. Extras (creditless
+    /// OP/ED, menus, previews, files in an "NC"/"Extras" folder) are
+    /// `Special`, never an episode. Otherwise the file name is parsed as `of`
+    /// does, with the `file_name` rules for names the title parser leaves
+    /// unread ("S01E06-Title", "12 - Title", "21.mkv"); an episode or batch
+    /// whose name carries no season takes the nearest parent folder that
+    /// names one ("Season 2/[Group] Show - 05.mkv"), as season packs are
+    /// commonly laid out.
     pub fn of_path(path: &str) -> EpisodeLabel {
+        if crate::file_name::is_extra(path) {
+            return EpisodeLabel::Special;
+        }
         let mut parts = path.rsplit(['/', '\\']);
         let name = parts.next().unwrap_or(path);
         let mut label = EpisodeLabel::of(name);
+        if label == EpisodeLabel::Unknown {
+            if let Some((season, number)) = crate::file_name::fallback_episode(name) {
+                tracing::debug!(path, ?season, number, "file episode read by the file-name rules");
+                label = EpisodeLabel::Episode { season: season.unwrap_or(1), number, seasons: season.into_iter().collect() };
+            }
+        }
         let (season, seasons) = match &mut label {
             EpisodeLabel::Episode { season, seasons, .. } | EpisodeLabel::Batch { season, seasons, .. } => (season, seasons),
             _ => return label,

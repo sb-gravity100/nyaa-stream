@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 mod label;
 mod cache;
 mod fansubbers;
+mod file_name;
 mod files;
 pub mod stem;
 mod store;

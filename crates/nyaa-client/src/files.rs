@@ -129,9 +129,20 @@ pub(crate) fn build_files(raw: Vec<(String, u64)>) -> (Vec<TorrentFile>, Vec<u32
 fn video_season_episode(path: &str) -> (Option<u32>, Option<u32>) {
     let mut parts: Vec<&str> = path.split('/').collect();
     let name = parts.pop().unwrap_or(path);
+    if crate::file_name::is_extra(path) {
+        tracing::debug!(path, "extra file: no episode");
+        return (None, None);
+    }
     let release = release_parse::parse_release(name);
-    let episode = release.episodes.map(|(first, _)| first);
+    let mut episode = release.episodes.map(|(first, _)| first);
     let mut season = release.seasons.first().copied();
+    if episode.is_none() {
+        if let Some((name_season, number)) = crate::file_name::fallback_episode(name) {
+            tracing::debug!(path, ?name_season, number, "file episode read by the file-name rules");
+            episode = Some(number);
+            season = season.or(name_season);
+        }
+    }
     if season.is_none() {
         // Nearest folder that names a season wins.
         season = parts.iter().rev().find_map(|folder| release_parse::parse_release(folder).seasons.first().copied());
