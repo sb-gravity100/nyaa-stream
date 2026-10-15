@@ -224,6 +224,13 @@
         (baseline 36 mislabelled S3, 17 false keeps; see PLAN.md)
   - [ ] L1c peer-consistency feature (group + naming template propagates a
         confirmed season to its unmarked releases)
+  - [ ] L1d file-name coverage (PLAN.md "File-name coverage"): extras with
+        numbers stay extras; `S##E##-Title`; leading number in a file name;
+        `Ep`/`Episode` prefixes; corpus.txt diff; re-run
+        `tosho_file_label_coverage` before/after
+  - [ ] L1e batch self-verification (title range vs gap-free parsed files)
+  - [ ] L1f live nyaa RSS check: every item mapped to an anime entry or
+        explained (no entry / not anime / unparsed)
   - [ ] L2 held-out-entries test (whole shows unseen) incl. a new-season case
         (Mushoku Tensei S3 EP9 crawl as a smoke check)
   - [ ] L3 Rust feature extraction + scorer (`crates/nyaa-client`), exported

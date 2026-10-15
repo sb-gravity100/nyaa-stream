@@ -2472,6 +2472,27 @@ consistency** (a release group's naming template confirmed by its marked
 releases propagates to its unmarked ones) and whole-set sanity (episode counts
 per season).
 
+**File-name coverage (L1d, measured 2026-10-15, harness
+`tosho_file_label_coverage`).** `EpisodeLabel::of_path` over the 44,621 Tosho
+torrents with a file list (569,328 video files): 79% of torrents fully read,
+14% partly, 7% not at all; 50,900 files unread. Families of unread files:
+`S01E06-Title` with no space after the number (9,556 files, 687 torrents),
+number-first names `12 - Title` / `12. Title` (8,961) and `12 Title` (1,358),
+bare `21.mkv` (3,974), `Ep-12` / `Ep12` prefixes (1,714), dotted scene names
+`Show.S02E10.mkv` (963), trailing `Show -04.mkv` (708), `12.5` (267), CJK
+counters (144); ~14k are extras (correctly unread). Duplicates: 4,618
+torrents have two files on one (season, episode); the largest cause is extras
+read as episodes (`NCOP03`, `NCED 4`, `OP01`, `Menu 2`, `SP10`, `Mini Ep11`
+-> episode N), then franchise packs whose folders are different shows
+(Oregairu / Zoku, Haruhi 2006 / 2009) and dub/sub or TV/BD duplicates.
+Fixes, in release-parse (file names only where noted) and checked against
+`corpus.txt` for title regressions: (1) creditless/menu/preview/SP tokens
+with a number are extras, never episodes; (2) `S##E##-Title`; (3) a leading
+1-4 digit number in a *file name* is the episode (`12 - Title`, `12. Title`,
+`21.mkv`, `001 Title`); (4) `Ep`/`EP`/`Episode` + number; (5) batch
+self-verification: a batch whose files read as a gap-free run matching its
+title range is accepted without review, anything else is flagged.
+
 **Model.** Gradient-boosted trees or logistic regression, exported to a plain
 format and scored in Rust (tiny, no runtime weight). No shipped LLM: size,
 latency, and online dependency; an LLM is at most an offline auditor.
