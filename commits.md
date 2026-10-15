@@ -1,3 +1,10 @@
+### `68cd908` · 2026-10-15 · docs: record L1e batch self-check results
+- `PLAN.md`
+- `PHASES.md`
+
+### `14dd77e` · 2026-10-15 · test: batch self-check over tosho releases with file lists (ignored, env-driven)
+- `src-tauri/src/tosho_verify_tests.rs`
+
 ### `110d0de` · 2026-10-15 · feat: batch self-check of a release's file list against its title range
 - `crates/nyaa-client/src/batch_check.rs`
 - `crates/nyaa-client/src/lib.rs`
