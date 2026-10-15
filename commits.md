@@ -1,3 +1,6 @@
+### `fe5251a` · 2026-10-15 · test: title-only crawl pass for the Mushoku S3 entry (ignored, env-driven)
+- `src-tauri/src/mushoku_s3_tests.rs`
+
 ### `6b8b34f` · 2026-10-15 · docs: plan v0.6.1 learned release-to-entry matcher (trusted rows only)
 - `PLAN.md`
 - `PHASES.md`
