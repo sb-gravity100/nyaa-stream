@@ -1,3 +1,7 @@
+### `bd73ac7` · 2026-10-15 · docs: v0.6.1 baseline, gold set and peer-consistency feature from the Mushoku crawl
+- `PLAN.md`
+- `PHASES.md`
+
 ### `72e0177` · 2026-10-15 · test: labeller coverage over trusted tosho releases (ignored, env-driven)
 - `src-tauri/src/tosho_verify_tests.rs`
 
