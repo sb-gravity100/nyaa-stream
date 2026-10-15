@@ -2506,6 +2506,22 @@ with a number are extras, never episodes; (2) `S##E##-Title`; (3) a leading
 self-verification: a batch whose files read as a gap-free run matching its
 title range is accepted without review, anything else is flagged.
 
+**Live RSS check (L1f, 2026-10-15, `nyaa.si/?page=rss&c=1_0`, 75 items).**
+Every item but one has a real AniList entry (`我是不白吃 第1092话`, a Chinese
+web short, has none). A naive release -> AniList mapper (release-parse title +
+alternate titles in `(..|..)` / `CJK / Romaji`, AniList search, normalised
+exact name match, season entry by name) got 45 fully right, 17 half right, 2
+wrong, 11 unmapped. The failure classes, each a feature the mapper needs:
+spelling variants (`KURUMICHAN`, `Dekite Iru` vs `Dekiteiru`, `Linck Click`,
+AniList's own Cyrillic `о` in `Juuоu Mujin Dandivine`); a year in the title
+picking a remake (`Magic Knight Rayearth (2026)` went to the 1994 entry);
+absolute numbering into a later season (`Kikansha no Mahou ... - 14` = 2nd
+Season ep 2); packs spanning two entries (`Sonic X 01-78` = Sonic X 1-52 +
+Sonic X Season 2); groups disagreeing on the season number for the same
+episode (`Link Click S04E11` vs `第三季 第11话`); movie subtitles
+(`~Soukai no Namida-hen~`). 30 of the 75 were one uploader's Sonic X dump, so
+the sample is skewed; repeat on several days before using it as a rate.
+
 **Model.** Gradient-boosted trees or logistic regression, exported to a plain
 format and scored in Rust (tiny, no runtime weight). No shipped LLM: size,
 latency, and online dependency; an LLM is at most an offline auditor.

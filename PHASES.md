@@ -229,7 +229,7 @@
         `Ep`/`Episode` prefixes; corpus.txt diff; re-run
         `tosho_file_label_coverage` before/after
   - [ ] L1e batch self-verification (title range vs gap-free parsed files)
-  - [ ] L1f live nyaa RSS check: every item mapped to an anime entry or
+  - [x] L1f live nyaa RSS check: every item mapped to an anime entry or
         explained (no entry / not anime / unparsed)
   - [ ] L2 held-out-entries test (whole shows unseen) incl. a new-season case
         (Mushoku Tensei S3 EP9 crawl as a smoke check)
