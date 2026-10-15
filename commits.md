@@ -1,3 +1,6 @@
+### `72e0177` · 2026-10-15 · test: labeller coverage over trusted tosho releases (ignored, env-driven)
+- `src-tauri/src/tosho_verify_tests.rs`
+
 ### `fe5251a` · 2026-10-15 · test: title-only crawl pass for the Mushoku S3 entry (ignored, env-driven)
 - `src-tauri/src/mushoku_s3_tests.rs`
 
