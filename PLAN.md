@@ -2409,9 +2409,11 @@ season, the AniDB ids come from Fribb.
    `decide` returns `UseTitleRules`.
 
 **Freshness.** The dump ends 2026-05-09. Newer releases have no `aid`, so
-title matching stays the fallback and must not regress. A later milestone can
-add the live AnimeTosho feed (`feed.animetosho.org/json?aid=`) for the gap;
-not in v0.5.0.
+title matching stays the fallback and must not regress. The live AnimeTosho
+feed (`feed.animetosho.org/json?aid=`) cannot fill the gap (checked 2026-10-15):
+AnimeTosho stopped ingesting torrents on 2026-05-09 (animetosho.org/about/shutdown2),
+the feed has nothing newer than the dump, and its feed/storage server expires in
+October 2026. The gap is permanent, which is why the learned matcher exists.
 
 **Risks.** AniDB splits entries differently from AniList (one AniList entry
 can span several AniDB entries, e.g. split cours): AniList -> AniDB is one to
