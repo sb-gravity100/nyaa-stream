@@ -2589,6 +2589,27 @@ training) to prove new-entry generalisation. Report precision/coverage overall
 and by year, group size, and sibling-vs-other-show negatives. Ship only if
 precision >= 99% on answered pairs; abstain below the threshold.
 
+**L1 prototype result (2026-10-16, `ml/`: `export_rows.py`, `fetch_anilist.py`,
+`train.py`, parser via `release-parse` example `ml_parse`).** Trained on the
+153,030 trusted (`approved` 1-3) releases published 2021 -> 2026-05-09 (151,869
+with an AniList entry through Fribb; 5,701 entries, AniList titles/format/
+episodes/air dates fetched live). Pairs = release x candidate entries (top 8 by
+char-n-gram title similarity plus the TVDB siblings of each); 28 relative
+features; XGBoost `binary:logistic`, train < 2024-09, validate to 2025-01,
+test 2025-01-01+ (47,144 releases); 10% of entries (544) never seen in training.
+Test top-1: **99.1%** (title similarity alone 76.1%); at p>=0.95 coverage 95.8%
+precision 99.93%; held-out entries 99.6% top-1, 99.9% precision at 96.5%
+coverage. Top feature by gain: release date inside the entry's air window, then
+title similarity rank/gap, then season match. **Not yet proof of the 99% gate**,
+because the test is easier than production: (1) every test release's true entry
+is in the candidate pool, so "none of these" (non-anime, entry without trusted
+rows, no Fribb mapping) was never tested or trained; (2) the pool holds only
+entries that have trusted releases; (3) no slice yet by release kind (late
+BD/batch releases outside the air window), group size or sibling-vs-other-show
+negatives; (4) labels are Tosho trusted rows, which skew toward groups it
+resolves well. Next: add no-match negatives and the Mushoku S3 gold set (L1b),
+then the slices.
+
 **Risks.** Fribb covers ~80% of entries (labels exist only for those); trusted
 rows skew old; new-season entries are exactly the low-signal case, so the entry
 hold-out is the real test; the model must never reject a release a trusted

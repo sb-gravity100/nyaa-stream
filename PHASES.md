@@ -214,7 +214,9 @@
 - [ ] Learned release-to-entry matcher - v0.6.1 (user 2026-10-15; see PLAN.md
       "Learned release-to-entry matcher"; replaces the unused stem mapper).
       One commit each:
-  - [ ] L1 Python prototype on the real dump (scratch, not committed): build
+  - [~] L1 (first run done 2026-10-16: 99.1% top-1 on 2025+, no-match cases
+        and slices still to add; PLAN.md "L1 prototype result") Python
+        prototype on the real dump (scratch, not committed): build
         trusted (entry, release) pairs via Fribb, sibling + other-show
         negatives, features, XGBoost (`binary:logistic`, scratch `ml/`
         scripts; decided 2026-10-15); report pre-2025 -> 2025+ holdout
