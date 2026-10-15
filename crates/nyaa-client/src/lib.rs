@@ -7,6 +7,7 @@ mod cache;
 mod fansubbers;
 mod file_name;
 mod files;
+mod peer_season;
 pub mod stem;
 mod store;
 mod throttle;
@@ -22,6 +23,7 @@ pub use batch_check::{check_batch, BatchCheck, BatchIssue};
 pub use fansubbers::group_tag;
 pub use files::TorrentFile;
 pub use label::EpisodeLabel;
+pub use peer_season::{peer_seasons, PeerRelease};
 pub use stem::stem_of;
 pub use store::{release_id, write_release_database, AnidbTvdb, ImportStats, ToshoImportStats, ToshoInfo, ToshoRelease};
 
