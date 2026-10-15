@@ -1,3 +1,14 @@
+### `d554297` · 2026-10-16 · docs: record L1 XGBoost prototype result
+- `PLAN.md`
+- `PHASES.md`
+- `FILE_INDEX.md`
+
+### `d1b8014` · 2026-10-16 · feat: L1 prototype of the XGBoost release-to-entry matcher (ml/, scratch)
+- `ml/export_rows.py`
+- `ml/fetch_anilist.py`
+- `ml/train.py`
+- `crates/release-parse/examples/ml_parse.rs`
+
 ### `798db24` · 2026-10-15 · docs: record that the AnimeTosho live feed cannot fill the post-dump gap
 - `PLAN.md`
 
