@@ -219,6 +219,11 @@
         negatives, features, GBDT/logistic; report pre-2025 -> 2025+ holdout
         precision/coverage sliced by year and group size. Stop here if
         precision < 99% on answered pairs
+  - [ ] L1b gold set: the user-reviewed Mushoku crawl (1,000 rows, verdict per
+        row) as a fixture; score the current rules and the prototype on it
+        (baseline 36 mislabelled S3, 17 false keeps; see PLAN.md)
+  - [ ] L1c peer-consistency feature (group + naming template propagates a
+        confirmed season to its unmarked releases)
   - [ ] L2 held-out-entries test (whole shows unseen) incl. a new-season case
         (Mushoku Tensei S3 EP9 crawl as a smoke check)
   - [ ] L3 Rust feature extraction + scorer (`crates/nyaa-client`), exported

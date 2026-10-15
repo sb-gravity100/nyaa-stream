@@ -2456,6 +2456,22 @@ episode number inside range after `anidb_tvdb` offset; batch vs single;
 file-count vs episode count; group's agreement history. Not features: `aid`,
 stem, show id (the model must not memorise ids).
 
+**Baseline and gold set (measured 2026-10-15).** Mushoku Tensei crawl (1,000
+nyaa titles, S3 entry 178789): the app's rules keep all 780 true S3 releases and
+read every episode number (750/750), but 36 S3 releases are labelled season 1
+(roman `III` / unmarked: Diogo4D, shincaps) and 17 non-S3 releases are kept
+(unmarked S1/S2 Blu-ray rips, `2nd 01-12` batches, a 16.5 special). Across
+217,738 trusted Tosho releases with a plain TVDB season: 69.1% unmarked on S1
+entries (fine), 19.1% marked and right, **10.1% unmarked on S2+ entries (the
+title carries no season; only entry context can decide)**, 0.8% marked wrong
+(part is TVDB-vs-title noise), 0.6% unparsed. Harnesses: `mushoku_crawl_titles`
+and `tosho_label_coverage` (ignored tests). The reviewed Mushoku crawl (the
+user's per-row check) is the first gold set; the mapper is scored against it
+and against the trusted rows. Extra features from that analysis: **peer
+consistency** (a release group's naming template confirmed by its marked
+releases propagates to its unmarked ones) and whole-set sanity (episode counts
+per season).
+
 **Model.** Gradient-boosted trees or logistic regression, exported to a plain
 format and scored in Rust (tiny, no runtime weight). No shipped LLM: size,
 latency, and online dependency; an LLM is at most an offline auditor.
