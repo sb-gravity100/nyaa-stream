@@ -1,3 +1,9 @@
+### `af2f779` · 2026-10-16 · feat: harden the L1 matcher prototype (no-match cases, slices, JJK and Mushoku runs)
+- `ml/train.py`
+- `ml/export_extra.py`
+- `ml/fetch_anilist.py`
+- `PLAN.md`
+
 ### `d554297` · 2026-10-16 · docs: record L1 XGBoost prototype result
 - `PLAN.md`
 - `PHASES.md`
