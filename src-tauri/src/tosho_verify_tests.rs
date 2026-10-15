@@ -506,3 +506,84 @@ fn tosho_label_coverage() {
     std::fs::write(out, tsv).unwrap();
     println!("labelled {n} trusted releases");
 }
+
+/// Multi-file torrents the labeller cannot fully map: runs `EpisodeLabel::of_path` on every video
+/// file of every dataset torrent that has a stored file list, and counts torrents whose files are
+/// all mapped, partly mapped, or not mapped, plus duplicate (season, episode) numbers. Writes the
+/// unmapped video paths to `FILES_OUT` (TSV: nyaa_id, path) to find the naming styles behind them.
+///
+/// ```text
+/// TOSHO_DATASET=<tosho-dataset-*.db> FILES_OUT=<out.tsv> \
+///   cargo test -p nyaa-stream --lib tosho_file_label_coverage -- --ignored --nocapture
+/// ```
+#[test]
+#[ignore = "needs TOSHO_DATASET and FILES_OUT"]
+fn tosho_file_label_coverage() {
+    let db = env_path("TOSHO_DATASET").expect("TOSHO_DATASET");
+    let out = env_path("FILES_OUT").expect("FILES_OUT");
+    let conn = Connection::open_with_flags(&db, OpenFlags::SQLITE_OPEN_READ_ONLY).unwrap();
+    let mut stmt = conn.prepare("SELECT nyaa_id, path FROM release_files ORDER BY nyaa_id, idx").unwrap();
+    let is_video = |p: &str| {
+        let l = p.to_lowercase();
+        [".mkv", ".mp4", ".avi", ".ts", ".m2ts", ".webm", ".wmv", ".mov", ".flv", ".ogm"].iter().any(|e| l.ends_with(e))
+    };
+    let mut tsv = String::from("nyaa_id\tpath\n");
+    let (mut torrents, mut no_video) = (0u32, 0u32);
+    let (mut all_mapped, mut partly, mut none_mapped, mut dup_numbers) = (0u32, 0u32, 0u32, 0u32);
+    let (mut files_total, mut files_unknown) = (0u64, 0u64);
+    let mut cur: Option<i64> = None;
+    let mut paths: Vec<String> = Vec::new();
+    let mut flush = |id: i64, paths: &mut Vec<String>, tsv: &mut String| {
+        let video: Vec<&String> = paths.iter().filter(|p| is_video(p)).collect();
+        torrents += 1;
+        if video.is_empty() {
+            no_video += 1;
+            paths.clear();
+            return;
+        }
+        let mut unknown = 0u32;
+        let mut seen: BTreeMap<(u32, u32), u32> = BTreeMap::new();
+        for p in &video {
+            files_total += 1;
+            match EpisodeLabel::of_path(p) {
+                EpisodeLabel::Unknown => {
+                    unknown += 1;
+                    files_unknown += 1;
+                    tsv.push_str(&format!("{id}\t{}\n", p.replace('\t', " ")));
+                }
+                EpisodeLabel::Episode { season, number, .. } => *seen.entry((season, number)).or_default() += 1,
+                _ => {}
+            }
+        }
+        if unknown == 0 {
+            all_mapped += 1;
+        } else if (unknown as usize) < video.len() {
+            partly += 1;
+        } else {
+            none_mapped += 1;
+        }
+        if seen.values().any(|&c| c > 1) {
+            dup_numbers += 1;
+        }
+        paths.clear();
+    };
+    let rows = stmt.query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?))).unwrap();
+    for row in rows {
+        let (id, path) = row.unwrap();
+        if cur != Some(id) {
+            if let Some(prev) = cur {
+                flush(prev, &mut paths, &mut tsv);
+            }
+            cur = Some(id);
+        }
+        paths.push(path);
+    }
+    if let Some(prev) = cur {
+        flush(prev, &mut paths, &mut tsv);
+    }
+    std::fs::write(out, tsv).unwrap();
+    println!("torrents with file lists: {torrents} (no video file: {no_video})");
+    println!("all video files mapped: {all_mapped}; partly unmapped: {partly}; none mapped: {none_mapped}");
+    println!("torrents with duplicate (season, episode) numbers: {dup_numbers}");
+    println!("video files: {files_total}, unmapped: {files_unknown}");
+}
