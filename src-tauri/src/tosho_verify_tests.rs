@@ -685,3 +685,78 @@ fn tosho_batch_check() {
     println!("flagged: {}", tally.flagged);
     println!("flagged by issue kind (a release may count in several): Missing {}, OutOfRange {}, Duplicates {}, Unread {}", tally.missing, tally.out_of_range, tally.duplicates, tally.unread);
 }
+
+/// Whether `EpisodeLabel::of` reads the title as an episode or batch that names no season.
+fn is_unmarked(title: &str) -> bool {
+    matches!(EpisodeLabel::of(title), EpisodeLabel::Episode { seasons, .. } | EpisodeLabel::Batch { seasons, .. } if seasons.is_empty())
+}
+
+/// Peer-consistent season (PLAN.md L1c) over the dataset's trusted releases whose AniDB entry has a
+/// plain TVDB season, with `nyaa_client::peer_seasons` run once over all of them. The TVDB season is
+/// the truth. Prints the propagation counts and writes one TSV row per propagated release (id,
+/// published, truth, propagated season, title) to `PEER_OUT`.
+///
+/// ```text
+/// TOSHO_DATASET=<tosho-dataset-*.db> PEER_OUT=<out.tsv> \
+///   cargo test -p nyaa-stream --lib tosho_peer_season -- --ignored --nocapture
+/// ```
+#[test]
+#[ignore = "needs TOSHO_DATASET and PEER_OUT"]
+fn tosho_peer_season() {
+    let db = env_path("TOSHO_DATASET").expect("TOSHO_DATASET");
+    let out = env_path("PEER_OUT").expect("PEER_OUT");
+    let conn = Connection::open_with_flags(&db, OpenFlags::SQLITE_OPEN_READ_ONLY).unwrap();
+    let mut stmt = conn
+        .prepare(
+            "SELECT r.id, r.published, t.season, r.title \
+             FROM releases r JOIN release_aid a ON a.nyaa_id = r.id \
+             JOIN anidb_tvdb t ON t.anidb_id = a.aid \
+             WHERE a.approved > 0 AND t.season > 0 AND t.mapping IS NULL",
+        )
+        .unwrap();
+    let rows: Vec<(i64, String, i64, String)> = stmt
+        .query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?, r.get::<_, i64>(2)?, r.get::<_, String>(3)?)))
+        .unwrap()
+        .map(|row| row.unwrap())
+        .collect();
+    let inputs: Vec<nyaa_client::PeerRelease> = rows.iter().map(|(_, published, _, title)| nyaa_client::PeerRelease { title, published }).collect();
+    let propagated = nyaa_client::peer_seasons(&inputs);
+
+    let (mut unmarked, mut unmarked_hard, mut hard_correct) = (0u32, 0u32, 0u32);
+    let (mut unmarked_first, mut first_other) = (0u32, 0u32);
+    let (mut total, mut correct, mut wrong) = (0u32, 0u32, 0u32);
+    let mut tsv = String::from("id\tpublished\ttruth\tpropagated\ttitle\n");
+    for ((id, published, truth, title), prop) in rows.iter().zip(&propagated) {
+        let is_unmarked = is_unmarked(title);
+        if is_unmarked {
+            unmarked += 1;
+            if *truth > 1 {
+                unmarked_hard += 1;
+                if *prop == Some(*truth as u32) {
+                    hard_correct += 1;
+                }
+            } else {
+                unmarked_first += 1;
+                if prop.is_some_and(|s| s != 1) {
+                    first_other += 1;
+                }
+            }
+        }
+        if let Some(season) = prop {
+            total += 1;
+            if *season as i64 == *truth {
+                correct += 1;
+            } else {
+                wrong += 1;
+            }
+            tsv.push_str(&format!("{id}\t{published}\t{truth}\t{season}\t{}\n", title.replace('\t', " ")));
+        }
+    }
+    std::fs::write(out, tsv).unwrap();
+    let precision = if total == 0 { 0.0 } else { correct as f64 / total as f64 };
+    println!("rows: {}", rows.len());
+    println!("unmarked rows: {unmarked}; unmarked with truth > 1: {unmarked_hard}");
+    println!("propagated: {total}; correct: {correct}; wrong: {wrong}; precision: {precision:.4}");
+    println!("unmarked truth > 1 with the correct season: {hard_correct} of {unmarked_hard}");
+    println!("unmarked truth == 1 given a season other than 1: {first_other} of {unmarked_first}");
+}

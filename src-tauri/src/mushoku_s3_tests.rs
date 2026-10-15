@@ -224,3 +224,30 @@ async fn mushoku_crawl_titles() {
     }
     std::fs::write(out, tsv).unwrap();
 }
+
+/// Peer-consistent season (PLAN.md L1c) over the Mushoku crawl: prints every release that
+/// `nyaa_client::peer_seasons` gives a season, as `date | season | title`, and the count.
+/// No truth here; the list is reviewed by hand.
+///
+/// ```text
+/// MUSHOKU_CRAWL=<nyaa-crawl-mushoku_tensei-14pages.json> \
+///   cargo test -p nyaa-stream --lib mushoku_peer_season -- --ignored --nocapture
+/// ```
+#[test]
+#[ignore = "needs MUSHOKU_CRAWL"]
+fn mushoku_peer_season() {
+    let crawl = env_path("MUSHOKU_CRAWL").expect("MUSHOKU_CRAWL");
+    let json: serde_json::Value = serde_json::from_slice(&std::fs::read(crawl).unwrap()).unwrap();
+    let items = json["items"].as_array().unwrap();
+    let pairs: Vec<(&str, &str)> = items.iter().map(|item| (item["title"].as_str().unwrap_or(""), item["date"].as_str().unwrap_or(""))).collect();
+    let inputs: Vec<nyaa_client::PeerRelease> = pairs.iter().map(|(title, published)| nyaa_client::PeerRelease { title, published }).collect();
+    let seasons = nyaa_client::peer_seasons(&inputs);
+    let mut propagated = 0u32;
+    for ((title, date), season) in pairs.iter().zip(&seasons) {
+        if let Some(season) = season {
+            propagated += 1;
+            println!("{date} | {season} | {title}");
+        }
+    }
+    println!("propagated {propagated} of {} releases", items.len());
+}
