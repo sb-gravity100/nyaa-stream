@@ -1,3 +1,9 @@
+### `c829310` · 2026-10-17 · feat: sort nyaa searches by seeders (s=seeders&o=desc), key caches by sort, drop the newest-first early stop
+- `crates/nyaa-client/src/lib.rs`
+- `crates/nyaa-client/src/store.rs`
+- `PLAN.md`
+- `PHASES.md`
+
 ### `796f1c2` · 2026-10-16 · feat: score a live nyaa search against a franchise with the L1 model (ml/score_search.py)
 - `ml/score_search.py`
 - `crates/nyaa-client/examples/search_json.rs`
