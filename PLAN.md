@@ -156,6 +156,23 @@ Building the workspace requires, beyond Rust/Node:
   app search and in the browser RSS fallback. Cache and store entries are
   keyed by category code, so releases stored under `1_2` aren't found by
   `1_0` searches until re-fetched. Target version: next patch (bump pending)
+  **Sort (user 2026-10-17):** every app search page adds `&s=seeders&o=desc`
+  (`?f=0&c=1_0&q=<query>&s=seeders&o=desc&p=<n>`, also `/user/<name>?...`).
+  Why: nyaa.si returns at most 1,000 results per query, newest first by
+  default, so a long show's early-season releases (e.g. Slime S1, 2018-19) sat
+  beyond the cap and were never fetched (seen 2026-10-16: 1,000-result queries
+  reached back only to 2021); seeders-descending fills the cap with the
+  releases people actually download. Consequences handled with it: (1) the
+  database's early stop ("first page fully stored means everything older was
+  seen") only holds for newest-first order, so a seeders-sorted fetch pages
+  to the end (up to `MAX_SEARCH_PAGES`) instead; (2) the search cache and
+  database key gain `|seeders` so answers fetched newest-first are not
+  replayed as seeder-sorted ones (they are re-fetched once); (3) merged
+  results stay newest-first by release id (`merge_newest_first`), the UI
+  ranks by its own rules. Trade-off: a brand-new release with no seeders yet
+  can fall outside the 1,000 for a very large franchise until it gains
+  seeders. The browser RSS fallback (dev only) is unchanged. Target version:
+  next patch (bump pending), with the main filter above.
 - **Metadata:** AniList GraphQL API (`https://graphql.anilist.co`), no auth
   required for public queries; Kitsu API (`crates/kitsu-client`) as a
   secondary source for wide backdrop banners and per-episode thumbnails,

@@ -12,7 +12,6 @@
 //!   does, for an instant first result and as the offline/rate-limited
 //!   fallback for queries never run before.
 
-use std::collections::HashSet;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -554,22 +553,6 @@ impl Store {
         })
         .await
     }
-
-    /// Ids among `ids` already stored.
-    pub(crate) async fn known_ids(&self, ids: &[i64]) -> anyhow::Result<HashSet<i64>> {
-        let ids = ids.to_vec();
-        self.run(move |conn| {
-            let mut stmt = conn.prepare_cached("SELECT 1 FROM releases WHERE id = ?1")?;
-            let mut known = HashSet::new();
-            for id in ids {
-                if stmt.exists(params![id])? {
-                    known.insert(id);
-                }
-            }
-            Ok(known)
-        })
-        .await
-    }
 }
 
 fn row_to_tosho_release(row: &rusqlite::Row<'_>) -> rusqlite::Result<ToshoRelease> {
@@ -802,6 +785,5 @@ INSERT INTO `toto_anidb_tvdb` (`anidbid`, `tvdbid`, `defaulttvdbseason`, `episod
         let stored = store.search("1_2|fate").await.unwrap().unwrap();
         assert_eq!(stored.results.len(), 2);
         assert!(store.search("1_2|missing").await.unwrap().is_none());
-        assert_eq!(store.known_ids(&[1, 2, 3, 4]).await.unwrap().len(), 3);
     }
 }

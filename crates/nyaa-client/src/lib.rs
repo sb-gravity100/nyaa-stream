@@ -145,6 +145,25 @@ fn user_path(user: Option<&str>) -> String {
     }
 }
 
+/// Sort sent with every search page: most seeded first. nyaa.si returns at
+/// most 1,000 results per query, so newest first (its default) never reached a
+/// long show's early seasons.
+const SEARCH_SORT: &str = "s=seeders&o=desc";
+
+/// Suffix of the search cache / database key for `SEARCH_SORT`: answers
+/// fetched in another order must not be replayed as this one.
+const SORT_KEY: &str = "seeders";
+
+/// One search result page of nyaa.si, sorted by `SEARCH_SORT`.
+fn search_url(user: Option<&str>, sanitized_query: &str, category: Category, page: u32) -> String {
+    format!(
+        "{NYAA_BASE_URL}{}?f=0&c={}&q={}&{SEARCH_SORT}&p={page}",
+        user_path(user),
+        category.code(),
+        urlencoding::encode(sanitized_query)
+    )
+}
+
 /// Rows per page of nyaa.si's HTML search results (fixed by nyaa.si itself).
 /// Used to detect the last page: a page returning fewer rows than this
 /// means there's nothing more to fetch.
@@ -336,14 +355,14 @@ impl NyaaClient {
             tracing::debug!(query, sanitized, "sanitized smart punctuation for nyaa.si search");
         }
         let key = match user {
-            Some(user) => format!("{}|user:{}|{sanitized}", category.code(), user.to_lowercase()),
-            None => format!("{}|{sanitized}", category.code()),
+            Some(user) => format!("{}|user:{}|{sanitized}|{SORT_KEY}", category.code(), user.to_lowercase()),
+            None => format!("{}|{sanitized}|{SORT_KEY}", category.code()),
         };
         if let Some(store) = &self.store {
             return self.search_with_store(store, &key, user, &sanitized, category).await;
         }
         let Some(cache) = &self.cache else {
-            return self.search_uncached(user, &sanitized, category, None).await;
+            return self.search_uncached(user, &sanitized, category).await;
         };
         let cached = cache.get::<Vec<NyaaResult>>("search", &key).await;
         if let Some(hit) = &cached {
@@ -352,7 +371,7 @@ impl NyaaClient {
                 return Ok(hit.value.clone());
             }
         }
-        match self.search_uncached(user, &sanitized, category, None).await {
+        match self.search_uncached(user, &sanitized, category).await {
             Ok(results) => {
                 cache.put("search", &key, &results).await;
                 Ok(results)
@@ -368,9 +387,10 @@ impl NyaaClient {
     }
 
     /// The database-backed search: replay a fresh stored answer; otherwise
-    /// fetch only as many pages as it takes to reach releases already stored
-    /// (nyaa.si is newest first), merge with the stored answer, save; and if
-    /// the fetch fails fall back to the stored answer or a local word match.
+    /// fetch every page (the results are seeders-descending, so a page of
+    /// already stored releases says nothing about the pages after it), merge
+    /// with the stored answer, save; and if the fetch fails fall back to the
+    /// stored answer or a local word match.
     async fn search_with_store(&self, store: &Store, key: &str, user: Option<&str>, sanitized: &str, category: Category) -> anyhow::Result<Vec<NyaaResult>> {
         let prior = store.search(key).await.unwrap_or_else(|err| {
             tracing::warn!(%err, "reading the stored search failed");
@@ -383,7 +403,7 @@ impl NyaaClient {
             }
         }
         let prior_results = prior.map(|p| p.results);
-        match self.search_uncached(user, sanitized, category, Some((store, prior_results.is_some()))).await {
+        match self.search_uncached(user, sanitized, category).await {
             Ok(fetched) => {
                 let merged = merge_newest_first(fetched, prior_results.unwrap_or_default());
                 if let Err(err) = store.save_search(key, category.code(), &merged).await {
@@ -406,27 +426,19 @@ impl NyaaClient {
         }
     }
 
-    /// Fetches result pages. With `stored` = (store, true) - this query was
-    /// fetched before - it stops after the first page whose releases are all
-    /// already stored, since everything older was seen last time.
-    async fn search_uncached(&self, user: Option<&str>, sanitized: &str, category: Category, stored: Option<(&Store, bool)>) -> anyhow::Result<Vec<NyaaResult>> {
+    /// Fetches result pages until a short one or `MAX_SEARCH_PAGES`. No early
+    /// stop at already stored releases: that only works newest first, and the
+    /// pages are seeders-descending (PLAN.md "Torrent source" -> Sort).
+    async fn search_uncached(&self, user: Option<&str>, sanitized: &str, category: Category) -> anyhow::Result<Vec<NyaaResult>> {
         let sanitized = sanitized.to_string();
 
         let mut all_results = Vec::new();
         for page in 1..=MAX_SEARCH_PAGES {
             let page_results = self.search_page(user, &sanitized, category, page).await?;
             let page_count = page_results.len();
-            let page_ids: Vec<i64> = page_results.iter().filter_map(|r| release_id(&r.view_url)).collect();
             all_results.extend(page_results);
             if page_count < RESULTS_PER_PAGE {
                 break;
-            }
-            if let Some((store, true)) = stored {
-                let known = store.known_ids(&page_ids).await.unwrap_or_default();
-                if !page_ids.is_empty() && known.len() == page_ids.len() {
-                    tracing::debug!(query = sanitized, page, "reached already stored releases, not fetching older pages");
-                    break;
-                }
             }
         }
 
@@ -435,12 +447,7 @@ impl NyaaClient {
     }
 
     async fn search_page(&self, user: Option<&str>, sanitized_query: &str, category: Category, page: u32) -> anyhow::Result<Vec<NyaaResult>> {
-        let url = format!(
-            "{NYAA_BASE_URL}{}?f=0&c={}&q={}&p={page}",
-            user_path(user),
-            category.code(),
-            urlencoding::encode(sanitized_query)
-        );
+        let url = search_url(user, sanitized_query, category, page);
         tracing::debug!(query = sanitized_query, url, page, "fetching nyaa.si search page");
 
         // A rate-limited (429) or failing page parses to zero rows - it must
@@ -715,6 +722,18 @@ mod tests {
     const SQL: &str = "INSERT INTO `toto_files` (`id`, `toto_id`, `filename`, `filesize`) VALUES (1,10,'Show/Season 1/Show - 01.mkv',1000),(2,10,'Show/Season 2/Show - 01.mkv',2000),(3,10,'Show/cover.jpg',5);
 INSERT INTO `toto_toto` (`id`, `nyaa_id`, `nyaa_subdom`, `name`, `btih`, `totalsize`, `dateline`, `torrentfiles`, `nyaa_cat`, `deleted`, `isdupe`, `aid`, `eid`, `resolveapproved`) VALUES (10,100,'','[G] Show - Batch',0x0102030405060708090a0b0c0d0e0f1011121314,3000,1700000000,3,'1_37',0,0,55,7,3),(12,200,'','[G] Show - Other',0x0102030405060708090a0b0c0d0e0f1011121316,3000,1700000000,3,'1_37',0,0,55,7,3);
 ";
+
+    #[test]
+    fn search_pages_are_sorted_by_seeders() {
+        assert_eq!(
+            search_url(None, "Tensei shitara Slime Datta Ken", Category::AllAnime, 3),
+            "https://nyaa.si/?f=0&c=1_0&q=Tensei%20shitara%20Slime%20Datta%20Ken&s=seeders&o=desc&p=3"
+        );
+        assert_eq!(
+            search_url(Some("Erai-raws"), "slime", Category::AnimeEnglishTranslated, 1),
+            "https://nyaa.si/user/Erai-raws?f=0&c=1_2&q=slime&s=seeders&o=desc&p=1"
+        );
+    }
 
     fn temp(name: &str) -> std::path::PathBuf {
         let path = std::env::temp_dir().join(format!("nyaa-client-test-{name}-{}", std::process::id()));

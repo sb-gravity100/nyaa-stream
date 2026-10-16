@@ -211,6 +211,12 @@
         unknown-numbering packs stay on a Batch row
   - [ ] M5 FILE_INDEX/CHANGELOG/version bump, tag
 
+- [ ] nyaa search sorted by seeders (user 2026-10-17; PLAN.md "Torrent source" ->
+      Sort; next patch, bump pending). One commit each:
+  - [ ] S1 `search_page` adds `&s=seeders&o=desc`; cache + store key gain
+        `|seeders`; store early stop disabled for the sorted fetch; unit tests
+  - [ ] S2 FILE_INDEX/CHANGELOG notes, `cargo check --workspace`
+
 - [ ] Learned release-to-entry matcher - v0.6.1 (user 2026-10-15; see PLAN.md
       "Learned release-to-entry matcher"; replaces the unused stem mapper).
       One commit each:
