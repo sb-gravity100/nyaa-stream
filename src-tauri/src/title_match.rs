@@ -15,6 +15,33 @@ use std::collections::BTreeSet;
 use anilist_client::Franchise;
 use nyaa_client::ToshoRelease;
 use release_parse::Kind;
+use serde::Serialize;
+
+#[derive(Debug, Clone, Serialize)]
+pub struct MatchCriterion {
+    pub criterion: String,
+    pub passed: bool,
+    pub evidence: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct MatchEvaluation {
+    pub matched: bool,
+    pub reason: String,
+    pub checks: Vec<MatchCriterion>,
+}
+
+fn add_match_check(
+    checks: &mut Vec<MatchCriterion>,
+    collect: bool,
+    criterion: &str,
+    passed: bool,
+    evidence: impl FnOnce() -> String,
+) {
+    if collect {
+        checks.push(MatchCriterion { criterion: criterion.into(), passed, evidence: evidence() });
+    }
+}
 
 /// What the dataset's AniDB id says about a release for one entry.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -785,27 +812,60 @@ impl ShowMatcher {
 
     /// Whether `release_title` belongs to this entry.
     pub fn matches(&self, release_title: &str) -> bool {
+        self.evaluate(release_title, false).matched
+    }
+
+    /// The same title/season rules as `matches`, with the checks that
+    /// determined the result for the developer search analyzer.
+    pub fn explain(&self, release_title: &str) -> MatchEvaluation {
+        self.evaluate(release_title, true)
+    }
+
+    fn evaluate(&self, release_title: &str, collect: bool) -> MatchEvaluation {
+        let mut checks = Vec::new();
         let haystack = haystack(release_title);
         let release_seasons = self.named_seasons(release_title, &haystack);
+        add_match_check(&mut checks, collect, "Season compatibility", !self.names_only_other_seasons(&release_seasons), || {
+            if release_seasons.is_empty() {
+                format!("No explicit season marker; entry seasons: {:?}", self.seasons)
+            } else {
+                format!("Release seasons {:?}; entry seasons {:?}", release_seasons, self.seasons)
+            }
+        });
         // Markers that name only other seasons rule the release out, even
         // when a full name matches ("Slime" names every season). With no
         // season known for the entry nothing is ruled out.
         if self.names_only_other_seasons(&release_seasons) {
             tracing::trace!(release_title, ?release_seasons, entry_seasons = ?self.seasons, "rejected: other season");
-            return false;
+            return MatchEvaluation { matched: false, reason: "Release names another season".into(), checks };
         }
-        if self.season_ambiguous(release_title) {
+        let ambiguous = self.season_ambiguous(release_title);
+        add_match_check(&mut checks, collect, "Franchise title ambiguity", !ambiguous, || {
+            if ambiguous { "Unmarked title is shared with a different-season franchise entry" } else { "No conflicting shared-title evidence" }.into()
+        });
+        if ambiguous {
             tracing::trace!(release_title, entry_season = ?self.primary, "rejected: unmarked title is shared with an earlier season");
-            return false;
+            return MatchEvaluation { matched: false, reason: "Unmarked title is ambiguous across seasons".into(), checks };
         }
         // Movies, OVAs and specials are filed under their own entry, not
         // a TV season's episode list.
         // A pack naming several seasons may bundle them ("S01-S05 + OVA").
         let parsed = release_parse::parse_release(release_title);
         // (A season pack that bundles extras - "S01 + OVA" - is still its season's.)
-        if is_tv(self.format.as_deref()) && release_seasons.len() < 2 && (matches!(parsed.kind, Kind::Movie | Kind::Special) || (names_extra(&haystack) && !parsed.extras && !names_whole_series(&haystack))) {
+        let tv_content_ok = !is_tv(self.format.as_deref())
+            || release_seasons.len() >= 2
+            || !(matches!(parsed.kind, Kind::Movie | Kind::Special)
+                || (names_extra(&haystack) && !parsed.extras && !names_whole_series(&haystack)));
+        add_match_check(&mut checks, collect, "Release type fits this entry", tv_content_ok, || {
+            if is_tv(self.format.as_deref()) {
+                format!("Entry format {:?}; parsed release kind {:?}", self.format, parsed.kind)
+            } else {
+                format!("Entry format {:?} is not TV-limited", self.format)
+            }
+        });
+        if !tv_content_ok {
             tracing::trace!(release_title, "rejected: movie/special on a TV entry");
-            return false;
+            return MatchEvaluation { matched: false, reason: "Movie or special is excluded from a TV entry".into(), checks };
         }
         // How specifically the release names this entry: a full name, else
         // the short name - which needs this entry's season: the marker, or
@@ -815,9 +875,11 @@ impl ShowMatcher {
         let whole = (release_seasons.is_empty() && names_whole_series(&haystack)) || (self.seasons.is_empty() && release_seasons.len() >= 2);
         let in_season = release_seasons.iter().any(|season| self.seasons.contains(season)) || whole;
         let mut own = Self::longest_match(&haystack, &self.names);
+        let mut name_basis = if own > 0 { "Selected entry title" } else { "No selected title yet" };
         if own == 0 {
             own = self.same_season_siblings.iter().map(|names| Self::longest_match(&haystack, names)).max().unwrap_or(0);
             if own > 0 {
+                name_basis = "Same-season franchise alias";
                 tracing::trace!(release_title, "same-season sibling title identifies the selected season");
             }
         }
@@ -825,20 +887,26 @@ impl ShowMatcher {
             let effective_ok = in_season || (release_seasons.is_empty() && self.seasons.contains(&1));
             own = if effective_ok { Self::longest_match(&haystack, &self.bases) } else { 0 };
             if own == 0 {
-                return false;
+                add_match_check(&mut checks, collect, "Title identifies this entry", false, || {
+                    format!("No whole-word entry/alias match; short-name season condition {effective_ok}; entry seasons {:?}, release seasons {:?}", self.seasons, release_seasons)
+                });
+                return MatchEvaluation { matched: false, reason: "Release title does not identify this entry".into(), checks };
             }
+            name_basis = "Short title plus compatible season";
             tracing::trace!(release_title, "short name + season");
         }
+        add_match_check(&mut checks, collect, "Title identifies this entry", true, || format!("{name_basis}; whole-series pack: {whole}"));
         // A sibling's longer, more specific name wins ("Food Wars! The Second
         // Plate" is not the first season's). A season marker that is this
         // entry's keeps the release here: the sibling is then a split cour or
         // its own season-qualified name ("... Season 3"), not another season.
         let sibling = if in_season { 0 } else { self.siblings.iter().map(|names| Self::longest_match(&haystack, names)).max().unwrap_or(0) };
+        add_match_check(&mut checks, collect, "Selected title is at least as specific as siblings", sibling <= own, || format!("Selected-name score {own}; sibling-name score {sibling}"));
         if sibling > own {
             tracing::trace!(release_title, own, sibling, "rejected: names a sibling more specifically");
-            return false;
+            return MatchEvaluation { matched: false, reason: "A franchise sibling is named more specifically".into(), checks };
         }
-        true
+        MatchEvaluation { matched: true, reason: format!("Matched by {name_basis}"), checks }
     }
 }
 

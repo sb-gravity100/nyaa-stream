@@ -23,7 +23,7 @@ import { episodeNumbersByGroup } from "./releases";
 import { MediaPage } from "./MediaPage";
 import { HomePage } from "./HomePage";
 import { SettingsPanel } from "./SettingsPanel";
-import { DebugPage } from "./DebugPage";
+import { DebugPage, type SourceMappingRecord } from "./DebugPage";
 import { BrandMark, SearchIcon, SettingsIcon } from "./icons";
 import { Buffering } from "./Buffering";
 import { goBack, navigate, useRoute, type WatchTarget } from "./router";
@@ -152,6 +152,10 @@ function App() {
   }, [library]);
 
   useEffect(() => {
+    if (import.meta.env.DEV && location.hash === "#/debug") {
+      skipNextSearch.current = false;
+      return;
+    }
     if (skipNextSearch.current) {
       skipNextSearch.current = false;
       return;
@@ -224,6 +228,7 @@ function App() {
   const routeAnimeId = route.name === "anime" ? route.id : null;
   useEffect(() => {
     setRouteError(null);
+    if (import.meta.env.DEV && location.hash === "#/debug") return;
     if (routeAnimeId == null) {
       if (selectedAnime) backToSearch();
       return;
@@ -252,7 +257,7 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeAnimeId]);
 
-  async function openAnime(anime: AnimeMedia) {
+  async function openAnime(anime: AnimeMedia, forceDebugSearch = false) {
     const seq = ++openSeq.current;
     const releaseQuery = displayTitle(anime.title);
     skipNextSearch.current = true;
@@ -262,7 +267,7 @@ function App() {
     setError(null);
 
     const cachedSources = sourcesByMedia[anime.id];
-    if (cachedSources) {
+    if (cachedSources && !forceDebugSearch) {
       console.debug("[search_torrents_for_anime] served from cache", { anime: releaseQuery, count: cachedSources.length });
       setSources(cachedSources);
       setDetails(detailsByMedia[anime.id] ?? {});
@@ -307,7 +312,7 @@ function App() {
       }
       try {
         const results = isTauriAvailable()
-          ? await invoke<NyaaResult[]>("search_torrents_for_anime", { ...args, fansubber: preferredFansubber || null })
+          ? await invoke<NyaaResult[]>("search_torrents_for_anime", { ...args, fansubber: preferredFansubber || null, diagnostics: forceDebugSearch })
           : await fallbackSearchTorrentsForAnime(anime.title);
         fullLoaded = true;
         if (openSeq.current !== seq) return;
@@ -516,8 +521,36 @@ function App() {
 
   const currentEpisodeOffset = selectedAnime ? (episodeOffsetByMedia[selectedAnime.id] ?? 0) : 0;
 
-  const groupedSources = useMemo(() => {
-    if (selectedAnime && isMovie(selectedAnime)) return movieSources(sources);
+  const debugActive = import.meta.env.DEV && location.hash === "#/debug";
+  const sourceAnalysis = useMemo(() => {
+    const mapping = new Map<string, SourceMappingRecord>();
+    if (debugActive) for (const source of sources) {
+      mapping.set(source.view_url, { viewUrl: source.view_url, title: source.title, status: "unresolved", parsedLabel: episodeLabelText(labelOf(source.label, source.title)), mappedAs: [], reason: "Awaiting source grouping", checks: [] });
+    }
+    const check = (source: NyaaResult, name: string, outcome: SourceMappingRecord["checks"][number]["outcome"], evidence: string) => {
+      if (!debugActive) return;
+      mapping.get(source.view_url)?.checks.push({ name, outcome, evidence });
+    };
+    const reject = (source: NyaaResult, reason: string, checkName: string, evidence: string) => {
+      const row = mapping.get(source.view_url);
+      if (row) { row.status = "filtered"; row.reason = reason; }
+      check(source, checkName, "failed", evidence);
+    };
+    if (selectedAnime && isMovie(selectedAnime)) {
+      const movieGroups = movieSources(sources);
+      if (!debugActive) return { groups: movieGroups, mapping: [] };
+      const movieReleases = new Set(movieGroups.flatMap(([, group]) => group.releases.map((source) => source.view_url)));
+      for (const source of sources) {
+        check(source, "Anime show match", "passed", "Returned by the backend matcher for the selected AniList entry");
+        const parsed = labelOf(source.label, source.title);
+        const isMovieSource = MOVIE_TITLE.test(source.title) || (parsed.kind !== "episode" && !SERIES_PACK.test(source.title));
+        check(source, "Movie-entry release", isMovieSource ? "passed" : "failed", isMovieSource ? "Movie title or non-episode, non-series-pack release" : "Episode or series pack excluded from this movie entry");
+        const row = mapping.get(source.view_url)!;
+        if (movieReleases.has(source.view_url)) { row.status = "mapped"; row.mappedAs = ["Movie"]; row.reason = "Included in the movie source group"; }
+        else { row.status = "filtered"; row.reason = "Excluded by the movie-entry release rule"; }
+      }
+      return { groups: movieGroups, mapping: Array.from(mapping.values()) };
+    }
     const groups = new Map<string, { label: EpisodeLabel; releases: NyaaResult[] }>();
     const packs: { source: NyaaResult; label: Extract<EpisodeLabel, { kind: "batch" }>; explicit: boolean }[] = [];
     const addToGroup = (label: EpisodeLabel, source: NyaaResult) => {
@@ -536,7 +569,9 @@ function App() {
     }
     const groupNumbers = episodeNumbersByGroup(sources);
     for (const source of sources) {
+      check(source, "Anime show match", "passed", "Returned by the backend matcher for the selected AniList entry");
       const parsed = labelOf(source.label, source.title);
+      check(source, "Title episode label", parsed.kind === "unknown" ? "unresolved" : "passed", parsed.kind === "unknown" ? "No episode or batch could be read from the release title" : episodeLabelText(parsed));
       // The title-regex parser can't tell a batch apart from a genuinely
       // unparseable title. When we have ground truth from the torrent's
       // view page (file_count > 1), trust that over the "Unknown" guess.
@@ -545,11 +580,15 @@ function App() {
       // extractSeasonNumber's default would have produced anyway.
       let label: EpisodeLabel = parsed;
       const scraped = details[source.view_url];
+      if (scraped && (parsed.kind === "batch" || parsed.kind === "unknown")) {
+        check(source, "Torrent file list", "passed", `${scraped.file_count} files; detected seasons ${(scraped.seasons ?? []).join(", ") || "unmarked"}`);
+      }
       // AnimeTosho's AniDB episode id: a release that parsed no episode takes
       // the number its sibling releases of the same episode agree on.
       const grouped = parsed.kind === "unknown" && source.episode_group ? groupNumbers.get(source.episode_group) : undefined;
       if (grouped !== undefined) {
         label = { kind: "episode", season: currentAnimeSeason, number: grouped };
+        check(source, "AniDB episode group", "passed", `Episode id ${source.episode_group} maps this title to episode ${grouped}`);
       } else if (parsed.kind === "unknown" && scraped?.is_batch !== false) {
         // A matched release whose title names no episode is a season batch of
         // this entry (the matcher already tied it to the show). Once its view
@@ -557,8 +596,14 @@ function App() {
         // release with none of this entry's season is another season's pack.
         // (A single-file release stays unknown.)
         const fileSeasons = scraped?.seasons ?? [];
-        if (fileSeasons.length > 0 && !fileSeasons.includes(currentAnimeSeason)) continue;
+        if (fileSeasons.length > 0 && !fileSeasons.includes(currentAnimeSeason)) {
+          reject(source, "Torrent files belong to another season", "Scraped file seasons", `Files report seasons ${fileSeasons.join(", ")}; selected season is ${currentAnimeSeason}`);
+          continue;
+        }
         label = { kind: "batch", season: currentAnimeSeason, episodeRange: null };
+        check(source, "Batch fallback", "passed", scraped ? `${scraped.file_count} files identify this as a batch` : "Unknown title is provisionally grouped as a batch until file details say otherwise");
+      } else if (parsed.kind === "unknown") {
+        check(source, "Torrent file count", "passed", "Scraped details identify a single-file release; it remains Unknown");
       }
 
       // See loadEpisodeOffset's doc comment - a release numbered
@@ -585,9 +630,11 @@ function App() {
       ) {
         const relative = label.number - currentEpisodeOffset;
         if (relative >= 1 && relative <= selectedAnime.episodes) {
+          const originalNumber = label.number;
           label.number = relative;
           label.season = currentAnimeSeason;
           absoluteNumber = true;
+          check(source, "Franchise episode offset", "passed", `Episode ${originalNumber} − offset ${currentEpisodeOffset} = episode ${relative}`);
         }
       }
 
@@ -602,6 +649,7 @@ function App() {
         !(parsed.seasons ? parsed.seasons.length > 0 : parsed.season !== 1) &&
         !(scraped?.seasons ?? []).includes(currentAnimeSeason)
       ) {
+        reject(source, "Unmarked title is ambiguous for this season", "Season ambiguity", "No trusted AniDB mapping, absolute-number correction, or matching scraped season resolved it");
         continue;
       }
 
@@ -618,12 +666,14 @@ function App() {
         !(label.seasons ?? []).includes(currentAnimeSeason)
       ) {
         label = { ...label, season: currentAnimeSeason, seasons: [currentAnimeSeason] };
+        check(source, "Trusted AniDB season", "passed", `Trusted dataset match assigns this release to season ${currentAnimeSeason}`);
       }
 
       // Season 0 is a franchise's specials/movies, which are their own
       // AniList entries with their own pages - not episodes of a TV series
       // (e.g. Fate/strange Fake's "S00E01 Whispers of Dawn").
       if (label.kind === "episode" && label.season === 0 && (selectedAnime?.format === "TV" || selectedAnime?.format === "TV_SHORT")) {
+        reject(source, "Season 0 special excluded from TV episodes", "TV season rule", "Season 0 is routed to its own franchise entry");
         continue;
       }
 
@@ -639,6 +689,7 @@ function App() {
         (label.seasons ?? []).length < 2 &&
         (label.kind === "episode" ? seasonOneNumbers.has(label.number) : seasonOneNumbers.size > 0)
       ) {
+        reject(source, "Same-number release belongs to a later season", "First-season collision check", `Season ${label.season} episode number already exists on season 1`);
         continue;
       }
 
@@ -657,8 +708,20 @@ function App() {
         label.season !== currentAnimeSeason &&
         !(label.seasons ?? []).includes(currentAnimeSeason)
       ) {
+        reject(source, "Release season does not match this page", "Selected-season check", `Release season ${label.season}; selected season ${currentAnimeSeason}`);
         continue;
       }
+      const mappedSeasons = label.kind === "episode" || label.kind === "batch"
+        ? (label.seasons?.length ? label.seasons : [label.season])
+        : [];
+      const seasonEvidence = label.kind !== "episode" && label.kind !== "batch"
+        ? "No episode-season rule applies to this release label"
+        : currentAnimeSeason === 1 && marked && label.season > 1
+          ? `Later-season release retained because episode ${label.kind === "episode" ? label.number : "pack"} does not collide with a season 1 episode`
+          : marked
+            ? `Release season ${mappedSeasons.join(", ")} includes selected season ${currentAnimeSeason}`
+            : `No explicit season marker; title match allows it on season ${currentAnimeSeason}`;
+      check(source, "Selected season", label.kind === "episode" || label.kind === "batch" ? "passed" : "not needed", seasonEvidence);
 
       // A batch with an explicit episode range (e.g. "E15-E28") actually
       // covers those specific episodes, so spread it into each of those
@@ -667,6 +730,7 @@ function App() {
       // still can't be attributed to specific episodes, so it stays as-is.
       if (label.kind === "batch" && label.episodeRange !== null) {
         const [min, max] = label.episodeRange;
+        check(source, "Episode range", "passed", `Batch covers episodes ${min}–${max}`);
         for (let n = min; n <= max; n++) {
           addToGroup({ kind: "episode", season: label.season, number: n }, source);
         }
@@ -707,7 +771,35 @@ function App() {
     // legitimately spans multiple seasons (see SEASON_EPISODE_PATTERN's doc
     // comment) doesn't interleave them by raw episode number.
     const rank = (label: EpisodeLabel) => (label.kind === "episode" ? 0 : label.kind === "batch" ? 1 : 2);
-    return Array.from(groups.entries()).sort(([, a], [, b]) => {
+    const groupEntries = Array.from(groups.entries());
+    if (debugActive) for (const source of sources) {
+      const row = mapping.get(source.view_url)!;
+      if (row.status === "filtered") continue;
+      row.mappedAs = groupEntries.filter(([, group]) => group.releases.some((release) => release.view_url === source.view_url)).map(([key]) => key);
+      if (row.mappedAs.length > 0 && !row.mappedAs.every((key) => key === "Unknown")) {
+        row.status = "mapped";
+        row.reason = row.mappedAs.length > 1 ? "Mapped to multiple episode groups by its batch range or files" : `Mapped to ${row.mappedAs[0]}`;
+        const pack = packs.find((entry) => entry.source.view_url === source.view_url);
+        const destinationEvidence = row.mappedAs.map((destination) => {
+          const group = groupEntries.find(([key]) => key === destination)?.[1];
+          if (pack && group && group.label.kind === "episode") {
+            const files = details[source.view_url]?.files ?? [];
+            const namedSeason = (pack.label.seasons?.length ?? 0) === 1 ? pack.label.seasons?.[0] : 1;
+            const episodeNumber = group.label.number;
+            const file = files.find((candidate) => candidate.episode === episodeNumber && (candidate.season ?? namedSeason) === currentAnimeSeason);
+            if (file) return `${destination} ← ${file.path}`;
+            if (pack.explicit) return `${destination} ← pack title explicitly covers this season`;
+          }
+          return destination;
+        });
+        check(source, "Episode destination", "passed", destinationEvidence.join("; "));
+      } else {
+        row.status = "unresolved";
+        row.reason = "Kept by the show matcher, but no episode number or matching pack file identifies a page row";
+        check(source, "Episode group", "unresolved", row.reason);
+      }
+    }
+    const sortedGroups = groupEntries.sort(([, a], [, b]) => {
       const rankDiff = rank(a.label) - rank(b.label);
       if (rankDiff !== 0) return rankDiff;
       if (a.label.kind === "episode" && b.label.kind === "episode") {
@@ -721,7 +813,10 @@ function App() {
       }
       return 0;
     });
-  }, [sources, details, currentAnimeSeason, currentEpisodeOffset, selectedAnime?.episodes, selectedAnime?.format]);
+    return { groups: sortedGroups, mapping: Array.from(mapping.values()) };
+  }, [sources, details, currentAnimeSeason, currentEpisodeOffset, selectedAnime?.episodes, selectedAnime?.format, debugActive]);
+
+  const groupedSources = sourceAnalysis.groups;
 
   const settingsPanel = settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />;
   const settingsButton = (
@@ -730,12 +825,28 @@ function App() {
     </button>
   );
   const debugButton = import.meta.env.DEV && (
-    <button class="icon-button app-debug-button" onClick={() => { location.hash = "#/debug"; }} aria-label="Debug" title="Search flow debugger">
+    <button class="icon-button app-debug-button" onClick={() => { location.hash = "#/debug"; }} aria-label="Debug" title="Source mapping analyzer">
       Debug
     </button>
   );
 
-  if (import.meta.env.DEV && location.hash === "#/debug") return <DebugPage />;
+  if (import.meta.env.DEV && location.hash === "#/debug") return (
+    <DebugPage
+      query={query}
+      animeResults={animeResults}
+      searching={loading}
+      selectedAnime={selectedAnime}
+      entrySeason={currentAnimeSeason}
+      sources={sources}
+      sourcesLoading={sourcesLoading}
+      error={error}
+      sourceMapping={sourceAnalysis.mapping}
+      onQueryChange={setQuery}
+      onSearch={(q) => { backToSearch(); setQuery(q); return runSearch(q); }}
+      onSelectAnime={(anime) => { knownAnime.current.set(anime.id, anime); void openAnime(anime, true); }}
+      onReanalyze={() => { if (selectedAnime) void openAnime(selectedAnime, true); }}
+    />
+  );
 
   if (route.name === "anime" && selectedAnime?.id !== route.id) {
     // The route's anime is still loading (reload / back-forward into it).

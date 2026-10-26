@@ -768,10 +768,10 @@
       - [x] rust-lld for dev links (verified + timed)
       - [x] rust-analyzer separate target dir (`.vscode/settings.json`)
 - [x] Search flow debugger (developer-only):
-      - [x] `#/debug` page: live AniList search and selected-anime release
-            lookup using the app's existing commands
-      - [x] Timestamped stage timeline with inputs, outputs, elapsed time,
-            errors, and browser console capture; filter, clear, copy
+      - [x] `#/debug` observes the app's real selected-anime search path
       - [x] Keep it out of the normal production navigation; update
             PLAN.md/FILE_INDEX.md
-      - [x] Enable page scrolling and add a visual source-matching pipeline
+      - [x] Replace trace/log and static explainer with live query, match,
+            and episode-mapping analytics
+      - [x] Show per-release accepted/rejected criteria and mapped,
+            filtered, or unresolved destinations

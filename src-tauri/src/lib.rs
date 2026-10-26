@@ -22,7 +22,7 @@ use kitsu_client::{KitsuClient, KitsuMetadata};
 use mpv_player::MpvPlayer;
 use nyaa_client::{Category, NyaaClient, NyaaResult, TorrentDetails};
 use serde::Serialize;
-use tauri::{Manager, State};
+use tauri::{Emitter, Manager, State};
 use tokio::sync::Mutex;
 use torrent_engine::{largest_video_file, DecoderSupport, StreamStats, SubtitleTrack, TorrentEngine, TorrentFile, TorrentId};
 
@@ -73,40 +73,52 @@ fn log_frontend(level: String, message: String) {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct DebugLogSlice {
-    cursor: usize,
-    lines: Vec<String>,
+struct CandidateSearchMetric {
+    query: String,
+    hits: usize,
+    error: Option<String>,
 }
 
-/// Dev debugger log tail. Deliberately not logged itself, since the page polls
-/// this command and logging each poll would create a self-sustaining log stream.
-#[tauri::command]
-async fn debug_read_logs(after: usize) -> Result<DebugLogSlice, String> {
-    #[cfg(not(debug_assertions))]
-    return Err("Backend log viewing is available only in development builds".into());
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct BackendReleaseAnalysis {
+    title: String,
+    view_url: String,
+    size: String,
+    seeders: u32,
+    leechers: u32,
+    label: nyaa_client::EpisodeLabel,
+    episode_group: Option<u32>,
+    aid_trusted: Option<bool>,
+    query_matches: Vec<String>,
+    accepted: bool,
+    decision: String,
+    reason: String,
+    checks: Vec<SourceMatchCriterion>,
+}
 
-    #[cfg(debug_assertions)]
-    {
-        let mut entries = tokio::fs::read_dir(log_dir()).await.map_err(|err| err.to_string())?;
-        let mut latest: Option<(std::time::SystemTime, PathBuf)> = None;
-        while let Some(entry) = entries.next_entry().await.map_err(|err| err.to_string())? {
-            let name = entry.file_name();
-            let name = name.to_string_lossy();
-            if !name.starts_with("nyaa-stream.") || !name.ends_with(".log") { continue; }
-            let modified = entry.metadata().await.ok().and_then(|m| m.modified().ok()).unwrap_or(std::time::UNIX_EPOCH);
-            if latest.as_ref().map_or(true, |(time, _)| modified > *time) {
-                latest = Some((modified, entry.path()));
-            }
-        }
-        let Some((_, path)) = latest else { return Ok(DebugLogSlice { cursor: 0, lines: Vec::new() }); };
-        let content = tokio::fs::read_to_string(path).await.map_err(|err| err.to_string())?;
-        let lines: Vec<String> = content.lines().map(str::to_owned).collect();
-        let cursor = lines.len();
-        let start = if after == 0 { cursor.saturating_sub(2000) } else if after > cursor { 0 } else { after };
-        Ok(DebugLogSlice { cursor, lines: lines.into_iter().skip(start).collect() })
-    }
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SourceMatchCriterion {
+    name: String,
+    outcome: String,
+    evidence: String,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SourceMatchAnalytics {
+    anime_id: Option<i64>,
+    entry_season: Option<u32>,
+    queries: Vec<CandidateSearchMetric>,
+    raw_hits: usize,
+    unique_releases: usize,
+    duplicate_hits: usize,
+    accepted: usize,
+    rejected: usize,
+    releases: Vec<BackendReleaseAnalysis>,
 }
 
 #[tauri::command]
@@ -726,17 +738,35 @@ fn show_matcher(state: &AppState, title: &AnimeTitle, synonyms: &[String], anili
 /// off when nyaa.si rate limits.
 #[tauri::command]
 async fn search_torrents_for_anime(
+    app: tauri::AppHandle,
     state: State<'_, Arc<AppState>>,
     title: AnimeTitle,
     synonyms: Option<Vec<String>>,
     anilist_id: Option<i64>,
     fansubber: Option<String>,
+    diagnostics: Option<bool>,
 ) -> Result<Vec<NyaaResult>, String> {
     let synonyms = synonyms.unwrap_or_default();
     let franchise = load_franchise(&state, anilist_id, true).await;
     let queries = title_match::build_search_queries(title.english.as_deref(), title.romaji.as_deref(), &synonyms, anilist_id.and_then(|id| state.anime_lists.tvdb_season(id)), franchise.as_ref());
     if queries.is_empty() {
         tracing::warn!("search_torrents_for_anime called with no usable title");
+        if diagnostics.unwrap_or(false) {
+            let empty = SourceMatchAnalytics {
+                anime_id: anilist_id,
+                entry_season: None,
+                queries: Vec::new(),
+                raw_hits: 0,
+                unique_releases: 0,
+                duplicate_hits: 0,
+                accepted: 0,
+                rejected: 0,
+                releases: Vec::new(),
+            };
+            if let Err(err) = app.emit("source-match-analytics", empty) {
+                tracing::warn!(%err, "could not send empty matching analytics to debug view");
+            }
+        }
         return Ok(Vec::new());
     }
     let candidates: Vec<String> = queries.into_iter().map(|query| query.render()).collect();
@@ -762,19 +792,26 @@ async fn search_torrents_for_anime(
     outcomes.sort_by_key(|(order, _, _)| *order);
 
     let mut seen_view_urls = std::collections::HashSet::new();
+    let mut query_matches: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
     let mut merged = Vec::new();
     let mut last_err = None;
+    let mut query_metrics = Vec::with_capacity(outcomes.len());
+    let mut raw_hits = 0usize;
     for (_, candidate, outcome) in outcomes {
         match outcome {
             Ok(results) => {
+                raw_hits += results.len();
+                query_metrics.push(CandidateSearchMetric { query: candidate.clone(), hits: results.len(), error: None });
                 tracing::info!(query = candidate, count = results.len(), "candidate search completed");
                 for result in results {
+                    query_matches.entry(result.view_url.clone()).or_default().push(candidate.clone());
                     if seen_view_urls.insert(result.view_url.clone()) {
                         merged.push(result);
                     }
                 }
             }
             Err(err) => {
+                query_metrics.push(CandidateSearchMetric { query: candidate.clone(), hits: 0, error: Some(err.to_string()) });
                 tracing::error!(query = candidate, %err, "candidate search failed");
                 last_err = Some(err);
             }
@@ -787,9 +824,30 @@ async fn search_torrents_for_anime(
     }
 
     let matcher = show_matcher(&state, &title, &synonyms, anilist_id, franchise.as_ref());
-    let before = merged.len();
-    filter_for_show(&state, &matcher, anilist_id, &mut merged, |_| true).await;
-    tracing::info!(kept = merged.len(), dropped = before - merged.len(), "dropped releases that don't name the show");
+    let unique_releases = merged.len();
+    let mut release_analysis = filter_for_show(&state, &matcher, anilist_id, &mut merged, |_| true, diagnostics.unwrap_or(false)).await;
+    tracing::info!(kept = merged.len(), dropped = unique_releases - merged.len(), "dropped releases that don't name the show");
+
+    if diagnostics.unwrap_or(false) {
+        for release in &mut release_analysis {
+            release.query_matches = query_matches.remove(&release.view_url).unwrap_or_default();
+        }
+        let accepted = release_analysis.iter().filter(|item| item.accepted).count();
+        let analytics = SourceMatchAnalytics {
+            anime_id: anilist_id,
+            entry_season: matcher.primary_season(),
+            queries: query_metrics,
+            raw_hits,
+            unique_releases,
+            duplicate_hits: raw_hits.saturating_sub(unique_releases),
+            accepted,
+            rejected: release_analysis.len().saturating_sub(accepted),
+            releases: release_analysis,
+        };
+        if let Err(err) = app.emit("source-match-analytics", analytics) {
+            tracing::warn!(%err, "could not send source matching analytics to debug view");
+        }
+    }
 
     // A preferred fansubber whose nyaa.si account isn't known yet: learn it
     // from one of their releases here, so the next search can go straight to
@@ -824,7 +882,7 @@ async fn search_local_releases(
     }
     let matcher = show_matcher(&state, &title, &synonyms, anilist_id, franchise.as_ref());
     let mut merged = merge_unique(lists);
-    filter_for_show(&state, &matcher, anilist_id, &mut merged, |_| true).await;
+    let _ = filter_for_show(&state, &matcher, anilist_id, &mut merged, |_| true, false).await;
     tracing::info!(count = merged.len(), "local release search for the show");
     Ok(merged)
 }
@@ -882,7 +940,7 @@ async fn search_fansubber_releases(
     let matcher = show_matcher(&state, &title, &synonyms, anilist_id, franchise.as_ref());
     let mut merged = merge_unique(lists);
     let tag_word = title_match::normalize(tag);
-    filter_for_show(&state, &matcher, anilist_id, &mut merged, |result| user.is_some() || title_match::normalize(&result.title).split(' ').any(|w| w == tag_word)).await;
+    let _ = filter_for_show(&state, &matcher, anilist_id, &mut merged, |result| user.is_some() || title_match::normalize(&result.title).split(' ').any(|w| w == tag_word), false).await;
     tracing::info!(?user, count = merged.len(), "fansubber-only release search");
     Ok(merged)
 }
@@ -897,7 +955,14 @@ async fn get_popular_fansubbers(state: State<'_, Arc<AppState>>) -> Result<Vec<S
 /// the AnimeTosho dataset knows by AniDB id is decided by it (see
 /// `ShowMatcher::decide`); the rest by the title rules. The ids are looked up
 /// in one batch query, and each kept release gets its `episode_group` (eid).
-async fn filter_for_show(state: &AppState, matcher: &title_match::ShowMatcher, anilist_id: Option<i64>, results: &mut Vec<NyaaResult>, extra: impl Fn(&NyaaResult) -> bool) {
+async fn filter_for_show(
+    state: &AppState,
+    matcher: &title_match::ShowMatcher,
+    anilist_id: Option<i64>,
+    results: &mut Vec<NyaaResult>,
+    extra: impl Fn(&NyaaResult) -> bool,
+    capture_diagnostics: bool,
+) -> Vec<BackendReleaseAnalysis> {
     let entry_aids: Vec<u32> = anilist_id.and_then(|id| u32::try_from(id).ok()).map(|id| state.anime_lists.anidb_ids(id)).unwrap_or_default();
     let known = if entry_aids.is_empty() || results.is_empty() {
         std::collections::HashMap::new()
@@ -906,11 +971,18 @@ async fn filter_for_show(state: &AppState, matcher: &title_match::ShowMatcher, a
         state.nyaa.aids_of(&ids).await
     };
     let (mut by_id, mut by_title) = (0usize, 0usize);
+    let mut diagnostics = Vec::new();
     results.retain_mut(|result| {
         let tosho = nyaa_client::release_id(&result.view_url).and_then(|id| known.get(&id));
         let mut trusted = false;
         let mut by_title_decided = false;
-        let keep = match matcher.decide(&result.title, tosho, &entry_aids) {
+        let decision = matcher.decide(&result.title, tosho, &entry_aids);
+        let evaluation = if decision == title_match::Decision::UseTitleRules && capture_diagnostics {
+            Some(matcher.explain(&result.title))
+        } else {
+            None
+        };
+        let keep = match decision {
             title_match::Decision::Accept => {
                 by_id += 1;
                 trusted = tosho.is_some_and(|t| t.approved > 0);
@@ -923,10 +995,12 @@ async fn filter_for_show(state: &AppState, matcher: &title_match::ShowMatcher, a
             title_match::Decision::UseTitleRules => {
                 by_title += 1;
                 by_title_decided = true;
-                matcher.matches(&result.title)
+                evaluation.as_ref().map_or_else(|| matcher.matches(&result.title), |evaluation| evaluation.matched)
             }
         };
-        let keep = keep && extra(result);
+        let title_match_keep = keep;
+        let extra_keep = keep && extra(result);
+        let keep = title_match_keep && extra_keep;
         if keep {
             result.episode_group = tosho.map(|t| t.eid).filter(|eid| *eid != 0);
             result.aid_trusted = trusted.then_some(true);
@@ -934,9 +1008,76 @@ async fn filter_for_show(state: &AppState, matcher: &title_match::ShowMatcher, a
                 annotate_title_decided(matcher, result);
             }
         }
+        if capture_diagnostics {
+            let mut checks = Vec::new();
+            let (decision_name, reason) = match decision {
+                title_match::Decision::Accept => {
+                    checks.push(SourceMatchCriterion {
+                        name: "AnimeTosho identity".into(),
+                        outcome: "passed".into(),
+                        evidence: tosho.map_or_else(
+                            || "AniDB mapping matched this entry".to_string(),
+                            |known| if known.approved > 0 {
+                                format!("Approved AniDB id {} matched; approval {}, episode id {}", known.aid, known.approved, known.eid)
+                            } else {
+                                format!("Unconfirmed AniDB id {} matched and title checks did not flag ambiguity; episode id {}", known.aid, known.eid)
+                            },
+                        ),
+                    });
+                    checks.push(SourceMatchCriterion { name: "Title rules".into(), outcome: "not needed".into(), evidence: "Dataset identity accepted this release".into() });
+                    ("AnimeTosho accepted", "Trusted dataset identity matched this entry".to_string())
+                }
+                title_match::Decision::Reject => {
+                    checks.push(SourceMatchCriterion {
+                        name: "AnimeTosho identity".into(),
+                        outcome: "failed".into(),
+                        evidence: tosho.map_or_else(|| "Trusted AniDB mapping points to another entry".to_string(), |known| format!("AniDB id {} is not in this entry's ids {:?}; approved {}", known.aid, entry_aids, known.approved)),
+                    });
+                    checks.push(SourceMatchCriterion { name: "Title rules".into(), outcome: "not used".into(), evidence: "Trusted dataset decision rejects this release".into() });
+                    ("AnimeTosho rejected", "Trusted dataset identity points to another entry".to_string())
+                }
+                title_match::Decision::UseTitleRules => {
+                    checks.push(SourceMatchCriterion {
+                        name: "AnimeTosho identity".into(),
+                        outcome: "not decisive".into(),
+                        evidence: tosho.map_or_else(|| "No mapped release id for this result".to_string(), |known| format!("AniDB id {} with approved {}; title rules decide", known.aid, known.approved)),
+                    });
+                    let evaluation = evaluation.as_ref().expect("diagnostic title evaluation captured");
+                    checks.extend(evaluation.checks.iter().map(|check| SourceMatchCriterion {
+                        name: check.criterion.clone(),
+                        outcome: if check.passed { "passed".into() } else { "failed".into() },
+                        evidence: check.evidence.clone(),
+                    }));
+                    ("Title rules", evaluation.reason.clone())
+                }
+            };
+            if !title_match_keep {
+                checks.push(SourceMatchCriterion { name: "Final show match".into(), outcome: "rejected".into(), evidence: reason.clone() });
+            } else if !extra_keep {
+                checks.push(SourceMatchCriterion { name: "Additional source filter".into(), outcome: "failed".into(), evidence: "This search phase's extra condition rejected the result".into() });
+            } else {
+                checks.push(SourceMatchCriterion { name: "Final show match".into(), outcome: "kept".into(), evidence: reason.clone() });
+            }
+            diagnostics.push(BackendReleaseAnalysis {
+                title: result.title.clone(),
+                view_url: result.view_url.clone(),
+                size: result.size.clone(),
+                seeders: result.seeders,
+                leechers: result.leechers,
+                label: result.label.clone(),
+                episode_group: result.episode_group,
+                aid_trusted: result.aid_trusted,
+                query_matches: Vec::new(),
+                accepted: keep,
+                decision: decision_name.into(),
+                reason: if !title_match_keep { reason } else if !extra_keep { "Additional source filter rejected this release".into() } else { reason },
+                checks,
+            });
+        }
         keep
     });
     tracing::info!(entry_aids = entry_aids.len(), known = known.len(), by_id, by_title, kept = results.len(), "filtered releases for the show");
+    diagnostics
 }
 
 /// What the title rules know about a kept release that its label and flags
@@ -1705,7 +1846,6 @@ pub fn run() {
             tosho_import::tosho_import_cancel,
             tosho_import::tosho_import_status,
             log_frontend,
-            debug_read_logs,
             search_anime,
             get_anime_details,
             get_absolute_episode_offset,
