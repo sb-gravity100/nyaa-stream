@@ -1,3 +1,15 @@
+### `56972e8` · 2026-10-26 · fix: slide home header out in fullscreen
+- `src/fullscreen.ts`
+- `src/App.css`
+- `PLAN.md`
+- `PHASES.md`
+- `CHANGELOG.md`
+- `src/changelog.ts`
+- `FILE_INDEX.md`
+- `package.json`
+- `src-tauri/tauri.conf.json`
+- `src-tauri/Cargo.toml`
+
 ### `c829310` · 2026-10-17 · feat: sort nyaa searches by seeders (s=seeders&o=desc), key caches by sort, drop the newest-first early stop
 - `crates/nyaa-client/src/lib.rs`
 - `crates/nyaa-client/src/store.rs`
