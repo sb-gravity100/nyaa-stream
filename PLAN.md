@@ -496,6 +496,11 @@ nyaa_stream/
    dock tint (the webview can't read mpv's pixels) and lifting bottom
    subtitle lines above the visible control dock.
 
+   The home app bar slides above the viewport while the native window is
+   fullscreen, then returns when fullscreen ends. `fullscreen.ts` mirrors
+   the window state onto the document root so this also works after startup
+   in fullscreen.
+
    **Torrent downloads now live under AppData/cache** (`dirs::cache_dir()`
    joined with `nyaa-stream/downloads`), not the user's actual Downloads
    folder - app-owned data, not something the user is meant to keep or

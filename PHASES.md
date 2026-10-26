@@ -1,5 +1,8 @@
 # PHASES.md — nyaa-stream
 
+## v0.5.1 — Fullscreen header fix
+- [x] Slide the home app bar above the viewport in fullscreen; restore it on exit
+
 ## Phase 0 — Scaffolding (done)
 - [x] Tauri + Preact-TS project scaffolded
 - [x] Cargo workspace with `torrent-engine`, `nyaa-client`, `anilist-client`,

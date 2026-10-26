@@ -21,6 +21,7 @@ export function setFullscreen(on: boolean): void {
   if (on === current) return;
   console.debug("[fullscreen] set", { on });
   current = on;
+  document.documentElement.classList.toggle("app-fullscreen", on);
   for (const listener of listeners) listener(on);
   if (isTauri()) {
     getCurrentWindow()
@@ -58,6 +59,7 @@ export function installFullscreenHotkey(): void {
       .isFullscreen()
       .then((on) => {
         current = on;
+        document.documentElement.classList.toggle("app-fullscreen", on);
         for (const listener of listeners) listener(on);
         console.debug("[fullscreen] initial state", { on });
       })

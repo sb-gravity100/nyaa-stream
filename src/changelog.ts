@@ -10,6 +10,12 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.5.1",
+    date: "2026-10-26",
+    features: [],
+    fixes: ["The home header now slides out of view in fullscreen and returns on exit."],
+  },
+  {
     version: "0.5.0",
     date: "2026-10-13",
     features: [

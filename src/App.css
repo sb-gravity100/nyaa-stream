@@ -436,6 +436,12 @@ html.mpv-active .titlebar {
   backdrop-filter: var(--glass-blur);
   border-bottom: 1px solid var(--glass-rim);
   box-shadow: 0 10px 30px -18px rgba(4, 5, 12, 0.9);
+  transition: transform 220ms var(--ease-out);
+}
+
+html.app-fullscreen .app-bar {
+  transform: translateY(-100%);
+  pointer-events: none;
 }
 
 .app-brand {

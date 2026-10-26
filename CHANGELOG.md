@@ -9,6 +9,11 @@ step when cutting a release.
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-10-26
+
+### Fixed
+- The home header now slides out of view in fullscreen and returns on exit.
+
 ## [0.5.0] - 2026-10-13
 
 ### Added
