@@ -10,6 +10,12 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.5.5",
+    date: "2026-10-26",
+    features: [],
+    fixes: ["Player controls now appear only over the top or bottom controls and fade out as soon as the pointer leaves."],
+  },
+  {
     version: "0.5.4",
     date: "2026-10-26",
     features: [],

@@ -41,9 +41,8 @@ import {
 } from "./icons";
 
 const STATS_POLL_MS = 1000;
-// Mouse idle this long anywhere but the top/bottom control areas fades
-// the controls and hides the cursor. While the pointer rests over those
-// areas the controls stay up indefinitely.
+// Keyboard activity keeps already-visible controls up for this long. Mouse
+// movement out of the hover areas hides them immediately.
 const CONTROLS_IDLE_MS = 2000;
 // What counts as "over the controls": the bars themselves and the
 // always-present invisible strips under them (the bars have
@@ -822,16 +821,18 @@ function MpvPlayerView({
          if (!playerRoot.contains(target as Node) && !element?.closest(".titlebar")) return;
          const over =
             element != null &&
-            (element.closest(CONTROLS_AREA_SELECTOR) != null || element.closest(".titlebar") != null);
+            (element.closest(CONTROLS_AREA_SELECTOR) != null ||
+               element.closest(".titlebar, .player-menu, .player-playlist") != null);
          if (over !== hoveringControlsRef.current)
             console.debug("[player] pointer over controls area", { over });
          hoveringControlsRef.current = over;
-         showControls();
+         if (over) showControls();
+         else hideControlsImmediately();
       }
 
       function handlePointerLeave() {
          console.debug("[player] pointer left window");
-         hoveringControlsRef.current = false;
+         hideControlsImmediately();
       }
 
       document.addEventListener("pointermove", handlePointerMove);
@@ -883,6 +884,15 @@ function MpvPlayerView({
          hideControlsIfIdle,
          CONTROLS_IDLE_MS,
       );
+   }
+
+   function hideControlsImmediately() {
+      hoveringControlsRef.current = false;
+      window.clearTimeout(idleTimerRef.current);
+      setControlsVisible(false);
+      setCursorHidden(true);
+      setMenu(null);
+      setPlaylistOpen(false);
    }
 
    function hideControlsIfIdle() {

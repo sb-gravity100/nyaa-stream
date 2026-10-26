@@ -9,6 +9,11 @@ step when cutting a release.
 
 ## [Unreleased]
 
+## [0.5.5] - 2026-10-26
+
+### Changed
+- Player controls now appear only while hovering over the top or bottom controls and fade out as soon as the pointer leaves.
+
 ## [0.5.4] - 2026-10-26
 
 ### Fixed

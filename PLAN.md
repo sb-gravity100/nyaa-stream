@@ -1056,7 +1056,8 @@ permissions (`core:window:allow-start-dragging`, `-minimize`,
 `-toggle-maximize`, `-close`, `-show`) in the main capability.
 Player pointer tracking spans the document so the title-bar overlay remains
 part of the top hover area instead of repeatedly leaving and re-entering the
-player surface.
+player surface. Player controls are shown only over the top/bottom hover
+areas (or an open player menu); moving out hides them immediately.
 
 ## Download cache (planned, v0.4.0 - minor: new feature)
 

@@ -1,5 +1,8 @@
 # PHASES.md — nyaa-stream
 
+## v0.5.5 — Hover-only player controls
+- [x] Show controls only over the top/bottom hover areas; hide immediately when leaving them
+
 ## v0.5.4 — Player top-edge hover flicker
 - [x] Track pointer movement across the player and title-bar overlay as one hover surface
 
