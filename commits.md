@@ -1,3 +1,14 @@
+### `7d9d05a` · 2026-10-26 · fix: write dev logs to launch directory
+- `src-tauri/src/lib.rs`
+- `PLAN.md`
+- `PHASES.md`
+- `FILE_INDEX.md`
+- `CHANGELOG.md`
+- `src/changelog.ts`
+- `package.json`
+- `src-tauri/tauri.conf.json`
+- `src-tauri/Cargo.toml`
+
 ### `7979c30` · 2026-10-26 · fix: remove titlebar gap in fullscreen
 - `src/App.css`
 - `src/fullscreen.ts`
