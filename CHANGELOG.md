@@ -9,6 +9,13 @@ step when cutting a release.
 
 ## [Unreleased]
 
+## [0.5.7] - 2026-10-27
+
+### Fixed
+- Nyaa searches now target the selected anime entry with exact title and season phrases; ambiguous unmarked shared titles are excluded from season pages.
+- Same-season AniList aliases improve split-cour and translated-title search coverage.
+- Movie, OVA and special searches use the entry's full names rather than the franchise base.
+
 ## [0.5.6] - 2026-10-26
 
 ### Fixed

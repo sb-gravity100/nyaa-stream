@@ -34,6 +34,9 @@ const MAX_CANDIDATES: usize = 4;
 const MIN_SYNONYM_LEN: usize = 5;
 /// Shortest normalized base name (the short form before a season marker).
 const MIN_BASE_NAME_LEN: usize = 5;
+const MAX_SEARCH_NAMES: usize = 12;
+const MAX_SEARCH_BASES: usize = 6;
+const MAX_QUERY_PHRASES: usize = 32;
 
 /// Apostrophes and their lookalikes: dropped, not separators, so "Journey's"
 /// and "Journeys" both become `journeys` (groups write either).
@@ -130,9 +133,244 @@ fn names(english: Option<&str>, romaji: Option<&str>, synonyms: &[String]) -> Ve
     let mut seen = BTreeSet::new();
     all.retain(|name| {
         let key = normalize(name);
+        !key.is_empty() && name.chars().count() <= 120 && seen.insert(key)
+    });
+    all.truncate(MAX_SEARCH_NAMES);
+    all
+}
+
+/// One nyaa.si query expression. Positive phrases are alternatives; exclusion
+/// phrases form one negated OR group, matching nyaa.si's search syntax.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NyaaSearchQuery {
+    includes: Vec<String>,
+    excludes: Vec<String>,
+}
+
+impl NyaaSearchQuery {
+    pub fn render(&self) -> String {
+        self.render_with(None)
+    }
+
+    /// Adds an uploader tag to each OR branch (not just the first branch).
+    pub fn render_with_required_term(&self, term: &str) -> String {
+        self.render_with(Some(term))
+    }
+
+    fn render_with(&self, required: Option<&str>) -> String {
+        let positives = self
+            .includes
+            .iter()
+            .filter_map(|phrase| quote_phrase(phrase))
+            .map(|phrase| required.map_or_else(|| phrase.clone(), |term| format!("{term} {phrase}")))
+            .collect::<Vec<_>>()
+            .join("|");
+        let negatives = self.excludes.iter().filter_map(|phrase| quote_phrase(phrase)).collect::<Vec<_>>().join("|");
+        if negatives.is_empty() {
+            positives
+        } else {
+            format!("{positives} -{negatives}")
+        }
+    }
+}
+
+fn quote_phrase(text: &str) -> Option<String> {
+    let safe = text.chars().filter(|c| !matches!(c, '"' | '|' | '(' | ')')).collect::<String>();
+    let phrase = safe.split_whitespace().collect::<Vec<_>>().join(" ");
+    (!phrase.is_empty()).then(|| format!("\"{phrase}\""))
+}
+
+fn raw_names(english: Option<&str>, romaji: Option<&str>, synonyms: &[String]) -> Vec<String> {
+    let mut all: Vec<String> = [english, romaji]
+        .into_iter()
+        .flatten()
+        .map(str::to_string)
+        .chain(synonyms.iter().filter(|s| is_latin(s) && normalize(s).len() >= MIN_SYNONYM_LEN).cloned())
+        .collect();
+    let mut seen = BTreeSet::new();
+    all.retain(|name| {
+        let key = normalize(name);
         !key.is_empty() && seen.insert(key)
     });
     all
+}
+
+fn search_bases(english: Option<&str>, romaji: Option<&str>, synonyms: &[String], franchise: Option<&Franchise>, seasons: &BTreeSet<u32>, split_entry: bool) -> Vec<String> {
+    let mut bases = Vec::new();
+    for title in raw_names(english, romaji, synonyms) {
+        for variant in season_free_variants(&title) {
+            if let Some(base) = base_title(&variant) {
+                if !bases.iter().any(|old: &String| normalize(old) == normalize(&base)) {
+                    bases.push(base);
+                }
+            }
+        }
+    }
+    if let Some(franchise) = franchise {
+        for base in franchise_base_names(english, romaji, synonyms, franchise) {
+            if !bases.iter().any(|old| normalize(old) == normalize(&base)) {
+                bases.push(base);
+            }
+        }
+        for relative in franchise.relatives.iter().filter(|relative| is_tv(relative.format.as_deref())) {
+            let sibling_seasons = entry_seasons(relative.title.english.as_deref(), relative.title.romaji.as_deref(), &relative.synonyms, None);
+            let same_season = sibling_seasons.iter().any(|season| seasons.contains(season))
+                || (split_entry && relative.relation == "PREQUEL" && sibling_seasons.is_empty());
+            if !same_season {
+                continue;
+            }
+            for title in raw_names(relative.title.english.as_deref(), relative.title.romaji.as_deref(), &relative.synonyms) {
+                for variant in season_free_variants(&title) {
+                    if let Some(base) = base_title(&variant) {
+                        if !bases.iter().any(|old| normalize(old) == normalize(&base)) {
+                            bases.push(base);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    bases.truncate(MAX_SEARCH_BASES);
+    bases
+}
+
+fn roman_season(season: u32) -> Option<&'static str> {
+    Some(match season {
+        1 => "I",
+        2 => "II",
+        3 => "III",
+        4 => "IV",
+        5 => "V",
+        6 => "VI",
+        7 => "VII",
+        8 => "VIII",
+        9 => "IX",
+        10 => "X",
+        _ => return None,
+    })
+}
+
+fn ordinal_season(season: u32) -> String {
+    let suffix = match season % 100 {
+        11..=13 => "th",
+        _ => match season % 10 {
+            1 => "st",
+            2 => "nd",
+            3 => "rd",
+            _ => "th",
+        },
+    };
+    format!("{season}{suffix} Season")
+}
+
+fn season_markers(season: u32) -> Vec<String> {
+    let mut markers = vec![format!("S{season}"), format!("S{season:02}"), format!("Season {season}"), ordinal_season(season)];
+    if let Some(roman) = roman_season(season) {
+        markers.push(roman.to_string());
+    }
+    markers
+}
+
+/// Builds remote nyaa.si queries with exact phrase alternatives and explicit
+/// season markers. Local database lookups keep using `build_candidates`, whose
+/// plain words match the store's AND-search semantics.
+pub fn build_search_queries(
+    english: Option<&str>,
+    romaji: Option<&str>,
+    synonyms: &[String],
+    tvdb_season: Option<u32>,
+    franchise: Option<&Franchise>,
+) -> Vec<NyaaSearchQuery> {
+    let entry_seasons = entry_seasons(english, romaji, synonyms, tvdb_season);
+    let matcher = ShowMatcher::new(english, romaji, synonyms, tvdb_season);
+    let matcher = match franchise {
+        Some(franchise) => matcher.with_franchise(franchise),
+        None => matcher,
+    };
+    let primary = matcher.primary_season();
+    let is_tv_entry = franchise
+        .and_then(|f| f.format.as_deref())
+        .map(|format| is_tv(Some(format)))
+        .unwrap_or(tvdb_season.is_some() || !entry_seasons.is_empty());
+    let later_season = is_tv_entry && primary.is_some_and(|season| season > 1);
+    let mut exact_names = raw_names(english, romaji, synonyms);
+
+    if later_season {
+        if let Some(franchise) = franchise {
+            let sibling_tv_names: BTreeSet<String> = franchise
+                .relatives
+                .iter()
+                .filter(|r| is_tv(r.format.as_deref()))
+                .flat_map(|r| names(r.title.english.as_deref(), r.title.romaji.as_deref(), &r.synonyms))
+                .map(|name| normalize(&name))
+                .collect();
+            if sibling_tv_names.is_empty() {
+                exact_names.retain(|name| !release_seasons(name).is_empty());
+            } else {
+                exact_names.retain(|name| !sibling_tv_names.contains(&normalize(name)));
+            }
+        } else {
+            exact_names.retain(|name| !release_seasons(name).is_empty());
+        }
+    }
+
+    let mut queries = Vec::new();
+    let first_season = is_tv_entry && primary == Some(1);
+    let mut seasons = if first_season { BTreeSet::from([1]) } else { entry_seasons.clone() };
+    seasons.extend(primary.filter(|season| !later_season || *season > 1));
+    if later_season {
+        seasons.retain(|season| *season > 1);
+    }
+    let split_entry = raw_names(english, romaji, synonyms).iter().any(|name| is_split_part_name(&normalize(name)));
+    let bases = if is_tv_entry { search_bases(english, romaji, synonyms, franchise, &seasons, split_entry) } else { Vec::new() };
+    let exclusions = if first_season { sibling_exclusion_phrases(&bases, franchise) } else { Vec::new() };
+
+    if !exact_names.is_empty() {
+        queries.push(NyaaSearchQuery { includes: exact_names, excludes: exclusions.clone() });
+    }
+
+    if is_tv_entry {
+        let phrases = bases
+            .iter()
+            .flat_map(|base| seasons.iter().flat_map(move |season| season_markers(*season).into_iter().map(move |marker| format!("{base} {marker}"))))
+            .collect::<Vec<_>>();
+        if !phrases.is_empty() {
+            let phrases = phrases.into_iter().take(MAX_QUERY_PHRASES).collect();
+            queries.push(NyaaSearchQuery { includes: phrases, excludes: Vec::new() });
+        }
+    }
+
+    let mut seen = BTreeSet::new();
+    queries.retain(|query| seen.insert(query.render()));
+    tracing::debug!(?queries, primary, is_tv_entry, "built entry-specific nyaa queries");
+    queries.into_iter().take(MAX_CANDIDATES).collect()
+}
+
+fn sibling_exclusion_phrases(bases: &[String], franchise: Option<&Franchise>) -> Vec<String> {
+    let mut seasons = BTreeSet::new();
+    let mut titles = Vec::new();
+    if let Some(franchise) = franchise {
+        let tv_siblings: Vec<_> = franchise.relatives.iter().filter(|r| is_tv(r.format.as_deref())).collect();
+        for relative in &tv_siblings {
+            seasons.extend(entry_seasons(relative.title.english.as_deref(), relative.title.romaji.as_deref(), &relative.synonyms, None).into_iter().filter(|season| *season > 1));
+            titles.extend(raw_names(relative.title.english.as_deref(), relative.title.romaji.as_deref(), &relative.synonyms));
+            titles.extend(names(relative.title.english.as_deref(), relative.title.romaji.as_deref(), &relative.synonyms));
+        }
+        seasons.extend(2..=(tv_siblings.len() as u32 + 1).max(2));
+    }
+    for base in bases {
+        for season in &seasons {
+            titles.extend(season_markers(*season).into_iter().map(|marker| format!("{base} {marker}")));
+        }
+    }
+    let own_bases: BTreeSet<String> = bases.iter().map(|base| normalize(base)).collect();
+    let mut seen = BTreeSet::new();
+    titles.retain(|title| {
+        let key = normalize(title);
+        !key.is_empty() && !own_bases.contains(&key) && seen.insert(key)
+    });
+    titles.truncate(MAX_QUERY_PHRASES);
+    titles
 }
 
 /// The nyaa.si queries to run: the show's names minus any whose words are a
@@ -288,8 +526,12 @@ pub fn franchise_base_names(english: Option<&str>, romaji: Option<&str>, synonym
 
 /// `franchise_base_names` for already normalized names.
 fn shared_bases(own: &[String], franchise: &Franchise) -> Vec<String> {
+    shared_bases_for(own, &franchise.relatives)
+}
+
+fn shared_bases_for(own: &[String], relatives: &[anilist_client::Relative]) -> Vec<String> {
     let mut bases: Vec<String> = Vec::new();
-    for relative in &franchise.relatives {
+    for relative in relatives {
         for title in [relative.title.english.as_deref(), relative.title.romaji.as_deref()].into_iter().flatten() {
             let theirs = normalize(title);
             let theirs: Vec<&str> = theirs.split(' ').collect();
@@ -317,15 +559,25 @@ fn shared_bases(own: &[String], franchise: &Franchise) -> Vec<String> {
 /// accepted (see PLAN.md "Season-aware source matching").
 pub struct ShowMatcher {
     names: Vec<String>,
+    /// Original AniList names before removing season words. A full distinctive
+    /// entry title can identify an unmarked release when franchise data is not
+    /// available.
+    identity_names: Vec<String>,
     bases: Vec<String>,
     seasons: BTreeSet<u32>,
     /// The entry's AniList format (TV, MOVIE, OVA, ...), once known.
     format: Option<String>,
     /// Normalized names of the franchise's other entries.
     siblings: Vec<Vec<String>>,
-    /// Normalized names of the entries before this one (TV prequels): a
-    /// release that names only what these also carry could be theirs.
-    earlier: Vec<Vec<String>>,
+    /// TV-relative names from an entry in the same season (for aliases absent
+    /// from the selected AniList title, such as a translated season name).
+    same_season_siblings: Vec<Vec<String>>,
+    /// TV-relative names that identify a different season.
+    season_siblings: Vec<Vec<String>>,
+    /// Normalized short names shared with franchise relatives.
+    shared_bases: Vec<String>,
+    /// Short names shared specifically with a different TV season.
+    shared_season_bases: Vec<String>,
     /// The one season the entry is filed under: TVDB's, else the one its
     /// titles name, else 1 for a first season. None when unknown.
     primary: Option<u32>,
@@ -334,6 +586,7 @@ pub struct ShowMatcher {
 impl ShowMatcher {
     pub fn new(english: Option<&str>, romaji: Option<&str>, synonyms: &[String], tvdb_season: Option<u32>) -> Self {
         let titles = names(english, romaji, synonyms);
+        let identity_names = raw_names(english, romaji, synonyms).iter().map(|name| normalize(name)).collect();
         let mut bases: Vec<String> = Vec::new();
         for title in [english, romaji].into_iter().flatten() {
             let unseasoned = strip_season_suffix(title);
@@ -345,7 +598,7 @@ impl ShowMatcher {
                 }
             }
         }
-        let matcher = ShowMatcher { names: titles.iter().map(|name| normalize(name)).collect(), bases, seasons: entry_seasons(english, romaji, synonyms, tvdb_season), format: None, siblings: Vec::new(), earlier: Vec::new(), primary: tvdb_season.or_else(|| entry_seasons(english, romaji, synonyms, None).iter().next().copied()) };
+        let matcher = ShowMatcher { names: titles.iter().map(|name| normalize(name)).collect(), identity_names, bases, seasons: entry_seasons(english, romaji, synonyms, tvdb_season), format: None, siblings: Vec::new(), same_season_siblings: Vec::new(), season_siblings: Vec::new(), shared_bases: Vec::new(), shared_season_bases: Vec::new(), primary: tvdb_season.or_else(|| entry_seasons(english, romaji, synonyms, None).iter().next().copied()) };
         tracing::debug!(names = ?matcher.names, bases = ?matcher.bases, seasons = ?matcher.seasons, "show matcher built");
         matcher
     }
@@ -372,9 +625,10 @@ impl ShowMatcher {
             let own_part = self.names.iter().any(|name| is_split_part_name(name));
             self.primary = Some(if own_part { earlier } else { earlier + 1 }.max(1));
         }
-        for base in shared_bases(&self.names, franchise) {
+        self.shared_bases = shared_bases(&self.names, franchise);
+        for base in &self.shared_bases {
             if !self.bases.contains(&base) {
-                self.bases.push(base);
+                self.bases.push(base.clone());
             }
         }
         self.siblings = franchise
@@ -382,13 +636,29 @@ impl ShowMatcher {
             .iter()
             .map(|relative| names(relative.title.english.as_deref(), relative.title.romaji.as_deref(), &relative.synonyms).iter().map(|name| normalize(name)).collect())
             .collect();
-        self.earlier = franchise
-            .relatives
-            .iter()
-            .filter(|relative| relative.relation == "PREQUEL" && is_tv(relative.format.as_deref()))
-            .map(|relative| names(relative.title.english.as_deref(), relative.title.romaji.as_deref(), &relative.synonyms).iter().map(|name| normalize(name)).collect())
-            .collect();
-        tracing::debug!(format = ?self.format, seasons = ?self.seasons, siblings = self.siblings.len(), earlier = self.earlier.len(), "show matcher given its franchise");
+        let mut own_seasons = self.seasons.clone();
+        own_seasons.extend(self.primary);
+        let own_split = self.names.iter().any(|name| is_split_part_name(name));
+        let mut different_season_relatives = Vec::new();
+        self.same_season_siblings.clear();
+        self.season_siblings.clear();
+        for relative in franchise.relatives.iter().filter(|relative| is_tv(relative.format.as_deref())) {
+            let sibling_seasons = entry_seasons(relative.title.english.as_deref(), relative.title.romaji.as_deref(), &relative.synonyms, None);
+            let sibling_names: Vec<String> = names(relative.title.english.as_deref(), relative.title.romaji.as_deref(), &relative.synonyms)
+                .iter()
+                .map(|name| normalize(name))
+                .collect();
+            let same_season = sibling_seasons.iter().any(|season| own_seasons.contains(season))
+                || (own_split && relative.relation == "PREQUEL" && sibling_seasons.is_empty());
+            if same_season {
+                self.same_season_siblings.push(sibling_names);
+            } else {
+                self.season_siblings.push(sibling_names);
+                different_season_relatives.push(relative.clone());
+            }
+        }
+        self.shared_season_bases = shared_bases_for(&self.names, &different_season_relatives);
+        tracing::debug!(format = ?self.format, seasons = ?self.seasons, siblings = self.siblings.len(), same_season_siblings = self.same_season_siblings.len(), shared_bases = ?self.shared_bases, "show matcher given its franchise");
         self
     }
 
@@ -423,30 +693,35 @@ impl ShowMatcher {
         self.roman_season(&haystack(release_title))
     }
 
-    /// Whether an unmarked release only names what this entry's *earlier*
-    /// seasons also go by, so it may as well be theirs: a later-season entry
-    /// (the season set lacks 1), no season marker or numeral in the title,
-    /// and every one of the entry's names found in it is also a name of a TV
-    /// prequel ("Mushoku Tensei: Jobless Reincarnation - 01" is the first
-    /// season's; the third season's own romaji "Mushoku Tensei III: ..." is
-    /// not shared, and "Symphogear XV - 06" is not either). The release is
-    /// still kept by the title rules (absolute-numbered releases depend on
-    /// it); the frontend files it under this season only when something
-    /// confirms it (see `NyaaResult.season_ambiguous`).
+    /// Whether an unmarked release only names what a franchise sibling also
+    /// uses. Without a season marker, a shared title is ambiguous on any
+    /// season page. A trusted AniDB id or an unshared full title identifies the
+    /// selected entry.
     pub fn season_ambiguous(&self, release_title: &str) -> bool {
-        if self.seasons.is_empty() || self.seasons.contains(&1) || self.earlier.is_empty() {
+        let has_season_context = self.primary.is_some_and(|season| season > 1) || !self.season_siblings.is_empty() || !self.shared_season_bases.is_empty();
+        if !has_season_context {
             return false;
         }
         let haystack = haystack(release_title);
-        if !self.named_seasons(release_title, &haystack).is_empty() {
+        if !self.named_seasons(release_title, &haystack).is_empty() || names_whole_series(&haystack) {
             return false;
         }
-        let mut found = self.names.iter().filter(|name| haystack.contains(&format!(" {name} "))).peekable();
-        if found.peek().is_none() {
-            return false;
+        let found: Vec<&String> = self.names.iter().filter(|name| haystack.contains(&format!(" {name} "))).collect();
+        if found.is_empty() {
+            let ambiguous = Self::longest_match(&haystack, &self.shared_season_bases) > 0;
+            tracing::trace!(release_title, ambiguous, "unmarked release matches a different-season franchise base");
+            return ambiguous;
         }
-        let ambiguous = found.all(|name| self.earlier.iter().any(|names| names.contains(name)));
-        tracing::trace!(release_title, ambiguous, "unmarked release on a later-season entry");
+        let ambiguous = if self.season_siblings.is_empty() {
+            if self.same_season_siblings.is_empty() {
+                !found.iter().any(|name| self.identity_names.contains(name))
+            } else {
+                false
+            }
+        } else {
+            found.iter().all(|name| self.season_siblings.iter().any(|siblings| siblings.contains(name)))
+        };
+        tracing::trace!(release_title, ambiguous, "unmarked release shares a different-season franchise title");
         ambiguous
     }
 
@@ -485,7 +760,7 @@ impl ShowMatcher {
             // rejects on its own.
             (0, true) => {
                 let hay = haystack(release_title);
-                if self.names_only_other_seasons(&self.named_seasons(release_title, &hay)) {
+                if self.names_only_other_seasons(&self.named_seasons(release_title, &hay)) || self.season_ambiguous(release_title) {
                     Decision::UseTitleRules
                 } else {
                     Decision::Accept
@@ -519,6 +794,10 @@ impl ShowMatcher {
             tracing::trace!(release_title, ?release_seasons, entry_seasons = ?self.seasons, "rejected: other season");
             return false;
         }
+        if self.season_ambiguous(release_title) {
+            tracing::trace!(release_title, entry_season = ?self.primary, "rejected: unmarked title is shared with an earlier season");
+            return false;
+        }
         // Movies, OVAs and specials are filed under their own entry, not
         // a TV season's episode list.
         // A pack naming several seasons may bundle them ("S01-S05 + OVA").
@@ -536,6 +815,12 @@ impl ShowMatcher {
         let whole = (release_seasons.is_empty() && names_whole_series(&haystack)) || (self.seasons.is_empty() && release_seasons.len() >= 2);
         let in_season = release_seasons.iter().any(|season| self.seasons.contains(season)) || whole;
         let mut own = Self::longest_match(&haystack, &self.names);
+        if own == 0 {
+            own = self.same_season_siblings.iter().map(|names| Self::longest_match(&haystack, names)).max().unwrap_or(0);
+            if own > 0 {
+                tracing::trace!(release_title, "same-season sibling title identifies the selected season");
+            }
+        }
         if own == 0 {
             let effective_ok = in_season || (release_seasons.is_empty() && self.seasons.contains(&1));
             own = if effective_ok { Self::longest_match(&haystack, &self.bases) } else { 0 };
@@ -685,13 +970,13 @@ mod tests {
     #[test]
     fn unmarked_release_naming_only_what_earlier_seasons_share_is_ambiguous() {
         let m = mushoku_s3();
-        // Season 1's BD and TV releases: kept by the title rules, but they may be the first season's.
+        // Season 1's BD and TV releases are ambiguous for the third season.
         for title in [
             "[Diogo4D-NF93] [BD][1080p] Mushoku Tensei Isekai Ittara Honki Dasu - 01 [127C0B18].mkv",
             "[SubsPlease] Mushoku Tensei: Jobless Reincarnation - 03 (1080p)",
             "[EA]Mushoku_Tensei_-_Isekai_Ittara_Honki_Dasu_01-11_End_[1920x1080][BDRIP][HEVC][Flac]",
         ] {
-            assert!(m.matches(title), "{title}");
+            assert!(!m.matches(title), "{title}");
             assert!(m.season_ambiguous(title), "{title}");
         }
         // Naming the entry itself, or carrying a season marker: not ambiguous.
@@ -710,6 +995,17 @@ mod tests {
     }
 
     #[test]
+    fn later_season_without_franchise_data_needs_a_marker_or_distinctive_full_title() {
+        let mushoku = ShowMatcher::new(Some("Mushoku Tensei: Jobless Reincarnation Season 3"), Some("Mushoku Tensei III: Isekai Ittara Honki Dasu"), &[], Some(3));
+        assert!(!mushoku.matches("[Group] Mushoku Tensei - 05 [1080p]"));
+        assert!(!mushoku.matches("[Group] Mushoku Tensei: Jobless Reincarnation - 05 [1080p]"));
+        assert!(mushoku.matches("[Group] Mushoku Tensei III - 05 [1080p]"));
+
+        let food_wars = ShowMatcher::new(Some("Food Wars! The Second Plate"), Some("Shokugeki no Souma: Ni no Sara"), &[], Some(2));
+        assert!(food_wars.matches("[Group] Food Wars! The Second Plate - 05 [1080p]"));
+    }
+
+    #[test]
     fn roman_numeral_after_the_name_gives_the_label_season() {
         let m = mushoku_s3();
         assert_eq!(m.roman_season_of("[Diogo4D-NF93] [WEB][1080p] Mushoku Tensei III Isekai Ittara Honki Dasu - 01 [ABBEC7B2].mkv"), Some(3));
@@ -719,10 +1015,13 @@ mod tests {
     }
 
     #[test]
-    fn first_season_entries_never_flag_unmarked_releases() {
+    fn first_season_entries_reject_unmarked_shared_titles() {
         let franchise = Franchise { format: Some("TV".into()), has_tv_prequel: false, relatives: vec![relative("Mushoku Tensei: Jobless Reincarnation Season 2", "Mushoku Tensei II: Isekai Ittara Honki Dasu", "SEQUEL", "TV")] };
         let first = ShowMatcher::new(Some("Mushoku Tensei: Jobless Reincarnation"), Some("Mushoku Tensei: Isekai Ittara Honki Dasu"), &[], None).with_franchise(&franchise);
-        assert!(!first.season_ambiguous("[SubsPlease] Mushoku Tensei: Jobless Reincarnation - 03 (1080p)"));
+        let shared_unmarked = "[SubsPlease] Mushoku Tensei: Jobless Reincarnation - 03 (1080p)";
+        assert!(first.season_ambiguous(shared_unmarked));
+        assert!(!first.matches(shared_unmarked));
+        assert!(first.matches("[Group] Mushoku Tensei: Jobless Reincarnation S01E03"));
     }
 
     #[test]
@@ -856,7 +1155,12 @@ mod tests {
 
     #[test]
     fn guessed_aid_is_only_a_hint() {
-        let matcher = ShowMatcher::new(Some("That Time I Got Reincarnated as a Slime Season 3"), Some("Tensei shitara Slime Datta Ken 3rd Season"), &[], None);
+        let franchise = Franchise {
+            format: Some("TV".into()),
+            has_tv_prequel: true,
+            relatives: vec![relative("That Time I Got Reincarnated as a Slime", "Tensei shitara Slime Datta Ken", "PREQUEL", "TV")],
+        };
+        let matcher = ShowMatcher::new(Some("That Time I Got Reincarnated as a Slime Season 3"), Some("Tensei shitara Slime Datta Ken 3rd Season"), &[], None).with_franchise(&franchise);
         let ours = [111];
         // Right entry, nothing against it in the title: accepted even though the title rules would say no.
         let nameless = "[Group] Something Else Entirely - 05";
@@ -870,6 +1174,10 @@ mod tests {
         let ok = "[Group] Tensei shitara Slime Datta Ken S03E05 [1080p]";
         assert_eq!(matcher.decide(ok, Some(&tosho(999, 0)), &ours), Decision::UseTitleRules);
         assert!(matcher.matches_with_aid(ok, Some(&tosho(999, 0)), &ours));
+        let shared_unmarked = "[SubsPlease] That Time I Got Reincarnated as a Slime - 05 [1080p]";
+        assert_eq!(matcher.decide(shared_unmarked, Some(&tosho(111, 0)), &ours), Decision::UseTitleRules);
+        assert!(!matcher.matches_with_aid(shared_unmarked, Some(&tosho(111, 0)), &ours));
+        assert_eq!(matcher.decide(shared_unmarked, Some(&tosho(111, 1)), &ours), Decision::Accept);
     }
 
     #[test]
@@ -882,6 +1190,65 @@ mod tests {
         assert_eq!(matcher.decide(title, Some(&tosho(5, 3)), &[]), Decision::UseTitleRules);
         assert!(matcher.matches_with_aid(title, None, &[1]));
         assert!(!matcher.matches_with_aid("[Group] Fate strange Fake - 05", None, &[1]));
+    }
+
+    #[test]
+    fn later_season_remote_queries_require_a_season_or_unique_entry_name() {
+        let franchise = Franchise {
+            format: Some("TV".into()),
+            has_tv_prequel: true,
+            relatives: vec![
+                relative("Mushoku Tensei: Jobless Reincarnation", "Mushoku Tensei: Isekai Ittara Honki Dasu", "PREQUEL", "TV"),
+                relative("Mushoku Tensei: Jobless Reincarnation Season 2", "Mushoku Tensei II: Isekai Ittara Honki Dasu", "PREQUEL", "TV"),
+            ],
+        };
+        let queries = build_search_queries(
+            Some("Mushoku Tensei: Jobless Reincarnation Season 3"),
+            Some("Mushoku Tensei III: Isekai Ittara Honki Dasu"),
+            &[],
+            Some(3),
+            Some(&franchise),
+        );
+        let rendered: Vec<String> = queries.iter().map(NyaaSearchQuery::render).collect();
+        assert!(rendered.iter().any(|q| q.contains("\"Mushoku Tensei S03\"")));
+        assert!(rendered.iter().any(|q| q.contains("\"Mushoku Tensei III: Isekai Ittara Honki Dasu\"")));
+        assert!(!queries.iter().any(|q| q.includes.iter().any(|phrase| normalize(phrase) == "mushoku tensei")));
+        assert!(!rendered.iter().any(|q| q.contains("\"Mushoku Tensei: Jobless Reincarnation\"")));
+    }
+
+    #[test]
+    fn first_season_base_query_excludes_sibling_season_phrases() {
+        let franchise = Franchise {
+            format: Some("TV".into()),
+            has_tv_prequel: false,
+            relatives: vec![relative("Mushoku Tensei: Jobless Reincarnation Season 2", "Mushoku Tensei II: Isekai Ittara Honki Dasu", "SEQUEL", "TV")],
+        };
+        let queries = build_search_queries(
+            Some("Mushoku Tensei: Jobless Reincarnation"),
+            Some("Mushoku Tensei: Isekai Ittara Honki Dasu"),
+            &[],
+            None,
+            Some(&franchise),
+        );
+        let rendered: Vec<String> = queries.iter().map(NyaaSearchQuery::render).collect();
+        assert!(!queries.iter().any(|q| q.includes.iter().any(|phrase| normalize(phrase) == "mushoku tensei")));
+        assert!(rendered.iter().any(|q| q.contains(" -\"Mushoku Tensei: Jobless Reincarnation Season 2\"")));
+        assert!(rendered.iter().any(|q| q.contains("\"Mushoku Tensei S02\"")));
+        assert!(rendered.iter().any(|q| q.contains("\"Mushoku Tensei: Jobless Reincarnation Season 2\"")));
+    }
+
+    #[test]
+    fn movie_remote_queries_use_full_entry_names() {
+        let franchise = Franchise { format: Some("MOVIE".into()), has_tv_prequel: true, relatives: Vec::new() };
+        let queries = build_search_queries(Some("Your Name."), Some("Kimi no Na wa."), &[], None, Some(&franchise));
+        assert_eq!(queries.len(), 1);
+        assert_eq!(queries[0].render(), "\"Your Name.\"|\"Kimi no Na wa.\"");
+    }
+
+    #[test]
+    fn required_uploader_term_is_repeated_for_each_or_branch() {
+        let query = NyaaSearchQuery { includes: vec!["Show S2".into(), "Show Season 2".into()], excludes: vec!["Show S1".into()] };
+        assert_eq!(query.render_with_required_term("SubsPlease"), "SubsPlease \"Show S2\"|SubsPlease \"Show Season 2\" -\"Show S1\"");
     }
 
     #[test]

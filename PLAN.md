@@ -173,6 +173,27 @@ Building the workspace requires, beyond Rust/Node:
   can fall outside the 1,000 for a very large franchise until it gains
   seeders. The browser RSS fallback (dev only) is unchanged. Target version:
   next patch (bump pending), with the main filter above.
+  **Entry-specific search (done, v0.5.7 patch; user 2026-10-26).** Remote
+  queries use nyaa.si exact quoted title phrases joined with `|`, plus
+  season-qualified phrase alternatives. Same-season AniList sibling names add
+  aliases for split cours and translated titles. TV searches do not query a
+  bare shared base title. Unmarked titles shared with a different-season
+  sibling are rejected unless a trusted AniDB id or distinctive full title
+  identifies the entry. Season 1 uses exact names and season-1 forms with a
+  negated group for sibling titles and season markers. Movie/OVA/special
+  entries use their full entry names. Local release lookups retain plain
+  word-query candidates, then use the same strict result matcher. The trusted
+  `aid` bypass is intact.
+
+  **Precision check (2026-10-27, `title_match_fixture_recall_and_precision`).**
+  Query construction passes for all 1,275 AniList entries in the fixture,
+  with no-TVDB and mapped-TVDB variants. Across the three fixture franchises,
+  explicit Mushoku S3 titles keep 375/375, Food Wars S1 keeps 24/24, and Slime
+  S4 Part 3 keeps 655/655 (up from 588/655 before same-season alias handling).
+  The targeted Mushoku S3 and Slime S4 Part 3 checks have zero wrongly kept
+  titles. Mushoku S1 keeps 24/37 title-labeled releases and Cour 2 keeps 24/37
+  without a TVDB season or 28/37 with it. This recall loss is the chosen cost
+  of excluding unmarked titles shared with earlier entries.
 - **Metadata:** AniList GraphQL API (`https://graphql.anilist.co`), no auth
   required for public queries; Kitsu API (`crates/kitsu-client`) as a
   secondary source for wide backdrop banners and per-episode thumbnails,

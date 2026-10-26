@@ -633,7 +633,7 @@ mod tests {
             label: Default::default(),
             episode_group: None,
             aid_trusted: None,
-        season_ambiguous: None,
+            season_ambiguous: None,
         }
     }
 

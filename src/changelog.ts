@@ -10,6 +10,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.5.7",
+    date: "2026-10-27",
+    features: [],
+    fixes: [
+      "Nyaa searches now target the selected anime entry with exact title and season phrases.",
+      "Ambiguous unmarked franchise titles no longer appear on a season page unless a trusted mapping or distinct title identifies that season.",
+      "Same-season AniList aliases improve search coverage for split cours and translated titles.",
+      "Movie, OVA and special searches use the entry's full names.",
+    ],
+  },
+  {
     version: "0.5.6",
     date: "2026-10-26",
     features: [],

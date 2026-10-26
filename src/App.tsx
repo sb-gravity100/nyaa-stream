@@ -591,15 +591,8 @@ function App() {
         }
       }
 
-      // A release with no season marker that names the show only by what its
-      // earlier seasons share ("Mushoku Tensei Isekai Ittara Honki Dasu - 01"
-      // on Season 3's page - Season 1's BD) is as likely an earlier season's.
-      // On a later-season entry it needs confirming - an absolute episode
-      // number (above), the dataset's trusted AniDB id, or its file list -
-      // else it would sit in a stray season-1 "Episode N" row. (Releases that
-      // name the entry itself - "Symphogear XV - 06", "Mushoku Tensei III - 01" -
-      // are not flagged by the backend, and unparseable titles go through the
-      // batch path above.)
+      // Keep the legacy fallback for results restored from older cached paths;
+      // the backend now rejects unmarked names shared with franchise siblings.
       if (
         source.season_ambiguous &&
         !source.aid_trusted &&

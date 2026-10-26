@@ -48,7 +48,7 @@ export interface NyaaResult {
   /** True when the dataset's trusted AniDB id put the release on this show:
    * the season filters in `groupedSources` then keep it. */
   aid_trusted?: boolean | null;
-  /** Unmarked release naming the show only by what earlier seasons share: needs confirming (see groupedSources). */
+  /** Legacy/alternate-path marker for an unmarked release shared with another franchise entry. */
   season_ambiguous?: boolean | null;
 }
 

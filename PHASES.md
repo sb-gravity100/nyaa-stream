@@ -233,6 +233,16 @@
         trusted approval 1-3 separately from approval-0 audit rows
   - [x] Sync changelog; patch bump/tag follows in release commit
 
+- [x] Entry-specific nyaa search - v0.5.7 patch (user 2026-10-26; see PLAN.md
+      "Torrent source" -> "Entry-specific search"). Precision-first search:
+  - [x] Exact phrase alternatives and season-qualified remote queries; no
+        shared-base-only queries; full names for movie/OVA/special entries
+  - [x] Reject unmarked shared-title releases on season pages unless trusted
+        AniDB id or distinctive title evidence identifies that entry
+  - [x] Keep local word-search candidates separate from remote query grammar
+  - [x] Verify query construction and title fixture precision/recall; sync
+        changelog; patch bump/tag follows in release commit
+
 - [ ] Learned release-to-entry matcher - v0.6.1 (user 2026-10-15; see PLAN.md
       "Learned release-to-entry matcher"; replaces the unused stem mapper).
       One commit each:

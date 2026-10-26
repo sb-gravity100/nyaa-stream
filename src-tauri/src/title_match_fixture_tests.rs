@@ -17,7 +17,7 @@ use std::collections::BTreeMap;
 use anilist_client::{AnimeTitle, Franchise, Relative};
 use serde_json::Value;
 
-use crate::title_match::{build_candidates, ShowMatcher};
+use crate::title_match::{build_candidates, build_search_queries, ShowMatcher};
 
 const FIXTURE: &str = include_str!("../tests/fixtures/nyaa_titles/franchises.json");
 
@@ -177,8 +177,12 @@ const FLOORS: &[(i64, f64, usize, f64, usize)] = &[
     (20923, 0.95, 3, 0.95, 3),
     (21518, 0.69, 2, 0.74, 2),
     (99255, 0.54, 2, 0.54, 2),
-    (108465, 0.79, 3, 0.79, 3),
-    (127720, 0.76, 128, 0.95, 3),
+    // Precision-first: 13 unmarked S1 titles shared with later Mushoku entries
+    // are now intentionally omitted unless a trusted aid or distinctive title resolves them.
+    // Precision-first query/filtering intentionally drops unmarked releases
+    // shared with earlier Mushoku entries (13/37 S1 and 13/37 Cour 2 labels).
+    (108465, 0.64, 3, 0.64, 3),
+    (127720, 0.64, 128, 0.75, 3),
     (146065, 0.89, 8, 0.89, 8),
     (166873, 0.92, 8, 0.92, 8),
     (178789, 0.95, 8, 0.95, 8),
@@ -217,9 +221,16 @@ fn title_match_fixture_candidate_queries() {
         let franchise = franchise_of(&entries, index);
         for tvdb in [None, entry.season] {
             let candidates = build_candidates(entry.english.as_deref(), entry.romaji.as_deref(), &entry.synonyms, tvdb, Some(&franchise));
-            println!("{} {} {} tvdb={:?}: {:?}", entry.franchise, entry.id, entry.format, tvdb, candidates);
             assert!(candidates.len() <= 4, "{} {}: {} queries", entry.franchise, entry.id, candidates.len());
             assert!(!candidates.is_empty(), "{} {}: no query", entry.franchise, entry.id);
+
+            let queries = build_search_queries(entry.english.as_deref(), entry.romaji.as_deref(), &entry.synonyms, tvdb, Some(&franchise));
+            assert!(!queries.is_empty(), "{} {}: no remote query", entry.franchise, entry.id);
+            for query in &queries {
+                let rendered = query.render();
+                assert!(!rendered.trim().is_empty(), "{} {}: empty rendered query", entry.franchise, entry.id);
+                assert!(rendered.contains('"'), "{} {}: remote query has no exact phrase", entry.franchise, entry.id);
+            }
         }
     }
 }

@@ -157,7 +157,9 @@ export async function fallbackSearchTorrentsForAnime(title: {
   const seenViewUrls = new Set<string>();
   const merged: any[] = [];
   for (const candidate of candidates) {
-    const results = await fallbackSearchTorrents(candidate);
+    const phrase = candidate.replace(/["|()]/g, " ").split(/\s+/).filter(Boolean).join(" ");
+    if (!phrase) continue;
+    const results = await fallbackSearchTorrents(`"${phrase}"`);
     for (const result of results) {
       if (!seenViewUrls.has(result.view_url)) {
         seenViewUrls.add(result.view_url);

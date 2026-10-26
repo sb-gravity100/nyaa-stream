@@ -55,12 +55,8 @@ pub struct NyaaResult {
     /// cour). `None` otherwise.
     #[serde(default)]
     pub aid_trusted: Option<bool>,
-    /// `Some(true)` when the release has no season marker and names the
-    /// show only by what its earlier seasons also go by (a later-season
-    /// entry's search returned "Show - 01", which is as likely season 1's
-    /// episode): the frontend files it under the entry only when an absolute
-    /// episode number, the dataset or the torrent's file list confirm it.
-    /// Set by the show search commands, `None` otherwise.
+    /// Ambiguous unmarked season label, kept for diagnostics and legacy
+    /// result paths; the current title matcher rejects these by default.
     #[serde(default)]
     pub season_ambiguous: Option<bool>,
 }

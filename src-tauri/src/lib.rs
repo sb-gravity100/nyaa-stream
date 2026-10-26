@@ -734,11 +734,12 @@ async fn search_torrents_for_anime(
 ) -> Result<Vec<NyaaResult>, String> {
     let synonyms = synonyms.unwrap_or_default();
     let franchise = load_franchise(&state, anilist_id, true).await;
-    let candidates = title_match::build_candidates(title.english.as_deref(), title.romaji.as_deref(), &synonyms, anilist_id.and_then(|id| state.anime_lists.tvdb_season(id)), franchise.as_ref());
-    if candidates.is_empty() {
+    let queries = title_match::build_search_queries(title.english.as_deref(), title.romaji.as_deref(), &synonyms, anilist_id.and_then(|id| state.anime_lists.tvdb_season(id)), franchise.as_ref());
+    if queries.is_empty() {
         tracing::warn!("search_torrents_for_anime called with no usable title");
         return Ok(Vec::new());
     }
+    let candidates: Vec<String> = queries.into_iter().map(|query| query.render()).collect();
     tracing::debug!(?candidates, "search_torrents_for_anime invoked");
 
     let mut searches = tokio::task::JoinSet::new();
@@ -846,7 +847,14 @@ async fn search_fansubber_releases(
     let user = state.nyaa.resolve_fansubber(tag).await;
     let synonyms = synonyms.unwrap_or_default();
     let franchise = load_franchise(&state, anilist_id, false).await;
-    let candidates = title_match::build_candidates(title.english.as_deref(), title.romaji.as_deref(), &synonyms, anilist_id.and_then(|id| state.anime_lists.tvdb_season(id)), franchise.as_ref());
+    let queries = title_match::build_search_queries(title.english.as_deref(), title.romaji.as_deref(), &synonyms, anilist_id.and_then(|id| state.anime_lists.tvdb_season(id)), franchise.as_ref());
+    let candidates: Vec<String> = queries
+        .into_iter()
+        .map(|query| match user.as_deref() {
+            Some(_) => query.render(),
+            None => query.render_with_required_term(tag),
+        })
+        .collect();
 
     let mut searches = tokio::task::JoinSet::new();
     for (order, candidate) in candidates.into_iter().enumerate() {
@@ -934,8 +942,8 @@ async fn filter_for_show(state: &AppState, matcher: &title_match::ShowMatcher, a
 /// What the title rules know about a kept release that its label and flags
 /// do not say yet: a roman season after the entry's name ("Mushoku Tensei III
 /// - 01": `release-parse` cannot read it, the matcher can) goes into the
-/// label, and `season_ambiguous` is set for an unmarked release that names the
-/// show only by what its earlier seasons share.
+/// label. Unmarked names shared with franchise siblings are rejected by the
+/// title matcher unless a trusted AniDB id or distinctive title identifies it.
 pub(crate) fn annotate_title_decided(matcher: &title_match::ShowMatcher, result: &mut NyaaResult) {
     if let Some(season) = matcher.roman_season_of(&result.title) {
         if let nyaa_client::EpisodeLabel::Episode { season: s, seasons, .. } | nyaa_client::EpisodeLabel::Batch { season: s, seasons, .. } = &mut result.label {
