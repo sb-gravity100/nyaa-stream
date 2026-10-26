@@ -13,31 +13,12 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: "0.5.5",
     date: "2026-10-26",
     features: [],
-    fixes: ["Player controls now appear only over the top or bottom controls and fade out as soon as the pointer leaves."],
-  },
-  {
-    version: "0.5.4",
-    date: "2026-10-26",
-    features: [],
-    fixes: ["Player controls no longer flicker when the pointer is at the top edge."],
-  },
-  {
-    version: "0.5.3",
-    date: "2026-10-26",
-    features: [],
-    fixes: ["Development logs are now written to the working directory used to launch the app."],
-  },
-  {
-    version: "0.5.2",
-    date: "2026-10-26",
-    features: [],
-    fixes: ["Fullscreen removes the title-bar gap while keeping the home header visible."],
-  },
-  {
-    version: "0.5.1",
-    date: "2026-10-26",
-    features: [],
-    fixes: ["Fullscreen state is reflected in the webview for fullscreen-specific layout."],
+    fixes: [
+      "Fullscreen removes the title-bar gap while keeping the home header visible.",
+      "Development logs are written to the working directory used to launch the app.",
+      "Player controls no longer flicker at the top edge.",
+      "Player controls appear only over the top or bottom controls and fade out as soon as the pointer leaves.",
+    ],
   },
   {
     version: "0.5.0",

@@ -11,28 +11,11 @@ step when cutting a release.
 
 ## [0.5.5] - 2026-10-26
 
-### Changed
-- Player controls now appear only while hovering over the top or bottom controls and fade out as soon as the pointer leaves.
-
-## [0.5.4] - 2026-10-26
-
 ### Fixed
+- Fullscreen removes the title-bar gap while keeping the home header visible.
+- Development logs are written to the working directory used to launch the app.
 - Player controls no longer flicker when the pointer is at the top edge.
-
-## [0.5.3] - 2026-10-26
-
-### Changed
-- Development log files are now written to the working directory used to launch the app.
-
-## [0.5.2] - 2026-10-26
-
-### Fixed
-- Fullscreen now removes the title-bar gap while keeping the home header visible.
-
-## [0.5.1] - 2026-10-26
-
-### Fixed
-- Fullscreen state is reflected in the webview for fullscreen-specific layout.
+- Player controls appear only over the top or bottom controls and fade out as soon as the pointer leaves.
 
 ## [0.5.0] - 2026-10-13
 

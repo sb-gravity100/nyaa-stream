@@ -1,16 +1,10 @@
 # PHASES.md — nyaa-stream
 
-## v0.5.5 — Hover-only player controls
-- [x] Show controls only over the top/bottom hover areas; hide immediately when leaving them
-
-## v0.5.4 — Player top-edge hover flicker
-- [x] Track pointer movement across the player and title-bar overlay as one hover surface
-
-## v0.5.3 — Development log location
-- [x] Write debug-build log files to the process working directory
-
-## v0.5.1 — Fullscreen header fix
+## v0.5.5 — Polish fixes
 - [x] Remove the reserved title-bar space in fullscreen; keep the home app bar visible
+- [x] Write debug-build logs to the process working directory
+- [x] Prevent pointer flicker between the player and title-bar overlay
+- [x] Show player controls only over the top/bottom hover areas and hide them immediately when leaving
 
 ## Phase 0 — Scaffolding (done)
 - [x] Tauri + Preact-TS project scaffolded
