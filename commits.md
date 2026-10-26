@@ -13,6 +13,11 @@
 - `PHASES.md`
 - `FILE_INDEX.md`
 
+### `dabc301` · 2026-10-26 · chore: release v0.5.6
+- `package.json`
+- `src-tauri/Cargo.toml`
+- `src-tauri/tauri.conf.json`
+
 ### `d915507` · 2026-10-26 · fix: improve batch torrent episode mapping
 - `crates/nyaa-client/src/batch_check.rs`
 - `crates/nyaa-client/src/file_name.rs`
