@@ -13,6 +13,14 @@
 - `PHASES.md`
 - `FILE_INDEX.md`
 
+### `d915507` · 2026-10-26 · fix: improve batch torrent episode mapping
+- `crates/nyaa-client/src/batch_check.rs`
+- `crates/nyaa-client/src/file_name.rs`
+- `PLAN.md`
+- `PHASES.md`
+- `CHANGELOG.md`
+- `src/changelog.ts`
+
 ### `d35ee39` · 2026-10-26 · docs: plan torrent file mapping follow-up
 - `PLAN.md`
 - `PHASES.md`
