@@ -1,3 +1,10 @@
+### `6e32312` · 2026-10-26 · feat: add debugger scrolling and matching diagram
+- `src/DebugPage.tsx`
+- `src/DebugPage.css`
+- `PLAN.md`
+- `PHASES.md`
+- `FILE_INDEX.md`
+
 ### `0b7b92b` · 2026-10-26 · feat: include backend logs in debug trace
 - `src-tauri/src/lib.rs`
 - `src/DebugPage.tsx`
