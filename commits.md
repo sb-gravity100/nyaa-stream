@@ -1,3 +1,12 @@
+### `fc4fd03` · 2026-10-26 · feat: add search flow debug page
+- `src/App.tsx`
+- `src/App.css`
+- `src/DebugPage.tsx`
+- `src/DebugPage.css`
+- `PLAN.md`
+- `PHASES.md`
+- `FILE_INDEX.md`
+
 ### `d35ee39` · 2026-10-26 · docs: plan torrent file mapping follow-up
 - `PLAN.md`
 - `PHASES.md`
