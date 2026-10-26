@@ -223,14 +223,15 @@
         `|seeders`; store early stop disabled for the sorted fetch; unit tests
   - [ ] S2 FILE_INDEX/CHANGELOG notes, `cargo check --workspace`
 
-- [ ] Torrent-file mapping follow-up - v0.5.6 patch (2026-10-26; see PLAN.md
+- [x] Torrent-file mapping follow-up - v0.5.6 patch (2026-10-26; see PLAN.md
       "Torrent-file mapping follow-up"). Improve episode labels inside packs:
-  - [ ] Conservative filename markers for numbered `Extra`/alternate files
-  - [ ] Batch checker parses explicit episode sets, including sparse lists and
+  - [x] Conservative filename marker for numbered `Extra 01` files, with
+        regression checks for show/episode titles containing “Alternative” or “Extra”
+  - [x] Batch checker parses explicit episode sets, including sparse lists and
         `+`-joined ranges, without inventing missing episodes
-  - [ ] Re-run `tosho_file_label_coverage` and `tosho_batch_check`; report
+  - [x] Re-run `tosho_file_label_coverage` and `tosho_batch_check`; report
         trusted approval 1-3 separately from approval-0 audit rows
-  - [ ] Sync changelog, bump patch, tag locally
+  - [x] Sync changelog; patch bump/tag follows in release commit
 
 - [ ] Learned release-to-entry matcher - v0.6.1 (user 2026-10-15; see PLAN.md
       "Learned release-to-entry matcher"; replaces the unused stem mapper).

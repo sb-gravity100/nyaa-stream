@@ -5,6 +5,8 @@
 
 use crate::files::is_video;
 use crate::label::EpisodeLabel;
+use regex::Regex;
+use std::sync::OnceLock;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BatchIssue {
@@ -38,6 +40,10 @@ pub fn check_batch(title: &str, file_paths: &[&str]) -> BatchCheck {
             return BatchCheck { verified: false, offset: 0, issues: vec![BatchIssue::NoTitleRange] };
         }
     };
+    let listed = listed_episode_set(title).filter(|episodes| episodes.contains(&first) && episodes.contains(&last));
+    if let Some(episodes) = &listed {
+        tracing::trace!(title, ?episodes, "batch check: explicit episode list parsed");
+    }
 
     // Episode numbers this title claims, and those of another season's files.
     let mut counted: Vec<u32> = Vec::new();
@@ -68,13 +74,18 @@ pub fn check_batch(title: &str, file_paths: &[&str]) -> BatchCheck {
     // Numbering the files actually use: the title's range, or 1..=n when a > 1
     // and every episode file sits in 1..=n (a season 2 pack numbered from 01).
     let n = last - first + 1;
-    let offset_numbering = first > 1 && !counted.is_empty() && !counted.iter().any(|e| (first..=last).contains(e)) && counted.iter().all(|e| (1..=n).contains(e));
-    let (lo, hi) = if offset_numbering { (1, n) } else { (first, last) };
+    let contiguous = listed.as_ref().map_or(true, |episodes| episodes.len() as u32 == n);
+    let offset_numbering = contiguous && first > 1 && !counted.is_empty() && !counted.iter().any(|e| (first..=last).contains(e)) && counted.iter().all(|e| (1..=n).contains(e));
+    let expected: Vec<u32> = if offset_numbering {
+        (1..=n).collect()
+    } else {
+        listed.clone().unwrap_or_else(|| (first..=last).collect())
+    };
 
     let clean = unread == 0 && other_season.is_empty();
-    let verdict = if clean && counted.iter().copied().eq(first..=last) {
-        Some(0)
-    } else if clean && first > 1 && counted.iter().copied().eq(1..=n) {
+    let verdict = if clean && counted == expected {
+        Some(if offset_numbering { first - 1 } else { 0 })
+    } else if clean && contiguous && first > 1 && counted.iter().copied().eq(1..=n) {
         Some(first - 1)
     } else {
         None
@@ -82,11 +93,11 @@ pub fn check_batch(title: &str, file_paths: &[&str]) -> BatchCheck {
 
     let mut issues = Vec::new();
     if verdict.is_none() {
-        let missing: Vec<u32> = (lo..=hi).filter(|e| !counted.contains(e)).collect();
+        let missing: Vec<u32> = expected.iter().copied().filter(|e| !counted.contains(e)).collect();
         if !missing.is_empty() {
             issues.push(BatchIssue::Missing(missing));
         }
-        let mut out: Vec<u32> = counted.iter().copied().filter(|e| !(lo..=hi).contains(e)).chain(other_season).collect();
+        let mut out: Vec<u32> = counted.iter().copied().filter(|e| !expected.contains(e)).chain(other_season).collect();
         out.sort_unstable();
         out.dedup();
         if !out.is_empty() {
@@ -104,6 +115,32 @@ pub fn check_batch(title: &str, file_paths: &[&str]) -> BatchCheck {
     let offset = verdict.unwrap_or(0);
     tracing::debug!(title, first, last, verified, offset, issues = issues.len(), "batch check verdict");
     BatchCheck { verified, offset, issues }
+}
+
+/// Reads explicit episode lists such as `01,02,05,07-13` and `41+48+50-52`.
+/// The caller confirms that the endpoints match release-parse's batch range,
+/// so incidental numeric lists elsewhere in a title cannot change the check.
+fn listed_episode_set(title: &str) -> Option<Vec<u32>> {
+    tracing::trace!(title, "reading explicit episode list from batch title");
+    static LIST: OnceLock<Regex> = OnceLock::new();
+    static ITEM: OnceLock<Regex> = OnceLock::new();
+    let captures = LIST
+        .get_or_init(|| Regex::new(r"(?i)(?:^|[^a-z0-9])(\d{1,3}(?:\s*[-~–]\s*\d{1,3})?(?:\s*[,&+]\s*\d{1,3}(?:\s*[-~–]\s*\d{1,3})?)+)(?:[^0-9]|$)").unwrap())
+        .captures(title)?;
+    let item_re = ITEM.get_or_init(|| Regex::new(r"^\s*(\d{1,3})(?:\s*[-~–]\s*(\d{1,3}))?\s*$").unwrap());
+    let mut episodes = Vec::new();
+    for item in captures.get(1)?.as_str().split([',', '&', '+']) {
+        let c = item_re.captures(item)?;
+        let first: u32 = c[1].parse().ok()?;
+        let last: u32 = c.get(2).map_or(Some(first), |m| m.as_str().parse().ok())?;
+        if first == 0 || last < first || last - first > 300 {
+            return None;
+        }
+        episodes.extend(first..=last);
+    }
+    episodes.sort_unstable();
+    episodes.dedup();
+    (episodes.len() > 1).then_some(episodes)
 }
 
 #[cfg(test)]
@@ -186,5 +223,28 @@ mod tests {
         files.push("Subs/[Erai-raws] Jujutsu Kaisen - 01.ass".to_string());
         files.push("Artwork/cover.jpg".to_string());
         assert_eq!(check(TITLE, &files), verified());
+    }
+
+    #[test]
+    fn sparse_comma_list_checks_only_the_named_episodes() {
+        let title = "Tama and Friends TV 01,02,05,07-13 (EngDub)";
+        let mut files = vec![1, 2, 5];
+        files.extend(7..=13);
+        let files: Vec<String> = files.into_iter().map(|n| format!("Tama and Friends - {n:02}.mkv")).collect();
+        assert_eq!(check(title, &files), verified());
+    }
+
+    #[test]
+    fn plus_joined_ranges_check_only_the_named_episodes() {
+        let title = "[ARR] Kagaku Ninja-Tai Gatchaman II - 41+48+50-52";
+        let files: Vec<String> = [41, 48, 50, 51, 52].into_iter().map(|n| format!("Gatchaman - {n:02}.mkv")).collect();
+        assert_eq!(check(title, &files), verified());
+    }
+
+    #[test]
+    fn sparse_list_reports_a_missing_named_episode_not_the_gaps() {
+        let title = "[ARR] Kagaku Ninja-Tai Gatchaman II - 41+48+50-52";
+        let files: Vec<String> = [41, 50, 51, 52].into_iter().map(|n| format!("Gatchaman - {n:02}.mkv")).collect();
+        assert_eq!(check(title, &files), BatchCheck { verified: false, offset: 0, issues: vec![BatchIssue::Missing(vec![48])] });
     }
 }

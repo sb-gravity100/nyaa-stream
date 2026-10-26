@@ -9,6 +9,12 @@ step when cutting a release.
 
 ## [Unreleased]
 
+## [0.5.6] - 2026-10-26
+
+### Fixed
+- Batch torrent mapping now checks explicit sparse episode lists without treating skipped numbers as missing.
+- Files named with a numbered `Extra` marker no longer duplicate the matching episode in a pack.
+
 ## [0.5.5] - 2026-10-26
 
 ### Fixed

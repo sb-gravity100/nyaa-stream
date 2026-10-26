@@ -10,6 +10,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.5.6",
+    date: "2026-10-26",
+    features: [],
+    fixes: [
+      "Batch torrent mapping now checks explicitly listed episodes without treating skipped numbers as missing.",
+      "Files labeled as numbered extras no longer duplicate episodes in a pack.",
+    ],
+  },
+  {
     version: "0.5.5",
     date: "2026-10-26",
     features: [],

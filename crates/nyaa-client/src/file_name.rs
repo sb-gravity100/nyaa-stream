@@ -27,6 +27,7 @@ fn extra_name(name: &str) -> bool {
     static CRC: OnceLock<Regex> = OnceLock::new();
     static SHORT: OnceLock<Regex> = OnceLock::new();
     static WORDS: OnceLock<Regex> = OnceLock::new();
+    static NUMBERED: OnceLock<Regex> = OnceLock::new();
     let name = re(&CRC, r"[\[(][0-9A-Fa-f]{8}[\])]").replace_all(name, "");
     let name = name.as_ref();
     // A letter suffix ("NCED01a") only after NC tokens: "ED60f" is a codec/hash fragment.
@@ -34,6 +35,7 @@ fn extra_name(name: &str) -> bool {
     // ("OP - 02", "ED25 [BD]", "Menu 2.m2ts"), not a word ("Makes Me OP Even", "[OP_HNK]",
     // "SP Professional - 07" is a sequel title).
     re(&SHORT, r"(?:^|[^A-Za-z0-9])(?:(?:NC\s?OP|NC\s?ED)[\s_-]?\d{0,3}[a-z]?(?:[^A-Za-z0-9]|$)|(?:OP|ED|PV|CM|SP|MENU|Menu)(?:[\s_-]?\d{1,3})?(?:$|[\s_]*[\[\]().]|[\s_]*-))").is_match(name)
+        || re(&NUMBERED, r"(?i)(?:^|[^a-z])extras?\s+\d{1,3}(?:$|[^0-9])").is_match(name)
         || re(&WORDS, r"(?i)(?:^|[^a-z])(?:creditless|textless|trailer|teaser|preview|clean[\s_.-]+(?:opening|ending)|mini[\s_.-]+ep)(?:[^a-z]|$)").is_match(name)
 }
 
@@ -127,6 +129,8 @@ mod tests {
             "[Doki-Chihiro]_Nogizaka_Haruka_no_Himitsu_-_OP_[1280x720_Blu-ray_FLAC][E9E83876].mkv",
             "[FFF] THE iDOLM@STER - ED25 [BD][1080p-FLAC][25D879A7].mkv",
             "Extras/CM/CM - 01.mkv",
+            "[nonA] Sayonara Zetsubou Sensei - Extra 01 (BD 1024x576).mkv",
+            "[tlacatlc6] Denpa Onna to Seishun Otoko Extra 1 (BD 1280x720 x264 AAC).mkv",
         ] {
             assert!(is_extra(path), "{path}");
         }
@@ -143,6 +147,9 @@ mod tests {
             "Hoshi no Kirby - 055 [OP_HNK].avi",
             "Season 04/Kirby - Right Back At Ya! (2001) - S04E05 - 081 - A Trashy Tale [SDTV][bit][ ]-OP HNK.mp4",
             "Unique Skill Makes Me OP Even at Level 1 - S01E10 [English Dub] [CR WEB-RIP 1080p HEVC-10 AAC] [95F2F223].mkv",
+            "Prince of Stride - Alternative - 06 (1280x720 HEVC AAC).mp4",
+            "K-ON!! 26 Extra Visit! (BD1080p AC3 10bit).mkv",
+            "[Erai-raws] Peter Grill to Kenja no Jikan - Super Extra - 01 [1080p].mkv",
             "[Wasurenai] Yumeiro Patissiere SP Professional - 07 [XviD 704x400] [16E0E431].avi",
             "[CBM]_Michiko_&_Hatchin_-_06_-_The_Saudade_of_Fools,_Parte_2_[720p]_[2727ED5A].mkv",
             "[Baws] Attack on Titan - S04E20 - Memories of the Future (BD 1080p Hi10 FLAC) [55ED9D3E].mkv",
