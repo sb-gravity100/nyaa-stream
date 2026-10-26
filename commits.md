@@ -1,3 +1,9 @@
+### `0b7b92b` · 2026-10-26 · feat: include backend logs in debug trace
+- `src-tauri/src/lib.rs`
+- `src/DebugPage.tsx`
+- `PLAN.md`
+- `FILE_INDEX.md`
+
 ### `fc4fd03` · 2026-10-26 · feat: add search flow debug page
 - `src/App.tsx`
 - `src/App.css`
