@@ -2699,8 +2699,10 @@ start/completion/failure, elapsed time, arguments, counts, and returned data
 in a compact filterable timeline. It also captures console logs while the
 debug route is open, with clear/copy controls. Tauri dev runs also tail the
 active rotating backend log and merge Rust tracing lines into the timeline;
-browser preview captures browser console output. The route is for local
-development and makes no production UI changes.
+browser preview captures browser console output. The page scrolls vertically
+through the full trace and includes a compact horizontal process diagram from
+anime identity through candidate search, matching, and episode grouping. The
+route is for local development and makes no production UI changes.
 
 ## Custom magnet in the search bar (planned, v0.6.0 - minor feature; was v0.4.5, held out of v0.5.0 on 2026-10-13)
 

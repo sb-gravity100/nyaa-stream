@@ -764,3 +764,4 @@
             errors, and browser console capture; filter, clear, copy
       - [x] Keep it out of the normal production navigation; update
             PLAN.md/FILE_INDEX.md
+      - [x] Enable page scrolling and add a visual source-matching pipeline

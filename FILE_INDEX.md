@@ -130,8 +130,8 @@
 | `src/icons.tsx` | Inline SVG icon set used by the player and pages, plus the app-bar `BrandMark` logo | frontend |
 | `src/types.ts` | Shared TS interfaces mirroring the Rust structs (`AnimeMedia`, `NyaaResult`, `TorrentDetails`, `AiringEntry`, `PlaySession`/`PlayFile`, `SubtitleInfo`, ...) | frontend |
 | `src/browserFallback.ts` | Dev-only path used when no Tauri IPC bridge is present (plain browser preview): direct AniList/nyaa fetches mirroring the Rust client logic | frontend, dev-tool |
-| `src/DebugPage.tsx` | Developer-only `#/debug` workflow explorer: runs anime search and selection pipelines, showing timestamped stage inputs/results/errors and captured console logs | frontend, dev-tool, diagnostics |
-| `src/DebugPage.css` | Compact dark layout and responsive styles for the search flow debugger | frontend, styles, dev-tool |
+| `src/DebugPage.tsx` | Developer-only `#/debug` workflow explorer: runs anime search and selection pipelines, shows a source-matching diagram, timestamped stage inputs/results/errors, and captured console/backend logs | frontend, dev-tool, diagnostics |
+| `src/DebugPage.css` | Compact dark layout, vertical page scrolling, horizontally scrollable matching pipeline, and responsive styles for the search flow debugger | frontend, styles, dev-tool |
 | `src/kitsu.ts` | Frontend wrapper around `get_kitsu_metadata`, used by `MediaPage.tsx` for the backdrop/thumbnail fallback chain; `localStorage` snapshot (`kitsuSnapshot`) seeds card art on the first paint after launch | frontend |
 | `src/enhanceImage.ts` | `useEnhancedImage`: upscales (up to 2x, toward 1920px wide) and unsharp-masks hero/backdrop art on a canvas, cached as blob URLs; falls back to the original URL on any failure (e.g. CORS) | frontend |
 | `src/torrentThumbnail.ts` | Frontend wrapper around `capture_torrent_thumbnail`, the last-resort thumbnail source when Kitsu and AniList both lack episode art; asks the disk cache (`cached_torrent_thumbnail`) before any nyaa search | frontend |
