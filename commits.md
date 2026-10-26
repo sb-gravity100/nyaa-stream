@@ -1,3 +1,15 @@
+### `7979c30` · 2026-10-26 · fix: remove titlebar gap in fullscreen
+- `src/App.css`
+- `src/fullscreen.ts`
+- `PLAN.md`
+- `PHASES.md`
+- `CHANGELOG.md`
+- `src/changelog.ts`
+- `FILE_INDEX.md`
+- `package.json`
+- `src-tauri/tauri.conf.json`
+- `src-tauri/Cargo.toml`
+
 ### `56972e8` · 2026-10-26 · fix: slide home header out in fullscreen
 - `src/fullscreen.ts`
 - `src/App.css`
