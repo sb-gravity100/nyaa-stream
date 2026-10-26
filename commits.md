@@ -1,3 +1,7 @@
+### `d35ee39` · 2026-10-26 · docs: plan torrent file mapping follow-up
+- `PLAN.md`
+- `PHASES.md`
+
 ### `e99cc43` · 2026-10-26 · docs: consolidate recent fixes in v0.5.5
 - `CHANGELOG.md`
 - `PHASES.md`
