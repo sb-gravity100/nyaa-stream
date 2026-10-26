@@ -18,7 +18,7 @@
 | `commits.md` | Commit log (prepend after every commit) | docs |
 | `src-tauri/Cargo.toml` | Tauri app crate manifest, depends on all `crates/*` | backend, config |
 | `src-tauri/src/main.rs` | Binary entrypoint, calls `nyaa_stream_lib::run()` | backend |
-| `src-tauri/src/lib.rs` | Tauri commands and app wiring; `init_logging` writes daily logs to the launch working directory in debug builds and `%LOCALAPPDATA%\nyaa-stream\logs` in release builds (keeps 7 files; release builds have no console) | backend, core |
+| `src-tauri/src/lib.rs` | Tauri commands and app wiring; `init_logging` writes daily logs to the launch working directory in debug builds and `%LOCALAPPDATA%\nyaa-stream\logs` in release builds (keeps 7 files; release builds have no console); `debug_read_logs` tails the active log for the dev search debugger | backend, core, diagnostics |
 | `src-tauri/src/resume.rs` | Continue-watching resume buffers: save on `stop_playback` (open reads + 16 MB from the resume keyframe, verified bytes only), attach in `play_magnet`, sweep by the Continue watching keep list, 25 / 600 MB caps - see PLAN.md "Continue-watching resume buffer" | backend, resume |
 | `src-tauri/src/load_trace.rs` | Load profiler: per-load traces (`trace_begin`/`trace_mark`/`trace_end`), stage debug lines, one `load trace ...` info summary with stream-read stats - see PLAN.md "Load profiler" | backend, diagnostics |
 | `src-tauri/src/logs_export.rs` | `export_logs`: zips the last 7 log files + `system.txt` into Downloads, Windows profile path/username scrubbed in the copies | backend, logs |
