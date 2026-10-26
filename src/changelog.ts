@@ -10,6 +10,12 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.5.3",
+    date: "2026-10-26",
+    features: [],
+    fixes: ["Development logs are now written to the working directory used to launch the app."],
+  },
+  {
     version: "0.5.2",
     date: "2026-10-26",
     features: [],

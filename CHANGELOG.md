@@ -9,6 +9,11 @@ step when cutting a release.
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-10-26
+
+### Changed
+- Development log files are now written to the working directory used to launch the app.
+
 ## [0.5.2] - 2026-10-26
 
 ### Fixed

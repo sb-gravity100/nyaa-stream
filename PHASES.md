@@ -1,5 +1,8 @@
 # PHASES.md — nyaa-stream
 
+## v0.5.3 — Development log location
+- [x] Write debug-build log files to the process working directory
+
 ## v0.5.1 — Fullscreen header fix
 - [x] Remove the reserved title-bar space in fullscreen; keep the home app bar visible
 

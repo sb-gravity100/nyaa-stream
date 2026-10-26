@@ -1388,6 +1388,9 @@ yaa-stream\logs`, the last 7 daily files) plus a
   - **GitHub** - opens a new issue on the repo prefilled (title, app version,
     OS, "describe what happened"); the user attaches the zip. The modal notes
     that GitHub issues are public.
+- **Development log location:** dev builds write daily logs directly into
+  the working directory from which the app was launched; release builds keep
+  using `%LOCALAPPDATA%\nyaa-stream\logs`.
 - **Windows username hidden:** while zipping, every occurrence of the
   user's profile path (`C:\Users\<name>`, also with forward slashes and in
   JSON-escaped `\` form) is replaced with `%USERPROFILE%`, and the bare
