@@ -1,3 +1,13 @@
+### `5c6e6ff` · 2026-10-27 · feat: show live source mapping analytics
+- `src/DebugPage.tsx`
+- `src/DebugPage.css`
+- `src/App.tsx`
+- `src-tauri/src/lib.rs`
+- `src-tauri/src/title_match.rs`
+- `PLAN.md`
+- `PHASES.md`
+- `FILE_INDEX.md`
+
 ### `338e495` · 2026-10-27 · chore: release v0.5.7
 - `package.json`
 - `src-tauri/Cargo.toml`
