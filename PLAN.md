@@ -2551,6 +2551,21 @@ range (`01,02,05,07-13`, `41+48+50-52`), `x365` read as episode 365
 (Hidamari Sketch x365), `20.5-21` read as 5-21. Verified batches need no
 manual review; flagged ones are the review/training queue.
 
+**Torrent-file mapping follow-up (planned, v0.5.6 patch; measured 2026-10-26).**
+Re-ran `tosho_batch_check` and `tosho_file_label_coverage` on the imported
+2026-05-09 database. Of 9,754 file-list torrents whose titles parse as a
+range, 8,216 verify and 1,538 are flagged; 8,052 of those checked torrents
+have approval 0, so the aggregate is a parser audit, not trusted attribution
+ground truth. Among trusted (approval 1-3) range batches, 164/195 verify and
+31 are flagged. File labels map 40,068/44,621 torrents fully, 2,281 partly,
+and 1,196 not at all; 1,828 have duplicate (season, episode) labels. The
+duplicate sample includes 123 torrents with filenames containing `Extra`,
+which file-name `is_extra` currently misses. Follow-up: add conservative
+filename-only extra markers and make batch self-checking understand explicit
+sparse episode lists (`01,02,05,07-13`, `41+48+50-52`) without treating
+omitted episodes as missing. Split dataset audits by `release_aid.approved`;
+approval-0 rows are not label ground truth.
+
 **Peer consistency (L1c, measured 2026-10-15; NOT enabled).**
 `nyaa_client::peer_seasons` gives an unmarked release the season that *other*
 groups' marked releases of the same show stem use in the same airing window
