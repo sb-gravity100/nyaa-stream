@@ -1,3 +1,8 @@
+### `338e495` · 2026-10-27 · chore: release v0.5.7
+- `package.json`
+- `src-tauri/Cargo.toml`
+- `src-tauri/tauri.conf.json`
+
 ### `b66d8cb` · 2026-10-27 · feat: target nyaa searches to anime entry
 - `CHANGELOG.md`
 - `FILE_INDEX.md`
