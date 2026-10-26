@@ -1,3 +1,20 @@
+### `e99cc43` · 2026-10-26 · docs: consolidate recent fixes in v0.5.5
+- `CHANGELOG.md`
+- `PHASES.md`
+- `src/changelog.ts`
+
+### `7ab0740` · 2026-10-26 · fix: show player controls only on hover
+- `src/PlayerView.tsx`
+- `src/HlsPlayerView.tsx`
+- `PLAN.md`
+- `PHASES.md`
+- `FILE_INDEX.md`
+- `CHANGELOG.md`
+- `src/changelog.ts`
+- `package.json`
+- `src-tauri/tauri.conf.json`
+- `src-tauri/Cargo.toml`
+
 ### `ddd3eb9` · 2026-10-26 · fix: stabilize player hover at top edge
 - `src/PlayerView.tsx`
 - `src/HlsPlayerView.tsx`
