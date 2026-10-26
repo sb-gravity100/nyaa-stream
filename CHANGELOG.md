@@ -9,10 +9,15 @@ step when cutting a release.
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-10-26
+
+### Fixed
+- Fullscreen now removes the title-bar gap while keeping the home header visible.
+
 ## [0.5.1] - 2026-10-26
 
 ### Fixed
-- The home header now slides out of view in fullscreen and returns on exit.
+- Fullscreen state is reflected in the webview for fullscreen-specific layout.
 
 ## [0.5.0] - 2026-10-13
 

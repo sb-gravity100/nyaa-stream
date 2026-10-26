@@ -10,10 +10,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.5.2",
+    date: "2026-10-26",
+    features: [],
+    fixes: ["Fullscreen removes the title-bar gap while keeping the home header visible."],
+  },
+  {
     version: "0.5.1",
     date: "2026-10-26",
     features: [],
-    fixes: ["The home header now slides out of view in fullscreen and returns on exit."],
+    fixes: ["Fullscreen state is reflected in the webview for fullscreen-specific layout."],
   },
   {
     version: "0.5.0",
