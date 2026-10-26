@@ -2683,6 +2683,17 @@ rows skew old; new-season entries are exactly the low-signal case, so the entry
 hold-out is the real test; the model must never reject a release a trusted
 `aid` accepts.
 
+## Search flow debugger (developer tool, local only)
+
+A dedicated `#/debug` web route for inspecting the anime search and selection
+pipeline. It runs the same AniList lookup, then on selection runs local
+release lookup, optional preferred-fansubber lookup, the full title-matching
+Nyaa search, and the selected-anime metadata requests. Each stage records
+start/completion/failure, elapsed time, arguments, counts, and returned data
+in a compact filterable timeline. It also captures console logs while the
+debug route is open, with clear/copy controls. The route is for local
+development and makes no production UI changes.
+
 ## Custom magnet in the search bar (planned, v0.6.0 - minor feature; was v0.4.5, held out of v0.5.0 on 2026-10-13)
 
 **Request** (2026-10-13): paste a magnet URL into the search bar. Decided

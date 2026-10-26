@@ -756,3 +756,10 @@
       - [x] Dev profile debug info: line-tables-only, dependencies 0
       - [x] rust-lld for dev links (verified + timed)
       - [x] rust-analyzer separate target dir (`.vscode/settings.json`)
+- [x] Search flow debugger (developer-only):
+      - [x] `#/debug` page: live AniList search and selected-anime release
+            lookup using the app's existing commands
+      - [x] Timestamped stage timeline with inputs, outputs, elapsed time,
+            errors, and browser console capture; filter, clear, copy
+      - [x] Keep it out of the normal production navigation; update
+            PLAN.md/FILE_INDEX.md
