@@ -1,5 +1,8 @@
 # PHASES.md — nyaa-stream
 
+## v0.5.4 — Player top-edge hover flicker
+- [x] Track pointer movement across the player and title-bar overlay as one hover surface
+
 ## v0.5.3 — Development log location
 - [x] Write debug-build log files to the process working directory
 

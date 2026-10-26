@@ -9,6 +9,11 @@ step when cutting a release.
 
 ## [Unreleased]
 
+## [0.5.4] - 2026-10-26
+
+### Fixed
+- Player controls no longer flicker when the pointer is at the top edge.
+
 ## [0.5.3] - 2026-10-26
 
 ### Changed

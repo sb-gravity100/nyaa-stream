@@ -740,15 +740,18 @@ export function HlsPlayerView({
    useEffect(() => {
       const root = rootRef.current;
       if (!root) return;
+      const playerRoot = root;
 
-      // Re-checked on every move rather than via enter/leave events, which
-      // miss the pointer when the bars appear or vanish underneath it.
+      // Track the title-bar overlay too: it sits above this root at the top
+      // edge, so root-only listeners can rapidly toggle controls on leave.
       function handlePointerMove(event: PointerEvent) {
          if (event.pointerType !== "mouse") return;
          const target = event.target;
+         const element = target instanceof Element ? target : null;
+         if (!playerRoot.contains(target as Node) && !element?.closest(".titlebar")) return;
          const over =
-            target instanceof Element &&
-            target.closest(CONTROLS_AREA_SELECTOR) != null;
+            element != null &&
+            (element.closest(CONTROLS_AREA_SELECTOR) != null || element.closest(".titlebar") != null);
          if (over !== hoveringControlsRef.current)
             console.debug("[player] pointer over controls area", { over });
          hoveringControlsRef.current = over;
@@ -756,17 +759,15 @@ export function HlsPlayerView({
       }
 
       function handlePointerLeave() {
-         console.debug("[player] pointer left player");
+         console.debug("[player] pointer left window");
          hoveringControlsRef.current = false;
-         window.clearTimeout(idleTimerRef.current);
-         hideControlsIfIdle();
       }
 
-      root.addEventListener("pointermove", handlePointerMove);
-      root.addEventListener("pointerleave", handlePointerLeave);
+      document.addEventListener("pointermove", handlePointerMove);
+      document.addEventListener("pointerleave", handlePointerLeave);
       return () => {
-         root.removeEventListener("pointermove", handlePointerMove);
-         root.removeEventListener("pointerleave", handlePointerLeave);
+         document.removeEventListener("pointermove", handlePointerMove);
+         document.removeEventListener("pointerleave", handlePointerLeave);
       };
    }, []);
 

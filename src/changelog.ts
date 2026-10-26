@@ -10,6 +10,12 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.5.4",
+    date: "2026-10-26",
+    features: [],
+    fixes: ["Player controls no longer flicker when the pointer is at the top edge."],
+  },
+  {
     version: "0.5.3",
     date: "2026-10-26",
     features: [],

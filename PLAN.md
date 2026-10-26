@@ -1054,6 +1054,9 @@ shadow on). In the player the strip shows and fades with the player's top
 controls, and is hidden in fullscreen and PiP. Needs the window
 permissions (`core:window:allow-start-dragging`, `-minimize`,
 `-toggle-maximize`, `-close`, `-show`) in the main capability.
+Player pointer tracking spans the document so the title-bar overlay remains
+part of the top hover area instead of repeatedly leaving and re-entering the
+player surface.
 
 ## Download cache (planned, v0.4.0 - minor: new feature)
 
