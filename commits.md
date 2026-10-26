@@ -1,3 +1,18 @@
+### `b66d8cb` · 2026-10-27 · feat: target nyaa searches to anime entry
+- `CHANGELOG.md`
+- `FILE_INDEX.md`
+- `PHASES.md`
+- `PLAN.md`
+- `crates/nyaa-client/src/lib.rs`
+- `crates/nyaa-client/src/store.rs`
+- `src-tauri/src/lib.rs`
+- `src-tauri/src/title_match.rs`
+- `src-tauri/src/title_match_fixture_tests.rs`
+- `src/App.tsx`
+- `src/browserFallback.ts`
+- `src/changelog.ts`
+- `src/types.ts`
+
 ### `6e32312` · 2026-10-26 · feat: add debugger scrolling and matching diagram
 - `src/DebugPage.tsx`
 - `src/DebugPage.css`
