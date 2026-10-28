@@ -54,6 +54,7 @@
 | `crates/release-parse/src/{tokenizer,parser,number,helper,keyword,token,element}.rs` | The port's modules, one per anitopy file (tokenizer.py, parser.py, parser_number.py, parser_helper.py, keyword.py, token.py, element.py) | backend, search, parser |
 | `crates/release-parse/src/extra.rs` | nyaa-stream additions to the anitopy port: CJK counters, season ranges/lists, roman-numeral seasons, spaced `~` ranges, technical numbers (audio channels, fps, `H 264`) | backend, search, parser |
 | `crates/release-parse/src/release.rs` | `parse_release(title) -> Release` (title, seasons, episode range, `Kind`, extras, group, version; `FINAL_SEASON` sentinel) - the typed view the app uses | backend, search, parser |
+| `crates/release-parse/upstream/animebatch/` | Supplied Python animebatch 0.1.0 source and 42 labeled cases, retained for Rust port parity | reference, parser, test |
 | `crates/release-parse/examples/labels.rs` | Scratch tool: one title per stdin line → `Release` as JSON, for diffing against `episodeParser.ts` | backend, dev-tool |
 | `crates/nyaa-client/examples/search_json.rs` | Scratch tool: live nyaa.si search (no release database, no Tosho data) for one or more queries, one `NyaaResult` JSON per line, deduplicated; input of `ml/score_search.py` | backend, dev-tool, ml |
 | `ml/score_search.py` | Scores a live nyaa search against one franchise with the local XGBoost model (franchise entries from AniList relations + Fribb season, no Tosho data); prints episode -> sources and packs or exports per-release debugger predictions | ml, dev-tool |

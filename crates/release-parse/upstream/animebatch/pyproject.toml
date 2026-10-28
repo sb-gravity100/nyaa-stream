@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "animebatch"
+version = "0.1.0"
+description = "Hybrid guessit + anitopy parser with batch/season-range rules and season-aware search"
+requires-python = ">=3.9"
+dependencies = ["guessit", "anitopy"]
+
+[project.optional-dependencies]
+fuzzy = ["rapidfuzz"]
+test = ["pytest"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
