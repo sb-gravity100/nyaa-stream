@@ -2712,7 +2712,7 @@ hold-out is the real test; the model must never reject a release a trusted
 
 ## Search flow debugger (developer tool, local only)
 
-**ML trial (v0.5.8, debugger only).** The debugger can score its raw nyaa
+**ML trial (unversioned debugger work).** The debugger can score its raw nyaa
 results with the locally trained XGBoost prototype and show the predicted
 entry, confidence, margin, and abstention beside the existing rule decision.
 The trial uses the training artifacts under the user's app-data Tosho folder;
