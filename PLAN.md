@@ -587,6 +587,15 @@ by an app-styled HTML menu whose items depend on what was right-clicked.
 
 ## Release plan (decided 2026-09-29)
 
+**v0.5.7 publication (SB, 2026-10-28).** Publish the existing unpublished
+v0.5.7 line with the Rust animebatch batch/season parser and its guessit-used
+metadata API. The full Rust anitopy port is already present. Build from an
+isolated branch based on the local v0.5.7 tag; omit the developer debugger,
+all `ml/` files, and later experimental debugger/model commits. Move the
+unpublished local v0.5.7 tag to the release commit after `main` is reconciled.
+SB chose to wait for that reconciliation before publication; preserve both
+divergent development branches until then.
+
 Three published releases: **v0.3.2** (the playback fixes) as soon as it
 passes a live test, **v0.4.0** (splash/title bar, download cache, resume
 buffer, contact and send logs, and the sbtl torrent engine), then **v1.0.0** (the stable Windows release
