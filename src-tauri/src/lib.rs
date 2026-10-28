@@ -73,42 +73,6 @@ fn log_frontend(level: String, message: String) {
     }
 }
 
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct DebugLogSlice {
-    cursor: usize,
-    lines: Vec<String>,
-}
-
-/// Dev debugger log tail. Deliberately not logged itself, since the page polls
-/// this command and logging each poll would create a self-sustaining log stream.
-#[tauri::command]
-async fn debug_read_logs(after: usize) -> Result<DebugLogSlice, String> {
-    #[cfg(not(debug_assertions))]
-    return Err("Backend log viewing is available only in development builds".into());
-
-    #[cfg(debug_assertions)]
-    {
-        let mut entries = tokio::fs::read_dir(log_dir()).await.map_err(|err| err.to_string())?;
-        let mut latest: Option<(std::time::SystemTime, PathBuf)> = None;
-        while let Some(entry) = entries.next_entry().await.map_err(|err| err.to_string())? {
-            let name = entry.file_name();
-            let name = name.to_string_lossy();
-            if !name.starts_with("nyaa-stream.") || !name.ends_with(".log") { continue; }
-            let modified = entry.metadata().await.ok().and_then(|m| m.modified().ok()).unwrap_or(std::time::UNIX_EPOCH);
-            if latest.as_ref().map_or(true, |(time, _)| modified > *time) {
-                latest = Some((modified, entry.path()));
-            }
-        }
-        let Some((_, path)) = latest else { return Ok(DebugLogSlice { cursor: 0, lines: Vec::new() }); };
-        let content = tokio::fs::read_to_string(path).await.map_err(|err| err.to_string())?;
-        let lines: Vec<String> = content.lines().map(str::to_owned).collect();
-        let cursor = lines.len();
-        let start = if after == 0 { cursor.saturating_sub(2000) } else if after > cursor { 0 } else { after };
-        Ok(DebugLogSlice { cursor, lines: lines.into_iter().skip(start).collect() })
-    }
-}
-
 #[tauri::command]
 async fn search_anime(state: State<'_, Arc<AppState>>, query: String) -> Result<Vec<AnimeMedia>, String> {
     tracing::debug!(%query, "search_anime invoked");
@@ -1705,7 +1669,6 @@ pub fn run() {
             tosho_import::tosho_import_cancel,
             tosho_import::tosho_import_status,
             log_frontend,
-            debug_read_logs,
             search_anime,
             get_anime_details,
             get_absolute_episode_offset,

@@ -475,15 +475,6 @@ html.mpv-active .titlebar {
   gap: 8px;
 }
 
-.app-debug-button {
-  min-height: 36px;
-  padding: 0 12px;
-  border: 1px solid var(--glass-rim);
-  color: var(--muted);
-  font: 600 12px var(--font-display);
-  letter-spacing: 0.04em;
-}
-
 .media-settings-anchor {
   position: fixed;
   top: 16px;

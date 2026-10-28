@@ -23,7 +23,6 @@ import { episodeNumbersByGroup } from "./releases";
 import { MediaPage } from "./MediaPage";
 import { HomePage } from "./HomePage";
 import { SettingsPanel } from "./SettingsPanel";
-import { DebugPage } from "./DebugPage";
 import { BrandMark, SearchIcon, SettingsIcon } from "./icons";
 import { Buffering } from "./Buffering";
 import { goBack, navigate, useRoute, type WatchTarget } from "./router";
@@ -729,14 +728,6 @@ function App() {
       <SettingsIcon />
     </button>
   );
-  const debugButton = import.meta.env.DEV && (
-    <button class="icon-button app-debug-button" onClick={() => { location.hash = "#/debug"; }} aria-label="Debug" title="Search flow debugger">
-      Debug
-    </button>
-  );
-
-  if (import.meta.env.DEV && location.hash === "#/debug") return <DebugPage />;
-
   if (route.name === "anime" && selectedAnime?.id !== route.id) {
     // The route's anime is still loading (reload / back-forward into it).
     return (
@@ -761,7 +752,7 @@ function App() {
     const animeId = selectedAnime.id;
     return (
       <main class="container">
-        <div class="media-settings-anchor">{debugButton}{settingsButton}</div>
+        <div class="media-settings-anchor">{settingsButton}</div>
         <MediaPage
           key={animeId}
           anime={selectedAnime}
@@ -897,7 +888,7 @@ function App() {
             </div>
           )}
         </div>
-        <div class="app-bar-actions">{debugButton}{settingsButton}</div>
+        <div class="app-bar-actions">{settingsButton}</div>
       </header>
 
       <HomePage
