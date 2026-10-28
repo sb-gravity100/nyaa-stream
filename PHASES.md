@@ -1,5 +1,13 @@
 # PHASES.md — nyaa-stream
 
+## v0.6.0 — animebatch parser replacement (requested 2026-10-28)
+- [ ] Copy the supplied Python source into a tracked reference directory
+- [ ] Port animebatch batch, season-range, alias and search behavior to Rust
+- [ ] Reuse the existing Rust anitopy port; port the guessit fields used by animebatch
+- [ ] Replace the app's release parsing path while preserving its public data contract
+- [ ] Run the archive's labeled cases, title matching fixtures, corpus comparison and `cargo check --workspace`
+- [ ] Sync FILE_INDEX/CHANGELOG; bump and tag v0.6.0 locally with the milestone
+
 ## v0.5.5 — Polish fixes
 - [x] Remove the reserved title-bar space in fullscreen; keep the home app bar visible
 - [x] Write debug-build logs to the process working directory

@@ -587,6 +587,16 @@ by an app-styled HTML menu whose items depend on what was right-clicked.
 
 ## Release plan (decided 2026-09-29)
 
+**v0.6.0 parser replacement (requested 2026-10-28).** Port the supplied
+`animebatch.zip` into `crates/release-parse` and make its batch/season-range
+rules and season-aware search the app's release parsing path. Retain the
+existing Rust anitopy 2.1.1 port as the anitopy component. Port the guessit
+title, season, resolution and source behavior used by animebatch to Rust,
+without a Python runtime dependency. Preserve the archive's 42 labeled
+regressions; compare app title-matching fixtures and the 10,151-title corpus
+before switching behavior. Keep the supplied Python source in the repository
+as a reference for parity. Ship with the v0.6.0 local milestone tag.
+
 Three published releases: **v0.3.2** (the playback fixes) as soon as it
 passes a live test, **v0.4.0** (splash/title bar, download cache, resume
 buffer, contact and send logs, and the sbtl torrent engine), then **v1.0.0** (the stable Windows release
