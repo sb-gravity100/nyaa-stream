@@ -1,3 +1,8 @@
+### `0e590d0` · 2026-10-28 · chore: release v0.5.8
+- `package.json`
+- `src-tauri/Cargo.toml`
+- `src-tauri/tauri.conf.json`
+
 ### `aa830c7` · 2026-10-28 · feat: show experimental ML source matches in debugger
 - `PLAN.md`
 - `PHASES.md`
