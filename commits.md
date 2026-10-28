@@ -2725,3 +2725,6 @@ Commit log, newest first. Prepend a new entry after every commit.
 ### `f34d30c` · 2026-10-28 · docs: plan Tauri plugin version alignment
 - `PLAN.md`
 - `PHASES.md`
+### `d504fe3` · 2026-10-28 · fix: pin matching Tauri plugins for v0.5.7
+- `src-tauri/Cargo.toml`
+- `PHASES.md`
