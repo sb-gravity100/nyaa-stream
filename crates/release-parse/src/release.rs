@@ -118,8 +118,5 @@ pub fn parse_release(title: &str) -> Release {
     let e = crate::parse(title);
     let mut release = Release::from_elements(title, &e);
     crate::batch::apply(title, &mut release);
-    if let Some(parsed_title) = release.title.as_deref() {
-        release.title = Some(crate::animebatch::guess_title(title, parsed_title));
-    }
     release
 }

@@ -9,6 +9,10 @@ step when cutting a release.
 
 ## [Unreleased]
 
+### Changed
+- Release parsing now recognizes more batch episode ranges, box sets and season packs using the Rust port of animebatch's rules.
+- A Rust animebatch API provides season-aware search and normalized title, source and resolution metadata without Python dependencies.
+
 ## [0.5.7] - 2026-10-27
 
 ### Fixed

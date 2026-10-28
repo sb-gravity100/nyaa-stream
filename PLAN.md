@@ -589,13 +589,23 @@ by an app-styled HTML menu whose items depend on what was right-clicked.
 
 **v0.6.0 parser replacement (requested 2026-10-28).** Port the supplied
 `animebatch.zip` into `crates/release-parse` and make its batch/season-range
-rules and season-aware search the app's release parsing path. Retain the
+rules the app's release parsing path. Expose its season-aware search as a
+Rust API; keep the app's existing AniList-aware matcher. Retain the
 existing Rust anitopy 2.1.1 port as the anitopy component. Port the guessit
 title, season, resolution and source behavior used by animebatch to Rust,
 without a Python runtime dependency. Preserve the archive's 42 labeled
 regressions; compare app title-matching fixtures and the 10,151-title corpus
 before switching behavior. Keep the supplied Python source in the repository
 as a reference for parity. Ship with the v0.6.0 local milestone tag.
+The 10,151-title comparison showed 1,812 title changes if guessit's shorter
+title were made the app's canonical title (including loss of movie and season
+qualifiers). Keep the anitopy title in `parse_release`; `parse_batch` exposes
+the guessit title and both aliases for clients that need them.
+The final corpus diff changes 65 of 10,151 typed releases: 58 kind labels,
+20 episode ranges and 2 season lists (some records change multiple fields),
+with no canonical-title changes. The app's 39 active title-matching tests
+pass, including the fixture at its pre-port 118 wrongly kept Mushoku S1
+releases; the first draft's spaced season-range overmatch was removed.
 
 Three published releases: **v0.3.2** (the playback fixes) as soon as it
 passes a live test, **v0.4.0** (splash/title bar, download cache, resume

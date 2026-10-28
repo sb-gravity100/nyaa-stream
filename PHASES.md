@@ -4,9 +4,12 @@
 - [x] Copy the supplied Python source into a tracked reference directory
 - [x] Port animebatch batch, season-range, alias and search behavior to Rust (40 parse cases and archive search examples pass)
 - [x] Reuse the existing Rust anitopy port; port the guessit title, source and resolution fields used by animebatch (40-case Python oracle parity)
-- [x] Replace the app's release parsing path while preserving its public data contract
-- [ ] Run the archive's labeled cases, title matching fixtures, corpus comparison and `cargo check --workspace`
-- [ ] Sync FILE_INDEX/CHANGELOG; bump and tag v0.6.0 locally with the milestone
+- [x] Replace the app's release batch/season parsing path while preserving its public data contract and title specificity; guessit titles remain available through `parse_batch`
+- [x] Run the archive's 40 labeled parse cases and two search examples; 40-case Python metadata oracle; `cargo check --workspace`
+- [x] Compare the 10,151-title corpus with pre-port parser: 65 changed records (58 kinds, 20 episode ranges, 2 seasons; no title changes)
+- [x] Title-matching fixture: the season-range correction restored the pre-port 118 wrongly kept Mushoku S1 releases (ceiling 128); all 39 active `title_match` tests pass
+- [x] Sync FILE_INDEX and CHANGELOG
+- [ ] Bump and tag v0.6.0 locally with the rest of the milestone
 
 ## v0.5.5 — Polish fixes
 - [x] Remove the reserved title-bar space in fullscreen; keep the home app bar visible

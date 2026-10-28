@@ -50,6 +50,17 @@ fn supplied_bilingual_alias() {
 }
 
 #[test]
+fn corpus_range_regressions() {
+    let single = parse_release("[Erai-raws] Spy x Family Season 3 - 13 [1080p CR WEB-DL]");
+    assert_eq!(single.seasons, [3]);
+    assert_eq!(single.episodes, Some((13, 13)));
+    let dated = parse_release("[JP-EN] Boruto S01 [2017 - 2023] COMPLETE 1080p BDRip");
+    assert_ne!(dated.episodes, Some((2017, 2023)));
+    let mixed = parse_release("Bleach 1-279 [480p] Movies 1-4 [720p]");
+    assert_eq!(mixed.episodes, Some((1, 279)));
+}
+
+#[test]
 fn oracle_metadata_report() {
     let oracle: Vec<serde_json::Value> = serde_json::from_str(include_str!("animebatch_oracle.json")).unwrap();
     let mut differences = Vec::new();
