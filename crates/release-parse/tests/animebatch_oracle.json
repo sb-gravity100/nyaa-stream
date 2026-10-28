@@ -1,0 +1,1153 @@
+[
+  {
+    "raw": "[Serenae] Meitantei Precure! - 25-38 Batch (720p)",
+    "title": "Meitantei Precure!",
+    "aliases": [
+      "Meitantei Precure!"
+    ],
+    "group": "Serenae",
+    "seasons": [],
+    "season_source": "none",
+    "ep_start": 25,
+    "ep_end": 38,
+    "ep_total": null,
+    "batch_kind": "episode_range",
+    "is_complete": false,
+    "has_movies": false,
+    "has_extras": false,
+    "year": null,
+    "resolution": "720p",
+    "source": null,
+    "confidence": 0.9,
+    "trace": [
+      "ep:ep_bare=(25, 38, None)",
+      "kind:episode_range"
+    ],
+    "is_batch": true
+  },
+  {
+    "raw": "[SubsPlease] Nige Jouzu no Wakagimi S2 (01-12) (480p) [Batch]",
+    "title": "Nige Jouzu no Wakagimi",
+    "aliases": [
+      "Nige Jouzu no Wakagimi"
+    ],
+    "group": "SubsPlease",
+    "seasons": [
+      2
+    ],
+    "season_source": "explicit",
+    "ep_start": 1,
+    "ep_end": 12,
+    "ep_total": null,
+    "batch_kind": "episode_range",
+    "is_complete": false,
+    "has_movies": false,
+    "has_extras": false,
+    "year": null,
+    "resolution": "480p",
+    "source": null,
+    "confidence": 0.9,
+    "trace": [
+      "season:season_token=[2]",
+      "ep:ep_bracket=(1, 12, None)",
+      "kind:episode_range"
+    ],
+    "is_batch": true
+  },
+  {
+    "raw": "[Kashikoi] Ranpo Kitan - Game of Laplace - 01~11 [BD 1920x1080 x264 AAC][Sub_Esp][MP4]",
+    "title": "Ranpo Kitan",
+    "aliases": [
+      "Ranpo Kitan",
+      "Ranpo Kitan - Game of Laplace",
+      "Sub_Esp"
+    ],
+    "group": "Kashikoi",
+    "seasons": [],
+    "season_source": "none",
+    "ep_start": 1,
+    "ep_end": 11,
+    "ep_total": null,
+    "batch_kind": "episode_range",
+    "is_complete": false,
+    "has_movies": false,
+    "has_extras": false,
+    "year": null,
+    "resolution": "1080p",
+    "source": "Blu-ray",
+    "confidence": 0.9,
+    "trace": [
+      "ep:ep_bare=(1, 11, None)",
+      "kind:episode_range"
+    ],
+    "is_batch": true
+  },
+  {
+    "raw": "[One Pace][96-100] Loguetown - Extended Cut [1080p]",
+    "title": "Loguetown",
+    "aliases": [
+      "Loguetown",
+      "Loguetown - Extended Cut"
+    ],
+    "group": "One Pace",
+    "seasons": [],
+    "season_source": "none",
+    "ep_start": 96,
+    "ep_end": 100,
+    "ep_total": null,
+    "batch_kind": "episode_range",
+    "is_complete": false,
+    "has_movies": false,
+    "has_extras": false,
+    "year": null,
+    "resolution": "1080p",
+    "source": null,
+    "confidence": 0.9,
+    "trace": [
+      "ep:ep_bracket=(96, 100, None)",
+      "kind:episode_range"
+    ],
+    "is_batch": true
+  },
+  {
+    "raw": "Naruto [1-162 of 220] [Without Hardsubs] [Eng Subs] [BDRip] [800p]",
+    "title": "Naruto",
+    "aliases": [
+      "Naruto",
+      "1-162 of 220",
+      "Without Hardsubs"
+    ],
+    "group": null,
+    "seasons": [],
+    "season_source": "none",
+    "ep_start": 1,
+    "ep_end": 162,
+    "ep_total": 220,
+    "batch_kind": "episode_range",
+    "is_complete": false,
+    "has_movies": false,
+    "has_extras": false,
+    "year": null,
+    "resolution": null,
+    "source": "Blu-ray",
+    "confidence": 0.9,
+    "trace": [
+      "ep:ep_of_total=(1, 162, 220)",
+      "kind:episode_range"
+    ],
+    "is_batch": true
+  },
+  {
+    "raw": "[BDMV] Fate Grand Order Absolute Demonic Front Babylonia Box Set I (US)",
+    "title": "Fate Grand Order Absolute Demonic Front Babylonia Box Set I",
+    "aliases": [
+      "Fate Grand Order Absolute Demonic Front Babylonia Box Set I",
+      "Fate Grand Order Absolute Demonic Front Babylonia Box Set I (US)"
+    ],
+    "group": "BDMV",
+    "seasons": [],
+    "season_source": "none",
+    "ep_start": null,
+    "ep_end": null,
+    "ep_total": null,
+    "batch_kind": "box_set",
+    "is_complete": false,
+    "has_movies": false,
+    "has_extras": false,
+    "year": null,
+    "resolution": null,
+    "source": null,
+    "confidence": 0.6,
+    "trace": [
+      "ep:skipped(pack)",
+      "kind:box_set"
+    ],
+    "is_batch": true
+  },
+  {
+    "raw": "JoJo's Bizarre Adventure - Golden Wind (Blu-Ray 1920x1080 FLAC) (01-39) Some-Stuffs subs",
+    "title": "JoJo's Bizarre Adventure",
+    "aliases": [
+      "JoJo's Bizarre Adventure",
+      "JoJo's Bizarre Adventure - Golden Wind"
+    ],
+    "group": null,
+    "seasons": [],
+    "season_source": "none",
+    "ep_start": 1,
+    "ep_end": 39,
+    "ep_total": null,
+    "batch_kind": "episode_range",
+    "is_complete": false,
+    "has_movies": false,
+    "has_extras": false,
+    "year": null,
+    "resolution": "1080p",
+    "source": "Blu-ray",
+    "confidence": 0.9,
+    "trace": [
+      "ep:ep_bracket=(1, 39, None)",
+      "kind:episode_range"
+    ],
+    "is_batch": true
+  },
+  {
+    "raw": "[Koten_Gars] One Piece - Season 04-09 {S07-15 | WEB HD Era} [FUNi-DL][h.264][1080p][AAC] (English Dubbed)",
+    "title": "One Piece",
+    "aliases": [
+      "One Piece",
+      "One Piece - Season",
+      "FUNi-DL",
+      "h.264"
+    ],
+    "group": "Koten_Gars",
+    "seasons": [
+      4,
+      5,
+      6,
+      7,
+      8,
+      9
+    ],
+    "season_source": "range",
+    "ep_start": null,
+    "ep_end": null,
+    "ep_total": null,
+    "batch_kind": "multi_season",
+    "is_complete": false,
+    "has_movies": false,
+    "has_extras": false,
+    "year": null,
+    "resolution": "1080p",
+    "source": "Web",
+    "confidence": 0.9,
+    "trace": [
+      "season:season_range_word=[4, 5, 6, 7, 8, 9]",
+      "ep:skipped(pack)",
+      "kind:multi_season"
+    ],
+    "is_batch": true
+  },
+  {
+    "raw": "[PMR] Brave Witches S01 (BD Remux 1080p AVC FLAC) [Dual Audio]",
+    "title": "Brave Witches",
+    "aliases": [
+      "Brave Witches"
+    ],
+    "group": "PMR",
+    "seasons": [
+      1
+    ],
+    "season_source": "explicit",
+    "ep_start": null,
+    "ep_end": null,
+    "ep_total": null,
+    "batch_kind": "season_pack",
+    "is_complete": false,
+    "has_movies": false,
+    "has_extras": false,
+    "year": null,
+    "resolution": "1080p",
+    "source": "Blu-ray",
+    "confidence": 0.9,
+    "trace": [
+      "season:season_token=[1]",
+      "kind:season_pack"
+    ],
+    "is_batch": true
+  },
+  {
+    "raw": "Spirit.Sword.Sovereign.(Ling.Jian.Zun) S1-S4 Eps 001-517 Chinese Donghua EngSubs Edited for Content.(EFC)",
+    "title": "Spirit Sword Sovereign",
+    "aliases": [
+      "Spirit Sword Sovereign",
+      "Spirit Sword Sovereign (Ling Jian Zun)",
+      "Ling.Jian.Zun"
+    ],
+    "group": "EFC",
+    "seasons": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "season_source": "range",
+    "ep_start": 1,
+    "ep_end": 517,
+    "ep_total": null,
+    "batch_kind": "multi_season",
+    "is_complete": false,
+    "has_movies": false,
+    "has_extras": false,
+    "year": null,
+    "resolution": null,
+    "source": null,
+    "confidence": 0.9,
+    "trace": [
+      "season:season_range_s=[1, 2, 3, 4]",
+      "ep:ep_kw=(1, 517, None)",
+      "kind:multi_season"
+    ],
+    "is_batch": true
+  },
+  {
+    "raw": "Full Metal Alchemist Complete (Movies+Both Series)(Bluray Remux TrueHD 5.1 Dual Audio)",
+    "title": "Full Metal Alchemist",
+    "aliases": [
+      "Full Metal Alchemist"
+    ],
+    "group": "Movies+Both Series",
+    "seasons": [],
+    "season_source": "none",
+    "ep_start": null,
+    "ep_end": null,
+    "ep_total": null,
+    "batch_kind": "complete",
+    "is_complete": true,
+    "has_movies": true,
+    "has_extras": false,
+    "year": null,
+    "resolution": null,
+    "source": "Blu-ray",
+    "confidence": 0.6,
+    "trace": [
+      "ep:skipped(pack)",
+      "kind:complete"
+    ],
+    "is_batch": true
+  },
+  {
+    "raw": "[The_Wyandotte] Fairy Tail (2009) 1-175 (h.265 BD 1080p Dual-Audio FLAC)",
+    "title": "Fairy Tail",
+    "aliases": [
+      "Fairy Tail"
+    ],
+    "group": "The_Wyandotte",
+    "seasons": [],
+    "season_source": "none",
+    "ep_start": 1,
+    "ep_end": 175,
+    "ep_total": null,
+    "batch_kind": "episode_range",
+    "is_complete": false,
+    "has_movies": false,
+    "has_extras": false,
+    "year": 2009,
+    "resolution": "1080p",
+    "source": "Blu-ray",
+    "confidence": 0.9,
+    "trace": [
+      "ep:ep_bare=(1, 175, None)",
+      "kind:episode_range"
+    ],
+    "is_batch": true
+  },
+  {
+    "raw": "Attack.on.Titan.S04Part01.2020.and.S04Part02.2022.Bluray.REMUX.1080p.TRUHD.51.AC351.TRUHD20.AC320.Eng+Jap.EngSubs",
+    "title": "Attack on Titan S04Part01 2020 and S04Part02",
+    "aliases": [
+      "Attack on Titan S04Part01 2020 and S04Part02",
+      "Attack on Titan S04Part01 2020 and S04Part02 2022"
+    ],
+    "group": null,
+    "seasons": [
+      4
+    ],
+    "season_source": "explicit",
+    "ep_start": null,
+    "ep_end": null,
+    "ep_total": null,
+    "batch_kind": "season_pack",
+    "is_complete": false,
+    "has_movies": false,
+    "has_extras": false,
+    "year": 2020,
+    "resolution": "1080p",
+    "source": "Blu-ray",
+    "confidence": 0.9,
+    "trace": [
+      "season:season_part=[4]",
+      "kind:season_pack"
+    ],
+    "is_batch": true
+  },
+  {
+    "raw": "Mach Go Go Go 01-52 (BD 960x720 x264 AAC)",
+    "title": "Mach Go Go Go",
+    "aliases": [
+      "Mach Go Go Go"
+    ],
+    "group": null,
+    "seasons": [],
+    "season_source": "none",
+    "ep_start": 1,
+    "ep_end": 52,
+    "ep_total": null,
+    "batch_kind": "episode_range",
+    "is_complete": false,
+    "has_movies": false,
+    "has_extras": false,
+    "year": null,
+    "resolution": "720p",
+    "source": "Blu-ray",
+    "confidence": 0.9,
+    "trace": [
+      "ep:ep_bare=(1, 52, None)",
+      "kind:episode_range"
+    ],
+    "is_batch": true
+  },
+  {
+    "raw": "One Piece Seasons 01-18 English Audio",
+    "title": "One Piece",
+    "aliases": [
+      "One Piece",
+      "One Piece Seasons"
+    ],
+    "group": null,
+    "seasons": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18
+    ],
+    "season_source": "range",
+    "ep_start": null,
+    "ep_end": null,
+    "ep_total": null,
+    "batch_kind": "multi_season",
+    "is_complete": false,
+    "has_movies": false,
+    "has_extras": false,
+    "year": null,
+    "resolution": null,
+    "source": null,
+    "confidence": 0.9,
+    "trace": [
+      "season:season_range_word=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]",
+      "ep:skipped(pack)",
+      "kind:multi_season"
+    ],
+    "is_batch": true
+  },
+  {
+    "raw": "[sekkusu&ok] Fruits Basket (2019) S1 & S2 & S3 (The Final) - [Multi-Subs + VOSTFR] [1080p WEB-DL]",
+    "title": "Fruits Basket",
+    "aliases": [
+      "Fruits Basket",
+      "The Final"
+    ],
+    "group": "sekkusu&ok",
+    "seasons": [
+      1,
+      2,
+      3
+    ],
+    "season_source": "list",
+    "ep_start": null,
+    "ep_end": null,
+    "ep_total": null,
+    "batch_kind": "multi_season",
+    "is_complete": false,
+    "has_movies": false,
+    "has_extras": false,
+    "year": 2019,
+    "resolution": "1080p",
+    "source": "Web",
+    "confidence": 0.9,
+    "trace": [
+      "season:season_token=[1, 2, 3]",
+      "ep:skipped(pack)",
+      "kind:multi_season"
+    ],
+    "is_batch": true
+  },
+  {
+    "raw": "Detective Conan Part 2 [Ep.194-652]",
+    "title": "Detective Conan",
+    "aliases": [
+      "Detective Conan",
+      "Detective Conan Part 2",
+      "Ep.194-652"
+    ],
+    "group": null,
+    "seasons": [],
+    "season_source": "none",
+    "ep_start": 194,
+    "ep_end": 652,
+    "ep_total": null,
+    "batch_kind": "episode_range",
+    "is_complete": false,
+    "has_movies": false,
+    "has_extras": false,
+    "year": null,
+    "resolution": null,
+    "source": null,
+    "confidence": 0.9,
+    "trace": [
+      "ep:ep_kw=(194, 652, None)",
+      "kind:episode_range"
+    ],
+    "is_batch": true
+  },
+  {
+    "raw": "[AiDesuYo] Senki Zesshou Symphogear Complete Series Batch",
+    "title": "Senki Zesshou Symphogear",
+    "aliases": [
+      "Senki Zesshou Symphogear"
+    ],
+    "group": "AiDesuYo",
+    "seasons": [],
+    "season_source": "none",
+    "ep_start": null,
+    "ep_end": null,
+    "ep_total": null,
+    "batch_kind": "complete",
+    "is_complete": true,
+    "has_movies": false,
+    "has_extras": false,
+    "year": null,
+    "resolution": null,
+    "source": null,
+    "confidence": 0.6,
+    "trace": [
+      "ep:skipped(pack)",
+      "kind:complete"
+    ],
+    "is_batch": true
+  },
+  {
+    "raw": "[ColdFusion] Pokemon Movies 1-23 + Shorts + Specials (ENGLISH DUB ONLY)",
+    "title": "Pokemon Movies",
+    "aliases": [
+      "Pokemon Movies"
+    ],
+    "group": "ColdFusion",
+    "seasons": [],
+    "season_source": "none",
+    "ep_start": null,
+    "ep_end": null,
+    "ep_total": null,
+    "batch_kind": "movie_pack",
+    "is_complete": false,
+    "has_movies": true,
+    "has_extras": true,
+    "year": null,
+    "resolution": null,
+    "source": null,
+    "confidence": 0.6,
+    "trace": [
+      "ep:skipped(pack)",
+      "kind:movie_pack"
+    ],
+    "is_batch": true
+  },
+  {
+    "raw": "[a-S] Fairy Tail 001 - 175 [1080p BD] (Dual Audio)",
+    "title": "Fairy Tail",
+    "aliases": [
+      "Fairy Tail",
+      "Fairy Tail 001"
+    ],
+    "group": "a-S",
+    "seasons": [],
+    "season_source": "none",
+    "ep_start": 1,
+    "ep_end": 175,
+    "ep_total": null,
+    "batch_kind": "episode_range",
+    "is_complete": false,
+    "has_movies": false,
+    "has_extras": false,
+    "year": null,
+    "resolution": "1080p",
+    "source": "Blu-ray",
+    "confidence": 0.9,
+    "trace": [
+      "ep:ep_bare=(1, 175, None)",
+      "kind:episode_range"
+    ],
+    "is_batch": true
+  },
+  {
+    "raw": "[Various] ThunderBolt Fantasy Seasons 1-3 + 2Movies",
+    "title": "ThunderBolt Fantasy",
+    "aliases": [
+      "ThunderBolt Fantasy",
+      "ThunderBolt Fantasy Seasons"
+    ],
+    "group": "Various",
+    "seasons": [
+      1,
+      2,
+      3
+    ],
+    "season_source": "range",
+    "ep_start": null,
+    "ep_end": null,
+    "ep_total": null,
+    "batch_kind": "multi_season",
+    "is_complete": false,
+    "has_movies": true,
+    "has_extras": false,
+    "year": null,
+    "resolution": null,
+    "source": null,
+    "confidence": 0.9,
+    "trace": [
+      "season:season_range_word=[1, 2, 3]",
+      "ep:skipped(pack)",
+      "kind:multi_season"
+    ],
+    "is_batch": true
+  },
+  {
+    "raw": "[HuangSubs] Shrouding the Heavens Episodes 1-169 + The Imperial Path Movie (4K) (Zhe Tian, 遮天)",
+    "title": "Shrouding the Heavens",
+    "aliases": [
+      "Shrouding the Heavens",
+      "Zhe Tian, 遮天"
+    ],
+    "group": "HuangSubs",
+    "seasons": [],
+    "season_source": "none",
+    "ep_start": 1,
+    "ep_end": 169,
+    "ep_total": null,
+    "batch_kind": "episode_range",
+    "is_complete": false,
+    "has_movies": true,
+    "has_extras": false,
+    "year": null,
+    "resolution": "2160p",
+    "source": null,
+    "confidence": 0.9,
+    "trace": [
+      "ep:ep_kw=(1, 169, None)",
+      "kind:episode_range"
+    ],
+    "is_batch": true
+  },
+  {
+    "raw": "[SoM] Dragon Ball Z - COMPLETE (001-291) - Color Corrected Dragon Box Merge [480p][x264]",
+    "title": "Dragon Ball Z",
+    "aliases": [
+      "Dragon Ball Z"
+    ],
+    "group": "SoM",
+    "seasons": [],
+    "season_source": "none",
+    "ep_start": 1,
+    "ep_end": 291,
+    "ep_total": null,
+    "batch_kind": "complete",
+    "is_complete": true,
+    "has_movies": false,
+    "has_extras": false,
+    "year": null,
+    "resolution": "480p",
+    "source": null,
+    "confidence": 0.9,
+    "trace": [
+      "ep:ep_bracket=(1, 291, None)",
+      "kind:complete"
+    ],
+    "is_batch": true
+  },
+  {
+    "raw": "[BlueLobster] Lupin III - (01-278) [1080p] (Batch)",
+    "title": "Lupin III",
+    "aliases": [
+      "Lupin III"
+    ],
+    "group": "BlueLobster",
+    "seasons": [],
+    "season_source": "none",
+    "ep_start": 1,
+    "ep_end": 278,
+    "ep_total": null,
+    "batch_kind": "episode_range",
+    "is_complete": false,
+    "has_movies": false,
+    "has_extras": false,
+    "year": null,
+    "resolution": "1080p",
+    "source": null,
+    "confidence": 0.9,
+    "trace": [
+      "ep:ep_bracket=(1, 278, None)",
+      "kind:episode_range"
+    ],
+    "is_batch": true
+  },
+  {
+    "raw": "[DBD-Raws][犬夜叉/Inuyasha/いぬやしゃ][001-167TV全集+SP+特典映像][1080P][BDRip][HEVC-10bit][FLAC][MKV]",
+    "title": "Inuyasha",
+    "aliases": [
+      "Inuyasha",
+      "HEVC-10bit",
+      "犬夜叉",
+      "いぬやしゃ"
+    ],
+    "group": "DBD-Raws",
+    "seasons": [],
+    "season_source": "none",
+    "ep_start": 1,
+    "ep_end": 167,
+    "ep_total": null,
+    "batch_kind": "complete",
+    "is_complete": true,
+    "has_movies": false,
+    "has_extras": true,
+    "year": null,
+    "resolution": "1080p",
+    "source": "Blu-ray",
+    "confidence": 0.9,
+    "trace": [
+      "ep:ep_bracket=(1, 167, None)",
+      "kind:complete"
+    ],
+    "is_batch": true
+  },
+  {
+    "raw": "[Erai-raws] InuYasha - 001 ~ 167 [1080p NF WEB-DL AVC AAC][MultiSub] [BATCH]",
+    "title": "InuYasha",
+    "aliases": [
+      "InuYasha",
+      "MultiSub"
+    ],
+    "group": "Erai-raws",
+    "seasons": [],
+    "season_source": "none",
+    "ep_start": 1,
+    "ep_end": 167,
+    "ep_total": null,
+    "batch_kind": "episode_range",
+    "is_complete": false,
+    "has_movies": false,
+    "has_extras": false,
+    "year": null,
+    "resolution": "1080p",
+    "source": "Web",
+    "confidence": 0.9,
+    "trace": [
+      "ep:ep_bare=(1, 167, None)",
+      "kind:episode_range"
+    ],
+    "is_batch": true
+  },
+  {
+    "raw": "[Meakes] JoJo's Bizarre Adventure S02 E01-E24 | JoJo no Kimyou na Bouken Part 3: Stardust Crusaders (BD Remux 1080p x264 8-bit DTS-HD)",
+    "title": "JoJo's Bizarre Adventure",
+    "aliases": [
+      "JoJo's Bizarre Adventure"
+    ],
+    "group": "Meakes",
+    "seasons": [
+      2
+    ],
+    "season_source": "explicit",
+    "ep_start": 1,
+    "ep_end": 24,
+    "ep_total": null,
+    "batch_kind": "episode_range",
+    "is_complete": false,
+    "has_movies": false,
+    "has_extras": false,
+    "year": null,
+    "resolution": "1080p",
+    "source": "Blu-ray",
+    "confidence": 0.9,
+    "trace": [
+      "season:sxxeyy=02",
+      "ep:ep_kw=(1, 24, None)",
+      "kind:episode_range"
+    ],
+    "is_batch": true
+  },
+  {
+    "raw": "[INDEX] Demon Slayer Season 1-5 {鬼滅の刃 | Kimetsu no Yaiba} [ITA + US.BD][AV1 | 10bit][1080p][FLAC] (Dual Audio + Multi Sub)",
+    "title": "Demon Slayer",
+    "aliases": [
+      "Demon Slayer",
+      "Demon Slayer Season",
+      "鬼滅の刃 | Kimetsu no Yaiba",
+      "AV1 | 10bit"
+    ],
+    "group": "INDEX",
+    "seasons": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "season_source": "range",
+    "ep_start": null,
+    "ep_end": null,
+    "ep_total": null,
+    "batch_kind": "multi_season",
+    "is_complete": false,
+    "has_movies": false,
+    "has_extras": false,
+    "year": null,
+    "resolution": "1080p",
+    "source": "Blu-ray",
+    "confidence": 0.9,
+    "trace": [
+      "season:season_range_word=[1, 2, 3, 4, 5]",
+      "ep:skipped(pack)",
+      "kind:multi_season"
+    ],
+    "is_batch": true
+  },
+  {
+    "raw": "NARUTO [Batch]",
+    "title": "NARUTO",
+    "aliases": [
+      "NARUTO"
+    ],
+    "group": null,
+    "seasons": [],
+    "season_source": "none",
+    "ep_start": null,
+    "ep_end": null,
+    "ep_total": null,
+    "batch_kind": "batch_tag",
+    "is_complete": false,
+    "has_movies": false,
+    "has_extras": false,
+    "year": null,
+    "resolution": null,
+    "source": null,
+    "confidence": 0.4,
+    "trace": [
+      "kind:batch_tag"
+    ],
+    "is_batch": true
+  },
+  {
+    "raw": "[BDMV] JoJo no Kimyou na Bouken S2 - Stardust Crusaders [Vol.1-Vol.6 Fin] [JP]",
+    "title": "JoJo no Kimyou na Bouken",
+    "aliases": [
+      "JoJo no Kimyou na Bouken"
+    ],
+    "group": "BDMV",
+    "seasons": [
+      2
+    ],
+    "season_source": "explicit",
+    "ep_start": null,
+    "ep_end": null,
+    "ep_total": null,
+    "batch_kind": "box_set",
+    "is_complete": false,
+    "has_movies": false,
+    "has_extras": false,
+    "year": null,
+    "resolution": null,
+    "source": null,
+    "confidence": 0.9,
+    "trace": [
+      "season:season_token=[2]",
+      "ep:skipped(pack)",
+      "kind:box_set"
+    ],
+    "is_batch": true
+  },
+  {
+    "raw": "[Erai-raws] Watashi no Shiawase na Kekkon Special - 01 ~ 03 [1080p NF WEB-DL AVC AAC][MultiSub] [BATCH]",
+    "title": "Watashi no Shiawase na Kekkon Special",
+    "aliases": [
+      "Watashi no Shiawase na Kekkon Special",
+      "MultiSub"
+    ],
+    "group": "Erai-raws",
+    "seasons": [],
+    "season_source": "none",
+    "ep_start": 1,
+    "ep_end": 3,
+    "ep_total": null,
+    "batch_kind": "episode_range",
+    "is_complete": false,
+    "has_movies": false,
+    "has_extras": true,
+    "year": null,
+    "resolution": "1080p",
+    "source": "Web",
+    "confidence": 0.9,
+    "trace": [
+      "ep:ep_bare=(1, 3, None)",
+      "kind:episode_range"
+    ],
+    "is_batch": true
+  },
+  {
+    "raw": "[LostYears] Frieren Beyond Journey's End - Season 1 (S01) (WEB 1080p x265 10-bit AAC Opus) [Dual Audio] | (Sousou no Frieren) (Batch)",
+    "title": "Frieren Beyond Journey's End",
+    "aliases": [
+      "Frieren Beyond Journey's End",
+      "Sousou no Frieren"
+    ],
+    "group": "LostYears",
+    "seasons": [
+      1
+    ],
+    "season_source": "explicit",
+    "ep_start": null,
+    "ep_end": null,
+    "ep_total": null,
+    "batch_kind": "season_pack",
+    "is_complete": false,
+    "has_movies": false,
+    "has_extras": false,
+    "year": null,
+    "resolution": "1080p",
+    "source": "Web",
+    "confidence": 0.9,
+    "trace": [
+      "season:season_token=[1]",
+      "kind:season_pack"
+    ],
+    "is_batch": true
+  },
+  {
+    "raw": "Fate Zero S01 BluRay 1080p FLAC 2.0 AVC REMUX -FraMeSToR (Fate/Zero)",
+    "title": "Fate Zero",
+    "aliases": [
+      "Fate Zero"
+    ],
+    "group": "Fate/Zero",
+    "seasons": [
+      1
+    ],
+    "season_source": "explicit",
+    "ep_start": null,
+    "ep_end": null,
+    "ep_total": null,
+    "batch_kind": "season_pack",
+    "is_complete": false,
+    "has_movies": false,
+    "has_extras": false,
+    "year": null,
+    "resolution": "1080p",
+    "source": "Blu-ray",
+    "confidence": 0.9,
+    "trace": [
+      "season:season_token=[1]",
+      "kind:season_pack"
+    ],
+    "is_batch": true
+  },
+  {
+    "raw": "[SubsPlease] Saikyou Degarashi Ouji no Anyaku Teii Arasoi (01-12) (720p) [Batch]",
+    "title": "Saikyou Degarashi Ouji no Anyaku Teii Arasoi",
+    "aliases": [
+      "Saikyou Degarashi Ouji no Anyaku Teii Arasoi"
+    ],
+    "group": "SubsPlease",
+    "seasons": [],
+    "season_source": "none",
+    "ep_start": 1,
+    "ep_end": 12,
+    "ep_total": null,
+    "batch_kind": "episode_range",
+    "is_complete": false,
+    "has_movies": false,
+    "has_extras": false,
+    "year": null,
+    "resolution": "720p",
+    "source": null,
+    "confidence": 0.9,
+    "trace": [
+      "ep:ep_bracket=(1, 12, None)",
+      "kind:episode_range"
+    ],
+    "is_batch": true
+  },
+  {
+    "raw": "[SubsPlease] Tantei wa Mou, Shindeiru. S2 - 03 (480p) [DABACC21].mkv",
+    "title": "Tantei wa Mou, Shindeiru",
+    "aliases": [
+      "Tantei wa Mou, Shindeiru"
+    ],
+    "group": "SubsPlease",
+    "seasons": [
+      2
+    ],
+    "season_source": "explicit",
+    "ep_start": 3,
+    "ep_end": 3,
+    "ep_total": null,
+    "batch_kind": null,
+    "is_complete": false,
+    "has_movies": false,
+    "has_extras": false,
+    "year": null,
+    "resolution": "480p",
+    "source": null,
+    "confidence": 0.9,
+    "trace": [
+      "season:season_token=[2]",
+      "ep:anitopy=[3]",
+      "kind:None"
+    ],
+    "is_batch": false
+  },
+  {
+    "raw": "[Judas] Ao no Hako (Blue Box) - S02E04 [1080p][HEVC x265 10bit][Dual-Audio][Multi-Subs] (Weekly)",
+    "title": "Ao no Hako",
+    "aliases": [
+      "Ao no Hako",
+      "Ao no Hako (Blue Box)",
+      "Blue Box"
+    ],
+    "group": "Judas",
+    "seasons": [
+      2
+    ],
+    "season_source": "explicit",
+    "ep_start": 4,
+    "ep_end": 4,
+    "ep_total": null,
+    "batch_kind": null,
+    "is_complete": false,
+    "has_movies": false,
+    "has_extras": false,
+    "year": null,
+    "resolution": "1080p",
+    "source": null,
+    "confidence": 0.9,
+    "trace": [
+      "season:sxxeyy=02",
+      "ep:sxxeyy",
+      "kind:None"
+    ],
+    "is_batch": false
+  },
+  {
+    "raw": "[Erai-raws] Rilakkuma - 29 [480p CR WEB-DL AVC AAC][MultiSub][0A2E8604]",
+    "title": "Rilakkuma",
+    "aliases": [
+      "Rilakkuma",
+      "MultiSub"
+    ],
+    "group": "Erai-raws",
+    "seasons": [],
+    "season_source": "none",
+    "ep_start": 29,
+    "ep_end": 29,
+    "ep_total": null,
+    "batch_kind": null,
+    "is_complete": false,
+    "has_movies": false,
+    "has_extras": false,
+    "year": null,
+    "resolution": "480p",
+    "source": "Web",
+    "confidence": 0.6,
+    "trace": [
+      "ep:anitopy=[29]",
+      "kind:None"
+    ],
+    "is_batch": false
+  },
+  {
+    "raw": "[Yameii] Digimon Beatbreak - S01E42 [English Dub] [CR WEB-DL 720p H264 AAC] [2B048973]",
+    "title": "Digimon Beatbreak",
+    "aliases": [
+      "Digimon Beatbreak"
+    ],
+    "group": "Yameii",
+    "seasons": [
+      1
+    ],
+    "season_source": "explicit",
+    "ep_start": 42,
+    "ep_end": 42,
+    "ep_total": null,
+    "batch_kind": null,
+    "is_complete": false,
+    "has_movies": false,
+    "has_extras": false,
+    "year": null,
+    "resolution": "720p",
+    "source": "Web",
+    "confidence": 0.9,
+    "trace": [
+      "season:sxxeyy=01",
+      "ep:sxxeyy",
+      "kind:None"
+    ],
+    "is_batch": false
+  },
+  {
+    "raw": "[ToonsHub] One Piece EP1156 1080p CR WEB-DL DUAL AAC2.0 H.264 (Dual-Audio, Multi-Subs)",
+    "title": "One Piece",
+    "aliases": [
+      "One Piece"
+    ],
+    "group": "ToonsHub",
+    "seasons": [],
+    "season_source": "none",
+    "ep_start": 1156,
+    "ep_end": 1156,
+    "ep_total": null,
+    "batch_kind": null,
+    "is_complete": false,
+    "has_movies": false,
+    "has_extras": false,
+    "year": null,
+    "resolution": "1080p",
+    "source": "Web",
+    "confidence": 0.6,
+    "trace": [
+      "ep:anitopy=[1156]",
+      "kind:None"
+    ],
+    "is_batch": false
+  },
+  {
+    "raw": "[ASW] Tantei wa Mou, Shindeiru. S2 - 03 [1080p HEVC x265 10Bit][AAC]",
+    "title": "Tantei wa Mou, Shindeiru",
+    "aliases": [
+      "Tantei wa Mou, Shindeiru"
+    ],
+    "group": "ASW",
+    "seasons": [
+      2
+    ],
+    "season_source": "explicit",
+    "ep_start": 3,
+    "ep_end": 3,
+    "ep_total": null,
+    "batch_kind": null,
+    "is_complete": false,
+    "has_movies": false,
+    "has_extras": false,
+    "year": null,
+    "resolution": "1080p",
+    "source": null,
+    "confidence": 0.9,
+    "trace": [
+      "season:season_token=[2]",
+      "ep:anitopy=[3]",
+      "kind:None"
+    ],
+    "is_batch": false
+  }
+]

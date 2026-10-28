@@ -8,7 +8,7 @@ use std::sync::OnceLock;
 use regex::Regex;
 use crate::release::{Kind, Release};
 
-fn re(pattern: &'static str) -> &'static Regex {
+pub(crate) fn re(pattern: &'static str) -> &'static Regex {
     // The small fixed pattern set is compiled once; leaking the Regex avoids
     // holding the cache lock while matching.
     static REFS: OnceLock<std::sync::Mutex<std::collections::HashMap<&'static str, &'static Regex>>> = OnceLock::new();
