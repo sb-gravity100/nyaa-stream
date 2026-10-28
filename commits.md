@@ -2704,3 +2704,12 @@ Commit log, newest first. Prepend a new entry after every commit.
 ### `ad9ac50` · 2026-10-28 · docs: plan isolated v0.5.7 parser release
 - `PLAN.md`
 - `PHASES.md`
+### `7213ffd` · 2026-10-28 · chore: exclude debugger and ml from release
+- `src/App.tsx`
+- `src/App.css`
+- `src-tauri/src/lib.rs`
+- `src/DebugPage.tsx`
+- `src/DebugPage.css`
+- `ml/`
+- `crates/nyaa-client/examples/search_json.rs`
+- `crates/release-parse/examples/ml_parse.rs`
