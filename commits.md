@@ -2752,3 +2752,13 @@ Commit log, newest first. Prepend a new entry after every commit.
 - `crates/release-parse/tests/animebatch_cases.json`
 - `FILE_INDEX.md`
 - `PHASES.md`
+### `8e6bd92` · 2026-10-28 · feat: port animebatch search and guessit fields
+- `crates/release-parse/src/animebatch.rs`
+- `crates/release-parse/src/batch.rs`
+- `crates/release-parse/src/lib.rs`
+- `crates/release-parse/src/release.rs`
+- `crates/release-parse/Cargo.toml`
+- `crates/release-parse/tests/animebatch.rs`
+- `crates/release-parse/tests/animebatch_oracle.json`
+- `FILE_INDEX.md`
+- `PHASES.md`
