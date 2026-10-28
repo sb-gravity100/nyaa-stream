@@ -7,7 +7,7 @@
 - [x] Run parser (17 tests), title-matching (39 active tests), frontend build, and `cargo check --workspace`; inspect the release diff and verify no debugger or ML files/strings in the frontend bundle
 - [x] Pin Rust Tauri plugin versions to the matching JavaScript package versions; `cargo check --workspace` passes
 - [x] Build and sign NSIS/MSI installers in a dry run; staged five assets, verified `latest.json` version/URL and its NSIS signature against the `.sig` file
-- [ ] Point the unpublished local v0.5.7 tag at the release commit and publish from this branch without pushing development `main`
+- [x] Tag the release commit and publish v0.5.7 from this branch without pushing development `main`; GitHub has the NSIS/MSI, both signatures and `latest.json`
 
 ## v0.5.5 — Polish fixes
 - [x] Remove the reserved title-bar space in fullscreen; keep the home app bar visible

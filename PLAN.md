@@ -594,6 +594,8 @@ isolated branch based on the local v0.5.7 tag; omit the developer debugger,
 all `ml/` files, and later experimental debugger/model commits. Move the
 unpublished local v0.5.7 tag to the release commit and publish that branch's
 tag without pushing the divergent development `main` (SB 2026-10-28).
+Published 2026-10-28 from tag `v0.5.7` at `ff6e174`; the GitHub release is
+the latest release and development `main` was left untouched.
 The app keeps its anitopy title field to preserve season and movie matching;
 the new Rust animebatch API exposes guessit-style titles, normalized source
 and resolution, aliases, batch kinds, and hard season/episode filtering. The
