@@ -1,4 +1,11 @@
-### `0e590d0` · 2026-10-28 · chore: release v0.5.8
+### `0f9ddc0` · 2026-10-28 · chore: keep debugger work unversioned
+- `PLAN.md`
+- `PHASES.md`
+- `package.json`
+- `src-tauri/Cargo.toml`
+- `src-tauri/tauri.conf.json`
+
+### `0e590d0` · 2026-10-28 · chore: release v0.5.8 (reversed by `0f9ddc0`; tag removed)
 - `package.json`
 - `src-tauri/Cargo.toml`
 - `src-tauri/tauri.conf.json`
