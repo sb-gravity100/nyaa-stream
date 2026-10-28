@@ -601,6 +601,10 @@ and resolution, aliases, batch kinds, and hard season/episode filtering. The
 corpus, 65 typed records change (58 kinds, 20 episode ranges, 2 season lists),
 with no canonical-title changes; the title-matching fixture stays at its
 pre-port precision.
+The release dry run found that unconstrained Rust Tauri plugin dependencies
+resolved newer minor versions than the pinned JavaScript plugins. Pin the
+Rust opener, updater and dialog plugins to their matching JavaScript versions
+for this release before building signed installers.
 
 Three published releases: **v0.3.2** (the playback fixes) as soon as it
 passes a live test, **v0.4.0** (splash/title bar, download cache, resume
