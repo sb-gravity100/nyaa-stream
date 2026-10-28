@@ -4,7 +4,7 @@
 - [x] Remove the developer debugger and all `ml/` files from the release branch
 - [x] Port the supplied animebatch source and Rust parser changes from development
 - [x] Sync the changelog and file index for the release tree
-- [ ] Run parser, title-matching, frontend, and workspace checks; inspect the release diff
+- [x] Run parser (17 tests), title-matching (39 active tests), frontend build, and `cargo check --workspace`; inspect the release diff and verify no debugger or ML files/strings in the frontend bundle
 - [ ] Build and sign installers; inspect staged release assets and updater manifest
 - [ ] Point the unpublished local v0.5.7 tag at the release commit and publish from this branch without pushing development `main`
 
