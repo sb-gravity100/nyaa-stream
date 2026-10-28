@@ -775,3 +775,6 @@
             and episode-mapping analytics
       - [x] Show per-release accepted/rejected criteria and mapped,
             filtered, or unresolved destinations
+      - [x] v0.5.8: train the local XGBoost prototype and show its source
+            matching predictions alongside rule decisions in the debugger
+            only; verify confidence/abstention on live results

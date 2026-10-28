@@ -15,6 +15,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 ap = argparse.ArgumentParser()
 for a in ("model", "entries", "fribb", "results", "search", "target"): ap.add_argument(a)
 ap.add_argument("--out", default=""); ap.add_argument("--cache", default="franchise_cache.json")
+ap.add_argument("--json-out", default="", help="write per-release debugger predictions")
 ap.add_argument("--parser", default=r"C:\Users\SB\Desktop\Projects\nyaa_stream\target\release\examples\ml_parse.exe")
 args = ap.parse_args(); target = int(args.target)
 
@@ -122,6 +123,14 @@ out = []
 for gi, r in enumerate(rel):
     s = sorted(res[gi], reverse=True); b, top = s[0]; m = b - (s[1][0] if len(s) > 1 else 0)
     out.append((r, top if (b >= 0.95 and m >= 0.3) else None, b, top))
+if args.json_out:
+    with open(args.json_out, "w", encoding="utf8") as f:
+        json.dump([{"view_url": r.get("view_url"), "predicted_entry": assigned,
+                    "top_entry": top, "confidence": confidence,
+                    "margin": round(sorted(res[i], reverse=True)[0][0] -
+                                    (sorted(res[i], reverse=True)[1][0] if len(res[i]) > 1 else 0), 6),
+                    "target_match": assigned == target if assigned is not None else None}
+                   for i, (r, assigned, confidence, top) in enumerate(out)], f)
 
 # ---- report -----------------------------------------------------------------
 cnt = collections.Counter(ent[t]["label"] if t else "(abstain / not this franchise)" for _, t, _, _ in out)

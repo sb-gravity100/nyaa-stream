@@ -56,7 +56,7 @@
 | `crates/release-parse/src/release.rs` | `parse_release(title) -> Release` (title, seasons, episode range, `Kind`, extras, group, version; `FINAL_SEASON` sentinel) - the typed view the app uses | backend, search, parser |
 | `crates/release-parse/examples/labels.rs` | Scratch tool: one title per stdin line → `Release` as JSON, for diffing against `episodeParser.ts` | backend, dev-tool |
 | `crates/nyaa-client/examples/search_json.rs` | Scratch tool: live nyaa.si search (no release database, no Tosho data) for one or more queries, one `NyaaResult` JSON per line, deduplicated; input of `ml/score_search.py` | backend, dev-tool, ml |
-| `ml/score_search.py` | Scores a live nyaa search against one franchise with the XGBoost model (franchise entries from AniList relations + Fribb season, no Tosho data) and prints episode -> sources and packs | ml, dev-tool |
+| `ml/score_search.py` | Scores a live nyaa search against one franchise with the local XGBoost model (franchise entries from AniList relations + Fribb season, no Tosho data); prints episode -> sources and packs or exports per-release debugger predictions | ml, dev-tool |
 | `crates/release-parse/examples/ml_parse.rs` | Scratch tool for the learned matcher prototype: one title per stdin line → JSON (title, group, seasons, episodes, kind, extras) | backend, dev-tool, ml |
 | `ml/export_rows.py`, `ml/fetch_anilist.py`, `ml/train.py` | L1 prototype of the learned release-to-entry matcher (PLAN.md "Learned release-to-entry matcher"): trusted rows out of the Tosho dataset, AniList metadata via Fribb, XGBoost training with a time split + held-out entries; scratch, never shipped | ml, dev-tool |
 | `crates/release-parse/examples/parse_lines.rs` | Scratch tool: one title per stdin line → JSON elements per line, for diffing against Python anitopy | backend, dev-tool |
@@ -130,7 +130,7 @@
 | `src/icons.tsx` | Inline SVG icon set used by the player and pages, plus the app-bar `BrandMark` logo | frontend |
 | `src/types.ts` | Shared TS interfaces mirroring the Rust structs (`AnimeMedia`, `NyaaResult`, `TorrentDetails`, `AiringEntry`, `PlaySession`/`PlayFile`, `SubtitleInfo`, ...) | frontend |
 | `src/browserFallback.ts` | Dev-only path used when no Tauri IPC bridge is present (plain browser preview): direct AniList/nyaa fetches mirroring the Rust client logic | frontend, dev-tool |
-| `src/DebugPage.tsx` | Developer-only `#/debug` analyzer for actual selected-anime source matching: query coverage, backend pass/fail criteria, and each accepted source's frontend episode/batch destination | frontend, dev-tool, diagnostics |
+| `src/DebugPage.tsx` | Developer-only `#/debug` analyzer for actual selected-anime source matching: query coverage, backend pass/fail criteria, optional local ML predictions, and each accepted source's frontend episode/batch destination | frontend, dev-tool, diagnostics |
 | `src/DebugPage.css` | Scrollable responsive analytics layout for query coverage, matching funnel, per-release outcomes, and criteria evidence | frontend, styles, dev-tool |
 | `src/kitsu.ts` | Frontend wrapper around `get_kitsu_metadata`, used by `MediaPage.tsx` for the backdrop/thumbnail fallback chain; `localStorage` snapshot (`kitsuSnapshot`) seeds card art on the first paint after launch | frontend |
 | `src/enhanceImage.ts` | `useEnhancedImage`: upscales (up to 2x, toward 1920px wide) and unsharp-masks hero/backdrop art on a canvas, cached as blob URLs; falls back to the original URL on any failure (e.g. CORS) | frontend |

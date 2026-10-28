@@ -2712,6 +2712,20 @@ hold-out is the real test; the model must never reject a release a trusted
 
 ## Search flow debugger (developer tool, local only)
 
+**ML trial (v0.5.8, debugger only).** The debugger can score its raw nyaa
+results with the locally trained XGBoost prototype and show the predicted
+entry, confidence, margin, and abstention beside the existing rule decision.
+The trial uses the training artifacts under the user's app-data Tosho folder;
+normal source filtering and playback continue to use trusted AniDB ids and
+title rules. This keeps ML errors inspectable before any production gate.
+The 2026-10-28 local retrain on the 2026-05-09 dump measured 99.90% mixed
+precision at p>=0.95 and margin>=0.3 on its test mixture, but confidently
+assigned 26.4% of 87 non-anime releases. The debugger labels the scores
+experimental; this model is not suitable for production filtering.
+Live check on 2026-10-28: 321 nyaa results for `Mushoku Tensei III` produced
+265 confident S3 assignments and 56 abstentions with the new S3 entry present
+in the AniList relation pool (it is absent from the older Tosho dump).
+
 A dedicated `#/debug` web route observes the real anime selection, backend
 source matching, and frontend episode mapping path. The page removes the
 generic procedure/log timeline and static process explainer. Instead it shows
