@@ -5,7 +5,7 @@
 - [x] Port the supplied animebatch source and Rust parser changes from development
 - [x] Sync the changelog and file index for the release tree
 - [x] Run parser (17 tests), title-matching (39 active tests), frontend build, and `cargo check --workspace`; inspect the release diff and verify no debugger or ML files/strings in the frontend bundle
-- [ ] Pin Rust Tauri plugin versions to the matching JavaScript package versions and rerun checks
+- [x] Pin Rust Tauri plugin versions to the matching JavaScript package versions; `cargo check --workspace` passes
 - [ ] Build and sign installers; inspect staged release assets and updater manifest
 - [ ] Point the unpublished local v0.5.7 tag at the release commit and publish from this branch without pushing development `main`
 
