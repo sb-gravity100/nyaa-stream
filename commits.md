@@ -2744,3 +2744,11 @@ Commit log, newest first. Prepend a new entry after every commit.
 - `crates/release-parse/upstream/animebatch/`
 - `FILE_INDEX.md`
 - `PHASES.md`
+### `a930d8e` · 2026-10-28 · feat: port animebatch release rules
+- `crates/release-parse/src/batch.rs`
+- `crates/release-parse/src/lib.rs`
+- `crates/release-parse/src/release.rs`
+- `crates/release-parse/tests/animebatch.rs`
+- `crates/release-parse/tests/animebatch_cases.json`
+- `FILE_INDEX.md`
+- `PHASES.md`
