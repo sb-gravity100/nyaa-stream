@@ -116,5 +116,7 @@ impl Release {
 /// Parses a release title into a `Release`.
 pub fn parse_release(title: &str) -> Release {
     let e = crate::parse(title);
-    Release::from_elements(title, &e)
+    let mut release = Release::from_elements(title, &e);
+    crate::batch::apply(title, &mut release);
+    release
 }

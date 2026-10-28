@@ -2,7 +2,7 @@
 
 ## v0.6.0 — animebatch parser replacement (requested 2026-10-28)
 - [x] Copy the supplied Python source into a tracked reference directory
-- [ ] Port animebatch batch, season-range, alias and search behavior to Rust
+- [~] Port animebatch batch, season-range, alias and search behavior to Rust (40 parse cases pass; alias and search remain)
 - [ ] Reuse the existing Rust anitopy port; port the guessit fields used by animebatch
 - [ ] Replace the app's release parsing path while preserving its public data contract
 - [ ] Run the archive's labeled cases, title matching fixtures, corpus comparison and `cargo check --workspace`

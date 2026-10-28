@@ -8,6 +8,7 @@
 //! season, episode, release group, resolution, ...). See README.md.
 
 mod element;
+mod batch;
 mod extra;
 mod helper;
 mod keyword;
