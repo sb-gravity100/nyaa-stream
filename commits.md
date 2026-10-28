@@ -2730,3 +2730,6 @@ Commit log, newest first. Prepend a new entry after every commit.
 - `PHASES.md`
 ### `43b7ccb` · 2026-10-28 · docs: record signed v0.5.7 dry run
 - `PHASES.md`
+### `a8553d7` · 2026-10-28 · docs: record v0.5.7 publication
+- `PLAN.md`
+- `PHASES.md`
