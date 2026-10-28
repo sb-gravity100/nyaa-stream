@@ -2762,3 +2762,10 @@ Commit log, newest first. Prepend a new entry after every commit.
 - `crates/release-parse/tests/animebatch_oracle.json`
 - `FILE_INDEX.md`
 - `PHASES.md`
+### `cf31982` · 2026-10-28 · fix: constrain animebatch range parsing
+- `crates/release-parse/src/batch.rs`
+- `crates/release-parse/src/release.rs`
+- `crates/release-parse/tests/animebatch.rs`
+- `PLAN.md`
+- `PHASES.md`
+- `CHANGELOG.md`
