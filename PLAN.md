@@ -592,9 +592,15 @@ v0.5.7 line with the Rust animebatch batch/season parser and its guessit-used
 metadata API. The full Rust anitopy port is already present. Build from an
 isolated branch based on the local v0.5.7 tag; omit the developer debugger,
 all `ml/` files, and later experimental debugger/model commits. Move the
-unpublished local v0.5.7 tag to the release commit after `main` is reconciled.
-SB chose to wait for that reconciliation before publication; preserve both
-divergent development branches until then.
+unpublished local v0.5.7 tag to the release commit and publish that branch's
+tag without pushing the divergent development `main` (SB 2026-10-28).
+The app keeps its anitopy title field to preserve season and movie matching;
+the new Rust animebatch API exposes guessit-style titles, normalized source
+and resolution, aliases, batch kinds, and hard season/episode filtering. The
+40 supplied parse cases and Python metadata oracle pass. On the 10,151-title
+corpus, 65 typed records change (58 kinds, 20 episode ranges, 2 season lists),
+with no canonical-title changes; the title-matching fixture stays at its
+pre-port precision.
 
 Three published releases: **v0.3.2** (the playback fixes) as soon as it
 passes a live test, **v0.4.0** (splash/title bar, download cache, resume

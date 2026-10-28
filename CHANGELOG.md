@@ -11,6 +11,9 @@ step when cutting a release.
 
 ## [0.5.7] - 2026-10-27
 
+### Changed
+- Release parsing recognizes more batch episode ranges, box sets and season packs through the Rust animebatch port.
+
 ### Fixed
 - Nyaa searches now target the selected anime entry with exact title and season phrases; ambiguous unmarked shared titles are excluded from season pages.
 - Same-season AniList aliases improve split-cour and translated-title search coverage.

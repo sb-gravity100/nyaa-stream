@@ -18,6 +18,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Ambiguous unmarked franchise titles no longer appear on a season page unless a trusted mapping or distinct title identifies that season.",
       "Same-season AniList aliases improve search coverage for split cours and translated titles.",
       "Movie, OVA and special searches use the entry's full names.",
+      "Batch releases now recognize more episode ranges, box sets and season packs.",
     ],
   },
   {

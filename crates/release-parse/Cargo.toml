@@ -9,6 +9,7 @@ license = "MPL-2.0"
 [dependencies]
 regex = "1"
 unicode-normalization = "0.1"
+strsim = "0.11"
 tracing = { workspace = true }
 
 [dev-dependencies]

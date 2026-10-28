@@ -8,6 +8,8 @@
 //! season, episode, release group, resolution, ...). See README.md.
 
 mod element;
+mod batch;
+mod animebatch;
 mod extra;
 mod helper;
 mod keyword;
@@ -19,6 +21,7 @@ mod tokenizer;
 
 pub use element::{Category, Elements};
 pub use release::{parse_release, Kind, Release, FINAL_SEASON};
+pub use animebatch::{parse_batch, search_batch, BatchFilter, BatchKind, BatchMatch, BatchRelease, SearchOptions, UnknownSeason};
 
 use keyword::{keyword_manager, normalize};
 use token::Token;

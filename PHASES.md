@@ -1,13 +1,12 @@
 # PHASES.md — nyaa-stream
 
 ## v0.5.7 publication — animebatch parser (SB 2026-10-28)
-- [ ] Remove the developer debugger and all `ml/` files from the release branch
-- [ ] Port the supplied animebatch source and Rust parser changes from development
-- [ ] Sync the changelog and file index for the release tree
+- [x] Remove the developer debugger and all `ml/` files from the release branch
+- [x] Port the supplied animebatch source and Rust parser changes from development
+- [x] Sync the changelog and file index for the release tree
 - [ ] Run parser, title-matching, frontend, and workspace checks; inspect the release diff
 - [ ] Build and sign installers; inspect staged release assets and updater manifest
-- [ ] Reconcile `main` before publication (SB chose to wait)
-- [ ] Point the unpublished local v0.5.7 tag at the release commit and publish after reconciliation
+- [ ] Point the unpublished local v0.5.7 tag at the release commit and publish from this branch without pushing development `main`
 
 ## v0.5.5 — Polish fixes
 - [x] Remove the reserved title-bar space in fullscreen; keep the home app bar visible

@@ -18,7 +18,7 @@
 | `commits.md` | Commit log (prepend after every commit) | docs |
 | `src-tauri/Cargo.toml` | Tauri app crate manifest, depends on all `crates/*` | backend, config |
 | `src-tauri/src/main.rs` | Binary entrypoint, calls `nyaa_stream_lib::run()` | backend |
-| `src-tauri/src/lib.rs` | Tauri commands and app wiring; `init_logging` writes daily logs to the launch working directory in debug builds and `%LOCALAPPDATA%\nyaa-stream\logs` in release builds (keeps 7 files; release builds have no console); `debug_read_logs` tails the active log for the dev search debugger | backend, core, diagnostics |
+| `src-tauri/src/lib.rs` | Tauri commands and app wiring; `init_logging` writes daily logs to the launch working directory in debug builds and `%LOCALAPPDATA%\nyaa-stream\logs` in release builds (keeps 7 files; release builds have no console) | backend, core, diagnostics |
 | `src-tauri/src/resume.rs` | Continue-watching resume buffers: save on `stop_playback` (open reads + 16 MB from the resume keyframe, verified bytes only), attach in `play_magnet`, sweep by the Continue watching keep list, 25 / 600 MB caps - see PLAN.md "Continue-watching resume buffer" | backend, resume |
 | `src-tauri/src/load_trace.rs` | Load profiler: per-load traces (`trace_begin`/`trace_mark`/`trace_end`), stage debug lines, one `load trace ...` info summary with stream-read stats - see PLAN.md "Load profiler" | backend, diagnostics |
 | `src-tauri/src/logs_export.rs` | `export_logs`: zips the last 7 log files + `system.txt` into Downloads, Windows profile path/username scrubbed in the copies | backend, logs |
@@ -54,11 +54,11 @@
 | `crates/release-parse/src/{tokenizer,parser,number,helper,keyword,token,element}.rs` | The port's modules, one per anitopy file (tokenizer.py, parser.py, parser_number.py, parser_helper.py, keyword.py, token.py, element.py) | backend, search, parser |
 | `crates/release-parse/src/extra.rs` | nyaa-stream additions to the anitopy port: CJK counters, season ranges/lists, roman-numeral seasons, spaced `~` ranges, technical numbers (audio channels, fps, `H 264`) | backend, search, parser |
 | `crates/release-parse/src/release.rs` | `parse_release(title) -> Release` (title, seasons, episode range, `Kind`, extras, group, version; `FINAL_SEASON` sentinel) - the typed view the app uses | backend, search, parser |
+| `crates/release-parse/src/batch.rs` | Animebatch batch and season-range rules applied to the app's typed release result | backend, search, parser |
+| `crates/release-parse/src/animebatch.rs` | Rust animebatch API: guessit-compatible title/source/resolution fields, batch kinds, aliases, coverage and season-aware search; reuses the Rust anitopy parser | backend, search, parser |
+| `crates/release-parse/tests/{animebatch.rs,animebatch_cases.json,animebatch_oracle.json}` | Supplied hand-labeled parse cases and Python metadata oracle for Rust parity tests | backend, parser, test |
+| `crates/release-parse/upstream/animebatch/` | Supplied Python animebatch source retained for Rust port parity | reference, parser, test |
 | `crates/release-parse/examples/labels.rs` | Scratch tool: one title per stdin line → `Release` as JSON, for diffing against `episodeParser.ts` | backend, dev-tool |
-| `crates/nyaa-client/examples/search_json.rs` | Scratch tool: live nyaa.si search (no release database, no Tosho data) for one or more queries, one `NyaaResult` JSON per line, deduplicated; input of `ml/score_search.py` | backend, dev-tool, ml |
-| `ml/score_search.py` | Scores a live nyaa search against one franchise with the XGBoost model (franchise entries from AniList relations + Fribb season, no Tosho data) and prints episode -> sources and packs | ml, dev-tool |
-| `crates/release-parse/examples/ml_parse.rs` | Scratch tool for the learned matcher prototype: one title per stdin line → JSON (title, group, seasons, episodes, kind, extras) | backend, dev-tool, ml |
-| `ml/export_rows.py`, `ml/fetch_anilist.py`, `ml/train.py` | L1 prototype of the learned release-to-entry matcher (PLAN.md "Learned release-to-entry matcher"): trusted rows out of the Tosho dataset, AniList metadata via Fribb, XGBoost training with a time split + held-out entries; scratch, never shipped | ml, dev-tool |
 | `crates/release-parse/examples/parse_lines.rs` | Scratch tool: one title per stdin line → JSON elements per line, for diffing against Python anitopy | backend, dev-tool |
 | `crates/release-parse/README.md`, `LICENSE` | Attribution, MPL-2.0 text, port status and the deliberate differences from anitopy | docs, license |
 | `crates/nyaa-client/src/batch_check.rs` | Batch self-verification (PLAN.md L1e): `check_batch(title, file_paths) -> BatchCheck { verified, offset, issues }` - a batch title's episode range against its files' `EpisodeLabel::of_path` numbers (extras ignored; `Missing` / `OutOfRange` / `Duplicates` / `Unread` / `NoTitleRange`; a later-season pack numbered from 01 verifies with an offset); unit-tested | backend, search |
@@ -130,8 +130,6 @@
 | `src/icons.tsx` | Inline SVG icon set used by the player and pages, plus the app-bar `BrandMark` logo | frontend |
 | `src/types.ts` | Shared TS interfaces mirroring the Rust structs (`AnimeMedia`, `NyaaResult`, `TorrentDetails`, `AiringEntry`, `PlaySession`/`PlayFile`, `SubtitleInfo`, ...) | frontend |
 | `src/browserFallback.ts` | Dev-only path used when no Tauri IPC bridge is present (plain browser preview): direct AniList/nyaa fetches mirroring the Rust client logic | frontend, dev-tool |
-| `src/DebugPage.tsx` | Developer-only `#/debug` workflow explorer: runs anime search and selection pipelines, shows a source-matching diagram, timestamped stage inputs/results/errors, and captured console/backend logs | frontend, dev-tool, diagnostics |
-| `src/DebugPage.css` | Compact dark layout, vertical page scrolling, horizontally scrollable matching pipeline, and responsive styles for the search flow debugger | frontend, styles, dev-tool |
 | `src/kitsu.ts` | Frontend wrapper around `get_kitsu_metadata`, used by `MediaPage.tsx` for the backdrop/thumbnail fallback chain; `localStorage` snapshot (`kitsuSnapshot`) seeds card art on the first paint after launch | frontend |
 | `src/enhanceImage.ts` | `useEnhancedImage`: upscales (up to 2x, toward 1920px wide) and unsharp-masks hero/backdrop art on a canvas, cached as blob URLs; falls back to the original URL on any failure (e.g. CORS) | frontend |
 | `src/torrentThumbnail.ts` | Frontend wrapper around `capture_torrent_thumbnail`, the last-resort thumbnail source when Kitsu and AniList both lack episode art; asks the disk cache (`cached_torrent_thumbnail`) before any nyaa search | frontend |
