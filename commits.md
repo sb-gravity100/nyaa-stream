@@ -2720,3 +2720,5 @@ Commit log, newest first. Prepend a new entry after every commit.
 - `FILE_INDEX.md`
 - `CHANGELOG.md`
 - `src/changelog.ts`
+### `c3b2f46` · 2026-10-28 · docs: record v0.5.7 release checks
+- `PHASES.md`
