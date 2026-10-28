@@ -1,3 +1,12 @@
+### `aa830c7` · 2026-10-28 · feat: show experimental ML source matches in debugger
+- `PLAN.md`
+- `PHASES.md`
+- `FILE_INDEX.md`
+- `ml/score_search.py`
+- `src-tauri/src/lib.rs`
+- `src/DebugPage.tsx`
+- `src/DebugPage.css`
+
 ### `5c6e6ff` · 2026-10-27 · feat: show live source mapping analytics
 - `src/DebugPage.tsx`
 - `src/DebugPage.css`
@@ -2716,11 +2725,3 @@ Commit log, newest first. Prepend a new entry after every commit.
 
 ### `b936e43` · 2026-08-22 · Scaffold nyaa-stream: Tauri+Preact shell, torrent/nyaa/anilist/mpv crates
 - `Cargo.toml`, `src-tauri/*`, `crates/*`, `src/*`, `PLAN.md`, `PHASES.md`, `FILE_INDEX.md`, `CLAUDE.md`
-### `aa830c7` · 2026-10-28 · feat: show experimental ML source matches in debugger
-- `PLAN.md`
-- `PHASES.md`
-- `FILE_INDEX.md`
-- `ml/score_search.py`
-- `src-tauri/src/lib.rs`
-- `src/DebugPage.tsx`
-- `src/DebugPage.css`
