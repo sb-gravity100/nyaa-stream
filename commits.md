@@ -2722,3 +2722,6 @@ Commit log, newest first. Prepend a new entry after every commit.
 - `src/changelog.ts`
 ### `c3b2f46` · 2026-10-28 · docs: record v0.5.7 release checks
 - `PHASES.md`
+### `f34d30c` · 2026-10-28 · docs: plan Tauri plugin version alignment
+- `PLAN.md`
+- `PHASES.md`
