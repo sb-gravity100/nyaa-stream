@@ -2713,3 +2713,10 @@ Commit log, newest first. Prepend a new entry after every commit.
 - `ml/`
 - `crates/nyaa-client/examples/search_json.rs`
 - `crates/release-parse/examples/ml_parse.rs`
+### `7ad8235` · 2026-10-28 · feat: include animebatch parser in v0.5.7
+- `crates/release-parse/`
+- `PLAN.md`
+- `PHASES.md`
+- `FILE_INDEX.md`
+- `CHANGELOG.md`
+- `src/changelog.ts`
