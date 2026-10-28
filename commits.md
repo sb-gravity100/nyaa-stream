@@ -2728,3 +2728,5 @@ Commit log, newest first. Prepend a new entry after every commit.
 ### `d504fe3` · 2026-10-28 · fix: pin matching Tauri plugins for v0.5.7
 - `src-tauri/Cargo.toml`
 - `PHASES.md`
+### `43b7ccb` · 2026-10-28 · docs: record signed v0.5.7 dry run
+- `PHASES.md`
