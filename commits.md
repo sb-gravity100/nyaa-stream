@@ -2740,3 +2740,7 @@ Commit log, newest first. Prepend a new entry after every commit.
 ### `b4061f6` · 2026-10-28 · docs: plan animebatch parser replacement
 - `PLAN.md`
 - `PHASES.md`
+### `37b7f14` · 2026-10-28 · docs: retain animebatch source for port
+- `crates/release-parse/upstream/animebatch/`
+- `FILE_INDEX.md`
+- `PHASES.md`
