@@ -324,18 +324,18 @@ policy remains unchanged.
   - [x] FILE_INDEX.md/PLAN.md sync, CHANGELOG, `npm run bump -- minor`, tag v0.5.0, published or
         patch per the Release plan, tag
 
-- [ ] Custom magnet in the search bar - v0.6.0 (user 2026-10-13; was v0.4.5; minor feature, see PLAN.md
+- [~] Custom magnet in the search bar - v0.6.0 (user 2026-10-13; was v0.4.5; minor feature, see PLAN.md
       "Custom magnet in the search bar"). One commit each:
-  - [ ] M1 `parse_magnet` (`src-tauri/src/magnet.rs`) + command + tests
-  - [ ] M2 search-bar detection, "Play this magnet" row, invalid hint
-  - [ ] M3 `custom_sources` store table + API (`kind` episode|pack, season,
+  - [x] M1 bounded parser (`crates/nyaa-client/src/magnet.rs`) + Tauri command + parser coverage
+  - [x] M2 search-bar detection, "Play this magnet" row, invalid hint and row/player context actions
+  - [x] M3 `custom_sources` store table + API (`kind` episode|pack, season,
         optional episode range, stored file list)
-  - [ ] M4 "Attach to episode..." picker (single episode / whole pack /
+  - [x] M4 searchable attach/move picker (single episode / whole pack /
         range, detected kind with override, metadata-only file list),
-        merged into `groupedSources` as explicit packs
-  - [ ] M4b pack playback: `pickFile` by season + episode, extras skipped,
-        unknown-numbering packs stay on a Batch row
-  - [ ] M5 FILE_INDEX/CHANGELOG sync; release bump follows after all v0.6.0
+        merged into `groupedSources` by covered episode
+  - [x] M4b pack playback: `pickFile` by season + episode, extras skipped,
+        unknown-numbering packs stay on a Batch row; edits keep the durable row ID
+  - [x] M5 FILE_INDEX/CHANGELOG sync; release bump follows after all v0.6.0
         features are complete
 
 - [ ] nyaa search sorted by seeders (user 2026-10-17; PLAN.md "Torrent source" ->
