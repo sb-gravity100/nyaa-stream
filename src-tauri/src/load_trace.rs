@@ -86,20 +86,20 @@ impl LoadTraces {
     }
 
     /// Ends the trace and logs its summary line.
-    pub fn end(&self, id: u64, outcome: &str) {
+    pub fn end(&self, id: u64, outcome: &str, ended_at: Instant) {
         let Some(trace) = self.traces.lock().unwrap_or_else(|e| e.into_inner()).remove(&id) else {
             return;
         };
-        let summary = summarize(&trace, outcome);
+        let summary = summarize(&trace, outcome, ended_at);
         tracing::info!(trace = id, "load trace {summary}");
     }
 }
 
-fn summarize(trace: &Trace, outcome: &str) -> String {
+fn summarize(trace: &Trace, outcome: &str, ended_at: Instant) -> String {
     let mut parts = vec![
         format!("kind={}", trace.kind),
         format!("outcome={outcome}"),
-        format!("total_ms={}", trace.began.elapsed().as_millis()),
+        format!("total_ms={}", ended_at.saturating_duration_since(trace.began).as_millis()),
     ];
     for stage in &trace.stages {
         let value = match stage.duration_ms {
@@ -136,6 +136,9 @@ pub fn trace_mark(traces: State<'_, LoadTraces>, id: u64, stage: String, detail:
 /// buffer vs torrent bytes) and its peers / download rate now.
 #[tauri::command]
 pub async fn trace_end(traces: State<'_, LoadTraces>, app_state: State<'_, std::sync::Arc<AppState>>, id: u64, outcome: String) -> Result<(), String> {
+    // Capture completion before collecting optional stats; that query must
+    // never inflate the playback or seek duration in the trace summary.
+    let ended_at = Instant::now();
     if let Some((torrent_id, began, base)) = traces.torrent(id) {
         let engine = &app_state.torrent_engine;
         let reads = engine.read_summary(&torrent_id, began, base);
@@ -153,7 +156,7 @@ pub async fn trace_end(traces: State<'_, LoadTraces>, app_state: State<'_, std::
             traces.field(id, "rate_mbps", format!("{:.2}", stats.download_speed_mbps));
         }
     }
-    traces.end(id, &outcome);
+    traces.end(id, &outcome, ended_at);
     Ok(())
 }
 
@@ -169,7 +172,7 @@ mod tests {
         traces.mark(id, "first_frame", None, Some("resume".into()));
         traces.field(id, "waits", 3);
         let guard = traces.traces.lock().unwrap();
-        let summary = summarize(&guard[&id], "ok");
+        let summary = summarize(&guard[&id], "ok", Instant::now());
         assert!(summary.starts_with("kind=start outcome=ok total_ms="));
         assert!(summary.contains(" metadata=1200 "));
         assert!(summary.contains(" first_frame@"));

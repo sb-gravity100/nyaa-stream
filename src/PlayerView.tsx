@@ -568,10 +568,12 @@ function MpvPlayerView({
          if (start && !start.ended) return;
          const seek = seekTraceRef.current;
          if (seek && !seek.ended) {
-            traceMark(seek, "retarget");
+            traceMark(seek, "retarget", `target=${video.seekingTo?.toFixed(3) ?? "unknown"}`);
             return;
          }
-         seekTraceRef.current = traceBegin("seek", torrentIdRef.current ?? undefined);
+         const trace = traceBegin("seek", torrentIdRef.current ?? undefined);
+         seekTraceRef.current = trace;
+         traceMark(trace, "seek_issued", `target=${video.seekingTo?.toFixed(3) ?? "unknown"}`);
       });
       on("play", () => setPaused(false));
       on("pause", () => setPaused(true));
@@ -579,6 +581,8 @@ function MpvPlayerView({
       on("volumechange", () => setMuted(video.muted));
       on("canplay", () => {
          // mpv's playback-restart: the first frame.
+         if (seekTraceRef.current && !seekTraceRef.current.ended)
+            traceMark(seekTraceRef.current, "playback_restart", `position=${video.currentTime.toFixed(3)}`);
          traceEnd(startTraceRef.current, "ok");
          setReady(true);
       });
