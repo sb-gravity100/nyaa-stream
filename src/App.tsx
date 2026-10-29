@@ -1010,6 +1010,7 @@ function App() {
           key={animeId}
           anime={selectedAnime}
           kitsu={kitsuByMedia[selectedAnime.id] ?? null}
+          artwork={artworkByMedia[selectedAnime.id] ?? null}
           groupedSources={groupedSources}
           customSources={customSources}
           onSaveCustomSource={saveCustomSource}

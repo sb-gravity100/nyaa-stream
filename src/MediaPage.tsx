@@ -12,6 +12,8 @@ import { cachedTorrentThumbnail, notifyThumbnailSaved, subscribeFrameSaved } fro
 import { releaseGroup } from "./releases";
 import { useEnhancedImage } from "./enhanceImage";
 import { copyToClipboard, openContextMenu } from "./contextMenuStore";
+import { getEpisodeStill, type Artwork } from "./artwork";
+import { useProviderCredentials } from "./providerCredentials";
 
 type SourceGroup = [string, { label: EpisodeLabel; releases: NyaaResult[] }];
 
@@ -29,6 +31,7 @@ function listedSources(groups: SourceGroup[], anime: AnimeMedia): SourceGroup[] 
 interface Props {
   anime: AnimeMedia;
   kitsu: KitsuMetadata | null;
+  artwork: Artwork | null;
   groupedSources: SourceGroup[];
   /** The entry's season from the backend; falls back to the episode group's. */
   entrySeason?: number | null;
@@ -252,6 +255,7 @@ function progressKeyOf(key: string, group: { label: { kind: string; number?: num
 export function MediaPage({
   anime,
   kitsu,
+  artwork,
   groupedSources,
   entrySeason = null,
   sourcesLoading,
@@ -351,16 +355,39 @@ export function MediaPage({
   // Backdrop and episode thumbnails come from Kitsu (real wide banner and
   // better per-episode coverage than AniList - see src/kitsu.ts), falling
   // back to AniList's poster.
-  const backdrop = kitsu?.background ?? anime.bannerImage ?? anime.coverImage.extraLarge ?? anime.coverImage.large;
+  const backdrop = artwork?.backdrop ?? kitsu?.background ?? anime.bannerImage ?? anime.coverImage.extraLarge ?? anime.coverImage.large;
   const enhancedBackdrop = useEnhancedImage(backdrop);
   const kitsuThumbnails = kitsu?.episodeThumbnails;
+  const providerCredentials = useProviderCredentials();
+  const [tmdbEpisodeStills, setTmdbEpisodeStills] = useState<Record<number, string>>({});
+  const askedEpisodeStills = useRef(new Set<string>());
+  const previousTmdbToken = useRef(providerCredentials.tmdbReadAccessToken);
+  useEffect(() => {
+    if (previousTmdbToken.current !== providerCredentials.tmdbReadAccessToken) {
+      previousTmdbToken.current = providerCredentials.tmdbReadAccessToken;
+      askedEpisodeStills.current.clear();
+      setTmdbEpisodeStills({});
+      console.info("[media] provider credentials changed; refreshing TMDB episode stills", { animeId: anime.id, hasTmdb: !!providerCredentials.tmdbReadAccessToken });
+    }
+    for (const [, group] of visibleSources) {
+      if (group.label.kind !== "episode" || kitsuThumbnails?.[group.label.number]) continue;
+      const episode = group.label.number;
+      const key = `${anime.id}-${episode}`;
+      if (askedEpisodeStills.current.has(key)) continue;
+      askedEpisodeStills.current.add(key);
+      console.debug("[media] request TMDB episode still", { animeId: anime.id, episode });
+      void getEpisodeStill(anime.id, episode).then((still) => {
+        if (still) setTmdbEpisodeStills((current) => current[episode] ? current : { ...current, [episode]: still.url });
+      });
+    }
+  }, [anime.id, visibleSources, kitsuThumbnails, providerCredentials.tmdbReadAccessToken]);
   // Frames already on disk (the player's last frame, or a capture) fill in
   // episodes Kitsu has no picture for, instead of a bare number tile.
   const localThumbnails = useLocalThumbnails(
     anime.id,
     visibleSources.flatMap(([, group]) => (group.label.kind === "episode" && !kitsuThumbnails?.[group.label.number] ? [group.label.number] : [])),
   );
-  const thumbnails = useMemo(() => ({ ...localThumbnails, ...kitsuThumbnails }), [localThumbnails, kitsuThumbnails]);
+  const thumbnails = useMemo(() => ({ ...localThumbnails, ...tmdbEpisodeStills, ...kitsuThumbnails }), [localThumbnails, tmdbEpisodeStills, kitsuThumbnails]);
   const autoFrameChecks = useRef(new Set<string>());
   useEffect(() => {
     const known = new Set(["asw", "toonshub", "doomdos", "judas", "varyg", "anime time"]);
@@ -642,7 +669,9 @@ export function MediaPage({
               <img src={anime.coverImage.large} alt="" />
             </div>
           )}
-          <h1 class="media-title">{displayTitle(anime.title)}</h1>
+          {artwork?.logo
+            ? <img class="media-logo" src={artwork.logo} alt={displayTitle(anime.title)} />
+            : <h1 class="media-title">{displayTitle(anime.title)}</h1>}
           {anime.title.native && anime.title.native !== displayTitle(anime.title) && (
             <div class="media-native-title" lang="ja">
               {anime.title.native}
