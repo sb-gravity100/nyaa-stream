@@ -266,7 +266,7 @@
   - [x] Sync changelog and in-app What's New
   - [x] `cargo check --workspace` and `npm run build`
   - [ ] Verify live Slime search and seek/audio diagnostics
-  - [ ] Bump/tag v0.5.8 locally
+  - [x] Bump/tag v0.5.8 locally
 
 - [ ] Learned release-to-entry matcher - v0.6.1 (user 2026-10-15; see PLAN.md
       "Learned release-to-entry matcher"; replaces the unused stem mapper).
