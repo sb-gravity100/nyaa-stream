@@ -1,3 +1,6 @@
+### `0d0e649` · 2026-10-30 · docs: sync magnet attachment workflow
+- `FILE_INDEX.md`
+- `PHASES.md`
 ### `22aafdd` · 2026-10-30 · feat: attach magnets and map custom packs
 - `src-tauri/src/lib.rs`
 - `src/App.tsx`
