@@ -24,7 +24,9 @@ Feature work follows this order; remaining acceptance checks stay open below.
 
 - [x] Installer visual direction confirmed by SB: compact dark layout matching the app
 - [x] Create simplified installer prototype using the app's dusk-indigo and sakura palette; reviewed and refined by SB
-- [ ] Review proposed update schedule and first-install defaults
+- [x] Adopt the documented update schedule (30s first check, 6h cadence,
+      15m–6h failure backoff) and first-install defaults (per-user path,
+      Start menu on, desktop shortcut off)
 - [ ] 0: Prove installer/updater backend, clean-machine bootstrap, signed
       artifact, silent upgrade, old-install migration and restart lifecycle
   - [x] Local signed NSIS setup and signature generated; final custom template compiles

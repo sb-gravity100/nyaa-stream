@@ -45,8 +45,10 @@ resume-buffer save and teardown wait are implemented. A local signed NSIS
 artifact was generated, but its install/update lifecycle remains unverified;
 keep passive updater mode until isolated Windows checks establish elevation,
 existing MSI/NSIS migration, WebView2 bootstrap and relaunch behavior. See
-`docs/prototypes/installer/FEASIBILITY.md`. Update
-timing and first-install defaults remain proposed choices. Provider terms were
+`docs/prototypes/installer/FEASIBILITY.md`. The selected update schedule is
+30 seconds after readiness, then every six hours, with 15-minute to 6-hour
+failure backoff. First install defaults to `%LOCALAPPDATA%/Programs/nyaa-stream`,
+Start menu shortcut on and desktop shortcut off. Provider terms were
 rechecked: Simkl is excluded until the app provides Simkl login and sync.
 Fribb's mapping data has no stated license; do not publish until resolved.
 Continuous drag behavior, batch transition work and native supersampling remain
