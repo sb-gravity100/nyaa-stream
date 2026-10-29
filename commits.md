@@ -1,3 +1,5 @@
+### `e63bb71` · 2026-10-30 · docs: align seekbar milestone scope
+- `PHASES.md`
 ### `6aaee55` · 2026-10-30 · fix(updater): abort when playback teardown fails
 - `src/updater.ts`
 ### `ed49be5` · 2026-10-30 · style: polish installer progress page
