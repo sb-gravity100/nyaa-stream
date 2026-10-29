@@ -195,7 +195,7 @@ Var ReinstallPageCheck
 Page custom PageReinstall PageLeaveReinstall
 
 ; Bespoke first-install page: choose the destination and shortcuts in one step.
-Page custom PageInstallChoices PageLeaveInstallChoices "Install options" "Back" "Install" "Cancel"
+Page custom PageInstallChoices PageLeaveInstallChoices "Install options"
 
 ; Find a previous WiX installation and set $R6 to its uninstall registry key, or to "" if none.
 ;
@@ -436,6 +436,9 @@ Function PageInstallChoices
   ${If} $PassiveMode = 1
     Abort
   ${EndIf}
+  ; This is the final interactive choice page; label the wizard's Next action clearly.
+  GetDlgItem $R8 $HWNDPARENT 1
+  SendMessage $R8 ${WM_SETTEXT} 0 "STR:Install"
   nsDialogs::Create 1018
   Pop $R9
   ${If} $R9 == error
