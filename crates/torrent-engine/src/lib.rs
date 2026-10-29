@@ -119,6 +119,18 @@ pub struct TorrentEngine {
     open_reads: OpenReads,
     resume_buffers: ResumeBuffers,
     read_stats: ReadStats,
+    storyboards: Arc<StoryboardJobs>,
+}
+
+#[derive(Default)]
+struct StoryboardJobs {
+    jobs: std::sync::Mutex<HashMap<(TorrentId, usize), StoryboardTask>>,
+    root: std::sync::Mutex<PathBuf>,
+}
+
+struct StoryboardTask {
+    cancel: tokio_util::sync::CancellationToken,
+    paused: Arc<std::sync::atomic::AtomicBool>,
 }
 
 /// What the frontend's WebView can decode natively through MSE, reported
@@ -1123,6 +1135,83 @@ pub struct HlsRunInfo {
     pub subtitle_tracks: usize,
 }
 
+async fn storyboard_worker(
+    torrents: Arc<Engine>, id: TorrentId, file_idx: usize, root: PathBuf, job_id: u64,
+    cancel: tokio_util::sync::CancellationToken,
+    paused: Arc<std::sync::atomic::AtomicBool>,
+) {
+    use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
+    const CHUNK: u64 = 8 * 1024 * 1024;
+    const POLL: Duration = Duration::from_secs(2);
+    let dir = root.join(&id).join(file_idx.to_string());
+    let snapshot = dir.join(format!("verified-prefix-{job_id}.snapshot"));
+    let temp = dir.join(format!("verified-prefix-{job_id}.tmp"));
+    let mut processed_prefix = 0u64;
+    let mut attempted_prefix = 0u64;
+    tracing::info!(torrent_id = %id, file_idx, "verified-prefix storyboard worker started");
+    loop {
+        if cancel.is_cancelled() { break; }
+        if paused.load(std::sync::atomic::Ordering::Relaxed) {
+            tokio::select! { _ = cancel.cancelled() => break, _ = tokio::time::sleep(Duration::from_millis(200)) => continue }
+        }
+        let Some(torrent) = torrents.get(&id) else { break; };
+        let Some(file) = torrent.stats().files.get(file_idx).cloned() else { break; };
+        let mut ranges = file.ranges;
+        ranges.sort_unstable_by_key(|r| r.0);
+        // Only the fully verified run beginning at byte zero is safe to
+        // present to a container demuxer. Never seek across a hole.
+        let mut prefix = 0u64;
+        for (start, end) in ranges {
+            if start > prefix { break; }
+            prefix = prefix.max(end.min(file.length));
+            if prefix >= file.length { break; }
+        }
+        if prefix >= attempted_prefix.saturating_add(CHUNK) || (prefix == file.length && prefix > attempted_prefix) {
+            let result = async {
+                tokio::fs::create_dir_all(&dir).await?;
+                let mut out = tokio::fs::File::create(&temp).await?;
+                let mut reader = torrent.open(file_idx, 0, ReadKind::Background)?;
+                let mut start = 0u64;
+                while start < prefix {
+                    if cancel.is_cancelled() { anyhow::bail!("storyboard cancelled"); }
+                    let end = (start + CHUNK).min(prefix);
+                    reader.seek(std::io::SeekFrom::Start(start)).await?;
+                    let mut bytes = vec![0u8; usize::try_from(end - start)?];
+                    reader.read_exact(&mut bytes).await?;
+                    out.write_all(&bytes).await?;
+                    start = end;
+                }
+                out.flush().await?;
+                drop(out);
+                let _ = tokio::fs::remove_file(&snapshot).await;
+                tokio::fs::rename(&temp, &snapshot).await?;
+                anyhow::Ok(())
+            }.await;
+            match result {
+                Ok(()) => {
+                    let snapshot = snapshot.clone();
+                    let output_dir = dir.clone();
+                    let cancel_for_decode = cancel.clone();
+                    let paused_for_decode = paused.clone();
+                    match tokio::task::spawn_blocking(move || media::storyboard_prefix(&snapshot, &output_dir, &cancel_for_decode, &paused_for_decode)).await {
+                        Ok(Ok(_)) => processed_prefix = prefix,
+                        Ok(Err(err)) => tracing::debug!(torrent_id = %id, file_idx, %err, "verified-prefix storyboard pass could not decode yet"),
+                        Err(err) => tracing::warn!(torrent_id = %id, file_idx, %err, "storyboard decoder task failed"),
+                    }
+                    attempted_prefix = prefix;
+                }
+                Err(_err) if cancel.is_cancelled() => break,
+                Err(err) => tracing::debug!(torrent_id = %id, file_idx, %err, verified_prefix = prefix, "storyboard snapshot read failed"),
+            }
+        }
+        if prefix == file.length && (processed_prefix == file.length || attempted_prefix == prefix) { break; }
+        tokio::select! { _ = cancel.cancelled() => break, _ = tokio::time::sleep(POLL) => {} }
+    }
+    let _ = tokio::fs::remove_file(&temp).await;
+    let _ = tokio::fs::remove_file(&snapshot).await;
+    tracing::info!(torrent_id = %id, file_idx, "verified-prefix storyboard worker ended");
+}
+
 impl TorrentEngine {
     /// Starts the sbtl engine (`sbtl_engine`), rooted at
     /// `download_dir` and a local HTTP server that serves torrent file
@@ -1144,6 +1233,8 @@ impl TorrentEngine {
         let torrents = Engine::start(download_dir)?;
         let sources = TorrentSources::new(torrents.clone());
         let hls_jobs = HlsJobs::new(hls_cache_root, sources.clone());
+        let storyboards = Arc::new(StoryboardJobs::default());
+        *storyboards.root.lock().unwrap_or_else(|e| e.into_inner()) = hls_jobs.cache_root.parent().unwrap_or(&hls_jobs.cache_root).join("storyboard");
         let probes = MediaProbes::new(sources);
         let subtitle_logs = SubtitleLogs::default();
         let open_reads = OpenReads::default();
@@ -1194,7 +1285,7 @@ impl TorrentEngine {
             }
         });
 
-        Ok(Self { torrents, stream_addr, hls_jobs, probes, subtitle_logs, open_reads, resume_buffers, read_stats })
+        Ok(Self { torrents, stream_addr, hls_jobs, probes, subtitle_logs, open_reads, resume_buffers, read_stats, storyboards })
     }
 
     /// Adds a torrent from a magnet link or .torrent URL and starts
@@ -1223,6 +1314,7 @@ impl TorrentEngine {
     /// is guaranteed cleaned up here.
     pub async fn remove(&self, id: TorrentId) -> anyhow::Result<()> {
         tracing::debug!(torrent_id = %id, "removing torrent");
+        self.stop_storyboards_for_torrent(&id);
         self.hls_jobs.remove_torrent(&id).await;
         self.probes.remove_torrent(&id).await;
         self.subtitle_logs.remove_torrent(&id).await;
@@ -1231,6 +1323,75 @@ impl TorrentEngine {
         self.read_stats.remove_torrent(&id);
         self.torrents.remove(&id);
         Ok(())
+    }
+
+    /// Starts paced storyboard generation for a video file. The worker only
+    /// snapshots the contiguous verified prefix (starting at byte zero), so
+    /// FFmpeg never reads the live partial file or waits for missing pieces.
+    pub fn start_storyboard(&self, id: &TorrentId, file_idx: usize) -> anyhow::Result<()> {
+        tracing::info!(torrent_id = %id, file_idx, "storyboard generation requested");
+        let torrent = self.torrents.get(id).ok_or_else(|| anyhow::anyhow!("unknown torrent {id}"))?;
+        anyhow::ensure!(torrent.stats().files.get(file_idx).is_some(), "unknown file {file_idx} in torrent {id}");
+        let key = (id.clone(), file_idx);
+        let cancel = tokio_util::sync::CancellationToken::new();
+        // Player polling starts the worker; its buffering state immediately
+        // pauses or resumes this initial state through `pause_storyboard`.
+        let paused = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let mut jobs = self.storyboards.jobs.lock().unwrap_or_else(|e| e.into_inner());
+        if jobs.contains_key(&key) { return Ok(()); }
+        jobs.insert(key, StoryboardTask { cancel: cancel.clone(), paused: paused.clone() });
+        drop(jobs);
+        let root = self.storyboards.root.lock().unwrap_or_else(|e| e.into_inner()).clone();
+        static NEXT_JOB: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+        tokio::spawn(storyboard_worker(self.torrents.clone(), id.clone(), file_idx, root, NEXT_JOB.fetch_add(1, std::sync::atomic::Ordering::Relaxed), cancel, paused));
+        Ok(())
+    }
+
+    /// Pauses/resumes storyboard decode while playback is buffering.
+    pub fn pause_storyboard(&self, id: &TorrentId, file_idx: usize, paused: bool) -> bool {
+        tracing::debug!(torrent_id = %id, file_idx, paused, "storyboard pause state changed");
+        let jobs = self.storyboards.jobs.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(job) = jobs.get(&(id.clone(), file_idx)) {
+            job.paused.store(paused, std::sync::atomic::Ordering::Relaxed);
+            true
+        } else { false }
+    }
+
+    /// Cancels storyboard generation for a file. Completed frames remain in cache.
+    pub fn stop_storyboard(&self, id: &TorrentId, file_idx: usize) -> bool {
+        tracing::info!(torrent_id = %id, file_idx, "storyboard generation stopped");
+        self.storyboards.jobs.lock().unwrap_or_else(|e| e.into_inner()).remove(&(id.clone(), file_idx)).is_some_and(|job| { job.cancel.cancel(); true })
+    }
+
+    /// Looks up the cached frame for `floor(seconds / 5)` without starting work.
+    pub fn storyboard_frame(&self, id: &TorrentId, file_idx: usize, seconds: f64) -> Option<PathBuf> {
+        tracing::debug!(torrent_id = %id, file_idx, seconds, "storyboard frame lookup");
+        if !seconds.is_finite() || seconds < 0.0 { return None; }
+        let path = self.storyboards.root.lock().unwrap_or_else(|e| e.into_inner()).join(id).join(file_idx.to_string()).join(format!("{}.jpg", (seconds / 5.0).floor() as u64));
+        path.is_file().then_some(path)
+    }
+
+    /// Removes all cached storyboard frames for a torrent after the player
+    /// closes, unless a resume buffer keeps that episode's cache alive.
+    pub async fn clear_storyboard_cache(&self, id: &TorrentId) -> anyhow::Result<()> {
+        self.stop_storyboards_for_torrent(id);
+        let dir = self.storyboards.root.lock().unwrap_or_else(|e| e.into_inner()).join(id);
+        for attempt in 0..10 {
+            match tokio::fs::remove_dir_all(&dir).await {
+                Ok(()) => break,
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => break,
+                Err(_error) if attempt < 9 => tokio::time::sleep(Duration::from_millis(50)).await,
+                Err(error) => return Err(error.into()),
+            }
+        }
+        Ok(())
+    }
+
+    fn stop_storyboards_for_torrent(&self, id: &str) {
+        let mut jobs = self.storyboards.jobs.lock().unwrap_or_else(|e| e.into_inner());
+        jobs.retain(|(torrent_id, _), job| {
+            if torrent_id == id { job.cancel.cancel(); false } else { true }
+        });
     }
 
     /// Fetches `file_idx` (e.g. the next episode of a batch) at the lowest

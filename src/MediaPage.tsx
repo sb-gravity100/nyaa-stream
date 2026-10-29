@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { invoke } from "@tauri-apps/api/core";
-import { displayTitle, formatSeason, isMovie, type AnimeMedia, type CustomSource, type KitsuMetadata, type NyaaResult } from "./types";
+import { displayTitle, formatSeason, isMovie, type AnimeMedia, type CustomSource, type KitsuMetadata, type NyaaResult, type TorrentDetails } from "./types";
 import { episodeLabelText, labelOf, type EpisodeLabel } from "./episodeParser";
 import { PlayerView } from "./PlayerView";
 import { progressForAnime, setWatched, subscribeProgress, type ProgressEntry } from "./watchProgress";
@@ -8,7 +8,8 @@ import { BackIcon, CheckIcon, PlayIcon, PlusIcon } from "./icons";
 import { Buffering } from "./Buffering";
 import type { WatchTarget } from "./router";
 import { useSettings } from "./settings";
-import { cachedTorrentThumbnail, subscribeFrameSaved } from "./torrentThumbnail";
+import { cachedTorrentThumbnail, notifyThumbnailSaved, subscribeFrameSaved } from "./torrentThumbnail";
+import { releaseGroup } from "./releases";
 import { useEnhancedImage } from "./enhanceImage";
 import { copyToClipboard, openContextMenu } from "./contextMenuStore";
 
@@ -360,6 +361,170 @@ export function MediaPage({
     visibleSources.flatMap(([, group]) => (group.label.kind === "episode" && !kitsuThumbnails?.[group.label.number] ? [group.label.number] : [])),
   );
   const thumbnails = useMemo(() => ({ ...localThumbnails, ...kitsuThumbnails }), [localThumbnails, kitsuThumbnails]);
+  const autoFrameChecks = useRef(new Set<string>());
+  useEffect(() => {
+    const known = new Set(["asw", "toonshub", "doomdos", "judas", "varyg", "anime time"]);
+    for (const [, group] of visibleSources) {
+      if (group.label.kind !== "episode" || thumbnails[group.label.number]) continue;
+      const episode = group.label.number;
+      const key = `${anime.id}-${episode}`;
+      if (autoFrameChecks.current.has(key)) continue;
+      const release = group.releases.find((candidate) => known.has((releaseGroup(candidate) ?? "").toLowerCase()));
+      if (!release) continue;
+      autoFrameChecks.current.add(key);
+      void invoke<string | null>("build_view_page_thumbnail", {
+        cacheKey: key,
+        viewUrls: [release.view_url],
+        groups: [releaseGroup(release) ?? ""],
+        force: false,
+      }).then((url) => { if (url) notifyThumbnailSaved(anime.id, episode, url); })
+        .catch((err) => console.debug("[thumbnail-build] automatic screenshot lookup failed", { key, err: String(err) }));
+    }
+  }, [anime.id, visibleSources, thumbnails]);
+  const [thumbnailBuild, setThumbnailBuild] = useState<{ current: number; total: number; episodes: number[]; failed: number; noSeed: number } | null>(null);
+  const thumbnailCancelRef = useRef(false);
+  const [thumbnailBuildDone, setThumbnailBuildDone] = useState<{ failed: number; noSeed: number } | null>(null);
+  const missingThumbnailEpisodes = visibleSources.flatMap(([, group]) => group.label.kind === "episode" && !thumbnails[group.label.number] ? [group.label.number] : []);
+  async function buildMissingThumbnails() {
+    if (thumbnailBuild || missingThumbnailEpisodes.length === 0) return;
+    const episodes = [...missingThumbnailEpisodes];
+    thumbnailCancelRef.current = false;
+    try { await invoke("reset_thumbnail_build"); }
+    catch (err) { console.debug("[thumbnail-build] backend cancel state reset failed", { err: String(err) }); }
+    setThumbnailBuildDone(null);
+    setThumbnailBuild({ current: 0, total: episodes.length, episodes: [], failed: 0, noSeed: 0 });
+    const groupName = (release: NyaaResult) => releaseGroup(release)?.toLowerCase() ?? "";
+    const screenshotGroups = new Set(["asw", "toonshub", "doomdos", "judas", "varyg", "anime time"]);
+    const noScreenshotGroups = new Set(["subsplease", "erai-raws", "ember", "dkb", "new-raws", "sankyuu", "minimtbb", "tsundere-raws", "yameii", "kaleido-subs"]);
+
+    // First use release-page frames, which cost no torrent traffic.
+    for (const [index, episode] of episodes.entries()) {
+      if (thumbnailCancelRef.current) break;
+      setThumbnailBuild({ current: index, total: episodes.length, episodes: [episode], failed: 0, noSeed: 0 });
+      const row = visibleSources.find(([, group]) => group.label.kind === "episode" && group.label.number === episode);
+      if (!row) continue;
+      const releases = row[1].releases;
+      const pages = [...releases].sort((a, b) => Number(screenshotGroups.has(groupName(b))) - Number(screenshotGroups.has(groupName(a))));
+      for (const release of pages) {
+        if (noScreenshotGroups.has(groupName(release))) continue;
+        try {
+          const url = await invoke<string | null>("build_view_page_thumbnail", { cacheKey: `${anime.id}-${episode}`, viewUrls: [release.view_url], groups: [releaseGroup(release) ?? ""], force: true });
+          if (url) {
+            notifyThumbnailSaved(anime.id, episode, url);
+            break;
+          }
+        } catch (err) { console.warn("[thumbnail-build] release-page frame lookup failed", { episode, err: String(err) }); }
+        if (thumbnailCancelRef.current) break;
+      }
+    }
+
+    const sizeBytes = (value: string) => {
+      const match = value.match(/([\d.]+)\s*(B|KIB|KB|MIB|MB|GIB|GB|TIB|TB)/i);
+      if (!match) return Number.MAX_SAFE_INTEGER;
+      const unit = match[2].toUpperCase();
+      const power = unit.startsWith("T") ? 4 : unit.startsWith("G") ? 3 : unit.startsWith("M") ? 2 : unit.startsWith("K") ? 1 : 0;
+      return Number(match[1]) * 1024 ** power;
+    };
+    type Candidate = { release: NyaaResult; fileIdx: number };
+    type EpisodePlan = { episode: number; hadSeededSource: boolean; candidates: Candidate[] };
+    const preliminary = new Map<number, NyaaResult[]>();
+    const viewUrls = new Set<string>();
+    let noSeed = 0;
+    for (const episode of episodes) {
+      if (thumbnailCancelRef.current || await cachedTorrentThumbnail(anime.id, episode)) continue;
+      const row = visibleSources.find(([, group]) => group.label.kind === "episode" && group.label.number === episode);
+      if (!row) continue;
+      const candidates = row[1].releases.filter((release) => {
+        if (release.seeders < 1) return false;
+        const label = labelOf(release.label, release.title);
+        if (label.kind === "episode") return label.number === episode;
+        return label.kind === "batch" && label.episodeRange != null && episode >= label.episodeRange[0] && episode <= label.episodeRange[1];
+      });
+      if (candidates.length === 0) noSeed++;
+      const ordered = [...candidates].sort((a, b) => {
+        const labelA = labelOf(a.label, a.title);
+        const labelB = labelOf(b.label, b.title);
+        const subA = groupName(a) === "subsplease" && /480p/i.test(a.title);
+        const subB = groupName(b) === "subsplease" && /480p/i.test(b.title);
+        return Number(subB) - Number(subA)
+          || Number(b.seeders >= 3) - Number(a.seeders >= 3)
+          || Number(labelA.kind === "batch") - Number(labelB.kind === "batch")
+          || (sizeBytes(a.size) / (labelA.kind === "batch" ? (labelA.episodeRange ? labelA.episodeRange[1] - labelA.episodeRange[0] + 1 : anime.episodes || 1) : 1))
+            - (sizeBytes(b.size) / (labelB.kind === "batch" ? (labelB.episodeRange ? labelB.episodeRange[1] - labelB.episodeRange[0] + 1 : anime.episodes || 1) : 1));
+      }).slice(0, 3);
+      preliminary.set(episode, ordered);
+      for (const release of ordered) viewUrls.add(release.view_url);
+    }
+
+    let details: (TorrentDetails | null)[] = [];
+    if (viewUrls.size > 0 && !thumbnailCancelRef.current) {
+      try { details = await invoke<(TorrentDetails | null)[]>("get_torrent_details_batch", { viewUrls: [...viewUrls] }); }
+      catch (err) { console.warn("[thumbnail-build] release file lists unavailable", { err: String(err) }); }
+    }
+    const detailsByUrl = new Map([...viewUrls].map((url, index) => [url, details[index] ?? null]));
+    const plans: EpisodePlan[] = [];
+    for (const [episode, ordered] of preliminary) {
+      const candidates: Candidate[] = [];
+      for (const release of ordered) {
+        const fileList = detailsByUrl.get(release.view_url)?.files ?? [];
+        const label = labelOf(release.label, release.title);
+        const videoFiles = fileList.filter((file) => /\.(mkv|mp4|m4v|avi|webm|mov|ts|m2ts|wmv|flv)$/i.test(file.path));
+        const matching = videoFiles.filter((file) => (file.episode === episode || (videoFiles.length === 1 && label.kind === "episode"))
+          && (file.season == null || label.kind === "episode" && file.season === label.season || label.kind === "batch" && file.season === label.season));
+        if (label.kind === "batch" && matching.length === 0) continue;
+        const largestVideo = videoFiles.reduce((best, file) => !best || file.size > best.size ? file : best, undefined as (typeof videoFiles)[number] | undefined);
+        candidates.push({ release, fileIdx: matching[0]?.index ?? largestVideo?.index ?? 0 });
+      }
+      plans.push({ episode, hadSeededSource: (preliminary.get(episode)?.length ?? 0) > 0, candidates });
+    }
+
+    const completed = new Set<number>();
+    const maxCandidates = Math.max(0, ...plans.map((plan) => plan.candidates.length));
+    for (let rank = 0; rank < maxCandidates && !thumbnailCancelRef.current; rank++) {
+      const groups = new Map<string, { requests: { cacheKey: string; fileIdx: number; durationMinutes: number | null }[]; episodes: number[] }>();
+      for (const plan of plans) {
+        if (completed.has(plan.episode)) continue;
+        const candidate = plan.candidates[rank];
+        if (!candidate) continue;
+        const group = groups.get(candidate.release.magnet) ?? { requests: [], episodes: [] };
+        group.requests.push({ cacheKey: `${anime.id}-${plan.episode}`, fileIdx: candidate.fileIdx, durationMinutes: anime.duration });
+        group.episodes.push(plan.episode);
+        groups.set(candidate.release.magnet, group);
+      }
+      for (const [magnet, group] of groups) {
+        if (thumbnailCancelRef.current) break;
+        setThumbnailBuild({ current: completed.size, total: episodes.length, episodes: group.episodes, failed: 0, noSeed: 0 });
+        let result: (string | null)[] | null = null;
+        while (!thumbnailCancelRef.current && result == null) {
+          try {
+            result = await invoke<(string | null)[]>("capture_torrent_thumbnail_batch", { magnet, requests: group.requests, force: true });
+          } catch (err) {
+            if (String(err).includes("thumbnail-deferred")) {
+              await new Promise((resolve) => window.setTimeout(resolve, 1000));
+              continue;
+            }
+            console.warn("[thumbnail-build] batch capture failed", { episodes: group.episodes, err: String(err) });
+            break;
+          }
+        }
+        if (thumbnailCancelRef.current) break;
+        group.episodes.forEach((episode, index) => {
+          const url = result?.[index];
+          if (url) { notifyThumbnailSaved(anime.id, episode, url); completed.add(episode); }
+        });
+        setThumbnailBuild({ current: completed.size, total: episodes.length, episodes: [], failed: 0, noSeed: 0 });
+      }
+    }
+    let failed = 0;
+    if (!thumbnailCancelRef.current) {
+      for (const plan of plans) {
+        if (!completed.has(plan.episode) && plan.hadSeededSource) failed++;
+      }
+    }
+    setThumbnailBuild(null);
+    setThumbnailBuildDone({ failed, noSeed });
+    thumbnailCancelRef.current = false;
+  }
   const paragraphs = anime.description ? descriptionParagraphs(anime.description) : [];
   const watchedCount = Object.values(progress).filter((p) => p.completed).length;
   const continueEntry = continueTarget ? progressOf(continueTarget[0], continueTarget[1]) : undefined;
@@ -564,6 +729,18 @@ export function MediaPage({
               </span>
             )}
             <CustomSourcePicker sources={customSources} onSave={onSaveCustomSource} onRemove={onRemoveCustomSource} />
+            {!movie && missingThumbnailEpisodes.length > 0 && !watch && <button class="button button-secondary thumbnail-build-button" onClick={() => {
+              if (thumbnailBuild) {
+                thumbnailCancelRef.current = true;
+                invoke("cancel_thumbnail_build").catch((err) => console.debug("[thumbnail-build] cancel request failed", { err: String(err) }));
+              }
+              else void buildMissingThumbnails();
+            }}>
+              {thumbnailBuild ? `Building ${thumbnailBuild.current}/${thumbnailBuild.total} · Cancel` : `Build thumbnails (${missingThumbnailEpisodes.length})`}
+            </button>}
+            {thumbnailBuildDone != null && (thumbnailBuildDone.failed > 0 || thumbnailBuildDone.noSeed > 0) && <span class="thumbnail-build-result">
+              {[thumbnailBuildDone.failed > 0 ? `${thumbnailBuildDone.failed} failed` : "", thumbnailBuildDone.noSeed > 0 ? `${thumbnailBuildDone.noSeed} no seeded source` : ""].filter(Boolean).join(" · ")}
+            </span>}
           </header>
           {error && <p class="error-banner">{error}</p>}
           {watchMissing && (
@@ -607,6 +784,7 @@ export function MediaPage({
                     <button class="video-row-main" onClick={() => play(key)} aria-label={`Play ${key}`}>
                       <div class="video-thumbnail">
                         {thumbnail ? <img src={thumbnail} alt="" loading="lazy" /> : <span class="video-thumbnail-number">{episodeNumber ?? "All"}</span>}
+                        {episodeNumber != null && thumbnailBuild?.episodes.includes(episodeNumber) && <span class="thumbnail-build-spinner" aria-label="Building thumbnail" />}
                         <span class="video-thumbnail-play">
                           <PlayIcon size={22} />
                         </span>

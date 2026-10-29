@@ -65,7 +65,9 @@ pub async fn get_cache_sizes(state: State<'_, Arc<AppState>>) -> Result<CacheSiz
         CacheSizes {
             nyaa: dir_size(&root.join("nyaa_cache")),
             thumbnails: dir_size(&root.join("thumbnails")),
-            hls: dir_size(&hls_dir()),
+            // Storyboards share playback-cache cleanup and are retained only
+            // for a saved Continue-watching resume point.
+            hls: dir_size(&hls_dir()) + dir_size(&root.join("storyboard")),
             // Allocated bytes - the download cache's files are sparse.
             torrents: app.download_cache.status().0 + dir_size(&root.join("engine_cache")) + dir_size(&crate::resume::root()),
         }
@@ -87,7 +89,7 @@ pub async fn clear_cache(state: State<'_, Arc<AppState>>, kind: String) -> Resul
             if state.current_torrent.lock().await.is_some() {
                 return Err("Stop playback first - this cache is in use.".into());
             }
-            vec![hls_dir()]
+            vec![hls_dir(), root.join("storyboard")]
         }
         // Everything but the playing torrent (see download_cache::clear).
         "torrents" => {

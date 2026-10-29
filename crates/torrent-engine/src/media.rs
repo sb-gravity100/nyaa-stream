@@ -18,6 +18,7 @@
 
 use std::collections::HashMap;
 use std::path::Path;
+use std::time::Duration;
 
 use ez_ffmpeg::core::scheduler::ffmpeg_scheduler::Running;
 use ez_ffmpeg::{FfmpegContext, FfmpegScheduler, Input, Output};
@@ -241,6 +242,119 @@ pub fn keyframe_byte_offset(path: &Path, seconds: f64) -> anyhow::Result<Option<
         }
     }
     Ok(None)
+}
+
+/// Decode keyframes from a snapshot made exclusively from the verified
+/// contiguous prefix of a torrent file. A snapshot is deliberately a
+/// standalone file: FFmpeg never sees the original partially-written file.
+/// At most one frame per 5-second bucket is written, as a 240x135 JPEG.
+pub fn storyboard_prefix(snapshot: &Path, output_dir: &Path, cancel: &CancellationToken, paused: &std::sync::atomic::AtomicBool) -> anyhow::Result<usize> {
+    use ffmpeg_next::{codec, format, frame, media, software};
+    tracing::debug!(snapshot = %snapshot.display(), output_dir = %output_dir.display(), "decoding verified storyboard prefix");
+    init();
+    if cancel.is_cancelled() { return Ok(0); }
+    std::fs::create_dir_all(output_dir)?;
+    let mut input = format::input(snapshot).map_err(|e| anyhow::anyhow!("opening verified storyboard snapshot: {e}"))?;
+    let video_index = input.streams().best(media::Type::Video).map(|s| s.index());
+    let Some(video_index) = video_index else { return Ok(0); };
+    let params = input.stream(video_index).ok_or_else(|| anyhow::anyhow!("storyboard video stream disappeared"))?.parameters();
+    let context = codec::context::Context::from_parameters(params)?;
+    let mut decoder = context.decoder().video()?;
+    decoder.skip_frame(ffmpeg_next::Discard::NonKey);
+    let mut scaler: Option<software::scaling::Context> = None;
+    let mut decoded = frame::Video::empty();
+    let mut produced = 0usize;
+    let mut last_bucket: Option<u64> = None;
+    let mut last_write = std::time::Instant::now();
+    for (stream, packet) in input.packets() {
+        if cancel.is_cancelled() { break; }
+        while paused.load(std::sync::atomic::Ordering::Relaxed) && !cancel.is_cancelled() { std::thread::sleep(Duration::from_millis(100)); }
+        if stream.index() != video_index { continue; }
+        if decoder.send_packet(&packet).is_err() { continue; }
+        while decoder.receive_frame(&mut decoded).is_ok() {
+            if cancel.is_cancelled() { break; }
+            while paused.load(std::sync::atomic::Ordering::Relaxed) && !cancel.is_cancelled() { std::thread::sleep(Duration::from_millis(100)); }
+            if !decoded.is_key() { continue; }
+            let Some(pts) = decoded.pts() else { continue; };
+            let time_base = stream.time_base();
+            let seconds = pts as f64 * f64::from(time_base.numerator()) / f64::from(time_base.denominator());
+            if !seconds.is_finite() || seconds < 0.0 { continue; }
+            let bucket = (seconds / 5.0).floor() as u64;
+            if last_bucket == Some(bucket) { continue; }
+            let path = output_dir.join(format!("{bucket}.jpg"));
+            if path.exists() { last_bucket = Some(bucket); continue; }
+            if let Some(scaler) = scaler.as_mut() {
+                let mut scaled = frame::Video::empty();
+                scaler.run(&decoded, &mut scaled)?;
+                write_storyboard_jpeg(&scaled, &path)?;
+            } else {
+            let mut new_scaler = software::scaling::Context::get(
+                decoded.format(), decoded.width(), decoded.height(), ffmpeg_next::format::Pixel::RGB24,
+                decoded.width(), decoded.height(), software::scaling::Flags::BILINEAR,
+            )?;
+                let mut scaled = frame::Video::empty();
+                new_scaler.run(&decoded, &mut scaled)?;
+                write_storyboard_jpeg(&scaled, &path)?;
+                scaler = Some(new_scaler);
+            }
+            last_bucket = Some(bucket);
+            produced += 1;
+            // Pace CPU and disk use; cancellation is checked between frames.
+            let elapsed = last_write.elapsed();
+            if elapsed < Duration::from_millis(250) { std::thread::sleep(Duration::from_millis(250) - elapsed); }
+            last_write = std::time::Instant::now();
+        }
+    }
+    tracing::debug!(produced, "verified-prefix storyboard pass completed");
+    Ok(produced)
+}
+
+fn write_storyboard_jpeg(frame: &ffmpeg_next::frame::Video, path: &Path) -> anyhow::Result<()> {
+    static NEXT_TEMP: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+    let (width, height, stride) = (frame.width() as usize, frame.height() as usize, frame.stride(0));
+    let plane = frame.data(0);
+    let mut packed = Vec::with_capacity(width * height * 3);
+    for row in 0..height {
+        let start = row * stride;
+        packed.extend_from_slice(&plane[start..start + width * 3]);
+    }
+    let image = image::RgbImage::from_raw(width as u32, height as u32, packed)
+        .ok_or_else(|| anyhow::anyhow!("FFmpeg returned invalid RGB storyboard data"))?;
+    let mut top = 0;
+    let mut bottom = height;
+    let max_crop = height / 5;
+    let black_row = |y: usize| {
+        let row = image.as_raw();
+        let start = y * width * 3;
+        let black = (0..width).filter(|x| {
+            let offset = start + x * 3;
+            row[offset] <= 14 && row[offset + 1] <= 14 && row[offset + 2] <= 14
+        }).count();
+        black as f32 / width as f32 >= 0.985
+    };
+    while top < max_crop && top + 1 < bottom && black_row(top) { top += 1; }
+    while height - bottom < max_crop && bottom > top + 1 && black_row(bottom - 1) { bottom -= 1; }
+    let black_column = |x: usize| {
+        let row = image.as_raw();
+        let black = (top..bottom).filter(|y| {
+            let offset = y * width * 3 + x * 3;
+            row[offset] <= 14 && row[offset + 1] <= 14 && row[offset + 2] <= 14
+        }).count();
+        black as f32 / (bottom - top) as f32 >= 0.985
+    };
+    let mut left = 0;
+    let mut right = width;
+    let max_x_crop = width / 5;
+    while left < max_x_crop && left + 1 < right && black_column(left) { left += 1; }
+    while width - right < max_x_crop && right > left + 1 && black_column(right - 1) { right -= 1; }
+    let cropped = image::imageops::crop_imm(&image, left as u32, top as u32, (right - left) as u32, (bottom - top) as u32).to_image();
+    let resized = image::DynamicImage::ImageRgb8(cropped).resize_to_fill(240, 135, image::imageops::FilterType::Lanczos3).to_rgb8();
+    let mut jpeg = Vec::new();
+    image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg, 82).encode_image(&image::DynamicImage::ImageRgb8(resized))?;
+    let temp = path.with_extension(format!("{}.jpg.tmp", NEXT_TEMP.fetch_add(1, std::sync::atomic::Ordering::Relaxed)));
+    std::fs::write(&temp, jpeg)?;
+    std::fs::rename(temp, path)?;
+    Ok(())
 }
 
 // ---------------------------------------------------------------- encoders

@@ -21,6 +21,14 @@ export function subscribeFrameSaved(listener: SavedListener): () => void {
   return () => savedListeners.delete(listener);
 }
 
+/** Publishes a frame produced by the manual build queue into the same
+ * episode cache/listeners used by player screenshots and captures. */
+export function notifyThumbnailSaved(anilistId: number, episode: number, url: string): void {
+  const key = cacheKey(anilistId, episode);
+  cache.set(key, url);
+  for (const listener of savedListeners) listener(key, url);
+}
+
 /** `cached_torrent_thumbnail`'s reply. */
 interface CachedThumbnail {
   url: string | null;

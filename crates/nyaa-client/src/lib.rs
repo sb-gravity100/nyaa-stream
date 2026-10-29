@@ -789,6 +789,20 @@ impl NyaaClient {
         Ok(details.image_urls)
     }
 
+    /// Whether a release group has previously been checked for episode
+    /// screenshots. `None` means it is still an unknown group.
+    pub async fn screenshot_group_has_frames(&self, group: &str) -> anyhow::Result<Option<bool>> {
+        let Some(store) = &self.store else { return Ok(None) };
+        store.screenshot_group(group.to_string()).await
+    }
+
+    /// Records the result of a screenshot-group check in the permanent
+    /// release database so future builds skip groups known to have none.
+    pub async fn remember_screenshot_group(&self, group: &str, has_frames: bool) -> anyhow::Result<()> {
+        let Some(store) = &self.store else { return Ok(()) };
+        store.remember_screenshot_group(group.to_string(), has_frames).await
+    }
+
     async fn fetch_details_uncached(&self, view_url: &str) -> anyhow::Result<TorrentDetails> {
         tracing::debug!(view_url, "fetching nyaa.si torrent view page");
 

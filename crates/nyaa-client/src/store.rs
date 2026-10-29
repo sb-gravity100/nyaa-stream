@@ -16,7 +16,7 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OptionalExtension};
 
 use crate::{NyaaResult, TorrentDetails};
 
@@ -77,6 +77,10 @@ pub(crate) const RELEASE_TABLES: &str = "CREATE TABLE IF NOT EXISTS releases (
          id INTEGER PRIMARY KEY,
          json TEXT NOT NULL,
          fetched_at INTEGER NOT NULL
+     );
+     CREATE TABLE IF NOT EXISTS screenshot_groups (
+         group_name TEXT PRIMARY KEY,
+         has_frames INTEGER NOT NULL
      );";
 
 /// The permanent AnimeTosho tables (see `tosho_build` for the dataset they
@@ -300,6 +304,20 @@ impl Store {
     async fn run<T: Send + 'static>(&self, work: impl FnOnce(&mut Connection) -> rusqlite::Result<T> + Send + 'static) -> anyhow::Result<T> {
         let conn = self.conn.clone();
         Ok(tokio::task::spawn_blocking(move || work(&mut conn.lock().unwrap())).await??)
+    }
+
+    pub(crate) async fn screenshot_group(&self, group: String) -> anyhow::Result<Option<bool>> {
+        self.run(move |conn| {
+            conn.query_row("SELECT has_frames FROM screenshot_groups WHERE group_name=?1", params![group.to_lowercase()], |row| row.get::<_, bool>(0))
+                .optional()
+        }).await
+    }
+
+    pub(crate) async fn remember_screenshot_group(&self, group: String, has_frames: bool) -> anyhow::Result<()> {
+        self.run(move |conn| {
+            conn.execute("INSERT INTO screenshot_groups (group_name, has_frames) VALUES (?1, ?2) ON CONFLICT(group_name) DO UPDATE SET has_frames=excluded.has_frames", params![group.to_lowercase(), has_frames])?;
+            Ok(())
+        }).await
     }
 
     pub(crate) async fn save_custom_source(&self, source: CustomSourceInput) -> anyhow::Result<CustomSource> {

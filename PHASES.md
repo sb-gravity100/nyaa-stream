@@ -773,23 +773,23 @@ policy remains unchanged.
 - [ ] Build thumbnails button (v0.6.0, see PLAN.md "Build thumbnails
       button"): one commit each -
       - [x] nyaa view-page scrape collects description image URLs
-      - [ ] Frame thumbnail from a view-page image: frame filter, backend
+      - [x] Frame thumbnail from a view-page image: frame filter, backend
             fetch, letterbox crop, 640px JPEG into the thumb cache; auto
             for rows without art
-      - [ ] Screenshot groups: built-in yes/no lists (survey in PLAN.md),
+      - [x] Screenshot groups: built-in yes/no lists (survey in PLAN.md),
             unknown groups checked once and remembered
-      - [ ] `capture_torrent_thumbnail`: optional `file_idx` and `force`
-      - [ ] Batch captures share one torrent across their episodes
-      - [ ] Capture source pick: SubsPlease 480p (>= 1 seeder) first, else
+      - [x] `capture_torrent_thumbnail`: optional `file_idx` and `force`
+      - [x] Batch captures share one torrent across their episodes
+      - [x] Capture source pick: SubsPlease 480p (>= 1 seeder) first, else
             smallest file with >= 3, then >= 1
             seeders (batch = size / episodes, single episodes first); never
             0 seeders - row skipped as "no seeded source"
-      - [ ] Live swarm check: no peer within 20s → next candidate (max 3)
-      - [ ] Capture queue (list order, pause while playing, cancel)
-      - [ ] Episodes header button with count/progress/failed state,
+      - [x] Live swarm check: no peer within 20s → next candidate (max 3)
+      - [x] Capture queue (list order, pause while playing, cancel)
+      - [x] Episodes header button with count/progress/failed state,
             spinner on rows being captured
       - [ ] Verify live on a show with no Kitsu/AniList thumbnails
-      - [ ] PLAN.md/FILE_INDEX.md sync
+      - [x] PLAN.md/FILE_INDEX.md sync
 - [ ] HD banner sources (v0.6.0, see PLAN.md "HD banner sources"): one
       commit each -
       - [x] Fribb anime-lists ID map: runtime download, weekly refresh, offline
@@ -813,14 +813,16 @@ policy remains unchanged.
       - [ ] PLAN.md/FILE_INDEX.md sync
 - [ ] Seek-bar thumbnail preview (v0.6.0, see PLAN.md "Seek-bar thumbnail
       preview"): one commit each -
-      - [ ] `media.rs`: keyframe-only storyboard job (5s buckets, 240x135
+      - [x] `media.rs`: keyframe-only storyboard job (5s buckets, 240x135
             JPEG) over verified pieces only, revisiting as pieces arrive
-      - [ ] Paced/low priority, pauses while buffering, stops with player
-      - [ ] `storyboard_frame` command + cleanup in `stop_playback`
+      - [x] Paced/low priority, pauses while buffering, stops with player
+      - [x] `storyboard_frame` command + cleanup in `stop_playback`
             (kept with a resume buffer)
-      - [ ] Seek-bar hover shows the frame above the time tooltip
+      - [x] Seek-bar hover shows the frame above the time tooltip
             (debounced, cached; time only when not downloaded)
-      - [ ] PLAN.md/FILE_INDEX.md sync
+      - [x] PLAN.md/FILE_INDEX.md sync
+      - [ ] Verify partially downloaded files, arbitrary seeks, resume retention,
+            buffering pauses and both mpv/HLS surfaces on Windows
 - [ ] Background update checks and custom installation (v0.6.0, requested
       2026-10-29; see PLAN.md "v0.6.0 background updates and custom installer"):
       - [x] Add unobtrusive startup/periodic checks, focus/resume throttling,

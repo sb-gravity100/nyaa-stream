@@ -31,6 +31,32 @@
 - `PHASES.md`
 - `FILE_INDEX.md`
 - `docs/planning/V0_6_0.md`
+### `dd747e0` · 2026-10-30 · feat: add frame generation workflows
+- `FILE_INDEX.md`
+- `PHASES.md`
+- `crates/torrent-engine/Cargo.toml`
+- `crates/torrent-engine/src/lib.rs`
+- `crates/torrent-engine/src/media.rs`
+- `docs/planning/V0_6_0.md`
+- `src-tauri/src/cache.rs`
+- `src-tauri/src/lib.rs`
+- `src-tauri/src/resume.rs`
+- `src-tauri/src/thumbnail_build.rs`
+- `src/HlsPlayerView.tsx`
+- `src/MediaPage.tsx`
+- `src/PlayerView.tsx`
+
+### `36f6998` · 2026-10-29 · feat: build missing episode thumbnails
+- `FILE_INDEX.md`
+- `PHASES.md`
+- `crates/nyaa-client/src/lib.rs`
+- `crates/nyaa-client/src/store.rs`
+- `src-tauri/src/lib.rs`
+- `src/App.css`
+- `src/HlsPlayerView.tsx`
+- `src/MediaPage.tsx`
+- `src/PlayerView.tsx`
+- `src/torrentThumbnail.ts`
 
 ### `0513336` · 2026-10-29 · Merge branch `work/v0.6-magnets`
 - `crates/nyaa-client/src/magnet.rs`
