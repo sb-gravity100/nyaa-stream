@@ -554,6 +554,18 @@ export class MpvVideo extends EventTarget {
          case "stream-corrupt":
             void this.rebuildBuffer(e);
             return;
+         case "audio-decode-error": {
+            const activeId = this.activeAudioId;
+            const track = this.audioTracks.find((candidate) => candidate.index === activeId);
+            console.warn("[mpv] audio decode error", {
+               at: Number.isFinite(this.currentTime) ? this.currentTime : null,
+               seekingTo: this.seekingTo,
+               track: track ? { id: track.index, codec: track.codec, language: track.language, title: track.title } : null,
+               prefix: e.prefix,
+               text: e.text,
+            });
+            return;
+         }
          case "end-file":
             if (!this.isCurrentEntry(e.playlist_entry_id)) {
                console.info("[mpv] ignoring end-file of a previous entry", {

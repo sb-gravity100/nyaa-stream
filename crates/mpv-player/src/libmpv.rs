@@ -444,6 +444,14 @@ fn is_corruption_message(prefix: &str, text: &str) -> bool {
     }
 }
 
+/// Audio decoder errors need playback context, but do not imply that video
+/// buffers are corrupt or that the whole stream should be rebuilt.
+fn is_audio_decode_error(prefix: &str, level: &str, text: &str) -> bool {
+    prefix.starts_with("ffmpeg/audio")
+        && matches!(level, "error" | "fatal")
+        && (text.to_ascii_lowercase().contains("error decoding") || text.to_ascii_lowercase().contains("out-of-range"))
+}
+
 /// Writes one `mpv_event_log_message` to our log; a corruption line also
 /// becomes a `stream-corrupt` event for the frontend (see
 /// `is_corruption_message`), regardless of the log rate limit.
@@ -459,10 +467,15 @@ unsafe fn log_mpv_message(event: &MpvEvent, budget: &mut LogBudget) -> Option<Va
     let level = cstr(message.level).unwrap_or_default();
     let text = cstr(message.text).unwrap_or_default();
     let text = text.trim_end();
-    let corrupt = is_corruption_message(&prefix, text)
-        .then(|| json!({ "event": "stream-corrupt", "prefix": prefix, "text": text }));
+    let diagnostic_event = if is_corruption_message(&prefix, text) {
+        Some(json!({ "event": "stream-corrupt", "prefix": prefix, "text": text }))
+    } else if is_audio_decode_error(&prefix, &level, text) {
+        Some(json!({ "event": "audio-decode-error", "prefix": prefix, "text": text }))
+    } else {
+        None
+    };
     if !budget.allow() {
-        return corrupt;
+        return diagnostic_event.filter(|event| event["event"] == "stream-corrupt");
     }
     match level.as_str() {
         "fatal" | "error" => tracing::error!(target: "mpv", %prefix, "{text}"),
@@ -470,7 +483,7 @@ unsafe fn log_mpv_message(event: &MpvEvent, budget: &mut LogBudget) -> Option<Va
         "info" => tracing::info!(target: "mpv", %prefix, "{text}"),
         _ => tracing::debug!(target: "mpv", %prefix, %level, "{text}"),
     }
-    corrupt
+    diagnostic_event
 }
 
 fn event_loop(lib: &Lib, handle: Handle, stop: &AtomicBool, sender: mpsc::UnboundedSender<Value>) {
