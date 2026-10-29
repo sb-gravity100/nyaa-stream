@@ -26,6 +26,20 @@
 - [x] Publish all implemented pre-v0.6.0 work as v0.5.8: signed NSIS/MSI installers and updater manifest
 
 ## v0.7.0 — custom Windows libmpv build (planned 2026-10-29)
+- [ ] Improve batch next-episode transitions by reusing torrent/file metadata and
+      verified data; preserve season-aware file selection and source fallback
+- [ ] Measure next-episode click/autoplay to first frame on cached, partial,
+      and poorly seeded batches
+- [ ] Add preload timing choice: existing spare-bandwidth behavior (default)
+      or only after the current episode file reaches 100% verified download
+- [ ] Verify file-level threshold (not whole torrent/playhead), already-cached
+      episodes, playback priority, and preload cancellation/retarget on changes
+- [ ] Make seekbar thumb, time and played portion follow dragging immediately;
+      prevent playback events from snapping the drag position back
+- [ ] Capture the pointer, clamp targets, coalesce intermediate seeks and commit
+      the final target on release; handle cancel, unknown duration and source changes
+- [ ] Verify mpv/HLS scrubbing in fullscreen, paused/backward/undownloaded seeks,
+      keyboard seeking, and rejection of stale seek completions
 - [ ] Extend bounded 1.5x subtitle supersampling to embedded mpv (deferred by SB on 2026-10-29). Resolve native-build versus shared-overlay architecture; preserve video resolution and verify ASS layout/animation, screenshots/export, GPU compatibility and rendering cost.
 - [ ] Record current bundled libmpv identity/options and a baseline for ASS
       edge quality, E-AC-3 playback, seek latency, and hardware decoding

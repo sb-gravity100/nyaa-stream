@@ -683,6 +683,33 @@ old and new DLLs on the same ASS, E-AC-3, seek-latency, and hardware-decoding
 cases, and confirms the existing
 embedded-player ABI and HLS fallback still work.
 
+**v0.7.0 batch transitions, next-episode preload, and seek dragging
+(requested 2026-10-29).**
+- Improve next-episode loading from batch sources: reuse the active torrent,
+  resolved file list, and verified downloaded data rather than removing and
+  re-adding the batch. Resolve the next episode by its season/episode mapping,
+  including packs with multiple seasons or extra files. Preserve the selected
+  batch where it contains the next episode; use the normal source-selection
+  fallback when it does not. Measure next-episode click/autoplay to first frame
+  on cached, partially downloaded, and poorly seeded batches.
+- Add a next-episode preload timing option: retain the existing spare-bandwidth
+  behavior as the default and offer "Only after the current episode is fully
+  downloaded". Gate the latter on 100% verified bytes of the current episode's
+  file, not whole-batch torrent progress or playback position. If already fully
+  downloaded on open, the next file becomes eligible immediately. Keep preload
+  lower priority than active playback, resolve only the next episode, and
+  cancel or retarget it on episode/source changes, disabled preloading, or exit.
+  Verify the next file receives no preload requests before the threshold and
+  that existing downloaded data can be reused after switching episodes.
+- Make the seekbar follow dragging continuously: thumb, elapsed-time readout,
+  and played portion follow the pointer immediately, without being snapped
+  back by playback progress events. Retain pointer capture outside the bar,
+  clamp to the playable duration, coalesce intermediate seek requests, and
+  commit the final target on release. Handle cancel, source changes and unknown
+  duration cleanly; preserve paused state and keyboard seeking. Verify both
+  embedded mpv and HLS, including fullscreen, backward dragging, and targets
+  not yet downloaded; stale seek completions must not override the latest drag.
+
 The `msedgewebview2.DMP` snapshot reviewed 2026-10-29 contains about 2.56 GiB
 of captured memory ranges and about 2.08 GiB of private committed virtual
 memory. This is not a working-set measurement and does not attribute memory
