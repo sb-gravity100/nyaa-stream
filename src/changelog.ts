@@ -11,15 +11,22 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     version: "0.6.0",
-    date: "2026-10-29",
+    date: "2026-10-30",
     features: [
       "ASS dialogue styling now has separate controls for font, size, text color, outline/background and bottom margin, while retaining unchecked authored style fields.",
+      "Right-click menus now provide accessible actions for anime, episodes, sources, text fields and the player, including custom sources.",
+      "Paste a magnet or info hash to play it directly or attach it to an episode or pack.",
+      "TMDB and fanart.tv artwork can fill backdrops, logos and episode stills; missing episode art can be built from release screenshots or a seeded torrent.",
+      "Seek-bar previews show frames decoded only from verified local torrent data.",
+      "Quiet update checks, in-app download progress and deferred restart are available, with a branded NSIS install-choice page.",
     ],
     fixes: [
       "Removed experimental ML scoring and training tools; source matching continues to use trusted dataset ids and title rules.",
       "Embedded mpv blends subtitles onto upscaled video frames and uses EWA Lanczos video scaling.",
       "Plain-text subtitles use light font hinting for cleaner pixel alignment; styled ASS retains authored positioning and animation.",
       "HLS subtitles render with bounded supersampling to reduce rough text edges without blurring the video.",
+      "Updating saves the playback resume buffer and waits for torrent teardown before starting the installer.",
+      "Artwork provider credentials are kept out of exported and imported backups.",
     ],
   },
   {

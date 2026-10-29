@@ -11,6 +11,13 @@ step when cutting a release.
 
 ## [0.6.0] - Unreleased
 
+### Added
+- Flat, keyboard-accessible context menus for inputs, anime, episode/source rows and the player, including custom-source actions.
+- Paste a magnet or info hash to play it directly or attach it to an episode or pack.
+- TMDB/fanart.tv artwork fallbacks, provider-key settings, episode stills, release-page screenshots and a cancellable missing-thumbnail queue.
+- Seek-bar frame previews generated only from verified local torrent data.
+- Quiet update checks, in-app download/verification progress, deferred restart and a branded NSIS install-choice page.
+
 ### Removed
 - Experimental ML training/scoring tools, debugger predictions and unused dataset-mapper training. Rule-based matching and existing dataset compatibility are retained.
 
@@ -23,6 +30,8 @@ step when cutting a release.
 ### Fixed
 - Plain-text subtitles use light font hinting in mpv playback and clip export; styled ASS tracks retain unhinted positioning and animation.
 - HLS subtitle rendering uses 1.5x device-pixel supersampling up to a 2160px threshold, retaining native resolution on larger outputs.
+- Updating now saves the playback resume buffer and waits for torrent teardown before starting the installer.
+- Artwork provider credentials remain outside exported/imported backups.
 
 ## [0.5.8] - 2026-10-29
 
