@@ -677,6 +677,29 @@ old and new DLLs on the same ASS, E-AC-3, seek-latency, and hardware-decoding
 cases, and confirms the existing
 embedded-player ABI and HLS fallback still work.
 
+The `msedgewebview2.DMP` snapshot reviewed 2026-10-29 contains about 2.56 GiB
+of captured memory ranges and about 2.08 GiB of private committed virtual
+memory. This is not a working-set measurement and does not attribute memory
+to JavaScript objects or a particular subsystem; the dump has no V8 heap
+snapshot stream. Use matching WebView2 symbols plus DevTools heap snapshots
+and repeated idle/library/player measurements before treating this as a leak.
+Evaluate one shared WebView2 environment/control where the Tauri window model
+allows it, bounded frontend image/thumbnail caches and released object URLs,
+and WebView2's low-memory target or suspend/resume for inactive UI states.
+Keep the renderer active while its controls are needed for playback. Do not
+share the user-data folder with unrelated applications.
+
+For process branding, label WebView2 processes by their supported process
+kind in nyaa-stream diagnostics and apply the custom icon to the nyaa-stream
+host/window. The WebView2 runtime owns its child executable identity; do not
+rename or patch `msedgewebview2.exe` or its icon. Verify any Task Manager
+grouping available through supported Windows app identity settings.
+
+The PotPlayer installer review exposed no source-level evidence of its
+memory-management strategy. Use its visible behavior only as a comparison;
+memory changes must be independently implemented and justified by this
+dump's follow-up profiling.
+
 Three published releases: **v0.3.2** (the playback fixes) as soon as it
 passes a live test, **v0.4.0** (splash/title bar, download cache, resume
 buffer, contact and send logs, and the sbtl torrent engine), then **v1.0.0** (the stable Windows release

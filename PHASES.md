@@ -13,6 +13,18 @@
 ## v0.7.0 — custom Windows libmpv build (planned 2026-10-29)
 - [ ] Record current bundled libmpv identity/options and a baseline for ASS
       edge quality, E-AC-3 playback, seek latency, and hardware decoding
+- [x] Inspect `msedgewebview2.DMP` structure: about 2.56 GiB captured and
+      2.08 GiB private committed virtual memory; no JS heap attribution
+- [ ] Profile WebView2 with matching symbols and DevTools heap snapshots;
+      identify retained DOM/JS objects and native allocation owners
+- [ ] Bound image/thumbnail caches and release stale object URLs or route data
+- [ ] Evaluate supported WebView2 low-memory and suspend/resume modes for
+      inactive states; preserve controls during active playback
+- [ ] Reuse one WebView2 environment/control where the Tauri window model
+      supports it; keep this app's user-data folder isolated
+- [ ] Add branded WebView2 process-role labels to diagnostics and apply a
+      custom icon to the nyaa-stream host/window; verify supported Task
+      Manager grouping without renaming or patching the WebView2 runtime
 - [ ] Audit required libmpv APIs, stream protocols, codecs, ASS/font handling,
       screenshots, and playback commands; disable unused optional features
       only after confirming no runtime dependency
