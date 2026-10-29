@@ -39,19 +39,18 @@ Do not switch to `quiet` without isolated proof of elevation and install-mode
 behavior.
 
 The Windows NSIS bundle completed with the configured `nyaa-stream` Start Menu
-folder and produced `target/release/bundle/nsis/nyaa-stream_0.6.0_x64-setup.exe`.
-The generated script was recompiled directly with makensis after the registry
-and shortcut fixes; it exited successfully with only unused/duplicate
-localization warnings. The signed updater artifact was excluded from this
-check; no signing key was supplied. The interactive page, install, error
-recovery, uninstaller and updater flow have not been exercised on an isolated
-Windows profile.
+folder and produced `target/release/bundle/nsis/nyaa-stream_0.6.0_x64-setup.exe`
+plus its `.sig` using the local release key. The generated script was also
+recompiled directly with makensis after the registry and shortcut fixes; it
+exited successfully with only unused/duplicate localization warnings. These
+artifacts were not uploaded. The interactive page, install, error recovery,
+uninstaller and updater flow have not been exercised on an isolated Windows
+profile.
 
 ## Still requires an isolated Windows environment
 
 No installer was run against SB's active profile. These checks remain open:
 
-- Build/inspect a signed updater artifact using the release key.
 - Install fresh with Start menu/desktop choices, then verify launch, shortcuts,
   uninstall registration and WebView2 bootstrap on a clean Windows machine.
 - Upgrade both existing NSIS and MSI installs; verify their install paths,

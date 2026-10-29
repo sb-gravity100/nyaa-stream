@@ -41,10 +41,11 @@ and verification remain valid. Tag v0.6.0 only after the milestone is complete.
 Installer direction confirmed by SB: **compact dark layout matching the app**.
 The custom NSIS template and branded install-choice page are integrated; NSIS
 still owns progress and completion. The in-app quiet checker, staged download,
-resume-buffer save and teardown wait are implemented. The signed installer
-lifecycle remains unverified; keep passive updater mode until isolated Windows
-checks establish elevation, existing MSI/NSIS migration, WebView2 bootstrap and
-relaunch behavior. See `docs/prototypes/installer/FEASIBILITY.md`. Update
+resume-buffer save and teardown wait are implemented. A local signed NSIS
+artifact was generated, but its install/update lifecycle remains unverified;
+keep passive updater mode until isolated Windows checks establish elevation,
+existing MSI/NSIS migration, WebView2 bootstrap and relaunch behavior. See
+`docs/prototypes/installer/FEASIBILITY.md`. Update
 timing and first-install defaults remain proposed choices. Provider terms were
 rechecked: Simkl is excluded until the app provides Simkl login and sync.
 Fribb's mapping data has no stated license; do not publish until resolved.
