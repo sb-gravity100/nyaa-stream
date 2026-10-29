@@ -1,3 +1,15 @@
+### `0f655dc` · 2026-10-29 · feat: add quiet in-app update flow
+- `src/updater.ts`
+- `src/App.tsx`
+- `src/SettingsPanel.tsx`
+- `src/App.css`
+- `docs/prototypes/installer/FEASIBILITY.md`
+- `docs/prototypes/installer/index.html`
+- `docs/planning/V0_6_0.md`
+- `PLAN.md`
+- `PHASES.md`
+- `FILE_INDEX.md`
+
 ### `389ace0` · 2026-10-29 · feat: add player surface context actions
 - `src/PlayerView.tsx`
 - `src/HlsPlayerView.tsx`
