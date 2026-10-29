@@ -1,3 +1,7 @@
+### `f24d149` · 2026-10-29 · docs: specify v0.5.9 subtitle blending
+- `PLAN.md`
+- `PHASES.md`
+
 ### `dd77fba` · 2026-10-29 · feat: add selective ASS dialogue styling
 - `src/settings.ts`
 - `src/subtitles.ts`
