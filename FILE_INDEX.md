@@ -55,7 +55,7 @@
 | `crates/torrent-engine/src/direct_input.rs` | Direct torrent reads for in-process FFmpeg: `TorrentSources`/`TorrentReader` serve AVIO read/seek callbacks from `sbtl_engine` readers (foreground or background), reopen at the same offset when a read fails, and cancel reads when a `MediaJob` aborts | backend, streaming, ffmpeg |
 | `crates/torrent-engine/src/subtitle_log.rs` | `SubtitleLogs`: per-track append-only event logs read incrementally from the runs' `sub_<index>_<start|bg>.ass` files, serving `subtitle_handler`'s `?from=N` deltas | backend, subtitles |
 | `crates/torrent-engine/build.rs` | Links the static FFmpeg's dependencies (dav1d, openh264, libmfx, Windows system libs) for `ffmpeg-sys-next` | backend, build-config |
-| `crates/nyaa-client/src/lib.rs` | nyaa.si search: paginated HTML-table scrape (RSS was found to cap at 75 results and ignore `p=`), query sanitization (curly-quote fix), view-page scrape for submitter/batch ground truth (`fetch_details` falls back to the dataset's `release_files` before scraping) | backend, search |
+| `crates/nyaa-client/src/lib.rs` | nyaa.si search: paginated HTML-table scrape, query sanitization, view-page submitter/batch details and cached description image URLs for episode-frame thumbnails | backend, search |
 | `crates/nyaa-client/src/throttle.rs` | Shared gate in front of every nyaa.si request: 2 in flight, 250ms between starts, and on 429/503 a client-wide cooldown (honours `Retry-After`, capped at 30s) then retry, up to 4 attempts | backend, search, rate-limit |
 | `crates/release-parse/src/lib.rs` | Release title parser (MPL-2.0 port of anitopy 2.1.1): `parse(title) -> Elements` (anime title, season, episode, group, resolution, ...), per-call `Ctx` state; unit tests | backend, search, parser |
 | `crates/release-parse/src/{tokenizer,parser,number,helper,keyword,token,element}.rs` | The port's modules, one per anitopy file (tokenizer.py, parser.py, parser_number.py, parser_helper.py, keyword.py, token.py, element.py) | backend, search, parser |
@@ -150,5 +150,7 @@
 | `src/main.tsx` | Frontend entrypoint: loads the bundled Zen Kaku Gothic New weights (body, Japanese) and Outfit (display), installs `devLogger`, global context-menu listener and renders | frontend |
 | `reference/stremio-core/` | Reference-only clone of Stremio's core (state/data layer), gitignored, not a build dependency | reference |
 | `reference/stremio-web/` | Reference-only clone of Stremio's actual UI (React), gitignored — used to verify real layout/styling/data-flow decisions against source rather than guessing | reference |
+
+| `src-tauri/src/thumbnail_build.rs` | Backend release-page frame processing: bounded HTTPS image fetch, public-host checks, image size limits, black-bar crop, 16:9 frame validation, middle-frame selection and 640px JPEG output | backend, thumbnails |
 
 Update this table whenever files are added, moved, or removed.

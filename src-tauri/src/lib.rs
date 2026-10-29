@@ -10,6 +10,7 @@ mod player;
 pub(crate) mod resume;
 mod title_match;
 mod tosho_import;
+mod thumbnail_build;
 #[cfg(test)]
 mod title_match_fixture_tests;
 
@@ -435,6 +436,80 @@ async fn cached_torrent_thumbnail(state: State<'_, Arc<AppState>>, cache_key: St
     let failed_recently = url.is_none() && thumbnail_failed_recently(&state, &cache_key).await;
     tracing::debug!(cache_key, hit = url.is_some(), failed_recently, "cached_torrent_thumbnail");
     Ok(CachedThumbnail { url, failed_recently })
+}
+
+fn valid_nyaa_view_url(raw: &str) -> bool {
+    tracing::debug!("validating nyaa view URL for thumbnail build");
+    let Ok(url) = reqwest::Url::parse(raw) else { return false };
+    url.scheme() == "https" && matches!(url.host_str(), Some("nyaa.si" | "www.nyaa.si")) && url.path().starts_with("/view/")
+}
+
+/// Fetches release-page description frames in the provided preference order,
+/// validates them on the backend and stores the selected 640px JPEG in the
+/// shared thumbnail cache. This command is intended for the manual build queue.
+#[tauri::command]
+async fn build_view_page_thumbnail(
+    state: State<'_, Arc<AppState>>,
+    cache_key: String,
+    view_urls: Vec<String>,
+    force: bool,
+) -> Result<Option<String>, String> {
+    tracing::info!(cache_key, candidate_pages = view_urls.len(), force, "build_view_page_thumbnail invoked");
+    if !valid_thumbnail_key(&cache_key) {
+        tracing::warn!(cache_key, "build_view_page_thumbnail rejected cache key");
+        return Err("invalid cache key".to_string());
+    }
+    let cache_path = thumbnail_path(&state, &cache_key);
+    if let Some(url) = thumbnail_url(&cache_path, &cache_key).await {
+        tracing::debug!(cache_key, "build_view_page_thumbnail cache hit");
+        return Ok(Some(url));
+    }
+    if !force && thumbnail_failed_recently(&state, &cache_key).await {
+        tracing::debug!(cache_key, "build_view_page_thumbnail skipped after recent failure");
+        return Ok(None);
+    }
+    let _permit = state.thumbnail_captures.acquire().await.map_err(|error| error.to_string())?;
+    if let Some(url) = thumbnail_url(&cache_path, &cache_key).await {
+        tracing::debug!(cache_key, "thumbnail was filled while waiting for the build slot");
+        return Ok(Some(url));
+    }
+    for view_url in view_urls.into_iter().take(12) {
+        if !valid_nyaa_view_url(&view_url) {
+            tracing::warn!("thumbnail candidate URL rejected");
+            continue;
+        }
+        let image_urls = match state.nyaa.fetch_description_images(&view_url).await {
+            Ok(image_urls) => image_urls,
+            Err(error) => {
+                tracing::warn!(%error, "failed to read release-page image links");
+                continue;
+            }
+        };
+        if image_urls.is_empty() {
+            tracing::debug!("release page has no description images");
+            continue;
+        }
+        match thumbnail_build::best_frame_jpeg(&image_urls).await {
+            Ok(Some(jpeg)) => {
+                if let Some(parent) = cache_path.parent() {
+                    tokio::fs::create_dir_all(parent).await.map_err(|error| error.to_string())?;
+                }
+                let temporary = cache_path.with_extension("tmp");
+                tokio::fs::write(&temporary, &jpeg).await.map_err(|error| error.to_string())?;
+                tokio::fs::rename(&temporary, &cache_path).await.map_err(|error| error.to_string())?;
+                let _ = tokio::fs::remove_file(thumbnail_failure_path(&state, &cache_key)).await;
+                tracing::info!(cache_key, bytes = jpeg.len(), "built thumbnail from release-page frame");
+                return thumbnail_url(&cache_path, &cache_key).await.ok_or_else(|| "saved thumbnail vanished".to_string()).map(Some);
+            }
+            Ok(None) => tracing::debug!("release page images contained no usable episode frame"),
+            Err(error) => tracing::warn!(%error, "release page frame processing failed"),
+        }
+    }
+    if let Err(error) = tokio::fs::write(thumbnail_failure_path(&state, &cache_key), b"").await {
+        tracing::warn!(cache_key, %error, "failed to record release-page thumbnail miss");
+    }
+    tracing::info!(cache_key, "no release-page frame found");
+    Ok(None)
 }
 
 /// Fallback seek target when there's no duration estimate to compute a real
@@ -1855,6 +1930,7 @@ pub fn run() {
             get_kitsu_metadata,
             capture_torrent_thumbnail,
             cached_torrent_thumbnail,
+            build_view_page_thumbnail,
             save_frame_thumbnail,
             search_torrents,
             search_torrents_for_anime,

@@ -143,6 +143,10 @@ pub struct TorrentDetails {
     /// caches a selected frame instead of hotlinking an expiring host URL.
     #[serde(default)]
     pub image_urls: Vec<String>,
+    /// Distinguishes a scraped page with no images from old cached details
+    /// that predate screenshot extraction and still need one page refresh.
+    #[serde(default)]
+    pub images_scanned: bool,
 }
 
 /// nyaa.si's search categories, passed as the `c` query param.
@@ -731,7 +735,42 @@ impl NyaaClient {
         seasons.sort_unstable();
         seasons.dedup();
         let file_count = files.len();
-        Some(TorrentDetails { submitter: "Anonymous".to_string(), is_batch: file_count > 1, file_count, files, seasons, image_urls: Vec::new() })
+        Some(TorrentDetails { submitter: "Anonymous".to_string(), is_batch: file_count > 1, file_count, files, seasons, image_urls: Vec::new(), images_scanned: false })
+    }
+
+    /// Returns cached description image links or scrapes the release page once
+    /// when stored details predate image extraction.
+    pub async fn fetch_description_images(&self, view_url: &str) -> anyhow::Result<Vec<String>> {
+        tracing::debug!(view_url, "fetching nyaa.si description images");
+        let id = release_id(view_url);
+        if let (Some(store), Some(id)) = (&self.store, id) {
+            if let Some(details) = store.details(id).await? {
+                if details.images_scanned {
+                    tracing::debug!(id, count = details.image_urls.len(), "description image links served from release database");
+                    return Ok(details.image_urls);
+                }
+            }
+        }
+        if let Some(cache) = &self.cache {
+            if let Some(hit) = cache.get::<TorrentDetails>("details", view_url).await {
+                if hit.value.images_scanned {
+                    tracing::debug!(count = hit.value.image_urls.len(), "description image links served from cache");
+                    return Ok(hit.value.image_urls);
+                }
+            }
+        }
+
+        let details = self.fetch_details_uncached(view_url).await?;
+        if let Some(cache) = &self.cache {
+            cache.put("details", view_url, &details).await;
+        }
+        if let (Some(store), Some(id)) = (&self.store, id) {
+            if let Err(error) = store.save_details(id, &details).await {
+                tracing::warn!(id, %error, "storing description image links failed");
+            }
+        }
+        tracing::info!(count = details.image_urls.len(), "scraped description image links");
+        Ok(details.image_urls)
     }
 
     async fn fetch_details_uncached(&self, view_url: &str) -> anyhow::Result<TorrentDetails> {
@@ -777,6 +816,7 @@ impl NyaaClient {
             files,
             seasons,
             image_urls,
+            images_scanned: true,
         })
     }
 }
@@ -824,7 +864,7 @@ INSERT INTO `toto_toto` (`id`, `nyaa_id`, `nyaa_subdom`, `name`, `btih`, `totals
         assert!(client.store.as_ref().unwrap().details(100).await.unwrap().is_none());
 
         // A stored scrape wins over the dataset.
-        let scraped = TorrentDetails { submitter: "Reza".into(), is_batch: true, file_count: 2, files: Vec::new(), seasons: vec![3], image_urls: Vec::new() };
+        let scraped = TorrentDetails { submitter: "Reza".into(), is_batch: true, file_count: 2, files: Vec::new(), seasons: vec![3], image_urls: Vec::new(), images_scanned: true };
         client.store.as_ref().unwrap().save_details(200, &scraped).await.unwrap();
         let details = client.fetch_details("https://nyaa.si/view/200").await.unwrap();
         assert_eq!((details.submitter.as_str(), details.seasons), ("Reza", vec![3]));

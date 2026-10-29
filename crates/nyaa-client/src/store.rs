@@ -737,6 +737,8 @@ INSERT INTO `toto_anidb_tvdb` (`anidbid`, `tvdbid`, `defaulttvdbseason`, `episod
             file_count: 1,
             files: vec![crate::TorrentFile { path: "Season 2/a S02E01.mkv".into(), size: 5, index: 0, season: Some(2), episode: Some(1) }],
             seasons: vec![2],
+            image_urls: Vec::new(),
+            images_scanned: false,
         };
         store.save_details(7, &details).await.unwrap();
         let back = store.details(7).await.unwrap().unwrap();

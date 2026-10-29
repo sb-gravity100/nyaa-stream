@@ -762,7 +762,7 @@ policy remains unchanged.
       - [ ] FILE_INDEX.md/PLAN.md sync
 - [ ] Build thumbnails button (v0.6.0, see PLAN.md "Build thumbnails
       button"): one commit each -
-      - [ ] nyaa view-page scrape collects description image URLs
+      - [x] nyaa view-page scrape collects description image URLs
       - [ ] Frame thumbnail from a view-page image: frame filter, backend
             fetch, letterbox crop, 640px JPEG into the thumb cache; auto
             for rows without art
