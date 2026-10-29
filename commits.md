@@ -1,7 +1,11 @@
+### `3eec94e` · 2026-10-30 · fix(installer): label setup action Install
+- `src-tauri/installer/installer.nsi`
 ### `7dba978` · 2026-10-30 · fix(magnet): warn when pack numbering is unknown
 - `src/AttachCustomSourceDialog.tsx`
 ### `0f205f3` · 2026-10-30 · fix(player): skip extras in default pack playback
 - `src/PlayerView.tsx`
+### `f2611f6` · 2026-10-30 · fix: merge duplicate custom source edits
+- `crates/nyaa-client/src/store.rs`
 ### `ab0f0a4` · 2026-10-30 · docs: describe magnet attachment workflow
 - `CHANGELOG.md`
 - `src/changelog.ts`
