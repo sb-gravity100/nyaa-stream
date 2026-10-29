@@ -1,3 +1,5 @@
+### `6aaee55` · 2026-10-30 · fix(updater): abort when playback teardown fails
+- `src/updater.ts`
 ### `ed49be5` · 2026-10-30 · style: polish installer progress page
 - `src-tauri/installer/installer.nsi`
 ### `77a7222` · 2026-10-30 · fix(installer): label setup action Install
