@@ -79,6 +79,13 @@ struct ArmIds {
 }
 #[derive(Serialize, Deserialize)]
 struct TmdbIds { tv: Option<u64>, movie: Option<u64> }
+#[derive(Serialize, Deserialize, Default)]
+struct TmdbFindResponse {
+    #[serde(default)] tv_results: Vec<TmdbFindItem>,
+    #[serde(default)] movie_results: Vec<TmdbFindItem>,
+}
+#[derive(Serialize, Deserialize)]
+struct TmdbFindItem { id: u64 }
 #[derive(Serialize, Deserialize)]
 struct SeasonMap { tmdb: Option<i32> }
 #[derive(Serialize, Deserialize)]
@@ -197,7 +204,8 @@ impl ArtworkClient {
         // Prefer entries with explicit seasonal coordinates for split-cour mapping.
         found.sort_by_key(|row| row.season.as_ref().and_then(|s| s.tmdb).is_none());
         let row = found.into_iter().next();
-        let arm_needed = row.is_none();
+        let row_tmdb = row.as_ref().and_then(|r| r.themoviedb_id.as_ref());
+        let arm_needed = row_tmdb.and_then(|ids| ids.tv.or(ids.movie)).is_none();
         let arm = if arm_needed {
             match self.arm_ids(anilist_id).await {
                 Ok(ids) => ids,
@@ -208,9 +216,25 @@ impl ArtworkClient {
             }
         } else { ArmIds::default() };
         let tmdb = row.as_ref().and_then(|r| r.themoviedb_id.as_ref());
+        let mut tmdb_tv_id = tmdb.and_then(|id| id.tv);
+        let mut tmdb_movie_id = tmdb.and_then(|id| id.movie);
+        if tmdb_tv_id.is_none() && tmdb_movie_id.is_none() {
+            if let (Some(imdb_id), Some(token)) = (
+                arm.imdb.as_deref().filter(|id| valid_imdb_id(id)),
+                self.credentials.tmdb_read_access_token.as_deref().filter(|s| !s.trim().is_empty()),
+            ) {
+                match self.tmdb_find_ids(imdb_id, token).await {
+                    Ok((tv_id, movie_id)) => {
+                        tmdb_tv_id = tv_id;
+                        tmdb_movie_id = movie_id;
+                    }
+                    Err(err) => tracing::warn!(anilist_id, provider = "tmdb", error = %err, "IMDb artwork ID fallback failed"),
+                }
+            }
+        }
         Ok(AnimeIds {
-            tmdb_tv_id: tmdb.and_then(|id| id.tv),
-            tmdb_movie_id: tmdb.and_then(|id| id.movie),
+            tmdb_tv_id,
+            tmdb_movie_id,
             tmdb_season: row.as_ref().and_then(|r| r.season.as_ref()).and_then(|s| s.tmdb),
             tmdb_episode_offset: row.as_ref().and_then(|r| r.episode_offset.as_ref()).and_then(|o| o.tmdb),
             tvdb_id: row.as_ref().and_then(|r| r.tvdb_id),
@@ -256,6 +280,17 @@ impl ArtworkClient {
         self.cached_json(&key, TMDB_TTL_SECS, || async { self.tmdb_get(&format!("/{kind}/{id}/images"), token).await }).await
     }
 
+    async fn tmdb_find_ids(&self, imdb_id: &str, token: &str) -> Result<(Option<u64>, Option<u64>)> {
+        let key = format!("tmdb-find-{imdb_id}");
+        self.cached_json(&key, TMDB_TTL_SECS, || async {
+            tracing::debug!(imdb_id, "requesting TMDB ID by external IMDb ID");
+            Ok(self.client.get(format!("{TMDB_API}/find/{imdb_id}"))
+                .bearer_auth(token)
+                .query(&[("external_source", "imdb_id")])
+                .send().await?.error_for_status()?.json::<TmdbFindResponse>().await?)
+        }).await.map(|response| unambiguous_tmdb_ids(&response))
+    }
+
     async fn tmdb_get<T: for<'de> Deserialize<'de>>(&self, path: &str, token: &str) -> Result<T> {
         tracing::debug!(path, "requesting TMDB metadata");
         Ok(self.client.get(format!("{TMDB_API}{path}")).bearer_auth(token).query(&[("include_image_language", "en,null")]).send().await?.error_for_status()?.json().await?)
@@ -293,6 +328,17 @@ fn choose_backdrop(images: &[TmdbImage]) -> Option<String> {
         .or_else(|| images.iter().max_by(|a,b| a.vote_average.total_cmp(&b.vote_average)))
         .map(|i| tmdb_image_url(&i.file_path, "w1280"))
 }
+fn valid_imdb_id(value: &str) -> bool {
+    value.len() <= 50
+        && value.strip_prefix("tt").is_some_and(|digits| !digits.is_empty() && digits.bytes().all(|byte| byte.is_ascii_digit()))
+}
+fn unambiguous_tmdb_ids(response: &TmdbFindResponse) -> (Option<u64>, Option<u64>) {
+    match (response.tv_results.as_slice(), response.movie_results.as_slice()) {
+        ([tv], []) => (Some(tv.id), None),
+        ([], [movie]) => (None, Some(movie.id)),
+        _ => (None, None),
+    }
+}
 fn choose_logo(images: &[TmdbImage]) -> Option<String> {
     images.iter().max_by(|a,b| a.vote_average.total_cmp(&b.vote_average)).map(|i| tmdb_image_url(&i.file_path, "w500"))
 }
@@ -325,3 +371,32 @@ async fn write_timed<T: Serialize>(path: &Path, value: &T) -> Result<()> {
     Ok(())
 }
 fn now() -> u64 { SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs() }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn imdb_ids_are_validated_before_becoming_tmdb_paths() {
+        assert!(valid_imdb_id("tt1234567"));
+        assert!(!valid_imdb_id("1234567"));
+        assert!(!valid_imdb_id("tt"));
+        assert!(!valid_imdb_id("tt12/3"));
+        assert!(!valid_imdb_id(&format!("tt{}", "1".repeat(49))));
+    }
+
+    #[test]
+    fn tmdb_find_accepts_only_one_unambiguous_media_result() {
+        let tv = TmdbFindResponse { tv_results: vec![TmdbFindItem { id: 42 }], ..Default::default() };
+        assert_eq!(unambiguous_tmdb_ids(&tv), (Some(42), None));
+
+        let movie = TmdbFindResponse { movie_results: vec![TmdbFindItem { id: 84 }], ..Default::default() };
+        assert_eq!(unambiguous_tmdb_ids(&movie), (None, Some(84)));
+
+        let ambiguous = TmdbFindResponse {
+            tv_results: vec![TmdbFindItem { id: 42 }],
+            movie_results: vec![TmdbFindItem { id: 84 }],
+        };
+        assert_eq!(unambiguous_tmdb_ids(&ambiguous), (None, None));
+    }
+}

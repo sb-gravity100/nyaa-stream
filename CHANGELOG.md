@@ -15,7 +15,7 @@ step when cutting a release.
 - Flat, keyboard-accessible context menus for inputs, anime, episode/source rows and the player, including custom-source actions.
 - Paste a magnet or info hash to play it directly or search for an anime and attach it to an episode or pack; existing sources can be edited, moved or removed.
 - Custom packs now appear on their numbered episode rows using inspected file and season metadata; extras are excluded and unknown packs stay on a Batch row.
-- TMDB/fanart.tv artwork fallbacks, provider-key settings, episode stills, release-page screenshots and a cancellable missing-thumbnail queue.
+- TMDB/fanart.tv artwork fallbacks (including IMDb-based TMDB lookup when an ID crosswalk is missing), provider-key settings, episode stills, release-page screenshots and a cancellable missing-thumbnail queue.
 - Seek-bar frame previews generated only from verified local torrent data.
 - Quiet update checks, in-app download/verification progress, deferred restart and a branded NSIS install-choice page.
 
