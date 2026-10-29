@@ -1,3 +1,7 @@
+### `3689e99` · 2026-10-29 · docs: plan subtitle AA improvement
+- `PLAN.md`
+- `PHASES.md`
+
 ### `41a95d3` · 2026-10-29 · chore: release v0.5.8
 - `CHANGELOG.md`
 - `FILE_INDEX.md`
