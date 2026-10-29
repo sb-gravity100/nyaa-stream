@@ -1,3 +1,8 @@
+### `b72547a` · 2026-10-29 · fix: split oversized nyaa search expressions
+- `src-tauri/src/title_match.rs`
+- `src-tauri/src/lib.rs`
+- `crates/nyaa-client/src/lib.rs`
+
 ### `bed12a6` · 2026-10-29 · docs: plan v0.5.8 playback and search fixes
 - `PLAN.md`
 - `PHASES.md`
