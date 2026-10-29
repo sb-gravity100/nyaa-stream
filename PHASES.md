@@ -20,7 +20,7 @@ Feature work follows this order; remaining acceptance checks stay open below.
 
 - [~] Preserve permanent release data, source attachments and playback/resume state through migrations, upgrades, failed updates and restart; updater restart now waits for resume-buffer save and teardown. Existing-profile upgrade/failure preservation still needs isolated Windows verification.
 
-- [x] Remove cancelled ML training/scoring prototype and dataset trainer; retain rule matching and legacy dataset compatibility. Frontend build, workspace/all-target checks, 54 nyaa-client tests and 39 matching tests passed.
+- [x] Remove cancelled ML training/scoring prototype and dataset trainer; retain rule matching and legacy dataset compatibility. Frontend build, workspace/all-target checks, 56 nyaa-client tests and 39 matching tests passed.
 
 - [x] Installer visual direction confirmed by SB: compact dark layout matching the app
 - [x] Create simplified installer prototype using the app's dusk-indigo and sakura palette; reviewed and refined by SB
