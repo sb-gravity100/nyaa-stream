@@ -10,6 +10,7 @@ import type { WatchTarget } from "./router";
 import { useSettings } from "./settings";
 import { cachedTorrentThumbnail, subscribeFrameSaved } from "./torrentThumbnail";
 import { useEnhancedImage } from "./enhanceImage";
+import { copyToClipboard, openContextMenu } from "./contextMenuStore";
 
 type SourceGroup = [string, { label: EpisodeLabel; releases: NyaaResult[] }];
 
@@ -513,6 +514,14 @@ export function MediaPage({
                     class={`video-row${watched ? " watched" : ""}${key === continueTarget?.[0] ? " current" : ""}`}
                     key={key}
                     style={{ "--i": index }}
+                    onContextMenu={(event) => {
+                      console.debug("[media] open episode context menu", { animeId: anime.id, episodeKey: key, watched });
+                      openContextMenu(event, [
+                        { label: "Play", action: () => play(key) },
+                        { label: watched ? "Mark unwatched" : "Mark watched", action: () => setWatched(anime, key, episodeNumber, !watched) },
+                        { label: "Copy episode title", action: () => copyToClipboard(key, "episode-title") },
+                      ]);
+                    }}
                   >
 
                     <button class="video-row-main" onClick={() => play(key)} aria-label={`Play ${key}`}>

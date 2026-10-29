@@ -13,6 +13,7 @@ import { bestRelease, codecPlayable, getPreferredGroup, releaseCodec, releaseGro
 import { labelOf } from "./episodeParser";
 import { Buffering } from "./Buffering";
 import { StatisticsMenu } from "./StatisticsMenu";
+import { copyToClipboard, openContextMenu, openNyaaPage } from "./contextMenuStore";
 import { getSettings as getSettingsSnapshot, useSettings } from "./settings";
 import { defaultSubtitleIndex, isStyledTrack, subtitleTrackLabel } from "./subtitles";
 import { useAssRenderer } from "./assRenderer";
@@ -245,9 +246,10 @@ export function HlsPlayerView({
    // file (see the attach effect).
    const reattachRef = useRef<{ url: string; time: number } | null>(null);
    const [videoEl, setVideoEl] = useState<HTMLVideoElement | null>(null);
-   const preferredGroup = settings.rememberFansubGroup
-      ? getPreferredGroup(anime.id)
-      : null;
+   const [preferredGroupState, setPreferredGroupState] = useState<string | null>(() =>
+      settings.rememberFansubGroup ? getPreferredGroup(anime.id) : null,
+   );
+   const preferredGroup = settings.rememberFansubGroup ? preferredGroupState : null;
    const releasePrefs = {
       preferredGroup,
       preferredFansubber: settings.preferredFansubber,
@@ -256,6 +258,23 @@ export function HlsPlayerView({
    const [selectedRelease, setSelectedRelease] = useState<NyaaResult>(() =>
       bestRelease(releases, releasePrefs),
    );
+
+   function showSourceContextMenu(event: MouseEvent, release: NyaaResult) {
+      const group = releaseGroup(release);
+      console.debug("[hls-player] open source context menu", { animeId: anime.id, hasGroup: group !== null, hasNyaaPage: !!release.view_url });
+      openContextMenu(event, [
+         { label: "Play this source", action: () => { setSelectedRelease(release); setMenu(null); } },
+         { label: "Copy magnet", action: () => { setMenu(null); return copyToClipboard(release.magnet, "magnet"); } },
+         { label: "Open on nyaa.si", disabled: !release.view_url, action: () => { setMenu(null); return openNyaaPage(release.view_url); } },
+         { label: "Always prefer this group", disabled: !group, action: () => {
+            if (!group) return;
+            console.info("[hls-player] preferred group selected", { animeId: anime.id, group });
+            setPreferredGroup(anime.id, group);
+            setPreferredGroupState(group);
+            setMenu(null);
+         } },
+      ]);
+   }
    const [torrentId, setTorrentId] = useState<string | null>(null);
    const [files, setFiles] = useState<PlayFile[]>([]);
    const [selectedFile, setSelectedFile] = useState<PlayFile | null>(null);
@@ -1563,6 +1582,7 @@ export function HlsPlayerView({
                               <button
                                  key={r.magnet}
                                  class={`player-menu-item player-source-item${r.magnet === selectedRelease.magnet ? " selected" : ""}`}
+                                 onContextMenu={(event) => showSourceContextMenu(event, r)}
                                  onClick={() => {
                                     setSelectedRelease(r);
                                     setMenu(null);

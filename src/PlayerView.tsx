@@ -22,6 +22,7 @@ import { getSettings as getSettingsSnapshot, useSettings } from "./settings";
 import { applyMpvSubtitleStyle, mpvSubtitleSettings, defaultSubtitleIndex, isStyledTrack, subtitleTrackLabel } from "./subtitles";
 import { COMPLETED_FRACTION, MIN_RESUME_SECONDS, getProgress, resumePosition, saveProgress } from "./watchProgress";
 import { PlayerPlaylist, type PlaylistItem } from "./PlayerPlaylist";
+import { copyToClipboard, openContextMenu, openNyaaPage } from "./contextMenuStore";
 import {
   BackIcon,
   EpisodesIcon,
@@ -300,9 +301,10 @@ function MpvPlayerView({
    const selectedFileRef = useRef<PlayFile | null>(null);
    const rootRef = useRef<HTMLDivElement>(null);
    const [videoEl, setVideoEl] = useState<MpvVideo | null>(null);
-   const preferredGroup = settings.rememberFansubGroup
-      ? getPreferredGroup(anime.id)
-      : null;
+   const [preferredGroupState, setPreferredGroupState] = useState<string | null>(() =>
+      settings.rememberFansubGroup ? getPreferredGroup(anime.id) : null,
+   );
+   const preferredGroup = settings.rememberFansubGroup ? preferredGroupState : null;
    // This show's own quality choice (source menu) beats the global setting.
    const [animeResolution, setAnimeResolutionState] = useState(() => getAnimeResolution(anime.id));
    const releasePrefs = {
@@ -445,6 +447,23 @@ function MpvPlayerView({
          await video.stop().catch((err) => console.warn("[player] mpv stop before source switch failed", { err: String(err) }));
       }
       setSelectedRelease(release);
+   }
+
+   function showSourceContextMenu(event: MouseEvent, release: NyaaResult) {
+      const group = releaseGroup(release);
+      console.debug("[player] open source context menu", { animeId: anime.id, hasGroup: group !== null, hasNyaaPage: !!release.view_url });
+      openContextMenu(event, [
+         { label: "Play this source", action: () => switchSource(release) },
+         { label: "Copy magnet", action: () => { setMenu(null); return copyToClipboard(release.magnet, "magnet"); } },
+         { label: "Open on nyaa.si", disabled: !release.view_url, action: () => { setMenu(null); return openNyaaPage(release.view_url); } },
+         { label: "Always prefer this group", disabled: !group, action: () => {
+            if (!group) return;
+            console.info("[player] preferred group selected", { animeId: anime.id, group });
+            setPreferredGroup(anime.id, group);
+            setPreferredGroupState(group);
+            setMenu(null);
+         } },
+      ]);
    }
 
    function showToast(message: string) {
@@ -1952,6 +1971,7 @@ function MpvPlayerView({
                                  key={r.magnet}
                                  class={`player-menu-item player-source-item${r.magnet === selectedRelease.magnet ? " selected" : ""}`}
                                  onClick={() => void switchSource(r)}
+                                 onContextMenu={(event) => showSourceContextMenu(event, r)}
                               >
                                  <span class="player-source-title">
                                     {r.title}
@@ -2157,7 +2177,9 @@ function MpvPlayerView({
                   class={`player-speed${speed !== 1 ? " on" : ""}`}
                   onClick={() => changeSpeed(speed >= SPEEDS[SPEEDS.length - 1] ? 0 : 1)}
                   onContextMenu={(e) => {
+                     console.debug("[player] reset speed from context click");
                      e.preventDefault();
+                     e.stopPropagation();
                      changeSpeed(0);
                   }}
                   aria-label="Playback speed"

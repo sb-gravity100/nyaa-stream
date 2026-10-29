@@ -76,6 +76,20 @@ export async function openAniListPage(animeId: number): Promise<void> {
   }
 }
 
+export async function openNyaaPage(viewUrl: string): Promise<void> {
+  console.info("[context-menu] open nyaa page requested");
+  try {
+    const url = new URL(viewUrl);
+    if (url.protocol !== "https:" || !["nyaa.si", "www.nyaa.si"].includes(url.hostname)) {
+      console.warn("[context-menu] nyaa page rejected", { hostname: url.hostname, protocol: url.protocol });
+      return;
+    }
+    await openUrl(url.toString());
+  } catch (error) {
+    console.error("[context-menu] nyaa page open failed", { error: String(error) });
+  }
+}
+
 function textSelection(target: HTMLElement): { text: string; start?: number; end?: number } {
   if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) {
     const start = target.selectionStart ?? 0;
