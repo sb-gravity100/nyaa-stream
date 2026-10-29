@@ -195,7 +195,7 @@ Var ReinstallPageCheck
 Page custom PageReinstall PageLeaveReinstall
 
 ; Bespoke first-install page: choose the destination and shortcuts in one step.
-Page custom PageInstallChoices PageLeaveInstallChoices
+Page custom PageInstallChoices PageLeaveInstallChoices "Install options" "Back" "Install" "Cancel"
 
 ; Find a previous WiX installation and set $R6 to its uninstall registry key, or to "" if none.
 ;
