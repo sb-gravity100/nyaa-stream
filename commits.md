@@ -1,3 +1,5 @@
+### `7a7c47d` · 2026-10-30 · test(magnet): preserve creation time on merge
+- `crates/nyaa-client/src/store.rs`
 ### `cb329d5` · 2026-10-30 · docs: update nyaa test count
 - `PHASES.md`
 ### `91e3acf` · 2026-10-30 · docs: record custom source persistence coverage
