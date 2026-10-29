@@ -194,6 +194,21 @@ Building the workspace requires, beyond Rust/Node:
   titles. Mushoku S1 keeps 24/37 title-labeled releases and Cour 2 keeps 24/37
   without a TVDB season or 28/37 with it. This recall loss is the chosen cost
   of excluding unmarked titles shared with earlier entries.
+
+  **v0.5.8 patch follow-up (planned 2026-10-29).** A live Slime Season 4
+  query returned HTTP 400 because the exact-title alternatives were rendered
+  as one oversized OR expression. Split remote alternatives into bounded
+  queries while retaining exact phrase semantics, then merge and deduplicate
+  as today. Add query length/alternative-count context to search logs without
+  dumping unwieldy expressions by default. Investigate the 10-12s seek traces:
+  the log shows quick `seek restarted` events alongside much later summaries
+  with no torrent waits, so correlate each trace with its requested target,
+  restart time, coalesced targets, and actual completion before changing
+  buffering behavior. E-AC-3 decode errors occurred during a seek and did not
+  coincide with a playback failure; log the active audio codec/track and
+  playhead/seek context, and classify decoder errors separately from damaged
+  video/stream data. Continue improving logs with concise, actionable context
+  and bounded repetition.
 - **Metadata:** AniList GraphQL API (`https://graphql.anilist.co`), no auth
   required for public queries; Kitsu API (`crates/kitsu-client`) as a
   secondary source for wide backdrop banners and per-episode thumbnails,
