@@ -1,3 +1,11 @@
+### `70ba18e` · 2026-10-29 · chore: finalize v0.5.8 subtitle settings
+- `CHANGELOG.md`
+- `FILE_INDEX.md`
+- `PHASES.md`
+- `PLAN.md`
+- `crates/mpv-player/src/embedded.rs`
+- `src/changelog.ts`
+
 ### `aa84766` · 2026-10-29 · fix: use native libass AA for subtitles
 - `CHANGELOG.md`
 - `FILE_INDEX.md`
