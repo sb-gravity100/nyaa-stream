@@ -1,3 +1,6 @@
+### `1ebb7dc` · 2026-10-30 · docs: draft v0.6.0 release notes
+- `CHANGELOG.md`
+- `src/changelog.ts`
 ### `7eaa57a` · 2026-10-30 · docs: sync v0.6.0 implementation status
 - `FILE_INDEX.md`
 - `PHASES.md`
