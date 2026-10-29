@@ -1,3 +1,6 @@
+### `1798c5b` · 2026-10-29 · docs: record version branch convention
+- `PLAN.md`
+
 ### `4dfdfcf` · 2026-10-29 · docs: record v0.5.8 release prep
 - `PHASES.md`
 
