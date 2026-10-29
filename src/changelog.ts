@@ -10,6 +10,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.5.8",
+    date: "2026-10-29",
+    features: [],
+    fixes: [
+      "Long exact-title season searches are split into shorter requests to avoid search failures.",
+      "Seek timing diagnostics now reflect the time to playback restart and include seek targets.",
+      "Audio decoding errors now include playback and track context in the logs.",
+      "Search failure logs show concise query size and HTTP status details.",
+    ],
+  },
+  {
     version: "0.5.7",
     date: "2026-10-27",
     features: [],

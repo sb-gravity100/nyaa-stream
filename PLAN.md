@@ -195,20 +195,18 @@ Building the workspace requires, beyond Rust/Node:
   without a TVDB season or 28/37 with it. This recall loss is the chosen cost
   of excluding unmarked titles shared with earlier entries.
 
-  **v0.5.8 patch follow-up (planned 2026-10-29).** A live Slime Season 4
-  query returned HTTP 400 because the exact-title alternatives were rendered
-  as one oversized OR expression. Split remote alternatives into bounded
-  queries while retaining exact phrase semantics, then merge and deduplicate
-  as today. Add query length/alternative-count context to search logs without
-  dumping unwieldy expressions by default. Investigate the 10-12s seek traces:
-  the log shows quick `seek restarted` events alongside much later summaries
-  with no torrent waits, so correlate each trace with its requested target,
-  restart time, coalesced targets, and actual completion before changing
-  buffering behavior. E-AC-3 decode errors occurred during a seek and did not
-  coincide with a playback failure; log the active audio codec/track and
-  playhead/seek context, and classify decoder errors separately from damaged
-  video/stream data. Continue improving logs with concise, actionable context
-  and bounded repetition.
+  **v0.5.8 patch follow-up (2026-10-29).** A live Slime Season 4 query
+  returned HTTP 400 because exact-title alternatives formed an oversized OR
+  expression. Remote queries now split at eight alternatives or 600
+  characters, preserving exact phrase and exclusion semantics; results still
+  merge and deduplicate. Logs record query bytes, branch count and HTTP status
+  without printing full search URLs. Seek traces capture completion before
+  collecting optional torrent stats, so stats latency no longer inflates the
+  measured playback restart time; summaries include issued/retargeted seek
+  targets and the restart position. E-AC-3/audio decoder errors remain
+  separate from video/stream corruption and now log playhead, seek target and
+  active audio-track context without triggering a buffer rebuild. Live
+  verification on the same Slime search and a seek/audio session remains.
 - **Metadata:** AniList GraphQL API (`https://graphql.anilist.co`), no auth
   required for public queries; Kitsu API (`crates/kitsu-client`) as a
   secondary source for wide backdrop banners and per-episode thumbnails,

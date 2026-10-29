@@ -256,15 +256,17 @@
 
 - [ ] Search, seek and decoder diagnostics - v0.5.8 patch (user 2026-10-29;
       see PLAN.md "Torrent source" -> "v0.5.8 patch follow-up"):
-  - [ ] Split oversized exact-title OR queries into bounded nyaa.si requests;
+  - [x] Split oversized exact-title OR queries into bounded nyaa.si requests;
         preserve matching precision and merge/deduplicate results
-  - [ ] Correlate seek traces with requested targets, retargets and actual
-        playback restarts; use the log evidence before changing seek behavior
-  - [ ] Add E-AC-3/audio decoder context without treating audio errors as
+  - [x] Correlate seek traces with requested targets, retargets and actual
+        playback restarts; capture completion before slow stats collection
+  - [x] Add E-AC-3/audio decoder context without treating audio errors as
         damaged video or triggering an inappropriate buffer rebuild
-  - [ ] Improve high-value search, seek and mpv logs; avoid repetitive noise
-  - [ ] Sync changelog and in-app What's New; `cargo check --workspace`,
-        `npm run build`; bump/tag v0.5.8 locally
+  - [x] Improve high-value search, seek and mpv logs; avoid repetitive noise
+  - [x] Sync changelog and in-app What's New
+  - [x] `cargo check --workspace` and `npm run build`
+  - [ ] Verify live Slime search and seek/audio diagnostics
+  - [ ] Bump/tag v0.5.8 locally
 
 - [ ] Learned release-to-entry matcher - v0.6.1 (user 2026-10-15; see PLAN.md
       "Learned release-to-entry matcher"; replaces the unused stem mapper).
