@@ -23,6 +23,7 @@ No implementation starts as part of this planning request.
 - [x] Remove cancelled ML training/scoring prototype and dataset trainer; retain rule matching and legacy dataset compatibility. Frontend build, workspace/all-target checks, 54 nyaa-client tests and 39 matching tests passed.
 
 - [x] Installer visual direction confirmed by SB: compact dark layout matching the app
+- [x] Create standalone installer screen prototype covering choices, progress, completion and recovery; SB review remains pending
 - [ ] Review proposed update schedule, restart flow and first-install defaults
 - [ ] 0: Prove installer/updater backend, clean-machine bootstrap, signed
       artifact, silent upgrade, old-install migration and restart lifecycle

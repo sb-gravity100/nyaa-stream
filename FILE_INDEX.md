@@ -15,6 +15,7 @@
 | `README.md` | Public overview: features, stack, build prerequisites, release steps | docs |
 | `PLAN.md` | Concise active roadmap, v0.6.0 order, constraints and index of detailed planning documents | docs |
 | `docs/planning/V0_6_0.md` | Consolidated v0.6.0 implementation order, feature specifications, proposed defaults and acceptance criteria | docs, planning |
+| `docs/prototypes/installer/index.html` | Standalone compact dark installer UI prototype with install choices, progress, completion and recovery states | docs, prototype, installer |
 | `docs/planning/ARCHITECTURE.md` | Stack/build prerequisites, workspace/data flow, sbtl engines, development and legacy gap inventory | docs, architecture |
 | `docs/planning/PLAYBACK.md` | Playback/cache/resume/subtitle/desktop specifications and historical measurements | docs, player |
 | `docs/planning/MATCHING.md` | Release matching, AnimeTosho dataset, rule-based search debugger | docs, search |
