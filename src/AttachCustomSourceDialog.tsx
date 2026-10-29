@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { useEffect, useMemo, useState } from "preact/hooks";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { parseEpisode, type EpisodeLabel } from "./episodeParser";
 import { displayTitle, type AnimeMedia, type CustomSource } from "./types";
 import "./AttachCustomSourceDialog.css";
@@ -16,7 +16,7 @@ type InspectedFile = {
 
 export interface AttachCustomSourceDialogProps {
   input: string;
-  seasonForAnime: (anime: AnimeMedia) => number;
+  seasonForAnime: (anime: AnimeMedia) => Promise<number>;
   onClose: () => void;
   onAttach: (source: {
     anime: AnimeMedia;
@@ -44,6 +44,20 @@ function inferredLabel(title: string): EpisodeLabel {
   return parseEpisode(title);
 }
 
+function isExtra(file: InspectedFile): boolean {
+  return /\b(OVA|OAD|ONA|SP|Specials?|NCOP|NCED|Extras?|PV|Trailer)\d*\b/i.test(file.path)
+    || file.label?.kind === "special"
+    || (file.label?.kind === "batch" && file.label.extras === true);
+}
+
+function episodesInFile(file: InspectedFile): number[] {
+  if (file.episode != null) return [file.episode];
+  const range = file.episodeRange ?? (file.label?.kind === "batch" ? file.label.episodeRange : null);
+  if (!range || range[1] < range[0]) return [];
+  const count = Math.min(range[1] - range[0] + 1, 1000);
+  return Array.from({ length: count }, (_, index) => range[0] + index);
+}
+
 export function AttachCustomSourceDialog({ input: initialInput, source, seasonForAnime, onClose, onAttach }: AttachCustomSourceDialogProps) {
   const [input, setInput] = useState(source?.magnet ?? initialInput);
   const [parsed, setParsed] = useState<ParsedMagnet | null>(null);
@@ -55,18 +69,22 @@ export function AttachCustomSourceDialog({ input: initialInput, source, seasonFo
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [anime, setAnime] = useState<AnimeMedia | null>(null);
+  const [seasonLoading, setSeasonLoading] = useState(false);
+  const seasonRequestId = useRef(0);
   const [kind, setKind] = useState<"episode" | "pack">(source?.kind ?? "episode");
   const [season, setSeason] = useState<number>(source?.season ?? 1);
-  const [episodeStart, setEpisodeStart] = useState(source?.episodeStart ?? 1);
-  const [episodeEnd, setEpisodeEnd] = useState(source?.episodeEnd ?? source?.episodeStart ?? 1);
+  const [episodeStart, setEpisodeStart] = useState<number | null>(source?.episodeStart ?? null);
+  const [episodeEnd, setEpisodeEnd] = useState<number | null>(source?.episodeEnd ?? null);
   const [title, setTitle] = useState(source?.title ?? "");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const parsedTitle = parsed?.name?.trim() ?? "";
   const titleLabel = useMemo(() => parsedTitle ? inferredLabel(parsedTitle) : { kind: "unknown" } as const, [parsedTitle]);
-  const eligibleFiles = files?.filter((file) => file.isVideo && !file.label?.extras && file.label?.kind !== "special") ?? [];
-  const inferredPack = eligibleFiles.length >= 2 && (titleLabel.kind === "batch" || eligibleFiles.some((file) => file.label?.kind === "batch"));
+  const eligibleFiles = files?.filter((file) => file.isVideo && !isExtra(file)) ?? [];
+  const inferredPack = eligibleFiles.length >= 2;
+  const packRangeInvalid = episodeStart === null !== (episodeEnd === null)
+    || (episodeStart !== null && episodeEnd !== null && (!Number.isInteger(episodeStart) || !Number.isInteger(episodeEnd) || episodeStart < 1 || episodeEnd < episodeStart));
 
   useEffect(() => {
     let cancelled = false;
@@ -88,20 +106,29 @@ export function AttachCustomSourceDialog({ input: initialInput, source, seasonFo
         setFiles(inspected);
         const parsedLabel = result.name ? inferredLabel(result.name) : { kind: "unknown" } as const;
         if (!source) {
-          if (parsedLabel.kind === "episode") {
+          if (eligibleCount(inspected) >= 2) {
+            setKind("pack");
+            if (parsedLabel.kind === "batch" && !parsedLabel.extras && parsedLabel.episodeRange) {
+              setSeason(parsedLabel.season);
+              setEpisodeStart(parsedLabel.episodeRange[0]);
+              setEpisodeEnd(parsedLabel.episodeRange[1]);
+            } else {
+              const fileEpisodes = inspected.filter((file) => file.isVideo && !isExtra(file)).flatMap(episodesInFile);
+              setEpisodeStart(fileEpisodes.length ? Math.min(...fileEpisodes) : null);
+              setEpisodeEnd(fileEpisodes.length ? Math.max(...fileEpisodes) : null);
+            }
+          } else if (parsedLabel.kind === "episode") {
             setKind("episode");
             setSeason(parsedLabel.season);
             setEpisodeStart(parsedLabel.number);
             setEpisodeEnd(parsedLabel.number);
-          } else if (eligibleCount(inspected) >= 2 && ((parsedLabel.kind === "batch" && !parsedLabel.extras) || inspected.some((file) => file.isVideo && !file.label?.extras && file.label?.kind === "batch"))) {
-            setKind("pack");
-            if (parsedLabel.kind === "batch") {
-              setSeason(parsedLabel.season);
-              if (parsedLabel.episodeRange) {
-                setEpisodeStart(parsedLabel.episodeRange[0]);
-                setEpisodeEnd(parsedLabel.episodeRange[1]);
-              }
-            }
+          } else {
+            const onlyVideo = inspected.find((file) => file.isVideo && !isExtra(file));
+            setKind("episode");
+            if (onlyVideo?.season != null) setSeason(onlyVideo.season);
+            const episodeNumber = onlyVideo?.episode ?? null;
+            setEpisodeStart(episodeNumber);
+            setEpisodeEnd(episodeNumber);
           }
         }
       } catch (error) {
@@ -136,28 +163,42 @@ export function AttachCustomSourceDialog({ input: initialInput, source, seasonFo
     return () => { cancelled = true; window.clearTimeout(timer); };
   }, [query]);
 
-  function chooseAnime(candidate: AnimeMedia) {
+  async function chooseAnime(candidate: AnimeMedia) {
+    const requestId = ++seasonRequestId.current;
     setAnime(candidate);
-    setSeason(source?.season ?? seasonForAnime(candidate));
+    if (source?.animeId === candidate.id && source.season != null) {
+      setSeason(source.season);
+      setSeasonLoading(false);
+    } else {
+      setSeasonLoading(true);
+      try {
+        const candidateSeason = await seasonForAnime(candidate);
+        if (requestId === seasonRequestId.current) setSeason(candidateSeason);
+      } finally {
+        if (requestId === seasonRequestId.current) setSeasonLoading(false);
+      }
+    }
     setResults([]);
     setQuery(displayLabel(candidate));
   }
 
   function eligibleCount(items: InspectedFile[]): number {
-    return items.filter((file) => file.isVideo && !file.label?.extras && file.label?.kind !== "special").length;
+    return items.filter((file) => file.isVideo && !isExtra(file)).length;
   }
 
   async function submit(event: Event) {
     event.preventDefault();
-    if (!anime || !parsed || !files || inspecting || saving) return;
-    if (kind === "episode" && (!Number.isInteger(episodeStart) || episodeStart < 1)) return;
+    if (!anime || !parsed || !files || inspecting || seasonLoading || saving) return;
+    if (kind === "episode" && (episodeStart === null || !Number.isInteger(episodeStart) || episodeStart < 1)) return;
+    const hasRange = episodeStart != null || episodeEnd != null;
+    if (kind === "pack" && hasRange && packRangeInvalid) return;
     setSaving(true);
     setSaveError(null);
     try {
       await onAttach({
         anime, input: parsed.magnet, title: title.trim() || parsed.name?.trim() || `Torrent ${parsed.infoHash.slice(0, 8)}`,
-        kind, season, episodeStart: kind === "episode" ? episodeStart : null,
-        episodeEnd: kind === "episode" ? episodeStart : (episodeEnd >= episodeStart ? episodeEnd : null),
+        kind, season, episodeStart,
+        episodeEnd: kind === "episode" ? episodeStart : episodeEnd,
         ...(source ? { sourceId: source.id, sourceAnimeId: source.animeId } : {}),
       });
       onClose();
@@ -210,17 +251,17 @@ export function AttachCustomSourceDialog({ input: initialInput, source, seasonFo
           </label>
         </div>
         {kind === "episode" ? <label class="attach-source-field">Episode
-          <input type="number" min="1" value={episodeStart} onInput={(event) => setEpisodeStart(Number((event.currentTarget as HTMLInputElement).value))} />
+          <input type="number" min="1" value={episodeStart ?? ""} onInput={(event) => setEpisodeStart(event.currentTarget.value === "" ? null : Number(event.currentTarget.value))} />
         </label> : <div class="attach-source-options">
-          <label class="attach-source-field">Range start<input type="number" min="1" value={episodeStart} onInput={(event) => setEpisodeStart(Number((event.currentTarget as HTMLInputElement).value))} /></label>
-          <label class="attach-source-field">Range end<input type="number" min="1" value={episodeEnd} onInput={(event) => setEpisodeEnd(Number((event.currentTarget as HTMLInputElement).value))} /></label>
+          <label class="attach-source-field">Range start (optional)<input type="number" min="1" value={episodeStart ?? ""} onInput={(event) => setEpisodeStart(event.currentTarget.value === "" ? null : Number(event.currentTarget.value))} /></label>
+          <label class="attach-source-field">Range end (optional)<input type="number" min="1" value={episodeEnd ?? ""} onInput={(event) => setEpisodeEnd(event.currentTarget.value === "" ? null : Number(event.currentTarget.value))} /></label>
         </div>}
         {titleLabel.kind === "episode" && !source && <div class="attach-source-status">Episode {titleLabel.number} inferred from the torrent name.</div>}
         {inferredPack && !source && <div class="attach-source-status">Pack inferred from video files; extras are excluded.</div>}
         {saveError && <div class="attach-source-error">Couldn’t attach source: {saveError}</div>}
         <div class="attach-source-actions">
           <button type="button" class="button button-secondary" onClick={onClose}>Cancel</button>
-          <button type="submit" class="button" disabled={!parsed || !files || eligibleFiles.length === 0 || inspecting || !anime || saving || !Number.isInteger(season) || season < 1 || (kind === "episode" && (!Number.isInteger(episodeStart) || episodeStart < 1)) || (kind === "pack" && (!Number.isInteger(episodeStart) || !Number.isInteger(episodeEnd) || episodeStart < 1 || episodeEnd < episodeStart))}>{saving ? "Attaching…" : source ? "Move source" : "Attach source"}</button>
+          <button type="submit" class="button" disabled={!parsed || !files || eligibleFiles.length === 0 || inspecting || seasonLoading || !anime || saving || !Number.isInteger(season) || season < 1 || (kind === "episode" && (episodeStart === null || !Number.isInteger(episodeStart) || episodeStart < 1)) || (kind === "pack" && packRangeInvalid)}>{saving ? "Attaching…" : seasonLoading ? "Loading season…" : source ? "Move source" : "Attach source"}</button>
         </div>
       </form>
     </div>

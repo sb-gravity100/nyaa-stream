@@ -20,6 +20,7 @@ import { addRecentSearch, clearRecentSearches, getRecentSearches, removeRecentSe
 import { fetchKitsuMetadata, kitsuSnapshot } from "./kitsu";
 import { cachedTorrentThumbnail, fetchTorrentThumbnail } from "./torrentThumbnail";
 import { episodeNumbersByGroup } from "./releases";
+import { AttachCustomSourceDialog } from "./AttachCustomSourceDialog";
 import { MediaPage } from "./MediaPage";
 import { PlayerView } from "./PlayerView";
 import { HomePage } from "./HomePage";
@@ -74,6 +75,11 @@ function currentAndPreviousWeekWindow(): { from: number; to: number } {
 const MOVIE_TITLE = /\b(movie|film|gekijou?ban)\b|劇場版/i;
 // Series packs that show up in a movie's nyaa search (same franchise name).
 const SERIES_PACK = /\b(batch|complete|season\s*\d|s\d{1,2})\b|\d{1,3}\s*[-~]\s*\d{1,3}/i;
+const CUSTOM_EXTRA_FILE = /\b(OVA|OAD|ONA|SP|Specials?|NCOP|NCED|Extras?|PV|Trailer)\d*\b/i;
+
+function isCustomExtraFile(file: CustomSource["files"][number]): boolean {
+  return CUSTOM_EXTRA_FILE.test(file.path) || file.label?.kind === "special" || (file.label?.kind === "batch" && file.label.extras === true);
+}
 
 /** A movie's page: one "Movie" group of every release that is the film -
  * titles the parser can't number (how movies are named), minus the
@@ -96,8 +102,10 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [animeResults, setAnimeResults] = useState<AnimeMedia[]>([]);
-  const [directPlay, setDirectPlay] = useState<{ anime: AnimeMedia; source: NyaaResult } | null>(null);
+  const [directPlay, setDirectPlay] = useState<{ anime: AnimeMedia; source: NyaaResult; episode: number | null; season: number | null } | null>(null);
   const [directMagnetError, setDirectMagnetError] = useState<string | null>(null);
+  const [attachmentInput, setAttachmentInput] = useState<string | null>(null);
+  const [attachmentSource, setAttachmentSource] = useState<CustomSource | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   // Which page is showing comes from the URL (see router.ts); this is the
   // anime that page is about, once loaded.
@@ -256,15 +264,29 @@ function App() {
   async function playCustomMagnet(input: string) {
     setDirectMagnetError(null);
     try {
-      const parsed = await invoke<{ infoHash: string; name: string | null; magnet: string }>("parse_custom_magnet", { input });
+      const parsed = await invoke<{ infoHash: string; name: string | null; magnet: string; label: EpisodeLabel }>("parse_custom_magnet", { input });
       const title = parsed.name?.trim() || `Torrent ${parsed.infoHash.slice(0, 8)}`;
       const anime: AnimeMedia = { id: -1, title: { romaji: title, english: null, native: null }, description: null, episodes: null, coverImage: { large: null, extraLarge: null }, averageScore: null, format: null, season: null, seasonYear: null, duration: null };
-      const source: NyaaResult = { title, magnet: parsed.magnet, torrent_url: "", view_url: `custom://${parsed.infoHash}`, size: "", seeders: 0, leechers: 0, published: "", label: { kind: "unknown" } };
-      setDirectPlay({ anime, source });
+      const source: NyaaResult = { title, magnet: parsed.magnet, torrent_url: "", view_url: `magnet://${parsed.infoHash}`, size: "", seeders: 0, leechers: 0, published: "", label: parsed.label ?? { kind: "unknown" } };
+      setDirectPlay({
+        anime,
+        source,
+        episode: parsed.label.kind === "episode" ? parsed.label.number : null,
+        season: "season" in parsed.label ? parsed.label.season : null,
+      });
       setDropdownOpen(false);
     } catch (err) {
       setDirectMagnetError(err instanceof Error ? err.message : String(err));
     }
+  }
+
+  function showCustomMagnetContextMenu(event: MouseEvent, input: string) {
+    console.debug("[search] open magnet context menu", { inputLength: input.length });
+    openContextMenu(event, [
+      { label: "Play magnet", action: () => void playCustomMagnet(input) },
+      { label: "Attach to episode…", action: () => { setAttachmentSource(null); setAttachmentInput(input); setDropdownOpen(false); } },
+      { label: "Copy magnet", action: () => copyToClipboard(input, "magnet") },
+    ]);
   }
 
   function pickAnime(anime: AnimeMedia) {
@@ -894,12 +916,58 @@ function App() {
   }, [sources, details, currentAnimeSeason, currentEpisodeOffset, selectedAnime?.episodes, selectedAnime?.format, debugActive]);
 
   const customSources = selectedAnime ? customSourcesByMedia[selectedAnime.id] ?? [] : [];
-  const customReleases = useMemo<NyaaResult[]>(() => customSources.map((source) => {
+  const customReleases = useMemo<NyaaResult[]>(() => customSources.flatMap((source) => {
     const season = source.season ?? currentAnimeSeason;
-    const label: EpisodeLabel = source.kind === "episode" && source.episodeStart != null
-      ? { kind: "episode", season, number: source.episodeStart, seasons: [season] }
-      : { kind: "batch", season, episodeRange: source.episodeStart != null && source.episodeEnd != null ? [source.episodeStart, source.episodeEnd] : null, extras: false, seasons: [season] };
-    return { title: source.title, magnet: source.magnet, torrent_url: "", view_url: `custom://${source.id}`, size: "", seeders: 0, leechers: 0, published: "", label };
+    const releaseFor = (label: EpisodeLabel): NyaaResult => ({
+      title: source.title,
+      magnet: source.magnet,
+      torrent_url: "",
+      view_url: `custom://${source.id}`,
+      size: "",
+      seeders: 0,
+      leechers: 0,
+      published: "",
+      label,
+    });
+    if (source.kind === "episode" && source.episodeStart != null) {
+      return [releaseFor({ kind: "episode", season, number: source.episodeStart, seasons: [season] })];
+    }
+
+    const batch: EpisodeLabel = {
+      kind: "batch",
+      season,
+      episodeRange: source.episodeStart != null && source.episodeEnd != null ? [source.episodeStart, source.episodeEnd] : null,
+      extras: false,
+      seasons: [season],
+    };
+    if (source.kind !== "pack") return [releaseFor(batch)];
+
+    // A stored pack is offered on each numbered episode row covered by its
+    // metadata-only file list. Keep a Batch row when the pack has no usable
+    // numbering; never let extras create episode rows or widen its range.
+    const episodes = new Set<number>();
+    for (const file of source.files) {
+      if (!file.isVideo || isCustomExtraFile(file)) continue;
+      const namedSeasons = file.label && "seasons" in file.label ? (file.label.seasons ?? []) : [];
+      if (namedSeasons.length > 0 && !namedSeasons.includes(season)) continue;
+      const numbers = file.episode != null
+        ? [file.episode]
+        : file.episodeRange != null && file.episodeRange[1] >= file.episodeRange[0]
+          ? Array.from({ length: Math.min(file.episodeRange[1] - file.episodeRange[0] + 1, 1000) }, (_, index) => file.episodeRange![0] + index)
+          : [];
+      for (const number of numbers) {
+        if (source.episodeStart != null && number < source.episodeStart) continue;
+        if (source.episodeEnd != null && number > source.episodeEnd) continue;
+        episodes.add(number);
+      }
+    }
+    if (episodes.size === 0) return [releaseFor(batch)];
+    return Array.from(episodes).sort((a, b) => a - b).map((number) => releaseFor({
+      kind: "episode",
+      season,
+      number,
+      seasons: [season],
+    }));
   }), [customSources, currentAnimeSeason]);
   const groupedSources = useMemo(() => {
     const groups = sourceAnalysis.groups.map(([key, group]) => [key, { ...group, releases: [...group.releases] }] as [string, { label: EpisodeLabel; releases: NyaaResult[] }]);
@@ -920,16 +988,87 @@ function App() {
     });
   }, [sourceAnalysis.groups, customReleases]);
 
-  async function saveCustomSource(input: string, title: string, kind: "episode" | "pack", season: number | null, start: number | null, end: number | null) {
+  async function saveCustomSource(input: string, title: string, kind: "episode" | "pack", season: number | null, start: number | null, end: number | null, sourceId?: number) {
     if (!selectedAnime || !isTauriAvailable()) throw new Error("Custom sources are available in the desktop app.");
-    const saved = await invoke<CustomSource>("save_custom_source", { animeId: selectedAnime.id, input, title, kind, season, episodeStart: start, episodeEnd: end });
-    setCustomSourcesByMedia((current) => ({ ...current, [selectedAnime.id]: [...(current[selectedAnime.id] ?? []).filter((source) => source.infoHash !== saved.infoHash), saved] }));
+    const saved = sourceId != null
+      ? await invoke<CustomSource | null>("update_custom_source", { animeId: selectedAnime.id, id: sourceId, targetAnimeId: selectedAnime.id, input, title, kind, season, episodeStart: start, episodeEnd: end })
+      : await invoke<CustomSource>("save_custom_source", { animeId: selectedAnime.id, input, title, kind, season, episodeStart: start, episodeEnd: end });
+    if (!saved) throw new Error("The custom source no longer exists.");
+    setCustomSourcesByMedia((current) => ({ ...current, [selectedAnime.id]: [...(current[selectedAnime.id] ?? []).filter((source) => source.id !== saved.id && source.infoHash !== saved.infoHash), saved] }));
   }
   async function removeCustomSource(id: number) {
     if (!selectedAnime || !isTauriAvailable()) return;
     await invoke<boolean>("remove_custom_source", { animeId: selectedAnime.id, id });
     setCustomSourcesByMedia((current) => ({ ...current, [selectedAnime.id]: (current[selectedAnime.id] ?? []).filter((source) => source.id !== id) }));
   }
+
+  async function seasonForAnime(anime: AnimeMedia): Promise<number> {
+    const mapped = entrySeasonByMedia[anime.id];
+    if (mapped != null) return mapped;
+    const englishSeason = anime.title.english ? extractSeasonNumber(anime.title.english) : 1;
+    const fallback = englishSeason !== 1 ? englishSeason : extractSeasonNumber(anime.title.romaji ?? "");
+    if (!isTauriAvailable()) return fallback;
+    try {
+      const resolved = await invoke<number | null>("get_entry_season", { title: anime.title, synonyms: anime.synonyms ?? [], anilistId: anime.id });
+      return resolved ?? fallback;
+    } catch (err) {
+      console.warn("[attach-custom-source] season lookup failed", { animeId: anime.id, err: String(err) });
+      return fallback;
+    }
+  }
+
+  async function attachCustomSource(source: {
+    anime: AnimeMedia;
+    input: string;
+    title: string;
+    kind: "episode" | "pack";
+    season: number;
+    episodeStart: number | null;
+    episodeEnd: number | null;
+    sourceId?: number;
+    sourceAnimeId?: number;
+  }) {
+    if (!isTauriAvailable()) throw new Error("Custom sources are available in the desktop app.");
+    knownAnime.current.set(source.anime.id, source.anime);
+    const saved = source.sourceId != null && source.sourceAnimeId != null
+      ? await invoke<CustomSource | null>("update_custom_source", {
+          animeId: source.sourceAnimeId,
+          id: source.sourceId,
+          targetAnimeId: source.anime.id,
+          input: source.input,
+          title: source.title,
+          kind: source.kind,
+          season: source.season,
+          episodeStart: source.episodeStart,
+          episodeEnd: source.episodeEnd,
+        })
+      : await invoke<CustomSource>("save_custom_source", {
+          animeId: source.anime.id,
+          input: source.input,
+          title: source.title,
+          kind: source.kind,
+          season: source.season,
+          episodeStart: source.episodeStart,
+          episodeEnd: source.episodeEnd,
+        });
+    if (!saved) throw new Error("The custom source no longer exists.");
+    setCustomSourcesByMedia((current) => {
+      const next = { ...current };
+      if (source.sourceId != null && source.sourceAnimeId != null && source.sourceAnimeId !== source.anime.id) {
+        next[source.sourceAnimeId] = (next[source.sourceAnimeId] ?? []).filter((item) => item.id !== source.sourceId);
+      }
+      next[source.anime.id] = [...(next[source.anime.id] ?? []).filter((item) => item.id !== saved.id && item.infoHash !== saved.infoHash), saved];
+      return next;
+    });
+  }
+
+  const attachmentDialog = attachmentInput !== null && <AttachCustomSourceDialog
+    input={attachmentInput}
+    source={attachmentSource ?? undefined}
+    seasonForAnime={seasonForAnime}
+    onClose={() => { setAttachmentInput(null); setAttachmentSource(null); }}
+    onAttach={attachCustomSource}
+  />;
 
   const settingsPanel = settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} playbackActive={route.name === "anime" && route.watch != null} showUpdates={settingsShowUpdates} />;
   const settingsButton = (
@@ -971,15 +1110,16 @@ function App() {
     anime={directPlay.anime}
     episodeKey="Custom source"
     progressKey="Custom source"
-    episode={null}
-    season={null}
+    episode={directPlay.episode}
+    season={directPlay.season}
     releases={[directPlay.source]}
+    onAttachCustomSource={(release) => { setAttachmentSource(null); setAttachmentInput(release.magnet); }}
     onClose={() => setDirectPlay(null)}
     onNext={null}
     nextLabel={null}
     playlist={[]}
     onSelectEpisode={() => {}}
-  /></main>;
+  />{attachmentDialog}</main>;
 
   if (route.name === "anime" && selectedAnime?.id !== route.id) {
     // The route's anime is still loading (reload / back-forward into it).
@@ -1015,6 +1155,7 @@ function App() {
           customSources={customSources}
           onSaveCustomSource={saveCustomSource}
           onRemoveCustomSource={removeCustomSource}
+          onMoveCustomSource={(source) => { setAttachmentSource(source); setAttachmentInput(source.magnet); }}
           entrySeason={entrySeasonByMedia[selectedAnime.id] ?? null}
           sourcesLoading={sourcesLoading}
           sourcesCount={sources.length}
@@ -1028,6 +1169,7 @@ function App() {
           onRemoveFromLibrary={() => handleRemoveFromLibrary(selectedAnime.id)}
         />
         {settingsPanel}
+        {attachmentDialog}
       </main>
     );
   }
@@ -1090,7 +1232,7 @@ function App() {
           {dropdownOpen && query.trim() && (
             <div class="search-results-wrap" id="search-results" ref={resultsWrapRef}>
               {isCustomMagnetInput(query) && <ul class="search-results">
-                <li><button class="search-result-row" onMouseDown={(e) => e.preventDefault()} onClick={() => void playCustomMagnet(query)}>
+                <li><button class="search-result-row" onMouseDown={(e) => e.preventDefault()} onContextMenu={(event) => showCustomMagnetContextMenu(event, query)} onClick={() => void playCustomMagnet(query)}>
                   <span class="result-title">Play magnet</span><span class="result-status">Open this torrent directly</span>
                 </button></li>
                 {directMagnetError && <li><div class="search-status search-status-error" role="alert">{directMagnetError}</div></li>}
@@ -1168,6 +1310,7 @@ function App() {
         onRemoveFromLibrary={handleRemoveFromLibrary}
       />
       {settingsPanel}
+      {attachmentDialog}
     </main>
   );
 }

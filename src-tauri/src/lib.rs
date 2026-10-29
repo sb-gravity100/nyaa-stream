@@ -2204,6 +2204,7 @@ pub fn run() {
             magnet::inspect_custom_magnet,
             magnet::list_custom_sources,
             magnet::save_custom_source,
+            magnet::update_custom_source,
             magnet::remove_custom_source,
             save_frame_thumbnail,
             search_torrents,

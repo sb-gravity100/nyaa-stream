@@ -62,7 +62,7 @@ export interface CustomSource {
   season: number | null;
   episodeStart: number | null;
   episodeEnd: number | null;
-  files: { path: string; size: number; index: number; season: number | null; episode: number | null; isVideo: boolean }[];
+  files: { path: string; size: number; index: number; season: number | null; episode: number | null; episodeRange?: [number, number] | null; isVideo: boolean; label?: EpisodeLabel | null }[];
   createdAt: number;
   updatedAt: number;
 }

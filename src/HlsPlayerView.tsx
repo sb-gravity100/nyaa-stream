@@ -131,6 +131,10 @@ interface Props {
    /** The anime's episode groups, for the side playlist. */
    playlist: PlaylistItem[];
    onSelectEpisode: (key: string) => void;
+   onRemoveCustomSource?: (id: number) => Promise<void>;
+   onEditCustomSource?: (id: number) => void;
+   onMoveCustomSource?: (id: number) => void;
+   onAttachCustomSource?: (source: NyaaResult) => void;
 }
 
 type Menu = "subtitles" | "sources" | "stats" | null;
@@ -238,6 +242,10 @@ export function HlsPlayerView({
    nextLabel,
    playlist,
    onSelectEpisode,
+   onRemoveCustomSource,
+   onEditCustomSource,
+   onMoveCustomSource,
+   onAttachCustomSource,
 }: Props) {
    const settings = useSettings();
    const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -261,12 +269,23 @@ export function HlsPlayerView({
 
    function showSourceContextMenu(event: MouseEvent, release: NyaaResult) {
       const group = releaseGroup(release);
-      console.debug("[hls-player] open source context menu", { animeId: anime.id, hasGroup: group !== null, hasNyaaPage: !!release.view_url });
+      const customSourceId = release.view_url?.match(/^custom:\/\/(\d+)$/)?.[1];
+      const customMagnet = release.view_url?.startsWith("custom://") || release.view_url?.startsWith("magnet://") || false;
+      const hasNyaaPage = !!release.view_url && !customMagnet;
+      console.debug("[hls-player] open source context menu", { animeId: anime.id, customSource: !!customSourceId, customMagnet, hasGroup: group !== null, hasNyaaPage });
       openContextMenu(event, [
          { label: "Play this source", action: () => { setSelectedRelease(release); setMenu(null); } },
          { label: "Copy magnet", action: () => { setMenu(null); return copyToClipboard(release.magnet, "magnet"); } },
-         { label: "Open on nyaa.si", disabled: !release.view_url, action: () => { setMenu(null); return openNyaaPage(release.view_url); } },
-         { label: "Always prefer this group", disabled: !group, action: () => {
+         ...(customSourceId ? [
+            { label: "Edit custom source", disabled: !onEditCustomSource, action: () => { setMenu(null); onEditCustomSource?.(Number(customSourceId)); } },
+            { label: "Move to another anime…", disabled: !onMoveCustomSource, action: () => { setMenu(null); onMoveCustomSource?.(Number(customSourceId)); } },
+            { label: "Remove custom source", disabled: !onRemoveCustomSource, action: async () => { await onRemoveCustomSource?.(Number(customSourceId)); } },
+         ] : customMagnet ? [
+            { label: "Attach to episode…", disabled: !onAttachCustomSource, action: () => { setMenu(null); onAttachCustomSource?.(release); } },
+         ] : [
+            { label: "Open on nyaa.si", disabled: !hasNyaaPage, action: () => { setMenu(null); return openNyaaPage(release.view_url); } },
+         ]),
+         { label: "Always prefer this group", disabled: !group || customMagnet, action: () => {
             if (!group) return;
             console.info("[hls-player] preferred group selected", { animeId: anime.id, group });
             setPreferredGroup(anime.id, group);

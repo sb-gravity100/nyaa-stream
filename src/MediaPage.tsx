@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { invoke } from "@tauri-apps/api/core";
 import { displayTitle, formatSeason, isMovie, type AnimeMedia, type CustomSource, type KitsuMetadata, type NyaaResult, type TorrentDetails } from "./types";
-import { episodeLabelText, labelOf, type EpisodeLabel } from "./episodeParser";
+import { episodeLabelText, extractSeasonNumber, labelOf, type EpisodeLabel } from "./episodeParser";
 import { PlayerView } from "./PlayerView";
 import { progressForAnime, setWatched, subscribeProgress, type ProgressEntry } from "./watchProgress";
 import { BackIcon, CheckIcon, PlayIcon, PlusIcon } from "./icons";
@@ -16,6 +16,18 @@ import { getEpisodeStill, type Artwork } from "./artwork";
 import { useProviderCredentials } from "./providerCredentials";
 
 type SourceGroup = [string, { label: EpisodeLabel; releases: NyaaResult[] }];
+const CUSTOM_EXTRA_FILE = /\b(OVA|OAD|ONA|SP|Specials?|NCOP|NCED|Extras?|PV|Trailer)\d*\b/i;
+
+function isCustomExtraFile(file: CustomSource["files"][number]): boolean {
+  return CUSTOM_EXTRA_FILE.test(file.path) || file.label?.kind === "special" || (file.label?.kind === "batch" && file.label.extras === true);
+}
+
+function episodesForCustomFile(file: CustomSource["files"][number]): number[] {
+  if (file.episode != null) return [file.episode];
+  const range = file.episodeRange ?? (file.label?.kind === "batch" ? file.label.episodeRange : null);
+  if (!range || range[1] < range[0]) return [];
+  return Array.from({ length: Math.min(range[1] - range[0] + 1, 1000) }, (_, index) => range[0] + index);
+}
 
 /** The rows AniList/Kitsu know as real episodes: numbered episodes within
  * the episode count (AniList's, or Kitsu's when it's the fallback source).
@@ -52,14 +64,17 @@ interface Props {
   onAddToLibrary: () => void;
   onRemoveFromLibrary: () => void;
   customSources: CustomSource[];
-  onSaveCustomSource: (input: string, title: string, kind: "episode" | "pack", season: number | null, start: number | null, end: number | null) => Promise<void>;
+  onSaveCustomSource: (input: string, title: string, kind: "episode" | "pack", season: number | null, start: number | null, end: number | null, sourceId?: number) => Promise<void>;
   onRemoveCustomSource: (id: number) => Promise<void>;
+  onMoveCustomSource: (source: CustomSource) => void;
 }
 
-function CustomSourcePicker({ sources, onSave, onRemove, editSourceId, onEditComplete }: {
+function CustomSourcePicker({ sources, onSave, onRemove, onMove, defaultSeason, editSourceId, onEditComplete }: {
   sources: CustomSource[];
   onSave: Props["onSaveCustomSource"];
   onRemove: Props["onRemoveCustomSource"];
+  onMove: Props["onMoveCustomSource"];
+  defaultSeason: number;
   editSourceId: number | null;
   onEditComplete: () => void;
 }) {
@@ -67,16 +82,18 @@ function CustomSourcePicker({ sources, onSave, onRemove, editSourceId, onEditCom
   const [input, setInput] = useState("");
   const [title, setTitle] = useState("");
   const [kind, setKind] = useState<"episode" | "pack">("pack");
-  const [season, setSeason] = useState("");
+  const [season, setSeason] = useState(String(defaultSeason));
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [editingSourceId, setEditingSourceId] = useState<number | null>(null);
   const [magnetPreview, setMagnetPreview] = useState<{ infoHash: string; name: string | null; trackers: number } | null>(null);
-  const [files, setFiles] = useState<{ path: string; season: number | null; episode: number | null; isVideo: boolean }[]>([]);
+  const [files, setFiles] = useState<CustomSource["files"]>([]);
   function edit(source: CustomSource) {
+    setEditingSourceId(source.id);
     setInput(source.magnet); setTitle(source.title); setKind(source.kind);
-    setSeason(source.season?.toString() ?? ""); setStart(source.episodeStart?.toString() ?? ""); setEnd(source.episodeEnd?.toString() ?? "");
+    setSeason(source.season?.toString() ?? String(defaultSeason)); setStart(source.episodeStart?.toString() ?? ""); setEnd(source.episodeEnd?.toString() ?? "");
     setOpen(true); setError(null); setMagnetPreview({ infoHash: source.infoHash, name: source.title, trackers: 0 }); setFiles(source.files);
   }
   useEffect(() => {
@@ -88,7 +105,8 @@ function CustomSourcePicker({ sources, onSave, onRemove, editSourceId, onEditCom
   async function save(event: Event) {
     event.preventDefault(); setBusy(true); setError(null);
     try {
-      await onSave(input, title, kind, season ? Number(season) : null, start ? Number(start) : null, end ? Number(end) : null);
+      await onSave(input, title, kind, season ? Number(season) : null, start ? Number(start) : null, end ? Number(end) : null, editingSourceId ?? undefined);
+      setEditingSourceId(null);
       setInput(""); setTitle(""); setSeason(""); setStart(""); setEnd("");
     } catch (err) { setError(String(err)); }
     finally { setBusy(false); }
@@ -98,16 +116,22 @@ function CustomSourcePicker({ sources, onSave, onRemove, editSourceId, onEditCom
     try {
       const parsed = await invoke<{ infoHash: string; name: string | null; trackers: number }>("parse_custom_magnet", { input });
       setMagnetPreview(parsed);
-      const inspected = await invoke<{ path: string; season: number | null; episode: number | null; isVideo: boolean }[]>("inspect_custom_magnet", { input });
+      const inspected = await invoke<CustomSource["files"]>("inspect_custom_magnet", { input });
       setFiles(inspected);
-      const videos = inspected.filter((file) => file.isVideo);
-      if (videos.length === 1 && videos[0].episode != null) {
-        setKind("episode"); setSeason(videos[0].season?.toString() ?? ""); setStart(videos[0].episode.toString()); setEnd("");
+      const videos = inspected.filter((file) => file.isVideo && !isCustomExtraFile(file));
+      if (videos.length === 0) throw new Error("No episode video files were found in this magnet.");
+      const singleRange = videos.length === 1 ? episodesForCustomFile(videos[0]) : [];
+      const isPack = videos.length >= 2 || singleRange.length > 1;
+      const seasons = Array.from(new Set(videos.flatMap((file) => file.label && "seasons" in file.label ? file.label.seasons : [])));
+      if (seasons.length === 1) setSeason(String(seasons[0]));
+      if (!isPack) {
+        setKind("episode");
+        const onlyNumber = episodesForCustomFile(videos[0])[0];
+        setStart(onlyNumber?.toString() ?? "");
+        setEnd("");
       } else {
         setKind("pack");
-        const episodes = videos.map((file) => file.episode).filter((episode): episode is number => episode != null).sort((a, b) => a - b);
-        const seasons = Array.from(new Set(videos.map((file) => file.season).filter((value): value is number => value != null)));
-        if (seasons.length === 1) setSeason(String(seasons[0]));
+        const episodes = videos.flatMap(episodesForCustomFile).sort((a, b) => a - b);
         if (episodes.length) { setStart(String(episodes[0])); setEnd(String(episodes[episodes.length - 1])); }
       }
     } catch (err) { setError(err instanceof Error ? err.message : String(err)); }
@@ -118,6 +142,7 @@ function CustomSourcePicker({ sources, onSave, onRemove, editSourceId, onEditCom
       {sources.map((source) => <div class="custom-source-entry" key={source.id}>
         <span>{source.title} · {source.kind}{source.episodeStart != null ? ` · ${source.episodeStart}${source.episodeEnd && source.episodeEnd !== source.episodeStart ? `–${source.episodeEnd}` : ""}` : ""}</span>
         <button class="link-button" onClick={() => edit(source)}>Edit</button>
+        <button class="link-button" onClick={() => onMove(source)}>Move…</button>
         <button class="link-button" onClick={() => void onRemove(source.id)}>Remove</button>
       </div>)}
       <form onSubmit={save} class="custom-source-form">
@@ -131,7 +156,7 @@ function CustomSourcePicker({ sources, onSave, onRemove, editSourceId, onEditCom
         <button class="button button-secondary" disabled={busy}>{busy ? "Saving…" : "Save source"}</button>
       </form>
       {magnetPreview && <p class="custom-source-preview">{magnetPreview.name || magnetPreview.infoHash} · {episodeLabelText(labelOf(undefined, magnetPreview.name || ""))} · {magnetPreview.trackers} trackers</p>}
-      {files.length > 0 && <ul class="custom-source-files">{files.filter((file) => file.isVideo).map((file) => <li key={file.path}>{file.path}{file.episode != null ? ` · S${file.season ?? "?"} E${file.episode}` : " · Batch / unnumbered"}</li>)}</ul>}
+      {files.length > 0 && <ul class="custom-source-files">{files.filter((file) => file.isVideo && !isCustomExtraFile(file)).map((file) => <li key={file.path}>{file.path}{file.episode != null ? ` · S${file.season ?? "?"} E${file.episode}` : file.episodeRange ? ` · E${file.episodeRange[0]}–${file.episodeRange[1]}` : " · Batch / unnumbered"}</li>)}</ul>}
       {error && <p class="error-banner" role="alert">{error}</p>}
     </div>}
   </div>;
@@ -279,6 +304,7 @@ export function MediaPage({
   customSources,
   onSaveCustomSource,
   onRemoveCustomSource,
+  onMoveCustomSource,
 }: Props) {
   const seasonLabel = formatSeason(anime.season, anime.seasonYear);
   const movie = isMovie(anime);
@@ -623,6 +649,11 @@ export function MediaPage({
         setEditCustomSourceId(id);
         onCloseWatch();
       }}
+      onMoveCustomSource={(id) => {
+        const source = customSources.find((candidate) => candidate.id === id);
+        if (source) onMoveCustomSource(source);
+        onCloseWatch();
+      }}
     />
   );
 
@@ -773,8 +804,10 @@ export function MediaPage({
             )}
             <CustomSourcePicker
               sources={customSources}
-              onSave={onSaveCustomSource}
+      onSave={onSaveCustomSource}
               onRemove={onRemoveCustomSource}
+              onMove={onMoveCustomSource}
+              defaultSeason={entrySeason ?? extractSeasonNumber(anime.title.english ?? anime.title.romaji ?? "")}
               editSourceId={editCustomSourceId}
               onEditComplete={() => setEditCustomSourceId(null)}
             />
