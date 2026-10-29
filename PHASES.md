@@ -5,7 +5,7 @@
 - [x] Validate bundled libmpv live hinting changes, plain/ASS switching, 8 standard/high-DPI sizing cases and frontend production build
 - [x] Refresh version and run workspace checks; bump/tag v0.5.10 locally (unpublished)
 - [ ] Visually compare text edges and HLS rendering cost on real playback
-- [ ] Extend bounded 1.5x subtitle supersampling to embedded mpv; current hinting does not meet this requirement. Resolve native-build versus shared-overlay architecture, then verify ASS layout, screenshots/export, GPU compatibility and rendering cost.
+- [~] Native mpv supersampling deferred by SB on 2026-10-29 to v0.7.0; current smoothing changes retained.
 
 ## v0.5.9 — selective ASS subtitle styling
 - [x] Add independently selectable dialogue style fields, retaining existing preferences
@@ -26,6 +26,7 @@
 - [x] Publish all implemented pre-v0.6.0 work as v0.5.8: signed NSIS/MSI installers and updater manifest
 
 ## v0.7.0 — custom Windows libmpv build (planned 2026-10-29)
+- [ ] Extend bounded 1.5x subtitle supersampling to embedded mpv (deferred by SB on 2026-10-29). Resolve native-build versus shared-overlay architecture; preserve video resolution and verify ASS layout/animation, screenshots/export, GPU compatibility and rendering cost.
 - [ ] Record current bundled libmpv identity/options and a baseline for ASS
       edge quality, E-AC-3 playback, seek latency, and hardware decoding
 - [x] Inspect `msedgewebview2.DMP` structure: about 2.56 GiB captured and
