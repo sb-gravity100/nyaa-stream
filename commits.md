@@ -1,3 +1,11 @@
+### `41a95d3` · 2026-10-29 · chore: release v0.5.8
+- `CHANGELOG.md`
+- `FILE_INDEX.md`
+- `PHASES.md`
+- `PLAN.md`
+- `src/PlayerView.tsx`
+- `src/changelog.ts`
+
 ### `1798c5b` · 2026-10-29 · docs: record version branch convention
 - `PLAN.md`
 
