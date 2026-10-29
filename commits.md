@@ -1,3 +1,15 @@
+### `975469c` · 2026-10-29 · docs: organize project planning
+- `FILE_INDEX.md`
+- `PHASES.md`
+- `PLAN.md`
+- `README.md`
+- `docs/planning/ARCHITECTURE.md`
+- `docs/planning/MATCHING.md`
+- `docs/planning/PLAYBACK.md`
+- `docs/planning/RELEASING.md`
+- `docs/planning/ROADMAP.md`
+- `docs/planning/V0_6_0.md`
+
 ### `cb824ec` · 2026-10-29 · docs: plan v0.6.0 update experience
 - `PLAN.md`
 - `PHASES.md`
