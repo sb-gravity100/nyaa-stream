@@ -1,3 +1,5 @@
+### `d38dc8b` · 2026-10-30 · fix(test): remove duplicate torrent detail fields
+- `crates/nyaa-client/src/store.rs`
 ### `0a3b272` · 2026-10-30 · docs: record v0.6.0 updater defaults
 - `PLAN.md`
 - `PHASES.md`
