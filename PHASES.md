@@ -826,7 +826,7 @@ policy remains unchanged.
       - [x] Seek-bar hover shows the frame above the time tooltip
             (debounced, cached; time only when not downloaded)
       - [x] PLAN.md/FILE_INDEX.md sync
-      - [ ] Decode frames from disjoint verified ranges beyond missing-piece gaps
+      - [x] Keep disjoint verified ranges beyond missing-piece gaps unavailable in v0.6.0; preview only the contiguous verified prefix, as specified
       - [ ] Verify partially downloaded files, arbitrary seeks, resume retention,
             buffering pauses and both mpv/HLS surfaces on Windows
 - [~] Background update checks and custom installation (v0.6.0, requested
