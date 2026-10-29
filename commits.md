@@ -1,3 +1,11 @@
+### `8198f77` · 2026-10-29 · Merge branch `work/v0.6-artwork`
+- `crates/artwork-client/Cargo.toml`
+- `crates/artwork-client/src/lib.rs`
+- `PLAN.md`
+- `PHASES.md`
+- `FILE_INDEX.md`
+- `docs/planning/V0_6_0.md`
+
 ### `0513336` · 2026-10-29 · Merge branch `work/v0.6-magnets`
 - `crates/nyaa-client/src/magnet.rs`
 - `crates/nyaa-client/src/store.rs`
