@@ -1,3 +1,10 @@
+### `2771b18` · 2026-10-30 · feat(installer): add branded custom NSIS setup page
+- `docs/prototypes/installer/FEASIBILITY.md`
+- `scripts/make-nsis-art.ps1`
+- `src-tauri/installer/installer.nsi`
+- `src-tauri/installer/nsis-header.bmp`
+- `src-tauri/installer/nsis-sidebar.bmp`
+- `src-tauri/tauri.conf.json`
 ### `d695324` · 2026-10-30 · fix: preserve resume data before updater restart
 - `src-tauri/src/lib.rs`
 - `src/updater.ts`
