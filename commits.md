@@ -1,3 +1,6 @@
+### `5fc05ca` · 2026-10-30 · feat: edit attached sources from player
+- `src/MediaPage.tsx`
+- `src/PlayerView.tsx`
 ### `5bb557d` · 2026-10-30 · docs: record signed installer build
 - `PHASES.md`
 - `PLAN.md`
