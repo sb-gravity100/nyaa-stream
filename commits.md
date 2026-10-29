@@ -1,3 +1,7 @@
+### `c24b250` · 2026-10-29 · docs: plan custom mpv build for v0.10.0
+- `PLAN.md`
+- `PHASES.md`
+
 ### `37be1f3` · 2026-10-29 · chore: finalize v0.5.8 subtitle blur
 - `CHANGELOG.md`
 - `FILE_INDEX.md`
