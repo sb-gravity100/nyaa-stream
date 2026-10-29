@@ -83,6 +83,7 @@ export function AttachCustomSourceDialog({ input: initialInput, source, seasonFo
   const titleLabel = useMemo(() => parsedTitle ? inferredLabel(parsedTitle) : { kind: "unknown" } as const, [parsedTitle]);
   const eligibleFiles = files?.filter((file) => file.isVideo && !isExtra(file)) ?? [];
   const inferredPack = eligibleFiles.length >= 2 || eligibleFiles.some((file) => episodesInFile(file).length > 1);
+  const hasNumberedFiles = eligibleFiles.some((file) => episodesInFile(file).length > 0);
   const packRangeInvalid = episodeStart === null !== (episodeEnd === null)
     || (episodeStart !== null && episodeEnd !== null && (!Number.isInteger(episodeStart) || !Number.isInteger(episodeEnd) || episodeStart < 1 || episodeEnd < episodeStart));
 
@@ -220,6 +221,7 @@ export function AttachCustomSourceDialog({ input: initialInput, source, seasonFo
         <div class="attach-source-status" aria-live="polite">
           {inspecting ? "Inspecting torrent metadata…" : parsed && files ? `${eligibleFiles.length} eligible video files · ${parsed.infoHash.slice(0, 12)}…` : inspectionError ? `Inspection failed: ${inspectionError}` : "Enter a magnet link or info hash."}
         </div>
+        {files && eligibleFiles.length === 0 && <div class="attach-source-error">No episode video files were found. Extras and specials are excluded.</div>}
 
         <label class="attach-source-field">Search AniList
           <input value={query} onInput={(event) => { setQuery((event.currentTarget as HTMLInputElement).value); setAnime(null); }} placeholder="Anime title" autocomplete="off" />
@@ -255,6 +257,7 @@ export function AttachCustomSourceDialog({ input: initialInput, source, seasonFo
         </div>}
         {titleLabel.kind === "episode" && !source && <div class="attach-source-status">Episode {titleLabel.number} inferred from the torrent name.</div>}
         {inferredPack && !source && <div class="attach-source-status">Pack inferred from video files; extras are excluded.</div>}
+        {kind === "pack" && eligibleFiles.length > 0 && !hasNumberedFiles && <div class="attach-source-error">No episode numbers were found in the files. This pack will remain on the Batch row.</div>}
         {saveError && <div class="attach-source-error">Couldn’t attach source: {saveError}</div>}
         <div class="attach-source-actions">
           <button type="button" class="button button-secondary" onClick={onClose}>Cancel</button>
