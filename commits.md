@@ -1,3 +1,13 @@
+### `a99675f` · 2026-10-29 · feat: add shared context menu foundation
+- `src/contextMenuStore.ts`
+- `src/ContextMenu.tsx`
+- `src/ContextMenu.css`
+- `src/main.tsx`
+- `src/router.ts`
+- `docs/planning/V0_6_0.md`
+- `FILE_INDEX.md`
+- `PHASES.md`
+
 ### `52013dc` · 2026-10-29 · feat: add native clipboard support
 - `package.json`
 - `package-lock.json`
