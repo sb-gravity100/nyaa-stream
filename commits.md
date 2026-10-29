@@ -1,3 +1,16 @@
+### `c91efcb` · 2026-10-30 · Merge branch `work/v0.6-thumbnails`
+- `crates/torrent-engine/src/media.rs`
+- `crates/torrent-engine/src/lib.rs`
+- `src-tauri/src/thumbnail_build.rs`
+- `src-tauri/src/lib.rs`
+- `src/MediaPage.tsx`
+- `src/PlayerView.tsx`
+- `src/HlsPlayerView.tsx`
+- `src/torrentThumbnail.ts`
+- `FILE_INDEX.md`
+- `PHASES.md`
+- `docs/planning/V0_6_0.md`
+
 ### `8ad8969` · 2026-10-30 · feat: add artwork provider settings and home fallbacks
 - `crates/artwork-client/src/lib.rs`
 - `src-tauri/Cargo.toml`
