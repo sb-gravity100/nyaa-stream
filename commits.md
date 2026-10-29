@@ -1,3 +1,6 @@
+### `d695324` · 2026-10-30 · fix: preserve resume data before updater restart
+- `src-tauri/src/lib.rs`
+- `src/updater.ts`
 ### `8cf6f60` · 2026-10-30 · fix: handle custom sources in context menus
 - `src/ContextMenu.css`
 - `src/MediaPage.tsx`
