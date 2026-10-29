@@ -910,6 +910,67 @@ INSERT INTO `toto_anidb_tvdb` (`anidbid`, `tvdbid`, `defaulttvdbseason`, `episod
         assert!(store.details(8).await.unwrap().is_none());
     }
 
+    fn custom_source_input(anime_id: i64, info_hash: &str, title: &str, kind: &str) -> CustomSourceInput {
+        CustomSourceInput {
+            anime_id,
+            info_hash: info_hash.into(),
+            magnet: format!("magnet:?xt=urn:btih:{info_hash}"),
+            title: title.into(),
+            kind: kind.into(),
+            season: Some(2),
+            episode_start: Some(1),
+            episode_end: Some(3),
+            files: vec![CustomSourceFile {
+                path: "Season 2/Show - 01-03.mkv".into(),
+                size: 1234,
+                index: 4,
+                season: Some(2),
+                episode: Some(1),
+                episode_range: Some([1, 3]),
+                is_video: true,
+                label: None,
+            }],
+        }
+    }
+
+    #[tokio::test]
+    async fn custom_sources_migrate_move_merge_persist_and_remove() {
+        let path = temp_db("custom-source-migration");
+        write_release_database(&path, &[("1_2".into(), release(77, "Legacy release", 5))]).unwrap();
+        let store = Store::open(&path).unwrap();
+
+        let original = store.save_custom_source(custom_source_input(10, &"a".repeat(40), "Original", "episode")).await.unwrap();
+        let moved = store.update_custom_source(
+            10,
+            original.id,
+            20,
+            custom_source_input(20, &"b".repeat(40), "Moved", "pack"),
+        ).await.unwrap().unwrap();
+        assert_eq!((moved.id, moved.anime_id, moved.title.as_str()), (original.id, 20, "Moved"));
+        assert_eq!(moved.files[0].episode_range, Some([1, 3]));
+
+        let duplicate = store.save_custom_source(custom_source_input(20, &"c".repeat(40), "Duplicate", "episode")).await.unwrap();
+        let merged = store.update_custom_source(
+            20,
+            moved.id,
+            20,
+            custom_source_input(20, &"c".repeat(40), "Merged pack", "pack"),
+        ).await.unwrap().unwrap();
+        assert_eq!((merged.id, merged.title.as_str(), merged.kind.as_str()), (duplicate.id, "Merged pack", "pack"));
+        assert!(store.custom_sources(10).await.unwrap().is_empty());
+        assert_eq!(store.custom_sources(20).await.unwrap().len(), 1);
+        assert!(store.update_custom_source(10, original.id, 20, custom_source_input(20, &"d".repeat(40), "Wrong owner", "episode")).await.unwrap().is_none());
+
+        drop(store);
+        let reopened = Store::open(&path).unwrap();
+        let persisted = reopened.custom_sources(20).await.unwrap();
+        assert_eq!((persisted.len(), persisted[0].id, persisted[0].title.as_str()), (1, duplicate.id, "Merged pack"));
+        assert_eq!(persisted[0].files[0].season, Some(2));
+        assert!(reopened.remove_custom_source(20, duplicate.id).await.unwrap());
+        assert!(!reopened.remove_custom_source(20, duplicate.id).await.unwrap());
+        assert!(reopened.custom_sources(20).await.unwrap().is_empty());
+    }
+
     #[test]
     fn old_details_json_still_deserializes() {
         let old: TorrentDetails = serde_json::from_str(r#"{"submitter":"x","is_batch":false,"file_count":1}"#).unwrap();
