@@ -118,6 +118,7 @@ interface Props {
    /** The anime's episode groups, for the side playlist. */
    playlist: PlaylistItem[];
    onSelectEpisode: (key: string) => void;
+   onRemoveCustomSource?: (id: number) => Promise<void>;
 }
 
 type Menu = "subtitles" | "sources" | "stats" | null;
@@ -290,6 +291,7 @@ function MpvPlayerView({
    nextLabel,
    playlist,
    onSelectEpisode,
+   onRemoveCustomSource,
 }: Props) {
    const settings = useSettings();
    const videoRef = useRef<MpvVideo | null>(null);
@@ -453,19 +455,24 @@ function MpvPlayerView({
 
    function showSourceContextMenu(event: MouseEvent, release: NyaaResult) {
       const group = releaseGroup(release);
-      console.debug("[player] open source context menu", { animeId: anime.id, hasGroup: group !== null, hasNyaaPage: !!release.view_url });
-      openContextMenu(event, [
+      const customSourceId = release.view_url?.match(/^custom:\/\/(\d+)$/)?.[1];
+      console.debug("[player] open source context menu", { animeId: anime.id, customSource: !!customSourceId, hasGroup: group !== null, hasNyaaPage: !!release.view_url && !customSourceId });
+      const items = [
          { label: "Play this source", action: () => switchSource(release) },
          { label: "Copy magnet", action: () => { setMenu(null); return copyToClipboard(release.magnet, "magnet"); } },
-         { label: "Open on nyaa.si", disabled: !release.view_url, action: () => { setMenu(null); return openNyaaPage(release.view_url); } },
-         { label: "Always prefer this group", disabled: !group, action: () => {
+         ...(customSourceId ? [{ label: "Remove custom source", disabled: !onRemoveCustomSource, action: async () => {
+            console.info("[player] remove custom source requested", { animeId: anime.id, sourceId: Number(customSourceId) });
+            await onRemoveCustomSource?.(Number(customSourceId));
+         } }] : [{ label: "Open on nyaa.si", disabled: !release.view_url, action: () => { setMenu(null); return openNyaaPage(release.view_url); } }]),
+         { label: "Always prefer this group", disabled: !group || !!customSourceId, action: () => {
             if (!group) return;
             console.info("[player] preferred group selected", { animeId: anime.id, group });
             setPreferredGroup(anime.id, group);
             setPreferredGroupState(group);
             setMenu(null);
          } },
-      ]);
+      ];
+      openContextMenu(event, items);
    }
 
    function showPlayerContextMenu(event: MouseEvent) {

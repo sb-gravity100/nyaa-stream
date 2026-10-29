@@ -609,6 +609,7 @@ export function MediaPage({
       nextLabel={next ? next[0] : null}
       playlist={playlist}
       onSelectEpisode={selectFromPlayer}
+      onRemoveCustomSource={onRemoveCustomSource}
     />
   );
 
