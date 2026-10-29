@@ -616,6 +616,9 @@ by an app-styled HTML menu whose items depend on what was right-clicked.
 
 ## Release plan (decided 2026-09-29)
 
+**v0.5.10 subtitle edge smoothness (2026-10-29).** Target jagged text edges: use light FreeType hinting for plain subtitles in embedded mpv and clip export, but no hinting for styled ASS to retain authored positioning/animation. HLS renders subtitle coverage at 1.5x output device-pixel size up to a 2160px supersampling threshold; larger outputs retain native resolution. Keep video scaling and the requested `blend-subtitles=yes` unchanged. Validate track-switch hinting reset, HLS sizing at standard/high DPI, frontend build, and workspace checks. Visual playback acceptance remains required.
+
+
 **v0.5.9 selective ASS styling (requested 2026-10-29).** Also set embedded playback to `blend-subtitles=yes` and `scale=ewa_lanczos`, as requested by SB; keep the existing scaler blur, downscaler and subtitle blur. Use the subtitle-settings screenshot as a reference: extend the existing opt-in dialogue restyle with independent font/weight, size, text-color, outline/background/shadow, and bottom-margin controls. Preserve existing defaults, authored event tags/animations, and non-dialogue styles. Apply the same field selection in embedded mpv, HLS/libass, and clip export. Keep the current rendering pipeline; the screenshot does not establish a renderer-speed or quality benefit. Validate selective preservation and parity, then bump/tag v0.5.9.
 
 

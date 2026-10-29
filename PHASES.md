@@ -1,5 +1,9 @@
 # PHASES.md — nyaa-stream
 
+## v0.5.10 — subtitle edge smoothness
+- [ ] Add plain-text light hinting with ASS reset and bounded HLS supersampling
+- [ ] Validate rendering options, sizing, frontend build and workspace; bump/tag locally
+
 ## v0.5.9 — selective ASS subtitle styling
 - [x] Add independently selectable dialogue style fields, retaining existing preferences
 - [x] Apply matching field selection in mpv, HLS/libass, and clip export
