@@ -640,16 +640,40 @@ with no canonical-title changes. The app's 39 active title-matching tests
 pass, including the fixture at its pre-port 118 wrongly kept Mushoku S1
 releases; the first draft's spaced season-range overmatch was removed.
 
+**v0.10.0 custom Windows libmpv build (planned 2026-10-29).** Replace the
+opaque bundled player build with a reproducible, project-maintained build of
+upstream mpv/libmpv and its FFmpeg, libass, and libplacebo dependencies. Pin
+each source revision and record build options. The linked `mpv-build` scripts
+are Linux-focused; use them as a source-selection/options reference, and base
+the Windows build on mpv's documented Windows build workflow or a maintained
+Windows cross-toolchain after a small build feasibility spike. Keep the
+existing vcpkg FFmpeg build for the HLS pipeline separate unless a later
+measured design proves safe to consolidate.
+
+Use PotPlayer only as a source of documented feature ideas, not as code or
+binary input. Implement improvements through upstream mpv/FFmpeg/libass/
+libplacebo features or independently authored patches: keep ASS antialiasing
+and subtitle processing isolated from video scaling so detail is retained;
+verify E-AC-3 decoding with known samples; measure seek latency against the
+current DLL before tuning; and confirm hardware-decoding paths retain a
+software fallback. Add build identity and selected decoder/hwdec context to
+logs without logging private paths or credentials. Ship required license
+notices and corresponding source or source-offer materials for the exact
+distributed build. Acceptance compares old and new DLLs on the same ASS,
+E-AC-3, seeking, and hardware-decoding cases, and confirms the existing
+embedded-player ABI and HLS fallback still work.
+
 Three published releases: **v0.3.2** (the playback fixes) as soon as it
 passes a live test, **v0.4.0** (splash/title bar, download cache, resume
 buffer, contact and send logs, and the sbtl torrent engine), then **v1.0.0** (the stable Windows release
-after v0.8.0). **v0.5.0 is also published** (decided 2026-10-13: it bundles the
+after v0.10.0). **v0.5.0 is also published** (decided 2026-10-13: it bundles the
 unreleased v0.4.3 season-aware matching and the v0.4.4 AnimeTosho dataset /
 Import Tosho Data / Settings modal (the v0.4.5 custom magnet paste moved to
 v0.6.0 the same day), so the old 0.4.3-0.4.5 numbers are never released; the old v0.5.0 context-menu
 milestone merged into v0.6.0). The milestones in between - v0.6.0 (context
 menus + custom magnet paste + build thumbnails) → v0.6.1 (learned release-to-entry matcher) → v0.7.0 (HD banners) → v0.8.0 (seek preview) → v0.9.0
-(navigation/home rehaul) → v0.9.1 (Discover) - are each
+(navigation/home rehaul) → v0.9.1 (Discover) → v0.10.0 (custom Windows libmpv
+build) - are each
 bumped (`npm run bump`) and tagged **locally only**, never pushed. Commits
 are pushed with plain `git push` (no tags); `npm run release` pushes only
 the tag it publishes. Installs update 0.3.1 → 0.3.2 → 0.4.0 → 1.0.0 (v1.0.0 ships x86_64 and 32-bit

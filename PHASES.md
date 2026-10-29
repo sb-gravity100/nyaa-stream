@@ -11,6 +11,25 @@
 - [x] Sync FILE_INDEX and CHANGELOG
 - [ ] Bump and tag v0.6.0 locally with the rest of the milestone
 
+## v0.10.0 — custom Windows libmpv build (planned 2026-10-29)
+- [ ] Record current bundled libmpv identity/options and a baseline for ASS
+      edge quality, E-AC-3 playback, seek latency, and hardware decoding
+- [ ] Feasibility spike: compare mpv's documented Windows build workflow
+      with a maintained Windows cross-toolchain; treat mpv-build as a
+      Linux-focused source/options reference
+- [ ] Pin mpv, FFmpeg, libass, and libplacebo source revisions and create a
+      reproducible x64 `libmpv-2.dll` build with license/source materials
+- [ ] Preserve the existing HLS FFmpeg build separately unless measurements
+      support a safe consolidation
+- [ ] Implement subtitle AA/scaling through upstream features or original
+      patches, keeping subtitle processing isolated from video scaling
+- [ ] Verify E-AC-3 samples and decoder diagnostics; tune seeks only after
+      comparing measured latency with the current bundled DLL
+- [ ] Verify hardware decode and software fallback on supported Windows GPUs
+- [ ] Integrate the candidate DLL and check existing embedded-player ABI,
+      torrent playback, screenshots, and HLS fallback
+- [ ] Sync docs, bump/tag v0.10.0 locally on `release/0.10.0`
+
 ## v0.5.5 — Polish fixes
 - [x] Remove the reserved title-bar space in fullscreen; keep the home app bar visible
 - [x] Write debug-build logs to the process working directory
