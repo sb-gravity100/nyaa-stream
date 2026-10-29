@@ -1,3 +1,11 @@
+### `c5f4661` · 2026-10-29 · fix: smooth subtitle text edges
+- `src/subtitles.ts`
+- `src/assRenderer.ts`
+- `src/changelog.ts`
+- `CHANGELOG.md`
+- `FILE_INDEX.md`
+- `PHASES.md`
+
 ### `9c81c74` · 2026-10-29 · docs: plan subtitle edge smoothing
 - `PLAN.md`
 - `PHASES.md`
