@@ -1,3 +1,6 @@
+### `4dfdfcf` · 2026-10-29 · docs: record v0.5.8 release prep
+- `PHASES.md`
+
 ### `272037f` · 2026-10-29 · chore: release v0.5.8
 - `CHANGELOG.md`
 - `PHASES.md`
