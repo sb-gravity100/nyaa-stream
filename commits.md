@@ -1,3 +1,8 @@
+### `7eaa57a` · 2026-10-30 · docs: sync v0.6.0 implementation status
+- `FILE_INDEX.md`
+- `PHASES.md`
+- `PLAN.md`
+- `docs/planning/V0_6_0.md`
 ### `2771b18` · 2026-10-30 · feat(installer): add branded custom NSIS setup page
 - `docs/prototypes/installer/FEASIBILITY.md`
 - `scripts/make-nsis-art.ps1`
