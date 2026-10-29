@@ -1,3 +1,7 @@
+### `612ce7b` · 2026-10-29 · fix: measure seek traces at playback restart
+- `src-tauri/src/load_trace.rs`
+- `src/PlayerView.tsx`
+
 ### `b72547a` · 2026-10-29 · fix: split oversized nyaa search expressions
 - `src-tauri/src/title_match.rs`
 - `src-tauri/src/lib.rs`
