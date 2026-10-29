@@ -16,7 +16,8 @@ pub const FANART_API_KEY_URL: &str = "https://fanart.tv/get-an-api-key/";
 pub const TMDB_ATTRIBUTION: &str = "This product uses the TMDB API but is not endorsed or certified by TMDB.";
 
 /// Optional user-entered credentials. Never derive Debug: values are secrets.
-#[derive(Clone, Default)]
+#[derive(Clone, Default, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ProviderCredentials {
     pub tmdb_read_access_token: Option<String>,
     pub fanart_api_key: Option<String>,

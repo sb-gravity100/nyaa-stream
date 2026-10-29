@@ -1,4 +1,5 @@
 mod anime_lists;
+mod artwork;
 mod cache;
 mod download_cache;
 mod franchise_cache;
@@ -1932,6 +1933,8 @@ pub fn run() {
             capture_torrent_thumbnail,
             cached_torrent_thumbnail,
             build_view_page_thumbnail,
+            artwork::get_artwork,
+            artwork::get_episode_still,
             magnet::parse_custom_magnet,
             magnet::inspect_custom_magnet,
             magnet::list_custom_sources,

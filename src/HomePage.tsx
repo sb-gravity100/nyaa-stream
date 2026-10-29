@@ -5,12 +5,15 @@ import { PlayIcon, SearchIcon } from "./icons";
 import { cachedTorrentThumbnail, subscribeFrameSaved } from "./torrentThumbnail";
 import { useEnhancedImage } from "./enhanceImage";
 import { copyToClipboard, openAniListPage, openContextMenu } from "./contextMenuStore";
+import { getEpisodeStill, type Artwork } from "./artwork";
+import { useProviderCredentials } from "./providerCredentials";
 
 interface Props {
   library: AnimeMedia[];
   latestEpisodes: AiringEntry[];
   latestEpisodesLoading: boolean;
   kitsuByMedia: Record<number, KitsuMetadata | null>;
+  artworkByMedia: Record<number, Artwork>;
   torrentThumbnails: Record<string, string | null>;
   onSelectAnime: (anime: AnimeMedia) => void;
   onSelectEpisode: (anime: AnimeMedia, episode: number) => void;
@@ -70,6 +73,7 @@ interface Featured {
   reason: string;
   anime: AnimeMedia;
   art: string | null;
+  logo: string | null;
   meta: string;
   progress: number | null;
   action: string;
@@ -136,9 +140,9 @@ function Hero({
       {art && <img key={`in-${anime.id}`} class={`home-hero-art${slide.current ? ` slide-in-${slide.current.dir}` : ""}`} src={art} alt="" />}
       <div class="home-hero-body" key={anime.id} data-slide={slide.current?.dir}>
         <div class="home-hero-reason">{featured.reason}</div>
-        <h1 class={`home-hero-title${title.length > 40 ? " long" : ""}`} title={title}>
-          {title}
-        </h1>
+        {featured.logo
+          ? <img class="home-hero-logo" src={featured.logo} alt={title} />
+          : <h1 class={`home-hero-title${title.length > 40 ? " long" : ""}`} title={title}>{title}</h1>}
         {anime.title.native && anime.title.native !== title && (
           <div class="home-hero-native" lang="ja">
             {anime.title.native}
@@ -196,6 +200,7 @@ export function HomePage({
   latestEpisodes,
   latestEpisodesLoading,
   kitsuByMedia,
+  artworkByMedia,
   torrentThumbnails,
   onSelectAnime,
   onSelectEpisode,
@@ -206,6 +211,10 @@ export function HomePage({
   const stats = useLibraryStats();
   const [sort, setSort] = useState(loadSort);
   const [filter, setFilter] = useState("");
+  const [tmdbStills, setTmdbStills] = useState<Record<string, string>>({});
+  const askedStills = useRef(new Set<string>());
+  const providerCredentials = useProviderCredentials();
+  const previousTmdbToken = useRef(providerCredentials.tmdbReadAccessToken);
   function showAnimeContextMenu(event: MouseEvent, anime: AnimeMedia) {
     const saved = library.some((entry) => entry.id === anime.id);
     console.debug("[home] open anime context menu", { animeId: anime.id, saved });
@@ -239,6 +248,28 @@ export function HomePage({
     else if (sort === "unwatched") matches.sort((a, b) => Number(unwatched(a) <= 0) - Number(unwatched(b) <= 0) || watched(b) - watched(a));
     return matches;
   }, [library, filter, sort, stats]);
+
+  useEffect(() => {
+    if (previousTmdbToken.current !== providerCredentials.tmdbReadAccessToken) {
+      previousTmdbToken.current = providerCredentials.tmdbReadAccessToken;
+      askedStills.current.clear();
+      setTmdbStills({});
+      console.info("[home] provider credentials changed; refreshing TMDB still lookups", { hasTmdb: !!providerCredentials.tmdbReadAccessToken });
+    }
+    const candidates = [
+      ...latestEpisodes.map((entry) => ({ animeId: entry.media.id, episode: entry.episode })),
+      ...inProgress.flatMap((entry) => entry.episode == null ? [] : [{ animeId: entry.animeId, episode: entry.episode }]),
+    ];
+    for (const { animeId, episode } of candidates) {
+      const key = `${animeId}-${episode}`;
+      if (kitsuByMedia[animeId] === undefined || kitsuByMedia[animeId]?.episodeThumbnails[episode] || askedStills.current.has(key)) continue;
+      askedStills.current.add(key);
+      console.debug("[home] request TMDB episode still", { animeId, episode });
+      void getEpisodeStill(animeId, episode).then((still) => {
+        if (still) setTmdbStills((current) => current[key] ? current : { ...current, [key]: still.url });
+      });
+    }
+  }, [latestEpisodes, inProgress, kitsuByMedia, providerCredentials.tmdbReadAccessToken]);
   // Library shows with an episode out that hasn't been watched yet.
   const newEpisodeIds = useMemo(() => {
     const ids = new Set<number>();
@@ -268,7 +299,7 @@ export function HomePage({
   const candidates = useMemo((): Featured[] => {
     const list: Featured[] = [];
     const seen = new Set<number>();
-    const artFor = (id: number, anime: AnimeMedia) => kitsuByMedia[id]?.background ?? anime.bannerImage ?? anime.coverImage.extraLarge ?? anime.coverImage.large;
+    const artFor = (id: number, anime: AnimeMedia) => artworkByMedia[id]?.backdrop ?? kitsuByMedia[id]?.background ?? anime.bannerImage ?? anime.coverImage.extraLarge ?? anime.coverImage.large;
     for (const resume of inProgress.slice(0, 2)) {
       const anime = asAnime(resume);
       seen.add(anime.id);
@@ -276,6 +307,7 @@ export function HomePage({
         reason: "Pick up where you left off",
         anime,
         art: artFor(anime.id, anime),
+        logo: artworkByMedia[anime.id]?.logo ?? null,
         meta: `${resume.episodeKey} · ${Math.max(1, Math.round((resume.duration - resume.position) / 60))} min left`,
         progress: Math.min(1, resume.position / resume.duration),
         action: `Resume ${resume.episodeKey}`,
@@ -291,6 +323,7 @@ export function HomePage({
         reason: "New episode",
         anime,
         art: artFor(anime.id, anime),
+        logo: artworkByMedia[anime.id]?.logo ?? null,
         meta: `Episode ${latest.episode} · aired ${formatAiringDate(latest.airingAt).toLowerCase()}`,
         progress: null,
         action: `Play episode ${latest.episode}`,
@@ -305,6 +338,7 @@ export function HomePage({
         reason: "From your library",
         anime: saved,
         art: artFor(saved.id, saved),
+        logo: artworkByMedia[saved.id]?.logo ?? null,
         meta: [saved.format?.replace("_", " "), saved.episodes != null ? `${saved.episodes} episodes` : null].filter(Boolean).join(" · "),
         progress: null,
         action: "View episodes",
@@ -312,7 +346,7 @@ export function HomePage({
       });
     }
     return list;
-  }, [inProgress, latestEpisodes, library, kitsuByMedia]);
+  }, [inProgress, latestEpisodes, library, kitsuByMedia, artworkByMedia]);
 
   const [heroIndex, setHeroIndex] = useState(0);
   const [heroHovered, setHeroHovered] = useState(false);
@@ -357,7 +391,9 @@ export function HomePage({
               const thumbnail =
                 (entry.episode != null ? lastFrames[`${entry.animeId}-${entry.episode}`] : undefined) ??
                 (entry.episode != null ? kitsu?.episodeThumbnails[entry.episode] : undefined) ??
+                (entry.episode != null ? tmdbStills[`${entry.animeId}-${entry.episode}`] : undefined) ??
                 kitsu?.background ??
+                artworkByMedia[entry.animeId]?.backdrop ??
                 entry.anime.bannerImage ??
                 entry.anime.coverImage.extraLarge ??
                 entry.anime.coverImage.large;
@@ -419,7 +455,8 @@ export function HomePage({
                 // Kitsu has neither an episode thumbnail nor a backdrop
                 // (see App.tsx's loadTorrentThumbnail trigger condition).
                 const torrentThumbnail = torrentThumbnails[`${entry.media.id}-${entry.episode}`];
-                const thumbnail = episodeThumbnail ?? kitsu?.background ?? torrentThumbnail ?? entry.media.coverImage.large;
+                const tmdbThumbnail = tmdbStills[`${entry.media.id}-${entry.episode}`];
+                const thumbnail = episodeThumbnail ?? tmdbThumbnail ?? torrentThumbnail ?? kitsu?.background ?? artworkByMedia[entry.media.id]?.backdrop ?? entry.media.coverImage.large;
                 return (
                   <li key={`${entry.media.id}-${entry.episode}`} class="episode-card" style={{ "--i": index }}>
                     <button

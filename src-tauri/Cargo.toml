@@ -37,6 +37,7 @@ torrent-engine = { path = "../crates/torrent-engine" }
 sbtl-engine = { path = "../crates/sbtl-engine" }
 nyaa-client = { path = "../crates/nyaa-client" }
 anilist-client = { path = "../crates/anilist-client" }
+artwork-client = { path = "../crates/artwork-client" }
 release-parse = { path = "../crates/release-parse" }
 kitsu-client = { path = "../crates/kitsu-client" }
 mpv-player = { path = "../crates/mpv-player" }

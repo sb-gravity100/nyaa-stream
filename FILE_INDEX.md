@@ -107,7 +107,7 @@
 | `crates/artwork-client/src/lib.rs` | Cached Fribb AniList provider-ID map (weekly refresh) and TMDB/fanart.tv artwork API with disk-cached metadata, TMDB episode still lookup/offset correction, optional caller-supplied credentials, and source attribution; Simkl API is excluded pending required login/sync | backend, metadata, artwork, cache |
 | `crates/kitsu-client/src/anime.rs` | `search_anime` (text search, `include=mappings`) and `anime_by_anilist_id` - Kitsu anime carrying the AniList id they map to (unmapped entries dropped), for the AniList fallback | backend, metadata, fallback |
 | `crates/kitsu-client/examples/fallback_debug.rs` | Scratch tool (`cargo run -p kitsu-client --example fallback_debug -- "<query>" [anilist_id]`): prints the fallback search/by-id results against live Kitsu | backend, dev-tool |
-| `src/App.tsx` | Frontend root and routes; magnet/hash search detection and direct playback, persistent custom-source attachment/merge, quiet updater schedule and route-retained Update action, app-bar/search/settings wiring and cached anime browsing | frontend, core, magnet, updater |
+| `src/App.tsx` | Frontend root and routes; magnet/hash search and direct playback, persistent custom-source attachment/merge, quiet updater action, cached anime browsing and provider artwork loading | frontend, core, magnet, updater, artwork |
 | `src/App.css` | Shared dusk-indigo app styles, including the compact custom-source picker, magnet search action and Update button | frontend, styles |
 | `src/contextMenuStore.ts` | Shared context-menu store and global right-click fallback; custom flat items, text input selection/cut/copy/paste/select-all through the native clipboard plugin, selected-text copy, dev Shift+right-click passthrough | frontend, menu, clipboard |
 | `src/ContextMenu.tsx`, `src/ContextMenu.css` | Viewport-clamped menu UI with keyboard navigation, Escape/outside/scroll/blur/route dismissal and shortcut labels | frontend, menu, styles |
@@ -130,14 +130,14 @@
 | `src/releases.ts` | Release ranking (`bestRelease`/`sortReleases`: remembered fansub group, preferred-fansubber text (`matchesFansubber`: every word in the title), preferred resolution, seeders) and per-anime preferred-group persistence (`localStorage`) | frontend |
 | `src/episodeParser.ts` | `EpisodeLabel` type (episode / batch / movie / special / unknown) + `labelOf` (the backend-parsed label on results/play files, else this file's regex parser - browser preview fallback), `episodeLabelText`, fansub group-tag submitter extraction | frontend |
 | `src/recentSearches.ts` | Recent search queries (`localStorage`) for the empty-focus search dropdown | frontend, search |
-| `src/backup.ts` | Exports/imports every `nyaa-stream:*` localStorage key through the backup commands | frontend, backup |
+| `src/backup.ts` | Exports/imports app localStorage through the backup commands while excluding provider credential storage | frontend, backup |
 | `src/library.ts` | Saved-anime persistence via `localStorage` (PLAN.md's real store choice is still open — this doesn't commit to sqlite/flat-file) | frontend |
 | `src/downloadCache.ts` | Sends the Continue watching episodes to `set_download_cache_keep` whenever the row changes | frontend, cache |
 | `src/loadTrace.ts` | Frontend side of the load profiler: `traceBegin`/`traceMark`/`traceEnd` (best effort) | frontend, diagnostics |
 | `src/HelpSection.tsx` | Settings -> Help: Contact modal (repo, Discord) and Send logs modal (`export_logs`, reveal, Discord / prefilled GitHub issue) | frontend, settings, logs |
 | `src/watchProgress.ts` | Per-episode watch progress (`localStorage`): resume position, completed flag, Continue watching list, watched toggles | frontend |
 | `src/settings.ts` | Settings store (`localStorage`) + `useSettings` hook: playback prefs, subtitle defaults and default subtitle style with selective ASS dialogue overrides; `hardwareDecoding` (mpv `hwdec` auto-safe / no) | frontend |
-| `src/SettingsPanel.tsx` | Settings drawer: playback, subtitles (with CSS preview of the default style), update release notes/download/verification/retry/deferred restart, shortcut list, backup + nyaa.si release database / AnimeTosho dataset import (`import_tosho_dataset`, `tosho_info`) | frontend, settings, updater |
+| `src/SettingsPanel.tsx` | Settings drawer: playback, subtitles, user-supplied TMDB/fanart.tv keys with About attribution, updates, backup and AnimeTosho dataset import | frontend, settings, artwork, updater |
 | `src/subtitles.ts` | Subtitle helpers: default-track pick (language, skips signs/songs, container default), labels, `applySubtitleStyle` (rewrites ASS `Style:` lines with the user's default style, fallback player) and `applyMpvSubtitleStyle` (same style as mpv `sub-*` options / `sub-ass-style-overrides`, shared with clip export); both paths select ASS font, size, color, border and margin fields independently; mpv/export uses light hinting for plain text and no hinting for styled ASS | frontend |
 | `src/assRenderer.ts` | `useAssRenderer` (HLS fallback player only): JASSUB/libass subtitle renderer over the `<video>` with 1.5x device-pixel supersampling up to 2160px (native resolution above that), with WebGL composition when available and Canvas2D fallback; loads a track once then appends events from the backend's delta endpoint (`processData`), applies style/time offset/delay | frontend |
 | `src/PlayerPlaylist.tsx` | Slide-in episode list inside the player (toggled via control-bar button): thumbnails, progress, watched state, now-playing meter | frontend |
@@ -157,5 +157,9 @@
 | `reference/stremio-web/` | Reference-only clone of Stremio's actual UI (React), gitignored — used to verify real layout/styling/data-flow decisions against source rather than guessing | reference |
 
 | `src-tauri/src/thumbnail_build.rs` | Backend release-page frame processing: bounded HTTPS image fetch, public-host checks, image size limits, black-bar crop, 16:9 frame validation, middle-frame selection and 640px JPEG output | backend, thumbnails |
+
+| `src/artwork.ts` | Tauri wrappers and in-memory caching for show artwork and TMDB episode still lookups; clears on provider credential changes | frontend, artwork |
+| `src/providerCredentials.ts` | Local provider credential store and subscription hook; logs presence only and keeps keys outside backup payloads | frontend, settings, security |
+| `src-tauri/src/artwork.rs` | Tauri artwork commands; constructs the provider client with app cache storage and passes user credentials without logging them | backend, artwork |
 
 Update this table whenever files are added, moved, or removed.

@@ -28,6 +28,8 @@ import { DebugPage, type SourceMappingRecord } from "./DebugPage";
 import { BrandMark, SearchIcon, SettingsIcon } from "./icons";
 import { Buffering } from "./Buffering";
 import { copyToClipboard, openAniListPage, openContextMenu } from "./contextMenuStore";
+import { getArtwork, type Artwork } from "./artwork";
+import { useProviderCredentials } from "./providerCredentials";
 import { goBack, navigate, useRoute, type WatchTarget } from "./router";
 import { getUpdateState, startBackgroundUpdateChecks, subscribeUpdateState, type UpdateState } from "./updater";
 import {
@@ -127,6 +129,8 @@ function App() {
   // Read synchronously: the route effect below looks anime up in it on the
   // very first render (a reload on an anime route).
   const [library, setLibrary] = useState<AnimeMedia[]>(getLibrary);
+  const [artworkByMedia, setArtworkByMedia] = useState<Record<number, Artwork>>({});
+  const providerCredentials = useProviderCredentials();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsShowUpdates, setSettingsShowUpdates] = useState(false);
   const [updateState, setUpdateState] = useState<UpdateState>(getUpdateState);
@@ -172,6 +176,22 @@ function App() {
     loadLatestEpisodes();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [library]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const ids = [...new Set([...library.map((anime) => anime.id), ...(selectedAnime ? [selectedAnime.id] : [])])];
+    console.info("[artwork] refreshing app artwork", { shows: ids.length, hasTmdb: !!providerCredentials.tmdbReadAccessToken, hasFanart: !!providerCredentials.fanartApiKey });
+    setArtworkByMedia({});
+    const load = async () => {
+      for (const id of ids) {
+        if (cancelled) return;
+        const artwork = await getArtwork(id);
+        if (!cancelled) setArtworkByMedia((current) => ({ ...current, [id]: artwork }));
+      }
+    };
+    void load();
+    return () => { cancelled = true; };
+  }, [library, selectedAnime?.id, providerCredentials.tmdbReadAccessToken, providerCredentials.fanartApiKey]);
 
   useEffect(() => {
     if (import.meta.env.DEV && location.hash === "#/debug") {
@@ -1139,6 +1159,7 @@ function App() {
         latestEpisodes={latestEpisodes}
         latestEpisodesLoading={latestEpisodesLoading}
         kitsuByMedia={kitsuByMedia}
+        artworkByMedia={artworkByMedia}
         torrentThumbnails={torrentThumbnails}
         onSelectAnime={pickAnime}
         onSelectEpisode={selectEpisode}

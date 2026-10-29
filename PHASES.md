@@ -35,8 +35,11 @@ Feature work follows this order; remaining acceptance checks stay open below.
   - [x] Attach/edit/remove picker with explicit episode or pack mapping; attached sources merge into episode/Batch groups
   - [x] Metadata-only pack inspection and persisted video file list; no file reader is opened during inspection
   - [ ] Manual acceptance for sparse/multi-season pack selection, restart persistence, and malformed/hash input cases
-- [ ] 3: Wire the implemented ID/cache/provider foundation; add app settings,
-      About attribution, and frontend fallbacks
+- [~] 3: Wire the ID/cache/provider foundation into the app
+      - [x] Cached provider client and AniList ID mapping (TMDB + fanart.tv)
+      - [x] User-supplied keys stored locally, omitted from backup, and never logged
+      - [x] Tauri artwork/backdrop/still commands and About attribution settings
+      - [ ] Connect artwork fallbacks to media pages, hero and episode cards
 - [ ] 4: Release-page screenshots and missing-thumbnail build queue
 - [ ] 5: Verified-data-only seekbar storyboard/hover previews
 - [ ] 6: Bespoke installer UI with reviewed screens and proven backend

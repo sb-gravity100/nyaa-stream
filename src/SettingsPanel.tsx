@@ -2,12 +2,14 @@ import { useEffect, useRef, useState } from "preact/hooks";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open as pickFolder, open as pickFile } from "@tauri-apps/plugin-dialog";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import type { JSX } from "preact";
 import { DEFAULT_SUBTITLE_STYLE, resetSettings, updateSettings, useSettings, type PreferredResolution, type SubtitleStyle } from "./settings";
 import { CloseIcon } from "./icons";
 import { exportBackup, importBackup } from "./backup";
 import { applyPreparedUpdate, checkForUpdate, getUpdateState, prepareUpdate, subscribeUpdateState, type UpdateState } from "./updater";
 import { HelpSection } from "./HelpSection";
+import { saveProviderCredentials, useProviderCredentials } from "./providerCredentials";
 
 interface Props {
   onClose: () => void;
@@ -658,6 +660,69 @@ function SubtitlePreview({ style }: { style: SubtitleStyle }) {
   );
 }
 
+function ArtworkProviderSection() {
+  const credentials = useProviderCredentials();
+  const [draft, setDraft] = useState(credentials);
+  const [dirty, setDirty] = useState(false);
+
+  useEffect(() => {
+    if (!dirty) setDraft(credentials);
+  }, [credentials, dirty]);
+
+  function updateDraft(field: "tmdbReadAccessToken" | "fanartApiKey", value: string) {
+    console.debug("[settings] artwork credential edited", { field, present: value.length > 0 });
+    setDraft((current) => ({ ...current, [field]: value }));
+    setDirty(true);
+  }
+
+  async function openProviderPage(url: string, provider: string) {
+    console.info("[settings] opening provider key page", { provider });
+    try {
+      await openUrl(url);
+    } catch (error) {
+      console.warn("[settings] provider page could not be opened", { provider, error: String(error) });
+    }
+  }
+
+  return (
+    <section class="settings-section">
+      <h3>Artwork providers</h3>
+      <p class="setting-hint">Optional keys enable larger backdrops, logos and episode stills. Keys stay in this app profile and are excluded from backups.</p>
+      <Row label="TMDB API Read Access Token" hint="Used for TMDB backdrops, logos and episode stills.">
+        <input
+          class="setting-text-input"
+          type="password"
+          autoComplete="off"
+          spellcheck={false}
+          value={draft.tmdbReadAccessToken}
+          onInput={(event) => updateDraft("tmdbReadAccessToken", (event.currentTarget as HTMLInputElement).value)}
+        />
+        <button class="link-button" type="button" onClick={() => void openProviderPage("https://www.themoviedb.org/settings/api", "tmdb")}>Get key</button>
+      </Row>
+      <Row label="fanart.tv API key" hint="Optional artwork fallback; credited when its art is used.">
+        <input
+          class="setting-text-input"
+          type="password"
+          autoComplete="off"
+          spellcheck={false}
+          value={draft.fanartApiKey}
+          onInput={(event) => updateDraft("fanartApiKey", (event.currentTarget as HTMLInputElement).value)}
+        />
+        <button class="link-button" type="button" onClick={() => void openProviderPage("https://fanart.tv/get-an-api-key/", "fanart.tv")}>Get key</button>
+      </Row>
+      <div class="setting-control artwork-key-actions">
+        <button class="button button-primary" type="button" disabled={!dirty} onClick={() => { saveProviderCredentials(draft); setDirty(false); }}>Save keys</button>
+        <button class="button button-quiet" type="button" disabled={!credentials.tmdbReadAccessToken && !credentials.fanartApiKey} onClick={() => { const empty = { tmdbReadAccessToken: "", fanartApiKey: "" }; saveProviderCredentials(empty); setDraft(empty); setDirty(false); }}>Clear keys</button>
+      </div>
+      <div class="artwork-attribution">
+        <img src="https://www.themoviedb.org/assets/2/v4/logos/blue_short.svg" alt="TMDB" />
+        <p>This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
+        <p>Some artwork may come from <a href="https://fanart.tv" target="_blank" rel="noreferrer">fanart.tv</a>.</p>
+      </div>
+    </section>
+  );
+}
+
 export function SettingsPanel({ onClose, playbackActive = false, showUpdates = false }: Props) {
   const settings = useSettings();
   const style = settings.subtitleStyle;
@@ -787,6 +852,8 @@ yaa-stream screenshots.">
               </select>
             </Row>
           </section>
+
+          <ArtworkProviderSection />
 
           <section class="settings-section">
             <h3>Subtitles</h3>
