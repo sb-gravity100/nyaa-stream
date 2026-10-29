@@ -1,3 +1,15 @@
+### `36f6998` · 2026-10-29 · feat: build missing episode thumbnails
+- `FILE_INDEX.md`
+- `PHASES.md`
+- `crates/nyaa-client/src/lib.rs`
+- `crates/nyaa-client/src/store.rs`
+- `src-tauri/src/lib.rs`
+- `src/App.css`
+- `src/HlsPlayerView.tsx`
+- `src/MediaPage.tsx`
+- `src/PlayerView.tsx`
+- `src/torrentThumbnail.ts`
+
 ### `0513336` · 2026-10-29 · Merge branch `work/v0.6-magnets`
 - `crates/nyaa-client/src/magnet.rs`
 - `crates/nyaa-client/src/store.rs`
