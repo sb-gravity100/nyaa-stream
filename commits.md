@@ -1,3 +1,5 @@
+### `614384d` · 2026-10-30 · fix: infer custom packs from file metadata
+- `src/AttachCustomSourceDialog.tsx`
 ### `0d0e649` · 2026-10-30 · docs: sync magnet attachment workflow
 - `FILE_INDEX.md`
 - `PHASES.md`
