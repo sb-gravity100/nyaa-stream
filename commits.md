@@ -1,3 +1,9 @@
+### `0df8150` · 2026-10-30 · fix(installer): restore Start Menu choice on upgrades
+- `src-tauri/installer/installer.nsi`
+- `CHANGELOG.md`
+- `FILE_INDEX.md`
+- `PHASES.md`
+- `src/changelog.ts`
 ### `7a7c47d` · 2026-10-30 · test(magnet): preserve creation time on merge
 - `crates/nyaa-client/src/store.rs`
 ### `cb329d5` · 2026-10-30 · docs: update nyaa test count
