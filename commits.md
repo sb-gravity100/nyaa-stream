@@ -1,3 +1,7 @@
+### `daf4a6e` · 2026-10-29 · feat: add artwork provider client foundation
+- `crates/artwork-client/Cargo.toml`
+- `crates/artwork-client/src/lib.rs`
+
 ### `389ace0` · 2026-10-29 · feat: add player surface context actions
 - `src/PlayerView.tsx`
 - `src/HlsPlayerView.tsx`
