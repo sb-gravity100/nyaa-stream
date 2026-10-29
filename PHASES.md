@@ -4,6 +4,7 @@
 - [x] Add independently selectable dialogue style fields, retaining existing preferences
 - [x] Apply matching field selection in mpv, HLS/libass, and clip export
 - [x] Verify all 32 field combinations, preserved authored fields/signs/event tags, plain-track behavior, legacy defaults, and mpv/export parity; frontend production build
+- [ ] Set embedded mpv `blend-subtitles=yes` and `scale=ewa_lanczos`; verify workspace
 - [ ] Bump/tag v0.5.9
 
 ## v0.5.8 — implemented parser work (published 2026-10-29)
