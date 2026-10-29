@@ -54,6 +54,21 @@ export function playResY(script: string): number {
 // when `applyToStyled` is on, so signs/typesetting keep their look.
 const DIALOGUE_STYLE_NAME = /^(default|main|dialog(ue)?|top|italics?|flashback|narrat(ion|or)|internal|overlap)\b/i;
 
+/** Shared field selection for the HLS renderer and mpv/export overrides.
+ * Missing flags retain the previous behavior for older settings/backups. */
+function assOverrideFields(style: SubtitleStyle): Set<string> {
+  const fields = new Set<string>();
+  if (style.assOverrideFont !== false) ["fontname", "bold"].forEach((field) => fields.add(field));
+  if (style.assOverrideSize !== false) fields.add("fontsize");
+  if (style.assOverrideColor !== false) fields.add("primarycolour");
+  if (style.assOverrideBorder !== false) {
+    ["outlinecolour", "backcolour", "borderstyle", "outline", "shadow"].forEach((field) => fields.add(field));
+  }
+  if (style.assOverrideMargin !== false) fields.add("marginv");
+  console.debug("[subtitles] selected ASS override fields", { fields: [...fields] });
+  return fields;
+}
+
 /**
  * Rewrites the `Style:` lines of a script with the user's default subtitle
  * style. For plain (converted) tracks every style is restyled - ffmpeg only
@@ -63,7 +78,9 @@ const DIALOGUE_STYLE_NAME = /^(default|main|dialog(ue)?|top|italics?|flashback|n
  * authoring resolution.
  */
 export function applySubtitleStyle(script: string, style: SubtitleStyle, styled: boolean): string {
+  console.debug("[subtitles] applying script style", { styled, applyToStyled: style.applyToStyled });
   if (styled && !style.applyToStyled) return script;
+  const selected = styled ? assOverrideFields(style) : null;
   const resY = playResY(script);
   const formatMatch = script.match(/^\[V4\+? Styles\][\s\S]*?^Format:\s*(.+)$/m);
   if (!formatMatch) return script;
@@ -94,6 +111,7 @@ export function applySubtitleStyle(script: string, style: SubtitleStyle, styled:
     const name = values[col("name")]?.trim() ?? "";
     if (styled && !DIALOGUE_STYLE_NAME.test(name)) return line;
     for (const [field, value] of Object.entries(overrides)) {
+      if (selected && !selected.has(field)) continue;
       const i = col(field);
       if (i >= 0 && i < values.length) values[i] = value;
     }
@@ -134,6 +152,7 @@ export async function mpvSubtitleSettings(
   style: SubtitleStyle,
   styled: boolean,
 ): Promise<Record<string, string | number | boolean>> {
+  console.debug("[subtitles] preparing mpv style", { styled, applyToStyled: style.applyToStyled });
   const px = (percent: number) => (percent / 100) * MPV_REFERENCE_HEIGHT;
   const backOpacity = style.backgroundOpacity / 100;
   const settings: Record<string, string | number | boolean> = {
@@ -175,7 +194,10 @@ export async function mpvSubtitleSettings(
     MarginV: Math.round((style.marginPercent / 100) * resY).toString(),
   };
   // Commas separate overrides, so a font name can't contain one.
-  const overrides = names.flatMap((name) => Object.entries(fields).map(([k, v]) => `${name}.${k}=${v.replace(/,/g, "")}`));
+  const selected = assOverrideFields(style);
+  const overrides = names.flatMap((name) => Object.entries(fields)
+    .filter(([key]) => selected.has(key.toLowerCase()))
+    .map(([k, v]) => `${name}.${k}=${v.replace(/,/g, "")}`));
   console.debug("[subtitles] restyling ASS dialogue styles", { names, resY });
   settings["sub-ass-style-overrides"] = overrides.join(",");
   return settings;
@@ -183,6 +205,7 @@ export async function mpvSubtitleSettings(
 
 /** Applies the user's default subtitle style to the playing mpv. */
 export async function applyMpvSubtitleStyle(mpv: MpvSubtitleTarget, style: SubtitleStyle, styled: boolean): Promise<void> {
+  console.debug("[subtitles] applying mpv style", { styled });
   const settings = await mpvSubtitleSettings(mpv, style, styled);
   await Promise.all(Object.entries(settings).map(([name, value]) => mpv.setProperty(name, value)));
 }

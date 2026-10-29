@@ -846,10 +846,20 @@ yaa-stream screenshots.">
             </Row>
             <Toggle
               label="Also restyle styled (ASS) subtitles"
-              hint="Only their dialogue lines. Signs and typesetting keep their look."
+              hint="Targets dialogue style names. Other styles and inline effects remain authored."
               checked={style.applyToStyled}
               onChange={(v) => setStyle({ applyToStyled: v })}
             />
+            {style.applyToStyled && (
+              <>
+                <Toggle label="Override ASS font and bold" checked={style.assOverrideFont} onChange={(v) => setStyle({ assOverrideFont: v })} />
+                <Toggle label="Override ASS text size" checked={style.assOverrideSize} onChange={(v) => setStyle({ assOverrideSize: v })} />
+                <Toggle label="Override ASS text color" checked={style.assOverrideColor} onChange={(v) => setStyle({ assOverrideColor: v })} />
+                <Toggle label="Override ASS outline, shadow and background" checked={style.assOverrideBorder} onChange={(v) => setStyle({ assOverrideBorder: v })} />
+                <Toggle label="Override ASS distance from bottom" checked={style.assOverrideMargin} onChange={(v) => setStyle({ assOverrideMargin: v })} />
+                <p class="settings-hint">Unchecked fields keep the track's original style. Inline positioning, colors and animation can still take precedence.</p>
+              </>
+            )}
             <div class="settings-inline-actions">
               <button class="link-button" onClick={() => updateSettings({ subtitleStyle: DEFAULT_SUBTITLE_STYLE })}>
                 Reset subtitle style

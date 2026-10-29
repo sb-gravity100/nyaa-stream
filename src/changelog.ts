@@ -10,6 +10,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.5.9",
+    date: "2026-10-29",
+    features: [
+      "ASS dialogue styling now has separate controls for font, size, text color, outline/background and bottom margin, while retaining unchecked authored style fields.",
+    ],
+    fixes: [],
+  },
+  {
     version: "0.5.8",
     date: "2026-10-29",
     features: [],

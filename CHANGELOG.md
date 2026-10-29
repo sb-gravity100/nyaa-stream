@@ -9,6 +9,11 @@ step when cutting a release.
 
 ## [Unreleased]
 
+## [0.5.9] - 2026-10-29
+
+### Added
+- Selective ASS dialogue style overrides for font/weight, size, text color, outline/background/shadow and bottom margin, shared by embedded mpv, HLS playback and clip export. Unchecked fields and authored inline effects are retained.
+
 ## [0.5.8] - 2026-10-29
 
 ### Changed

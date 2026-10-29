@@ -29,6 +29,12 @@ export interface SubtitleStyle {
    * off by default: fansub styling is usually intentional. Signs/typeset
    * styles are never touched. */
   applyToStyled: boolean;
+  /** Select which dialogue style fields to replace when ASS restyling is on. */
+  assOverrideFont: boolean;
+  assOverrideSize: boolean;
+  assOverrideColor: boolean;
+  assOverrideBorder: boolean;
+  assOverrideMargin: boolean;
 }
 
 export type PreferredResolution = "any" | "2160" | "1080" | "720" | "480";
@@ -82,6 +88,11 @@ export const DEFAULT_SUBTITLE_STYLE: SubtitleStyle = {
   backgroundOpacity: 60,
   marginPercent: 5.6,
   applyToStyled: false,
+  assOverrideFont: true,
+  assOverrideSize: true,
+  assOverrideColor: true,
+  assOverrideBorder: true,
+  assOverrideMargin: true,
 };
 
 /** Bumped when DEFAULT_SUBTITLE_STYLE changes in a way stored settings

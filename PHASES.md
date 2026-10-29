@@ -1,9 +1,10 @@
 # PHASES.md — nyaa-stream
 
 ## v0.5.9 — selective ASS subtitle styling
-- [ ] Add independently selectable dialogue style fields, retaining existing preferences
-- [ ] Apply matching field selection in mpv, HLS/libass, and clip export
-- [ ] Verify preserved authored fields, signs, and event tags; build and bump/tag v0.5.9
+- [x] Add independently selectable dialogue style fields, retaining existing preferences
+- [x] Apply matching field selection in mpv, HLS/libass, and clip export
+- [x] Verify all 32 field combinations, preserved authored fields/signs/event tags, plain-track behavior, legacy defaults, and mpv/export parity; frontend production build
+- [ ] Bump/tag v0.5.9
 
 ## v0.5.8 — implemented parser work (published 2026-10-29)
 - [x] Copy the supplied Python source into a tracked reference directory
