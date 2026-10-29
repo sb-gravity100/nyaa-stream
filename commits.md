@@ -1,3 +1,9 @@
+### `accb738` · 2026-10-29 · feat: add anime context menu actions
+- `src/App.tsx`
+- `src/HomePage.tsx`
+- `src/contextMenuStore.ts`
+- `PHASES.md`
+
 ### `a99675f` · 2026-10-29 · feat: add shared context menu foundation
 - `src/contextMenuStore.ts`
 - `src/ContextMenu.tsx`
