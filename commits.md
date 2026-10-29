@@ -1,3 +1,9 @@
+### `715b4fa` · 2026-10-29 · chore: release v0.5.9
+- `PHASES.md`
+- `package.json`
+- `src-tauri/Cargo.toml`
+- `src-tauri/tauri.conf.json`
+
 ### `d749cea` · 2026-10-29 · fix: update subtitle blending and video scaler
 - `crates/mpv-player/src/embedded.rs`
 - `src/changelog.ts`
