@@ -1,3 +1,7 @@
+### `ddbe3ab` · 2026-10-29 · docs: require supersampling in the native player
+- `PLAN.md`
+- `PHASES.md`
+
 ### `c167888` · 2026-10-29 · chore: release v0.5.10
 - `package.json`
 - `src-tauri/tauri.conf.json`
