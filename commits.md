@@ -1,3 +1,5 @@
+### `adb87f3` · 2026-10-30 · docs: plan IMDb artwork ID fallback
+- `docs/planning/V0_6_0.md`
 ### `e63bb71` · 2026-10-30 · docs: align seekbar milestone scope
 - `PHASES.md`
 ### `6aaee55` · 2026-10-30 · fix(updater): abort when playback teardown fails
