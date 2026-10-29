@@ -17,10 +17,8 @@ sbtl torrent streaming, embedded libmpv playback and an HLS fallback.
 |---|---|---|
 | v0.5.8 | Implemented pre-v0.6.0 work | Published |
 | v0.6.0 | Subtitle styling/smoothing plus context menus, custom magnets, artwork, thumbnails, seek previews, updates and bespoke installer | Subtitle work implemented; remaining features planned; visual acceptance pending |
-| v0.6.1 | Learned release-to-entry matcher | Planned |
 | v0.7.0 | Custom libmpv, native subtitle supersampling, memory profiling, batch transitions, preload timing and continuous seek dragging | Planned |
-| v0.8.0 | Navigation and Home rehaul | Planned |
-| v0.8.1 | Discover | Planned |
+| v0.8.0 | Navigation/Home rehaul and Discover | Planned |
 | v1.0.0 | Stabilization and 32-bit Windows | Planned |
 | v1.1.0 | Binge Mode | Idea; not implementation-ready |
 
@@ -78,7 +76,7 @@ work and native supersampling remain v0.7.0.
 | [v0.6.0 specification](docs/planning/V0_6_0.md) | Complete feature lineup and acceptance criteria |
 | [Architecture](docs/planning/ARCHITECTURE.md) | Stack, build prerequisites, data flow, torrent engines and development notes |
 | [Playback](docs/planning/PLAYBACK.md) | Playback, cache/resume, subtitles, desktop UI and historical measurements |
-| [Matching](docs/planning/MATCHING.md) | Matching, AnimeTosho, learned matcher and search debugger |
+| [Matching](docs/planning/MATCHING.md) | Matching, AnimeTosho and rule-based search debugger |
 | [Future milestones](docs/planning/ROADMAP.md) | v0.7.0 player/memory/playback, navigation, Discover, x86 and Binge Mode |
 | [Releasing](docs/planning/RELEASING.md) | Release tooling/policy and dated release history |
 
@@ -157,7 +155,7 @@ See [detailed specification](docs/planning/PLAYBACK.md).
 
 See [detailed specification](docs/planning/ROADMAP.md).
 
-## Navigation and home rehaul + Discover (planned, v0.8.0 rehaul, v0.8.1 Discover)
+## Navigation and home rehaul + Discover (planned, v0.8.0 navigation, Home and Discover)
 
 See [detailed specification](docs/planning/ROADMAP.md).
 
@@ -182,10 +180,6 @@ See [detailed specification](docs/planning/ARCHITECTURE.md).
 See [detailed specification](docs/planning/MATCHING.md).
 
 ## AnimeTosho dataset (v0.5.0, was v0.4.4 - minor feature)
-
-See [detailed specification](docs/planning/MATCHING.md).
-
-## Learned release-to-entry matcher (planned, v0.6.1 - minor feature; user 2026-10-15)
 
 See [detailed specification](docs/planning/MATCHING.md).
 

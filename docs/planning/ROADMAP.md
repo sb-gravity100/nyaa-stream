@@ -107,7 +107,7 @@ dump's follow-up profiling.
 
 Assumes "32-bit" = Windows x86 (`i686-pc-windows-msvc`); tell me if Linux
 or ARM was meant. The stable v1.0.0 ships both `windows-x86_64` and
-`windows-i686` builds. Work starts after v0.8.1 (features stay 64-bit-tested
+`windows-i686` builds. Work starts after v0.8.0 (features stay 64-bit-tested
 until then, but must not add 64-bit-only assumptions).
 
 - **Toolchain**: add the `i686-pc-windows-msvc` Rust target; vcpkg triplet
@@ -134,12 +134,11 @@ until then, but must not add 64-bit-only assumptions).
 - Risks: 32-bit builds of vcpkg FFmpeg or sbtl may need patches; memory
   exhaustion on long HLS runs; small user base vs. extra build/QA cost.
 
-## Navigation and home rehaul + Discover (planned, v0.8.0 rehaul, v0.8.1 Discover)
+## Navigation and home rehaul + Discover (planned, v0.8.0 navigation, Home and Discover)
 
 Scope decided 2026-09-29: rework **navigation and the home page** only. The
 media page, player and settings keep their layouts (they inherit new
-navigation chrome and the existing theme, nothing more). The v0.8.0 rehaul
-and v0.8.1 Discover milestone are local-only tags, so v1.0.0 remains the
+navigation chrome and the existing theme, nothing more). The consolidated v0.8.0 rehaul/Discover milestone is a local-only tag, so v1.0.0 remains the
 first published build with the new UI (see "Release plan").
 
 **v0.8.0 - navigation and home rehaul**
@@ -154,7 +153,7 @@ first published build with the new UI (see "Release plan").
 - Search moves into the rail (also a global shortcut), results unchanged.
 - No new backend; frontend-only, verified in the app and the browser preview.
 
-**v0.8.1 - Discover** (`src/DiscoverPage.tsx`, new `anilist-client`
+**v0.8.0 - Discover** (`src/DiscoverPage.tsx`, new `anilist-client`
 queries, cached per session + short disk TTL; Kitsu fallback where the
 metadata fallback already exists)
 - **Seasonal and trending**: rows for Trending now, This season, Next

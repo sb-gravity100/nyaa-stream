@@ -18,6 +18,8 @@ No implementation starts as part of this planning request.
 
 ### Remaining v0.6.0 work
 
+- [ ] Remove cancelled ML training/scoring prototype and dataset trainer; preserve rule matching and dataset compatibility
+
 - [x] Installer visual direction confirmed by SB: compact dark layout matching the app
 - [ ] Review proposed update schedule, restart flow and first-install defaults
 - [ ] 0: Prove installer/updater backend, clean-machine bootstrap, signed
@@ -32,7 +34,7 @@ No implementation starts as part of this planning request.
 - [ ] 8: Integrated Windows verification, docs/changelog/index sync, local v0.6.0 tag
 
 Native supersampling, batch next-episode/preload work and continuous seekbar
-dragging remain v0.7.0; learned matching remains v0.6.1. Existing public-release
+dragging remain v0.7.0. Existing public-release
 policy remains unchanged.
 
 ## v0.5.8 — implemented parser work (published 2026-10-29)
@@ -372,42 +374,6 @@ policy remains unchanged.
   - [ ] Verify live Slime search, seek/audio diagnostics, and subtitle edges
         on HLS/mpv at standard and high resolutions
   - [x] Bump/tag v0.5.8 locally
-
-- [ ] Learned release-to-entry matcher - v0.6.1 (user 2026-10-15; see PLAN.md
-      "Learned release-to-entry matcher"; replaces the unused stem mapper).
-      One commit each:
-  - [~] L1 (first run done 2026-10-16: 99.1% top-1 on 2025+, no-match cases
-        and slices still to add; PLAN.md "L1 prototype result") Python
-        prototype on the real dump (scratch, not committed): build
-        trusted (entry, release) pairs via Fribb, sibling + other-show
-        negatives, features, XGBoost (`binary:logistic`, scratch `ml/`
-        scripts; decided 2026-10-15); report pre-2025 -> 2025+ holdout
-        precision/coverage sliced by year and group size. Stop here if
-        precision < 99% on answered pairs
-  - [ ] L1b gold set: the user-reviewed Mushoku crawl (1,000 rows, verdict per
-        row) as a fixture; score the current rules and the prototype on it
-        (baseline 36 mislabelled S3, 17 false keeps; see PLAN.md)
-  - [x] L1c peer-consistency feature (measured, not enabled: 93.2% precision
-        / 4.5% recall on season 2+; kept as a model feature, see PLAN.md) (group + naming template propagates a
-        confirmed season to its unmarked releases)
-  - [x] L1d file-name coverage (PLAN.md "File-name coverage"): extras with
-        numbers stay extras; `S##E##-Title`; leading number in a file name;
-        `Ep`/`Episode` prefixes; corpus.txt diff; re-run
-        `tosho_file_label_coverage` before/after
-  - [x] L1e batch self-verification (title range vs gap-free parsed files)
-  - [x] L1f live nyaa RSS check: every item mapped to an anime entry or
-        explained (no entry / not anime / unparsed)
-  - [ ] L2 held-out-entries test (whole shows unseen) incl. a new-season case
-        (Mushoku Tensei S3 EP9 crawl as a smoke check)
-  - [ ] L3 Rust feature extraction + XGBoost JSON tree evaluator
-        (`crates/nyaa-client`), exported `model.json`, parity test against
-        Python `predict` (1e-6, NaN default directions)
-  - [ ] L4 Python train + export script (`ml/train.py`: pairs CSV -> model.json
-        + threshold + feature order) that writes the model next to the
-        dataset; imported with it; Rust dev tool dumps the pairs CSV
-  - [ ] L5 hook into `filter_for_show` after trusted `aid`s (abstain -> title
-        rules); fixtures show no regression on `title_match_fixture_tests`
-  - [ ] L6 FILE_INDEX/CHANGELOG/version bump (minor), tag locally
 
 ## Phase 3 — Playback quality of life
 - [x] Wire a video player to the media page: play button per episode row
@@ -874,7 +840,7 @@ policy remains unchanged.
       - [ ] Search moved into the rail (+ global shortcut)
       - [ ] Home restyled for the rail layout
       - [ ] Verify live; PLAN.md/FILE_INDEX.md sync
-- [ ] Discover (v0.8.1, see PLAN.md "Navigation and home rehaul + Discover"):
+- [ ] Discover (v0.8.0, see PLAN.md "Navigation and home rehaul + Discover"):
       one commit each -
       - [ ] `anilist-client` queries: trending, season, upcoming, popular,
             filtered browse, recommendations, airing schedules (+ tests)
@@ -884,7 +850,7 @@ policy remains unchanged.
       - [ ] Recommendations rows from library/watch history
       - [ ] Airing schedule calendar
       - [ ] PLAN.md/FILE_INDEX.md sync, `npm run bump -- patch`, tag
-            `v0.8.1` locally (not pushed/published)
+            `v0.8.0` locally (not pushed/published)
 - [ ] 32-bit Windows (v1.0.0, see PLAN.md "32-bit Windows support"): one
       commit each -
       - [ ] Audit 64-bit assumptions (`usize` casts, sizes/offsets as `u64`,
@@ -899,7 +865,7 @@ policy remains unchanged.
       - [ ] Verify live on a 32-bit build (WoW64 or VM): playback, subs,
             resume, HLS fallback, updater
 - [ ] Stable release (v1.0.0, see PLAN.md "Release plan"): one commit each -
-      - [ ] Stabilization pass over v0.4.0-v0.8.1: open bugs, live verify
+      - [ ] Stabilization pass over v0.4.0-v0.8.0: open bugs, live verify
             items still unchecked, README/What's new
       - [ ] PLAN.md/FILE_INDEX.md sync, `npm run bump -- major`, tag
             `v1.0.0`, push the tag, build + publish the release
@@ -921,6 +887,3 @@ policy remains unchanged.
             and episode-mapping analytics
       - [x] Show per-release accepted/rejected criteria and mapped,
             filtered, or unresolved destinations
-      - [x] Train the local XGBoost prototype and show its source
-            matching predictions alongside rule decisions in the debugger
-            only; verify confidence/abstention on live results

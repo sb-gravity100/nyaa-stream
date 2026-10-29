@@ -42,14 +42,14 @@ releases; the first draft's spaced season-range overmatch was removed.
 Three published releases: **v0.3.2** (the playback fixes) as soon as it
 passes a live test, **v0.4.0** (splash/title bar, download cache, resume
 buffer, contact and send logs, and the sbtl torrent engine), then **v1.0.0** (the stable Windows release
-after v0.8.1). **v0.5.0 is also published** (decided 2026-10-13: it bundles the
+after v0.8.0). **v0.5.0 is also published** (decided 2026-10-13: it bundles the
 unreleased v0.4.3 season-aware matching and the v0.4.4 AnimeTosho dataset /
 Import Tosho Data / Settings modal (the v0.4.5 custom magnet paste moved to
 v0.6.0 the same day), so the old 0.4.3-0.4.5 numbers are never released; the old v0.5.0 context-menu
 milestone merged into v0.6.0). The milestones in between - v0.6.0 (context
 menus + custom magnet paste + build thumbnails + HD banners + seek preview)
-→ v0.6.1 (learned release-to-entry matcher) → v0.7.0 (custom Windows libmpv
-build) → v0.8.0 (navigation/home rehaul) → v0.8.1 (Discover) - are each
+→ v0.7.0 (custom Windows libmpv
+build) → v0.8.0 (navigation/home rehaul + Discover) - are each
 bumped (`npm run bump`) and tagged **locally only**, never pushed. Commits
 are pushed with plain `git push` (no tags); `npm run release` pushes only
 the tag it publishes. Installs update 0.3.1 → 0.3.2 → 0.4.0 → 1.0.0 (v1.0.0 ships x86_64 and 32-bit
