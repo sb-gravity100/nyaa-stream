@@ -1,3 +1,7 @@
+### `bed12a6` · 2026-10-29 · docs: plan v0.5.8 playback and search fixes
+- `PLAN.md`
+- `PHASES.md`
+
 ### `0f9ddc0` · 2026-10-28 · chore: keep debugger work unversioned
 - `PLAN.md`
 - `PHASES.md`
