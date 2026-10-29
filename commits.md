@@ -1,3 +1,9 @@
+### `c167888` · 2026-10-29 · chore: release v0.5.10
+- `package.json`
+- `src-tauri/tauri.conf.json`
+- `src-tauri/Cargo.toml`
+- `PHASES.md`
+
 ### `c5f4661` · 2026-10-29 · fix: smooth subtitle text edges
 - `src/subtitles.ts`
 - `src/assRenderer.ts`
