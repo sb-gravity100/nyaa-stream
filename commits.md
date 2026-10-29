@@ -1,3 +1,25 @@
+### `ef55db8` · 2026-10-29 · refactor: remove experimental ML pipeline
+- `CHANGELOG.md`
+- `FILE_INDEX.md`
+- `PHASES.md`
+- `crates/nyaa-client/examples/build_tosho.rs`
+- `crates/nyaa-client/examples/search_json.rs`
+- `crates/nyaa-client/src/stem.rs`
+- `crates/nyaa-client/src/tosho_build.rs`
+- `crates/release-parse/examples/ml_parse.rs`
+- `crates/release-parse/upstream/animebatch/PLAN.md`
+- `docs/planning/MATCHING.md`
+- `docs/planning/ROADMAP.md`
+- `ml/export_extra.py`
+- `ml/export_rows.py`
+- `ml/fetch_anilist.py`
+- `ml/score_search.py`
+- `ml/train.py`
+- `src-tauri/src/lib.rs`
+- `src/DebugPage.css`
+- `src/DebugPage.tsx`
+- `src/changelog.ts`
+
 ### `7e31b59` · 2026-10-29 · docs: require v0.6.0 user data preservation
 - `docs/planning/V0_6_0.md`
 - `PHASES.md`
