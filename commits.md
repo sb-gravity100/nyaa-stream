@@ -1,3 +1,7 @@
+### `0a3b272` · 2026-10-30 · docs: record v0.6.0 updater defaults
+- `PLAN.md`
+- `PHASES.md`
+- `docs/planning/V0_6_0.md`
 ### `0db99b8` · 2026-10-30 · feat(artwork): resolve missing TMDB IDs by IMDb
 - `crates/artwork-client/src/lib.rs`
 - `CHANGELOG.md`
