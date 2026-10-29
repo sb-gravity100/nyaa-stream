@@ -16,8 +16,7 @@ sbtl torrent streaming, embedded libmpv playback and an HLS fallback.
 | Version | Scope | State |
 |---|---|---|
 | v0.5.8 | Implemented pre-v0.6.0 work | Published |
-| v0.5.9–v0.5.10 | Selective ASS styling, blend/scaler changes, plain-text hinting and bounded HLS supersampling | Locally tagged; visual acceptance remains |
-| v0.6.0 | Context menus, custom magnets, artwork, missing-thumbnail builds, seek previews, in-app updates and bespoke installer | Specification ready for review; no implementation started |
+| v0.6.0 | Subtitle styling/smoothing plus context menus, custom magnets, artwork, thumbnails, seek previews, updates and bespoke installer | Subtitle work implemented; remaining features planned; visual acceptance pending |
 | v0.6.1 | Learned release-to-entry matcher | Planned |
 | v0.7.0 | Custom libmpv, native subtitle supersampling, memory profiling, batch transitions, preload timing and continuous seek dragging | Planned |
 | v0.8.0 | Navigation and Home rehaul | Planned |
@@ -26,6 +25,10 @@ sbtl torrent streaming, embedded libmpv playback and an HLS fallback.
 | v1.1.0 | Binge Mode | Idea; not implementation-ready |
 
 ## v0.6.0 implementation order
+
+SB consolidated the unpublished v0.5.9/v0.5.10 subtitle work into v0.6.0.
+There are no separate releases for those versions; existing implementation
+and verification remain valid. Tag v0.6.0 only after the milestone is complete.
 
 1. Prove installer/updater packaging, silent upgrade, migration and relaunch.
 2. Build shared context menus and clipboard behavior.

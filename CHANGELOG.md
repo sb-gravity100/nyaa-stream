@@ -9,19 +9,17 @@ step when cutting a release.
 
 ## [Unreleased]
 
-## [0.5.10] - 2026-10-29
-
-### Fixed
-- Plain-text subtitles use light font hinting in mpv playback and clip export; styled ASS tracks retain unhinted positioning and animation.
-- HLS subtitle rendering uses 1.5x device-pixel supersampling up to a 2160px threshold, retaining native resolution on larger outputs.
-
-## [0.5.9] - 2026-10-29
+## [0.6.0] - Unreleased
 
 ### Added
 - Selective ASS dialogue style overrides for font/weight, size, text color, outline/background/shadow and bottom margin, shared by embedded mpv, HLS playback and clip export. Unchecked fields and authored inline effects are retained.
 
 ### Changed
 - Embedded mpv uses `blend-subtitles=yes` and `scale=ewa_lanczos`, retaining scaler blur 1.5, Mitchell downscaling and subtitle blur 1.0.
+
+### Fixed
+- Plain-text subtitles use light font hinting in mpv playback and clip export; styled ASS tracks retain unhinted positioning and animation.
+- HLS subtitle rendering uses 1.5x device-pixel supersampling up to a 2160px threshold, retaining native resolution on larger outputs.
 
 ## [0.5.8] - 2026-10-29
 

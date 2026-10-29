@@ -6,6 +6,18 @@ Canonical specifics: [v0.6.0 implementation lineup](docs/planning/V0_6_0.md). Th
 feature checklists later in this file remain authoritative task breakdowns.
 No implementation starts as part of this planning request.
 
+### Completed subtitle work included in v0.6.0
+
+- [x] Selective ASS dialogue overrides for font, size, color, border and margin
+- [x] Matching override behavior in mpv, HLS/libass and clip export; all 32 combinations verified
+- [x] Embedded mpv `blend-subtitles=yes` and `scale=ewa_lanczos`; retain existing blur/downscale choices
+- [x] Plain-text light hinting with ASS reset; bounded 1.5x HLS supersampling
+- [x] Bundled libmpv initialization/live option checks, 8 high-DPI sizing cases, frontend build and workspace checks
+- [ ] Visually compare subtitle edges and HLS rendering cost on real playback
+- [~] Native mpv supersampling stays deferred to v0.7.0
+
+### Remaining v0.6.0 work
+
 - [x] Installer visual direction confirmed by SB: compact dark layout matching the app
 - [ ] Review proposed update schedule, restart flow and first-install defaults
 - [ ] 0: Prove installer/updater backend, clean-machine bootstrap, signed
@@ -22,20 +34,6 @@ No implementation starts as part of this planning request.
 Native supersampling, batch next-episode/preload work and continuous seekbar
 dragging remain v0.7.0; learned matching remains v0.6.1. Existing public-release
 policy remains unchanged.
-
-## v0.5.10 — subtitle edge smoothness
-- [x] Add plain-text light hinting with ASS reset and bounded HLS supersampling
-- [x] Validate bundled libmpv live hinting changes, plain/ASS switching, 8 standard/high-DPI sizing cases and frontend production build
-- [x] Refresh version and run workspace checks; bump/tag v0.5.10 locally (unpublished)
-- [ ] Visually compare text edges and HLS rendering cost on real playback
-- [~] Native mpv supersampling deferred by SB on 2026-10-29 to v0.7.0; current smoothing changes retained.
-
-## v0.5.9 — selective ASS subtitle styling
-- [x] Add independently selectable dialogue style fields, retaining existing preferences
-- [x] Apply matching field selection in mpv, HLS/libass, and clip export
-- [x] Verify all 32 field combinations, preserved authored fields/signs/event tags, plain-track behavior, legacy defaults, and mpv/export parity; frontend production build
-- [x] Set embedded mpv `blend-subtitles=yes` and `scale=ewa_lanczos`; workspace check and bundled libmpv headless option initialization passed
-- [x] Bump/tag v0.5.9 locally; publication pending
 
 ## v0.5.8 — implemented parser work (published 2026-10-29)
 - [x] Copy the supplied Python source into a tracked reference directory

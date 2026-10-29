@@ -7,11 +7,13 @@ publication. Update/installer feature requirements: [v0.6.0](V0_6_0.md).
 
 ## Release plan (decided 2026-09-29)
 
-**v0.5.10 subtitle edge smoothness (2026-10-29).** Target jagged text edges: use light FreeType hinting for plain subtitles in embedded mpv and clip export, but no hinting for styled ASS to retain authored positioning/animation. HLS renders subtitle coverage at 1.5x output device-pixel size up to a 2160px supersampling threshold; larger outputs retain native resolution. Keep video scaling and the requested `blend-subtitles=yes` unchanged. Validate track-switch hinting reset, HLS sizing at standard/high DPI, frontend build, and workspace checks. Visual playback acceptance remains required. SB clarified that supersampling must also cover embedded mpv, not only HLS. Deferred by SB on 2026-10-29 to the v0.7.0 custom libmpv work: the current mpv change is plain-text hinting, not supersampling. Native implementation must render subtitle masks at a bounded 1.5x resolution, downsample coverage before composition, preserve authored size/position/animation and video resolution, and cover the active GPU backend plus screenshots/export consistently. The bundled DLL exposes no verified control for this; evaluate a custom libmpv renderer build or a shared subtitle overlay during that future milestone before implementation. The custom build environment is not yet set up (Docker daemon unavailable; only docker-desktop is installed in WSL).
-
-
-**v0.5.9 selective ASS styling (requested 2026-10-29).** Also set embedded playback to `blend-subtitles=yes` and `scale=ewa_lanczos`, as requested by SB; keep the existing scaler blur, downscaler and subtitle blur. Use the subtitle-settings screenshot as a reference: extend the existing opt-in dialogue restyle with independent font/weight, size, text-color, outline/background/shadow, and bottom-margin controls. Preserve existing defaults, authored event tags/animations, and non-dialogue styles. Apply the same field selection in embedded mpv, HLS/libass, and clip export. Keep the current rendering pipeline; the screenshot does not establish a renderer-speed or quality benefit. Validate selective preservation and parity, then bump/tag v0.5.9.
-
+**v0.6.0 consolidation (SB, 2026-10-29).** All unpublished subtitle
+styling/smoothing work formerly labeled v0.5.9 and v0.5.10 ships in v0.6.0.
+Those patch versions are not published. Their local milestone tags are retired;
+commit history remains intact. Version manifests and release notes now target
+v0.6.0, but no v0.6.0 tag is created until its remaining features are complete.
+See [the implementation specification](V0_6_0.md) for completed subtitle work
+and [the future roadmap](ROADMAP.md) for deferred native supersampling.
 
 **Version branches:** Give each new version its own branch named
 `release/<version>` (for example, `release/0.5.7`). Start version-specific
