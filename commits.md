@@ -1,3 +1,5 @@
+### `91e3acf` · 2026-10-30 · docs: record custom source persistence coverage
+- `PHASES.md`
 ### `ef5d028` · 2026-10-30 · test(magnet): cover source migration and persistence
 - `crates/nyaa-client/src/store.rs`
 ### `1ff9b07` · 2026-10-30 · docs: record signed v0.6.0 installer builds
