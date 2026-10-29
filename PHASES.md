@@ -262,6 +262,8 @@
         playback restarts; capture completion before slow stats collection
   - [x] Add E-AC-3/audio decoder context without treating audio errors as
         damaged video or triggering an inappropriate buffer rebuild
+  - [x] Keep the pointer visible across the player surface; hide it only
+        after inactivity while controls may fade outside their hover zones
   - [x] Improve high-value search, seek and mpv logs; avoid repetitive noise
   - [x] Sync changelog and in-app What's New
   - [x] `cargo check --workspace` and `npm run build`

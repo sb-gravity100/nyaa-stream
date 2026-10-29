@@ -405,6 +405,7 @@ function MpvPlayerView({
    const [toast, setToast] = useState<string | null>(null);
    const [nextCountdown, setNextCountdown] = useState<number | null>(null);
    const idleTimerRef = useRef<number | undefined>(undefined);
+   const cursorIdleTimerRef = useRef<number | undefined>(undefined);
    const toastTimerRef = useRef<number | undefined>(undefined);
    const keyboardSeekTargetRef = useRef<number | null>(null);
    const keyboardSeekTimerRef = useRef<number | undefined>(undefined);
@@ -675,6 +676,7 @@ function MpvPlayerView({
    useEffect(() => {
       return () => {
          window.clearTimeout(idleTimerRef.current);
+         window.clearTimeout(cursorIdleTimerRef.current);
          window.clearTimeout(keyboardSeekTimerRef.current);
          window.clearTimeout(toastTimerRef.current);
          traceEnd(startTraceRef.current, "abandoned");
@@ -831,7 +833,10 @@ function MpvPlayerView({
             console.debug("[player] pointer over controls area", { over });
          hoveringControlsRef.current = over;
          if (over) showControls();
-         else hideControlsImmediately();
+         else {
+            showCursorAndRestartTimer();
+            hideControlsImmediately();
+         }
       }
 
       function handlePointerLeave() {
@@ -878,11 +883,11 @@ function MpvPlayerView({
 
 
 
-   /** Show controls + cursor and restart the idle countdown. Uses only
-    * refs and setters, so stale closures (the pointer effect) are safe. */
+   /** Show controls and restart their idle countdown. Cursor visibility has
+    * its own timer so leaving a hover zone doesn't hide it immediately. */
    function showControls() {
       setControlsVisible(true);
-      setCursorHidden(false);
+      showCursorAndRestartTimer();
       window.clearTimeout(idleTimerRef.current);
       idleTimerRef.current = window.setTimeout(
          hideControlsIfIdle,
@@ -890,22 +895,31 @@ function MpvPlayerView({
       );
    }
 
+   /** Cursor visibility follows pointer inactivity across the whole player,
+    * independently from the controls' hover zones. */
+   function showCursorAndRestartTimer() {
+      setCursorHidden(false);
+      window.clearTimeout(cursorIdleTimerRef.current);
+      cursorIdleTimerRef.current = window.setTimeout(() => {
+         console.debug("[player] pointer idle, hiding cursor");
+         setCursorHidden(true);
+      }, CONTROLS_IDLE_MS);
+   }
+
    function hideControlsImmediately() {
       hoveringControlsRef.current = false;
       window.clearTimeout(idleTimerRef.current);
       setControlsVisible(false);
-      setCursorHidden(true);
       setMenu(null);
       setPlaylistOpen(false);
    }
 
    function hideControlsIfIdle() {
-      // Resting over the top/bottom bars, or with a menu open, keeps them
-      // up; the next pointer move restarts the countdown.
+      // Resting over the top/bottom bars, or with a menu open, keeps the
+      // controls up; the next pointer move restarts this countdown.
       if (hoveringControlsRef.current || menuOpenRef.current) return;
       console.debug("[player] mouse idle, hiding controls");
       setControlsVisible(false);
-      setCursorHidden(true);
    }
 
    function togglePlaylist() {

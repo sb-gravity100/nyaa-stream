@@ -20,6 +20,7 @@ step when cutting a release.
 - Seek timing logs now stop at playback restart and include the requested and resumed positions; follow-up stats collection no longer inflates the reported delay.
 - Audio decoder errors include playback and track context and no longer trigger video-buffer recovery.
 - Search and request failure logs include concise query size and HTTP status details.
+- The pointer remains visible across the player surface and hides only after inactivity, independently of control-bar hover state.
 
 ## [0.5.7] - 2026-10-27
 

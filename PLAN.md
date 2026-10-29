@@ -207,6 +207,10 @@ Building the workspace requires, beyond Rust/Node:
   separate from video/stream corruption and now log playhead, seek target and
   active audio-track context without triggering a buffer rebuild. Live
   verification on the same Slime search and a seek/audio session remains.
+  Cursor visibility is independent of the hover controls: pointer movement
+  within the player keeps the cursor visible and restarts its idle timer;
+  moving outside control zones may hide the controls immediately, but the
+  cursor hides only after the idle timeout.
 - **Metadata:** AniList GraphQL API (`https://graphql.anilist.co`), no auth
   required for public queries; Kitsu API (`crates/kitsu-client`) as a
   secondary source for wide backdrop banners and per-episode thumbnails,

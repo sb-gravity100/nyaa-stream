@@ -18,6 +18,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Seek timing diagnostics now reflect the time to playback restart and include seek targets.",
       "Audio decoding errors now include playback and track context in the logs.",
       "Search failure logs show concise query size and HTTP status details.",
+      "The pointer remains visible across the player and hides only after inactivity.",
     ],
   },
   {
