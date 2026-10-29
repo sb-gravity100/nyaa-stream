@@ -1,3 +1,13 @@
+### `5bb46a6` · 2026-10-29 · feat: validate release-page thumbnail frames
+- `Cargo.toml`
+- `src-tauri/Cargo.toml`
+- `src-tauri/src/lib.rs`
+- `src-tauri/src/thumbnail_build.rs`
+- `crates/nyaa-client/src/lib.rs`
+- `crates/nyaa-client/src/store.rs`
+- `FILE_INDEX.md`
+- `PHASES.md`
+
 ### `2e09e10` · 2026-10-29 · feat: collect release description image URLs
 - `crates/nyaa-client/src/lib.rs`
 
