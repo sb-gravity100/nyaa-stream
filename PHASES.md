@@ -23,7 +23,7 @@ No implementation starts as part of this planning request.
 - [x] Remove cancelled ML training/scoring prototype and dataset trainer; retain rule matching and legacy dataset compatibility. Frontend build, workspace/all-target checks, 54 nyaa-client tests and 39 matching tests passed.
 
 - [x] Installer visual direction confirmed by SB: compact dark layout matching the app
-- [x] Create simplified installer prototype using the app's dusk-indigo and sakura palette; SB review remains pending
+- [x] Create simplified installer prototype using the app's dusk-indigo and sakura palette; reviewed and refined by SB
 - [ ] Review proposed update schedule, restart flow and first-install defaults
 - [ ] 0: Prove installer/updater backend, clean-machine bootstrap, signed
       artifact, silent upgrade, old-install migration and restart lifecycle
@@ -809,19 +809,21 @@ policy remains unchanged.
       - [ ] PLAN.md/FILE_INDEX.md sync
 - [ ] Background update checks and custom installation (v0.6.0, requested
       2026-10-29; see PLAN.md "v0.6.0 background updates and custom installer"):
-      - [ ] Add unobtrusive startup/periodic checks, focus/resume throttling,
+      - [x] Add unobtrusive startup/periodic checks, focus/resume throttling,
             request deduplication and offline/server backoff; keep manual checks
-      - [ ] Show Update at the header flex-end only when a newer published
+      - [x] Show Update at the header flex-end only when a newer published
             version is available; preserve drag/window controls and player chrome
-      - [ ] Build custom in-app release summary and download/verify/stage/
-            restart UI with truthful progress, retry and safe cancellation
-      - [ ] Preserve updater signatures, What's new marker and current install
+      - [x] Build custom in-app release summary and download/verify/stage/
+            restart UI with truthful progress, retry and playback deferral
+      - [x] Preserve updater signatures, What's new marker and current install
             on preparation failure; keep background checks non-installing
       - [ ] Audit Windows/Tauri installation lifecycle; stage inside the app,
             apply through a silent helper/backend at shutdown, then relaunch
       - [ ] Save resume state and allow restart to be deferred during playback
       - [ ] Design and implement a bespoke branded installer/bootstrapper UI;
             generic NSIS wizard artwork changes alone are insufficient
+      - [x] Prototype install path/shortcuts, progress/completion/errors, fresh
+            install and recovery screens; actual installer implementation stays open
       - [ ] Cover install path/shortcuts, progress/completion/errors, fresh
             install, upgrade, repair/uninstall and silent updater compatibility
       - [ ] Verify Windows end-to-end update failures/retries, signature

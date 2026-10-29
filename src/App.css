@@ -475,6 +475,23 @@ html.mpv-active .titlebar {
   gap: 8px;
 }
 
+.app-bar-actions {
+  justify-content: flex-end;
+}
+
+.button-update {
+  height: 36px;
+  padding: 0 15px;
+  border-color: rgba(240, 122, 166, 0.38);
+  background: rgba(240, 122, 166, 0.13);
+  color: var(--accent-strong);
+  font-size: 0.82rem;
+}
+
+.button-update:hover {
+  background: rgba(240, 122, 166, 0.22);
+}
+
 .app-debug-button {
   min-height: 36px;
   padding: 0 12px;
@@ -1729,6 +1746,35 @@ html.mpv-active .titlebar {
   min-height: 48px;
   padding: 6px 0;
   cursor: pointer;
+}
+
+.update-release-notes {
+  margin: 8px 0 0;
+  white-space: pre-wrap;
+}
+
+.update-check-again {
+  margin-top: 8px;
+}
+
+.update-error {
+  color: var(--danger);
+}
+
+.update-progress {
+  height: 5px;
+  margin-top: 12px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: rgba(236, 234, 246, 0.1);
+}
+
+.update-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width 0.2s ease;
 }
 
 .setting-text {

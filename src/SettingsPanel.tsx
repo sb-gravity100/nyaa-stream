@@ -6,12 +6,13 @@ import type { JSX } from "preact";
 import { DEFAULT_SUBTITLE_STYLE, resetSettings, updateSettings, useSettings, type PreferredResolution, type SubtitleStyle } from "./settings";
 import { CloseIcon } from "./icons";
 import { exportBackup, importBackup } from "./backup";
-import { checkForUpdate, installUpdate } from "./updater";
+import { applyPreparedUpdate, checkForUpdate, getUpdateState, prepareUpdate, subscribeUpdateState, type UpdateState } from "./updater";
 import { HelpSection } from "./HelpSection";
-import type { Update } from "@tauri-apps/plugin-updater";
 
 interface Props {
   onClose: () => void;
+  playbackActive?: boolean;
+  showUpdates?: boolean;
 }
 
 // Fonts libass can resolve: the bundled default, plus common system fonts
@@ -168,58 +169,61 @@ function StorageSection() {
   );
 }
 
-/** Checks GitHub Releases for a newer signed build and installs it. */
-function UpdateSection() {
-  const [update, setUpdate] = useState<Update | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  async function run(action: () => Promise<string | null>) {
-    setBusy(true);
-    setMessage(null);
-    try {
-      setMessage(await action());
-    } catch (err) {
-      console.warn("[updater] failed", { err: String(err) });
-      setMessage(err instanceof Error ? err.message : String(err));
-    }
-    setBusy(false);
-  }
+/** Signed update discovery and explicit download/restart controls. */
+function UpdateSection({ playbackActive }: { playbackActive: boolean }) {
+  const [state, setState] = useState<UpdateState>(getUpdateState);
+  useEffect(() => subscribeUpdateState(setState), []);
+  const busy = state.status === "checking" || state.status === "downloading" || state.status === "verifying";
+  const update = state.update;
+  const statusLabel = state.status === "checking" ? "Checking for updates…"
+    : state.status === "downloading" ? state.progress == null ? "Downloading…" : `Downloading ${state.progress}%`
+      : state.status === "verifying" ? "Verifying update signature…"
+        : state.status === "ready" ? "Ready to restart"
+          : state.status === "error" ? state.lastError ?? "Update check failed"
+            : update ? `v${update.version} is available` : "Checks GitHub Releases";
 
   return (
-    <section class="settings-section">
+    <section class="settings-section" data-settings-updates="true">
       <h3>Updates</h3>
       <div class="setting-row">
         <span class="setting-text">
           <span class="setting-label">nyaa-stream v{__APP_VERSION__}</span>
-          <span class="setting-hint">{message ?? (update ? `v${update.version} is available` : "Checks GitHub Releases")}</span>
+          <span class="setting-hint">{statusLabel}</span>
         </span>
         <span class="setting-control">
-          {update ? (
-            <button
-              class="button button-primary"
-              disabled={busy}
-              onClick={() => void run(async () => { await installUpdate(update, (p) => setMessage(p === null ? "Downloading…" : `Downloading ${p}%`)); return null; })}
-            >
-              Install and restart
+          {state.status === "ready" ? (
+            <button class="button button-primary" disabled={playbackActive} onClick={() => void applyPreparedUpdate().catch(() => undefined)}>
+              Restart now
+            </button>
+          ) : state.status === "downloading" || state.status === "verifying" ? (
+            <button class="button button-quiet" disabled>Preparing…</button>
+          ) : update ? (
+            <button class="button button-primary" disabled={busy} onClick={() => void prepareUpdate(update).catch(() => undefined)}>
+              {state.status === "error" ? "Retry download" : "Download update"}
             </button>
           ) : (
             <button
               class="button button-quiet"
               disabled={busy}
-              onClick={() =>
-                void run(async () => {
-                  const found = await checkForUpdate();
-                  setUpdate(found);
-                  return found ? null : "You're up to date";
-                })
-              }
+              onClick={() => void checkForUpdate().catch(() => undefined)}
             >
-              Check for updates
+              {state.status === "error" ? "Retry check" : "Check for updates"}
             </button>
           )}
         </span>
       </div>
+      {update && <div class="setting-hint update-release-notes">{update.body?.trim() || `Version ${update.version} is ready to download.`}</div>}
+      {update && !busy && state.status !== "ready" && <button class="link-button update-check-again" onClick={() => void checkForUpdate().catch(() => undefined)}>Check again</button>}
+      {state.status === "ready" && playbackActive && <div class="setting-hint">Close playback before restarting. The update will stay queued.</div>}
+      {state.status === "ready" && state.lastError && <div class="setting-hint update-error">The installer could not start: {state.lastError}</div>}
+      {state.status === "error" && update && <div class="setting-hint update-error">The current version is still available. Retry when ready.</div>}
+      {state.lastError && state.status !== "error" && state.status !== "ready" && <div class="setting-hint update-error">{state.lastError}</div>}
+      {state.status === "idle" && state.lastCheckedAt && <div class="setting-hint">You're up to date.</div>}
+      {state.status === "downloading" && state.progress != null && (
+        <div class="update-progress" role="progressbar" aria-label="Update download" aria-valuemin={0} aria-valuemax={100} aria-valuenow={state.progress}>
+          <span style={{ width: `${state.progress}%` }} />
+        </div>
+      )}
     </section>
   );
 }
@@ -654,7 +658,7 @@ function SubtitlePreview({ style }: { style: SubtitleStyle }) {
   );
 }
 
-export function SettingsPanel({ onClose }: Props) {
+export function SettingsPanel({ onClose, playbackActive = false, showUpdates = false }: Props) {
   const settings = useSettings();
   const style = settings.subtitleStyle;
   const panelRef = useRef<HTMLDivElement>(null);
@@ -683,6 +687,10 @@ export function SettingsPanel({ onClose }: Props) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
+
+  useEffect(() => {
+    if (showUpdates) panelRef.current?.querySelector("[data-settings-updates='true']")?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [showUpdates]);
 
   return (
     <div class="settings-backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
@@ -867,7 +875,7 @@ yaa-stream screenshots.">
             </div>
           </section>
 
-          <UpdateSection />
+          <UpdateSection playbackActive={playbackActive} />
 
           <BackupSection />
 

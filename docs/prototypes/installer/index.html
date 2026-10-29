@@ -28,6 +28,7 @@
     .browse { padding: 0 12px; font-size: 11px; }
     .shortcut { display: flex; align-items: center; gap: 8px; margin-top: 15px; color: #c3c5da; font-size: 11px; }
     .shortcut input { accent-color: #f07aa6; }
+    .shortcut + .shortcut { margin-top: 9px; }
     .progress { height: 6px; margin: 26px 0 9px; overflow: hidden; border-radius: 8px; background: #10121f; }
     .fill { width: 0; height: 100%; border-radius: inherit; background: #f07aa6; transition: width .2s ease; }
     .percent { color: #9ea1c0; font-size: 11px; text-align: right; }
@@ -51,8 +52,9 @@
       <section class="screen active" id="welcome">
         <h1>Install nyaa-stream</h1><p>Choose where to install the app.</p>
         <label for="path">Install location</label>
-        <div class="path"><input id="path" type="text" value="%LOCALAPPDATA%\Programs\nyaa-stream"><button class="browse">Browse</button></div>
-        <label class="shortcut"><input type="checkbox" checked> Add a Start menu shortcut</label>
+        <div class="path"><input id="path" type="text" value="%LOCALAPPDATA%\Programs\nyaa-stream"><button class="browse" onclick="browse()">Browse</button></div>
+        <label class="shortcut"><input type="checkbox" checked> Start menu shortcut</label>
+        <label class="shortcut"><input type="checkbox"> Desktop shortcut</label>
       </section>
       <section class="screen" id="installing">
         <h1>Installing…</h1><p id="progress-label">Copying app files</p>
@@ -69,6 +71,11 @@
   </section>
   <script>
     let timer;
+    function browse() {
+      const path = document.getElementById('path');
+      const chosen = prompt('Install location', path.value);
+      if (chosen?.trim()) path.value = chosen.trim();
+    }
     function show(id) {
       clearInterval(timer);
       document.querySelectorAll('.screen').forEach(el => el.classList.toggle('active', el.id === id));
