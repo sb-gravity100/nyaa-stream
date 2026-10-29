@@ -1,3 +1,9 @@
+### `0db99b8` · 2026-10-30 · feat(artwork): resolve missing TMDB IDs by IMDb
+- `crates/artwork-client/src/lib.rs`
+- `CHANGELOG.md`
+- `FILE_INDEX.md`
+- `PHASES.md`
+- `src/changelog.ts`
 ### `adb87f3` · 2026-10-30 · docs: plan IMDb artwork ID fallback
 - `docs/planning/V0_6_0.md`
 ### `e63bb71` · 2026-10-30 · docs: align seekbar milestone scope
