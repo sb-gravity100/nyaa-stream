@@ -600,6 +600,11 @@ by an app-styled HTML menu whose items depend on what was right-clicked.
 
 ## Release plan (decided 2026-09-29)
 
+**Version branches:** Give each new version its own branch, following
+`release/<version>-<short-topic>` (for example,
+`release/0.5.7-animebatch`). Start version-specific work on that branch so
+its changes and release commit stay grouped by version.
+
 **v0.6.0 parser replacement (requested 2026-10-28).** Port the supplied
 `animebatch.zip` into `crates/release-parse` and make its batch/season-range
 rules the app's release parsing path. Expose its season-aware search as a
