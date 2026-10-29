@@ -3,7 +3,7 @@
 ## v0.5.10 — subtitle edge smoothness
 - [x] Add plain-text light hinting with ASS reset and bounded HLS supersampling
 - [x] Validate bundled libmpv live hinting changes, plain/ASS switching, 8 standard/high-DPI sizing cases and frontend production build
-- [ ] Refresh version and run workspace checks; bump/tag locally
+- [x] Refresh version and run workspace checks; bump/tag v0.5.10 locally (unpublished)
 - [ ] Visually compare text edges and HLS rendering cost on real playback
 
 ## v0.5.9 — selective ASS subtitle styling
