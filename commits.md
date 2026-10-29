@@ -1,3 +1,7 @@
+### `9c81c74` · 2026-10-29 · docs: plan subtitle edge smoothing
+- `PLAN.md`
+- `PHASES.md`
+
 ### `715b4fa` · 2026-10-29 · chore: release v0.5.9
 - `PHASES.md`
 - `package.json`
