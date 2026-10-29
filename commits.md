@@ -1,3 +1,12 @@
+### `dd77fba` · 2026-10-29 · feat: add selective ASS dialogue styling
+- `src/settings.ts`
+- `src/subtitles.ts`
+- `src/SettingsPanel.tsx`
+- `src/changelog.ts`
+- `CHANGELOG.md`
+- `PHASES.md`
+- `FILE_INDEX.md`
+
 ### `4171719` · 2026-10-29 · docs: plan v0.5.9 selective subtitle styling
 - `PLAN.md`
 - `PHASES.md`
