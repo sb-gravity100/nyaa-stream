@@ -1,6 +1,6 @@
 # PHASES.md — nyaa-stream
 
-## v0.6.0 — animebatch parser replacement (requested 2026-10-28)
+## v0.6.0 — consolidated milestone (expanded 2026-10-29)
 - [x] Copy the supplied Python source into a tracked reference directory
 - [x] Port animebatch batch, season-range, alias and search behavior to Rust (40 parse cases and archive search examples pass)
 - [x] Reuse the existing Rust anitopy port; port the guessit title, source and resolution fields used by animebatch (40-case Python oracle parity)
@@ -9,11 +9,13 @@
 - [x] Compare the 10,151-title corpus with pre-port parser: 65 changed records (58 kinds, 20 episode ranges, 2 seasons; no title changes)
 - [x] Title-matching fixture: the season-range correction restored the pre-port 118 wrongly kept Mushoku S1 releases (ceiling 128); all 39 active `title_match` tests pass
 - [x] Sync FILE_INDEX and CHANGELOG
-- [ ] Bump and tag v0.6.0 locally with the rest of the milestone
 
-## v0.10.0 — custom Windows libmpv build (planned 2026-10-29)
+## v0.7.0 — custom Windows libmpv build (planned 2026-10-29)
 - [ ] Record current bundled libmpv identity/options and a baseline for ASS
       edge quality, E-AC-3 playback, seek latency, and hardware decoding
+- [ ] Audit required libmpv APIs, stream protocols, codecs, ASS/font handling,
+      screenshots, and playback commands; disable unused optional features
+      only after confirming no runtime dependency
 - [ ] Feasibility spike: compare mpv's documented Windows build workflow
       with a maintained Windows cross-toolchain; treat mpv-build as a
       Linux-focused source/options reference
@@ -21,14 +23,23 @@
       reproducible x64 `libmpv-2.dll` build with license/source materials
 - [ ] Preserve the existing HLS FFmpeg build separately unless measurements
       support a safe consolidation
+- [ ] Measure streamer-to-mpv Range reads, first byte, first frame, buffering,
+      and seek completion on repeatable torrent cases
+- [ ] Tune the app's stream reader and mpv cache/read-ahead/seek behavior from
+      those measurements; report binary-size and playback-time results apart
 - [ ] Implement subtitle AA/scaling through upstream features or original
       patches, keeping subtitle processing isolated from video scaling
-- [ ] Verify E-AC-3 samples and decoder diagnostics; tune seeks only after
-      comparing measured latency with the current bundled DLL
+- [ ] Verify E-AC-3 samples and decoder diagnostics
+- [ ] Profile seek delays with the existing seek traces; separate app,
+      stream-reader, demuxer, and decoder time before tuning
+- [ ] Benchmark upstream mpv seek/read-ahead and retarget/cancel behavior;
+      implement only independent changes with repeatable latency gains and
+      no stale-seek or resume regressions
+- [ ] Verify no PotPlayer code or private implementation details are copied
 - [ ] Verify hardware decode and software fallback on supported Windows GPUs
 - [ ] Integrate the candidate DLL and check existing embedded-player ABI,
       torrent playback, screenshots, and HLS fallback
-- [ ] Sync docs, bump/tag v0.10.0 locally on `release/0.10.0`
+- [ ] Sync docs, bump/tag v0.7.0 locally on `release/0.7.0`
 
 ## v0.5.5 — Polish fixes
 - [x] Remove the reserved title-bar space in fullscreen; keep the home app bar visible
@@ -245,7 +256,8 @@
         merged into `groupedSources` as explicit packs
   - [ ] M4b pack playback: `pickFile` by season + episode, extras skipped,
         unknown-numbering packs stay on a Batch row
-  - [ ] M5 FILE_INDEX/CHANGELOG/version bump, tag
+  - [ ] M5 FILE_INDEX/CHANGELOG sync; release bump follows after all v0.6.0
+        features are complete
 
 - [ ] nyaa search sorted by seeders (user 2026-10-17; PLAN.md "Torrent source" ->
       Sort; next patch, bump pending). One commit each:
@@ -718,8 +730,7 @@
       - [ ] Anime cards/posters + search dropdown + Continue watching
       - [ ] Episode rows + source/torrent rows
       - [ ] Player surface (flat, no Subtitles/Speed)
-      - [ ] FILE_INDEX.md/PLAN.md sync, `npm run bump -- minor`, tag
-            `v0.6.0` locally (not pushed/published - see PLAN.md "Release plan")
+      - [ ] FILE_INDEX.md/PLAN.md sync
 - [ ] Build thumbnails button (v0.6.0, see PLAN.md "Build thumbnails
       button"): one commit each -
       - [ ] nyaa view-page scrape collects description image URLs
@@ -739,9 +750,8 @@
       - [ ] Episodes header button with count/progress/failed state,
             spinner on rows being captured
       - [ ] Verify live on a show with no Kitsu/AniList thumbnails
-      - [ ] PLAN.md/FILE_INDEX.md sync, `npm run bump -- minor`, tag
-            `v0.6.0` locally (not pushed/published - see PLAN.md "Release plan")
-- [ ] HD banner sources (v0.7.0, see PLAN.md "HD banner sources"): one
+      - [ ] PLAN.md/FILE_INDEX.md sync
+- [ ] HD banner sources (v0.6.0, see PLAN.md "HD banner sources"): one
       commit each -
       - [ ] Fribb anime-lists id map: download, weekly refresh, offline
             lookup, arm-server fallback
@@ -757,9 +767,8 @@
             logged, not bundled); TMDB steps skipped without one
       - [ ] About attribution: TMDB logo (`src/assets/tmdb-logo.svg`) +
             notice, fanart.tv, Simkl; TMDB cache max 6 months
-      - [ ] PLAN.md/FILE_INDEX.md sync, `npm run bump -- minor`, tag
-            `v0.7.0` locally (not pushed/published - see PLAN.md "Release plan")
-- [ ] Seek-bar thumbnail preview (v0.8.0, see PLAN.md "Seek-bar thumbnail
+      - [ ] PLAN.md/FILE_INDEX.md sync
+- [ ] Seek-bar thumbnail preview (v0.6.0, see PLAN.md "Seek-bar thumbnail
       preview"): one commit each -
       - [ ] `media.rs`: keyframe-only storyboard job (5s buckets, 240x135
             JPEG) over verified pieces only, revisiting as pieces arrive
@@ -768,18 +777,17 @@
             (kept with a resume buffer)
       - [ ] Seek-bar hover shows the frame above the time tooltip
             (debounced, cached; time only when not downloaded)
-      - [ ] PLAN.md/FILE_INDEX.md sync, `npm run bump -- minor`, tag
-            `v0.8.0` locally (not pushed/published - see PLAN.md "Release plan")
-- [ ] Navigation and home rehaul (v0.9.0, see PLAN.md "Navigation and home
+      - [ ] PLAN.md/FILE_INDEX.md sync
+- [ ] Bump/tag the consolidated v0.6.0 milestone locally on `release/0.6.0`
+- [ ] Navigation and home rehaul (v0.8.0, see PLAN.md "Navigation and home
       rehaul + Discover"): one commit each -
       - [ ] Left rail component + layout shell (hidden in the player)
       - [ ] Routes `#/library`, `#/discover`, `#/discover/browse`
       - [ ] Library page; Home "Your library" row
       - [ ] Search moved into the rail (+ global shortcut)
       - [ ] Home restyled for the rail layout
-      - [ ] Verify live; PLAN.md/FILE_INDEX.md sync, `npm run bump -- minor`,
-            tag `v0.9.0` locally (not pushed/published)
-- [ ] Discover (v0.9.1, see PLAN.md "Navigation and home rehaul + Discover"):
+      - [ ] Verify live; PLAN.md/FILE_INDEX.md sync
+- [ ] Discover (v0.8.1, see PLAN.md "Navigation and home rehaul + Discover"):
       one commit each -
       - [ ] `anilist-client` queries: trending, season, upcoming, popular,
             filtered browse, recommendations, airing schedules (+ tests)
@@ -789,7 +797,7 @@
       - [ ] Recommendations rows from library/watch history
       - [ ] Airing schedule calendar
       - [ ] PLAN.md/FILE_INDEX.md sync, `npm run bump -- patch`, tag
-            `v0.9.1` locally (not pushed/published)
+            `v0.8.1` locally (not pushed/published)
 - [ ] 32-bit Windows (v1.0.0, see PLAN.md "32-bit Windows support"): one
       commit each -
       - [ ] Audit 64-bit assumptions (`usize` casts, sizes/offsets as `u64`,
@@ -804,7 +812,7 @@
       - [ ] Verify live on a 32-bit build (WoW64 or VM): playback, subs,
             resume, HLS fallback, updater
 - [ ] Stable release (v1.0.0, see PLAN.md "Release plan"): one commit each -
-      - [ ] Stabilization pass over v0.4.0-v0.8.0: open bugs, live verify
+      - [ ] Stabilization pass over v0.4.0-v0.8.1: open bugs, live verify
             items still unchecked, README/What's new
       - [ ] PLAN.md/FILE_INDEX.md sync, `npm run bump -- major`, tag
             `v1.0.0`, push the tag, build + publish the release

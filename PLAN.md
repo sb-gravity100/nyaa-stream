@@ -640,10 +640,16 @@ with no canonical-title changes. The app's 39 active title-matching tests
 pass, including the fixture at its pre-port 118 wrongly kept Mushoku S1
 releases; the first draft's spaced season-range overmatch was removed.
 
-**v0.10.0 custom Windows libmpv build (planned 2026-10-29).** Replace the
+**v0.7.0 custom Windows libmpv build (planned 2026-10-29).** Replace the
 opaque bundled player build with a reproducible, project-maintained build of
 upstream mpv/libmpv and its FFmpeg, libass, and libplacebo dependencies. Pin
-each source revision and record build options. The linked `mpv-build` scripts
+each source revision and record build options. Build only the optional mpv
+features and dependencies nyaa-stream uses, after auditing its libmpv API,
+stream protocols, codecs, ASS/font handling, screenshots, and playback
+commands. Disable unused outputs, protocols, encoders, and filters only when
+the dependency audit confirms they are unnecessary. This should reduce
+binary size and build surface; playback-speed gains must be demonstrated by
+benchmarks rather than assumed. The linked `mpv-build` scripts
 are Linux-focused; use them as a source-selection/options reference, and base
 the Windows build on mpv's documented Windows build workflow or a maintained
 Windows cross-toolchain after a small build feasibility spike. Keep the
@@ -654,26 +660,34 @@ Use PotPlayer only as a source of documented feature ideas, not as code or
 binary input. Implement improvements through upstream mpv/FFmpeg/libass/
 libplacebo features or independently authored patches: keep ASS antialiasing
 and subtitle processing isolated from video scaling so detail is retained;
-verify E-AC-3 decoding with known samples; measure seek latency against the
-current DLL before tuning; and confirm hardware-decoding paths retain a
-software fallback. Add build identity and selected decoder/hwdec context to
-logs without logging private paths or credentials. Ship required license
-notices and corresponding source or source-offer materials for the exact
-distributed build. Acceptance compares old and new DLLs on the same ASS,
-E-AC-3, seeking, and hardware-decoding cases, and confirms the existing
+verify E-AC-3 decoding with known samples; optimize seek latency against the
+current DLL using nyaa-stream's seek traces and repeatable playback cases;
+optimize data delivery between the torrent streamer and mpv; and confirm
+hardware-decoding paths retain a software fallback. Seek and stream work
+may tune upstream mpv buffering/read-ahead, retargeting and cancellation
+behavior, mpv's range/read pattern, or our stream-reader integration, but
+each change must show a measured improvement without stale-seek or resume
+regressions. Compare first-byte, first-frame, seek-complete, bytes-requested,
+and buffering times on the same torrents. Do not copy
+PotPlayer code or infer its private seek implementation. Add build identity
+and selected decoder/hwdec context to logs without logging private paths or
+credentials. Ship required license notices and corresponding source or
+source-offer materials for the exact distributed build. Acceptance compares
+old and new DLLs on the same ASS, E-AC-3, seek-latency, and hardware-decoding
+cases, and confirms the existing
 embedded-player ABI and HLS fallback still work.
 
 Three published releases: **v0.3.2** (the playback fixes) as soon as it
 passes a live test, **v0.4.0** (splash/title bar, download cache, resume
 buffer, contact and send logs, and the sbtl torrent engine), then **v1.0.0** (the stable Windows release
-after v0.10.0). **v0.5.0 is also published** (decided 2026-10-13: it bundles the
+after v0.8.1). **v0.5.0 is also published** (decided 2026-10-13: it bundles the
 unreleased v0.4.3 season-aware matching and the v0.4.4 AnimeTosho dataset /
 Import Tosho Data / Settings modal (the v0.4.5 custom magnet paste moved to
 v0.6.0 the same day), so the old 0.4.3-0.4.5 numbers are never released; the old v0.5.0 context-menu
 milestone merged into v0.6.0). The milestones in between - v0.6.0 (context
-menus + custom magnet paste + build thumbnails) → v0.6.1 (learned release-to-entry matcher) → v0.7.0 (HD banners) → v0.8.0 (seek preview) → v0.9.0
-(navigation/home rehaul) → v0.9.1 (Discover) → v0.10.0 (custom Windows libmpv
-build) - are each
+menus + custom magnet paste + build thumbnails + HD banners + seek preview)
+→ v0.6.1 (learned release-to-entry matcher) → v0.7.0 (custom Windows libmpv
+build) → v0.8.0 (navigation/home rehaul) → v0.8.1 (Discover) - are each
 bumped (`npm run bump`) and tagged **locally only**, never pushed. Commits
 are pushed with plain `git push` (no tags); `npm run release` pushes only
 the tag it publishes. Installs update 0.3.1 → 0.3.2 → 0.4.0 → 1.0.0 (v1.0.0 ships x86_64 and 32-bit
@@ -1344,7 +1358,7 @@ Episodes cards. A button on the Episodes section runs it on demand.
 - **Cost:** each capture downloads the file header and a few MB around the
   midpoint; the scratch torrent is removed afterwards (existing behaviour).
 
-## HD banner sources (planned, v0.7.0 - minor: new feature)
+## HD banner sources (planned, v0.6.0 - minor: new feature)
 
 Today every wide backdrop (media page, home hero, Continue watching) is
 `kitsu.background` (Kitsu `coverImage.original`) → AniList `bannerImage`
@@ -1375,9 +1389,8 @@ and quality and often missing. Researched 2026-09-29:
   (`/tv/{id}/season/{n}/episode/{e}/images`). The Fribb entry gives the TMDB
   tv id and season (`season.tmdb`); the episode number is the AniList one,
   corrected for split-cour entries by the same absolute-offset logic the
-  release matcher uses. From v0.7.0 the episode thumbnail order is
-  Kitsu / AniList → **TMDB still** → nyaa view-page screenshot → torrent
-  capture (v0.6.0 ships without the TMDB step).
+  release matcher uses. The v0.6.0 episode thumbnail order is Kitsu / AniList
+  → **TMDB still** → nyaa view-page screenshot → torrent capture.
 - **Logos (bonus):** TMDB / fanart.tv title logos can replace the text title
   on the home hero and media page, as Stremio does.
 - **New crate `crates/artwork-client`** (TMDB + fanart.tv + Simkl + the id
@@ -1401,7 +1414,7 @@ and quality and often missing. Researched 2026-09-29:
 - **Sizes:** load a 1280-wide variant first (TMDB `w1280`, Simkl `_mobile`)
   and swap to full size once decoded, so hero slides don't stall.
 
-## Seek-bar thumbnail preview (planned, v0.8.0 - minor: new feature)
+## Seek-bar thumbnail preview (planned, v0.6.0 - minor: new feature)
 
 Hovering the player's seek bar shows only a time tooltip today
 (`handleSeekHover`, `src/PlayerView.tsx`). Add a small frame preview above
@@ -1579,7 +1592,7 @@ go" in one log line. It also gives the numbers for the fast-resume
 
 Assumes "32-bit" = Windows x86 (`i686-pc-windows-msvc`); tell me if Linux
 or ARM was meant. The stable v1.0.0 ships both `windows-x86_64` and
-`windows-i686` builds. Work starts after v0.8.0 (features stay 64-bit-tested
+`windows-i686` builds. Work starts after v0.8.1 (features stay 64-bit-tested
 until then, but must not add 64-bit-only assumptions).
 
 - **Toolchain**: add the `i686-pc-windows-msvc` Rust target; vcpkg triplet
@@ -1606,15 +1619,15 @@ until then, but must not add 64-bit-only assumptions).
 - Risks: 32-bit builds of vcpkg FFmpeg or sbtl may need patches; memory
   exhaustion on long HLS runs; small user base vs. extra build/QA cost.
 
-## Navigation and home rehaul + Discover (planned, v0.9.0 rehaul, v0.9.1 Discover)
+## Navigation and home rehaul + Discover (planned, v0.8.0 rehaul, v0.8.1 Discover)
 
 Scope decided 2026-09-29: rework **navigation and the home page** only. The
 media page, player and settings keep their layouts (they inherit new
-navigation chrome and the existing theme, nothing more). Lands between
-v0.8.0 and v1.0.0; both are local-only tags, so v1.0.0 is the first
-published build with the new UI (see "Release plan").
+navigation chrome and the existing theme, nothing more). The v0.8.0 rehaul
+and v0.8.1 Discover milestone are local-only tags, so v1.0.0 remains the
+first published build with the new UI (see "Release plan").
 
-**v0.9.0 - navigation and home rehaul**
+**v0.8.0 - navigation and home rehaul**
 - Persistent left rail (icons + labels, collapses on narrow windows) replacing
   the current top-of-page navigation: Home, Discover, Library, Search,
   Settings. Sits under the custom title bar from v0.4.0; hidden in the
@@ -1626,7 +1639,7 @@ published build with the new UI (see "Release plan").
 - Search moves into the rail (also a global shortcut), results unchanged.
 - No new backend; frontend-only, verified in the app and the browser preview.
 
-**v0.9.1 - Discover** (`src/DiscoverPage.tsx`, new `anilist-client`
+**v0.8.1 - Discover** (`src/DiscoverPage.tsx`, new `anilist-client`
 queries, cached per session + short disk TTL; Kitsu fallback where the
 metadata fallback already exists)
 - **Seasonal and trending**: rows for Trending now, This season, Next
