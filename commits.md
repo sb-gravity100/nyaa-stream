@@ -1,3 +1,7 @@
+### `4620482` · 2026-10-29 · feat: simplify installer prototype
+- `docs/prototypes/installer/index.html`
+- `PHASES.md`
+
 ### `3fcb2d4` · 2026-10-29 · feat: prototype compact installer screens
 - `docs/prototypes/installer/index.html`
 - `FILE_INDEX.md`
