@@ -1,3 +1,7 @@
+### `7f5b618` · 2026-10-29 · docs: prioritize opt-in memory profiling
+- `PLAN.md`
+- `PHASES.md`
+
 ### `25bf4ae` · 2026-10-29 · docs: plan v0.7.0 memory and branding work
 - `PLAN.md`
 - `PHASES.md`
