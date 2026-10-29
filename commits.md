@@ -1,3 +1,7 @@
+### `64b3aae` · 2026-10-29 · fix: add audio decoder playback context
+- `crates/mpv-player/src/libmpv.rs`
+- `src/mpvVideo.ts`
+
 ### `612ce7b` · 2026-10-29 · fix: measure seek traces at playback restart
 - `src-tauri/src/load_trace.rs`
 - `src/PlayerView.tsx`
