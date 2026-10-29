@@ -53,6 +53,12 @@
       "icons/icon.ico"
     ],
     "windows": {
+      "nsis": {
+        "template": "installer/installer.nsi",
+        "headerImage": "installer/nsis-header.bmp",
+        "sidebarImage": "installer/nsis-sidebar.bmp",
+        "startMenuFolder": "nyaa-stream"
+      },
       "wix": {
         "language": "en-US",
         "bannerPath": "installer/banner.bmp",

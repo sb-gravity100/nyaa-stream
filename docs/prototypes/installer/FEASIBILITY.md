@@ -20,23 +20,38 @@ Checked against the current Tauri v2 documentation on 2026-10-29.
   existing signed GitHub manifest. The updater uses the signed NSIS/MSI
   artifact and can remain separate from the interactive first-install UI.
 
-## Direction
+## Implemented installer path
 
-Keep NSIS as the packaging and install engine, with a custom NSIS template for
-the reviewed dusk-indigo/sakura first-install experience. Keep the Tauri
-updater's signed payload for in-app updates; do not route it through the
-interactive first-install pages. Preserve `passive` until isolated tests show
-that every supported per-user/per-machine install can use `quiet` safely.
-The current updater UI stages and verifies in-app, then asks the user to
-restart; the Windows apply step still needs an isolated-machine decision about
-the passive installer progress window versus a dedicated helper.
+NSIS remains the install engine. `src-tauri/installer/installer.nsi` now adds a
+custom `nsDialogs` page that combines destination selection, folder browsing,
+Start Menu folder/shortcut choice and desktop shortcut choice. The real NSIS
+file-copy page reports progress/errors, and its completion page can launch the
+app. The generated header/sidebar artwork and the installer use the
+dusk-indigo/sakura palette. Rebuild artwork with
+`powershell -File scripts/make-nsis-art.ps1`.
+
+Tauri's signed updater payload and `passive` mode remain separate from the
+interactive page. The custom page explicitly skips passive updater runs, so
+`/UPDATE` continues using Tauri's existing migration and restart behavior.
+Do not switch to `quiet` without isolated proof of elevation and install-mode
+behavior.
+
+The Windows NSIS bundle completed and produced
+`target/release/bundle/nsis/nyaa-stream_0.6.0_x64-setup.exe`. That build used an
+empty Start Menu folder setting and emitted a warning about the missing MUI
+default-folder macro. The configuration now sets the `nyaa-stream` default so
+the shortcut choices appear and can be restored from the uninstall registry;
+that final configuration edit was not rebuilt. The artifact was not signed
+because the private signing key was not supplied. The interactive page,
+install, error recovery, uninstaller and updater flow have not been exercised
+on an isolated Windows profile.
 
 ## Still requires an isolated Windows environment
 
 No installer was run against SB's active profile. These checks remain open:
 
-- Build the custom template and inspect its generated NSIS script and signed
-  updater artifact.
+- Rebuild and inspect the final template with the configured Start Menu
+  folder, then build/inspect a signed updater artifact using the release key.
 - Install fresh with Start menu/desktop choices, then verify launch, shortcuts,
   uninstall registration and WebView2 bootstrap on a clean Windows machine.
 - Upgrade both existing NSIS and MSI installs; verify their install paths,
