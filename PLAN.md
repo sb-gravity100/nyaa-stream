@@ -681,13 +681,18 @@ The `msedgewebview2.DMP` snapshot reviewed 2026-10-29 contains about 2.56 GiB
 of captured memory ranges and about 2.08 GiB of private committed virtual
 memory. This is not a working-set measurement and does not attribute memory
 to JavaScript objects or a particular subsystem; the dump has no V8 heap
-snapshot stream. Use matching WebView2 symbols plus DevTools heap snapshots
-and repeated idle/library/player measurements before treating this as a leak.
-Evaluate one shared WebView2 environment/control where the Tauri window model
-allows it, bounded frontend image/thumbnail caches and released object URLs,
-and WebView2's low-memory target or suspend/resume for inactive UI states.
-Keep the renderer active while its controls are needed for playback. Do not
-share the user-data folder with unrelated applications.
+snapshot stream. **Profile first:** add opt-in, bounded memory sampling for
+the nyaa-stream host and WebView2 child processes, labeled by supported
+process kind and PID. Record working set and private bytes with app state
+(home, media page, player, minimized); avoid page contents and user paths.
+Use matching WebView2 symbols plus DevTools heap snapshots and repeatable
+idle/library/player runs to identify likely owners before treating this as a
+leak. Do not change cache or suspension policies until profiles support it.
+Then evaluate one shared WebView2 environment/control where the Tauri window
+model allows it, bounded frontend image/thumbnail caches and released object
+URLs, and WebView2's low-memory target or suspend/resume for inactive UI
+states. Keep the renderer active while its controls are needed for playback.
+Do not share the user-data folder with unrelated applications.
 
 For process branding, label WebView2 processes by their supported process
 kind in nyaa-stream diagnostics and apply the custom icon to the nyaa-stream

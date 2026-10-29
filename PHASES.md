@@ -15,6 +15,10 @@
       edge quality, E-AC-3 playback, seek latency, and hardware decoding
 - [x] Inspect `msedgewebview2.DMP` structure: about 2.56 GiB captured and
       2.08 GiB private committed virtual memory; no JS heap attribution
+- [ ] Add opt-in, bounded memory sampling for the host and WebView2 child
+      processes: role/PID, working set, private bytes, and app state
+- [ ] Capture repeatable idle, library, player, and minimized profiles before
+      changing caches, WebView2 memory targets, or suspend behavior
 - [ ] Profile WebView2 with matching symbols and DevTools heap snapshots;
       identify retained DOM/JS objects and native allocation owners
 - [ ] Bound image/thumbnail caches and release stale object URLs or route data
