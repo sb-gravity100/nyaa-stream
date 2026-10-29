@@ -160,6 +160,14 @@ export async function applyPreparedUpdate(): Promise<void> {
   try {
     console.info("[updater] waiting for playback resume data and teardown before install");
     await invoke("wait_for_playback_stop");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    publish({ status: "ready", lastError: message, update });
+    console.error("[updater] playback teardown failed; installer launch aborted", { version: update.version, error: message });
+    throw error;
+  }
+
+  try {
     const from = await getVersion();
     marker = JSON.stringify({ from, to: update.version });
     localStorage.setItem(UPDATED_FROM_KEY, marker);
