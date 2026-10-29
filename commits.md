@@ -1,3 +1,6 @@
+### `714c399` · 2026-10-30 · fix(installer): preserve shortcut choices across upgrades
+- `docs/prototypes/installer/FEASIBILITY.md`
+- `src-tauri/installer/installer.nsi`
 ### `1ebb7dc` · 2026-10-30 · docs: draft v0.6.0 release notes
 - `CHANGELOG.md`
 - `src/changelog.ts`
