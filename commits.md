@@ -1,3 +1,11 @@
+### `6272d7a` · 2026-10-29 · feat: add episode and source context actions
+- `src/MediaPage.tsx`
+- `src/PlayerView.tsx`
+- `src/HlsPlayerView.tsx`
+- `src/contextMenuStore.ts`
+- `FILE_INDEX.md`
+- `PHASES.md`
+
 ### `accb738` · 2026-10-29 · feat: add anime context menu actions
 - `src/App.tsx`
 - `src/HomePage.tsx`
