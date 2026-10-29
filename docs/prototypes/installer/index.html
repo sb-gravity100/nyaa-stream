@@ -3,116 +3,92 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>nyaa-stream installer prototype</title>
+  <title>nyaa-stream setup</title>
   <style>
-    :root { color-scheme: dark; font-family: "Segoe UI", sans-serif; background: #0b0d10; color: #f1f3f5; }
+    :root { color-scheme: dark; font: 14px "Segoe UI", sans-serif; background: #171a2b; color: #eceaf6; }
     * { box-sizing: border-box; }
-    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: radial-gradient(ellipse at 50% 0%, #172324 0, #0b0d10 62%); }
-    .window { width: min(760px, calc(100vw - 32px)); min-height: 500px; overflow: hidden; border: 1px solid #30383a; border-radius: 15px; background: #111518; box-shadow: 0 28px 100px #0009; }
-    .titlebar { height: 48px; display: flex; align-items: center; justify-content: space-between; padding: 0 18px; border-bottom: 1px solid #252c2e; color: #9ba5a7; font-size: 12px; }
-    .window-controls { display: flex; gap: 8px; align-items: center; }
-    .window-controls button { width: 28px; height: 25px; padding: 0; border: 0; border-radius: 5px; background: transparent; color: #aab2b4; font-size: 15px; }
-    .window-controls button:hover { background: #293133; }
-    .content { padding: 34px 42px 24px; }
-    .brand { display: flex; align-items: center; gap: 14px; margin-bottom: 30px; }
-    .brand img { width: 50px; height: 50px; border-radius: 12px; }
-    .brand-name { margin: 0; font-size: 22px; font-weight: 650; letter-spacing: -.4px; }
-    .brand-caption { margin: 4px 0 0; color: #94a1a2; font-size: 12px; }
-    .steps { display: flex; gap: 8px; margin: 0 0 28px; padding: 0; list-style: none; }
-    .steps li { flex: 1; padding-top: 10px; border-top: 2px solid #30383a; color: #778384; font-size: 11px; }
-    .steps li.active { border-color: #56d6bd; color: #dce7e5; }
-    .screen { display: none; min-height: 255px; }
-    .screen.active { display: block; animation: appear .18s ease-out; }
-    @keyframes appear { from { opacity: .4; transform: translateY(4px); } to { opacity: 1; transform: none; } }
-    h1 { margin: 0 0 9px; font-size: 25px; letter-spacing: -.55px; font-weight: 620; }
-    .lead { margin: 0 0 22px; color: #a2adae; font-size: 13px; line-height: 1.55; }
-    .field-label { display: block; margin-bottom: 7px; color: #c5cece; font-size: 12px; }
-    .path-row { display: flex; gap: 8px; }
-    input[type=text] { min-width: 0; flex: 1; padding: 11px 12px; border: 1px solid #343e40; border-radius: 7px; outline: none; background: #0c1012; color: #e7eceb; font: inherit; font-size: 12px; }
-    input[type=text]:focus { border-color: #56d6bd; }
+    body { min-height: 100vh; margin: 0; display: grid; place-items: center; background: radial-gradient(ellipse at 50% 0, #2b3050, #171a2b 70%); }
+    .window { width: min(540px, calc(100vw - 32px)); overflow: hidden; border: 1px solid rgba(236,234,246,.12); border-radius: 14px; background: #20243a; box-shadow: 0 24px 70px #08091399; }
+    header { display: flex; align-items: center; gap: 11px; padding: 20px 24px; border-bottom: 1px solid rgba(236,234,246,.09); }
+    header img { width: 38px; height: 38px; border-radius: 9px; }
+    header strong { font-size: 15px; font-weight: 650; }
+    header span { margin-left: auto; color: #9ea1c0; font-size: 11px; }
+    main { min-height: 236px; padding: 30px 28px 25px; }
+    .screen { display: none; }
+    .screen.active { display: block; animation: arrive .16s ease-out; }
+    @keyframes arrive { from { opacity: .5; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+    h1 { margin: 0 0 7px; font-size: 21px; font-weight: 620; letter-spacing: -.3px; }
+    p { margin: 0 0 20px; color: #9ea1c0; line-height: 1.5; font-size: 12px; }
+    label { display: block; margin-bottom: 6px; color: #c3c5da; font-size: 11px; }
+    .path { display: flex; gap: 8px; }
+    input[type=text] { flex: 1; min-width: 0; padding: 10px; border: 1px solid rgba(236,234,246,.13); border-radius: 6px; outline: none; background: #10121f; color: #eceaf6; font: inherit; font-size: 12px; }
+    input[type=text]:focus { border-color: #f07aa6; }
     button { cursor: pointer; font: inherit; }
-    .browse { padding: 0 14px; border: 1px solid #384244; border-radius: 7px; background: #1b2224; color: #d6dedd; font-size: 12px; }
-    .choices { display: flex; gap: 24px; margin-top: 18px; }
-    .choice { display: flex; gap: 8px; align-items: center; color: #b8c1c1; font-size: 12px; }
-    .choice input { accent-color: #56d6bd; }
-    .summary { display: grid; grid-template-columns: 42px 1fr; align-items: center; gap: 13px; max-width: 510px; margin: 28px auto 0; padding: 16px; border: 1px solid #293234; border-radius: 10px; background: #151b1d; }
-    .summary-mark { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 50%; background: #19352f; color: #72e2c9; font-size: 20px; }
-    .summary strong { display: block; font-size: 13px; }
-    .summary span { display: block; margin-top: 4px; color: #97a3a3; font-size: 11px; line-height: 1.5; }
-    .progress-wrap { max-width: 520px; margin: 36px auto 0; }
-    .progress-meta { display: flex; justify-content: space-between; margin-bottom: 10px; color: #bfc9c8; font-size: 12px; }
-    .track { height: 7px; overflow: hidden; border-radius: 9px; background: #293133; }
-    .fill { width: 0; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #38ad9b, #7ae4c9); transition: width .3s ease; }
-    .detail { margin-top: 11px; color: #859191; font-size: 11px; }
-    .footer { display: flex; justify-content: space-between; align-items: center; min-height: 60px; margin: 0 42px; border-top: 1px solid #252c2e; }
-    .footer-note { color: #778384; font-size: 10px; }
-    .footer select { margin-left: 6px; border: 1px solid #30383a; border-radius: 5px; padding: 4px 6px; background: #151b1d; color: #b7c1c0; font: inherit; }
-    .actions { display: flex; gap: 9px; }
-    .secondary, .primary { min-width: 92px; padding: 9px 14px; border-radius: 7px; font-size: 12px; }
-    .secondary { border: 1px solid #384244; background: #171d1f; color: #c1caca; }
-    .primary { border: 1px solid #65ddc1; background: #59d3b8; color: #0b1916; font-weight: 650; }
-    .primary:hover { background: #75e2c8; }
-    .secondary:hover { background: #222a2c; }
-    .error { color: #f3a5a5; }
-    @media (max-width: 560px) { .content { padding: 26px 22px 18px; } .footer { margin: 0 22px; } .choices { flex-direction: column; gap: 11px; } }
+    .browse, .secondary { border: 1px solid rgba(236,234,246,.13); border-radius: 6px; background: #2b3050; color: #eceaf6; }
+    .browse { padding: 0 12px; font-size: 11px; }
+    .shortcut { display: flex; align-items: center; gap: 8px; margin-top: 15px; color: #c3c5da; font-size: 11px; }
+    .shortcut input { accent-color: #f07aa6; }
+    .progress { height: 6px; margin: 26px 0 9px; overflow: hidden; border-radius: 8px; background: #10121f; }
+    .fill { width: 0; height: 100%; border-radius: inherit; background: #f07aa6; transition: width .2s ease; }
+    .percent { color: #9ea1c0; font-size: 11px; text-align: right; }
+    .error { color: #ff8a8a; }
+    footer { display: flex; min-height: 60px; align-items: center; justify-content: space-between; padding: 0 24px; border-top: 1px solid rgba(236,234,246,.09); }
+    .preview { color: #6c7092; font-size: 10px; }
+    select { margin-left: 4px; border: 0; background: transparent; color: #9ea1c0; font: inherit; font-size: 10px; }
+    .actions { display: flex; gap: 8px; }
+    .secondary, .primary { padding: 8px 14px; font-size: 11px; }
+    .primary { border: 0; border-radius: 6px; background: #f07aa6; color: #2a0f1c; font-weight: 650; }
+    .primary:hover { background: #ff94bb; }
+    .primary:disabled { cursor: default; opacity: .6; }
+    .secondary { padding: 7px 12px; }
+    @media (max-width: 460px) { main { padding: 24px 20px; } header, footer { padding-left: 18px; padding-right: 18px; } }
   </style>
 </head>
 <body>
-  <main class="window" aria-label="Installer UI prototype">
-    <div class="titlebar"><span>nyaa-stream · setup preview</span><div class="window-controls"><button aria-label="Minimize">−</button><button aria-label="Close" onclick="show('welcome')">×</button></div></div>
-    <div class="content">
-      <div class="brand"><img src="../../../src-tauri/icons/128x128.png" alt=""><div><p class="brand-name">nyaa-stream</p><p class="brand-caption">Anime, ready when you are.</p></div></div>
-      <ol class="steps"><li data-step="welcome" class="active">Welcome</li><li data-step="installing">Install</li><li data-step="done">Ready</li></ol>
-      <section id="welcome" class="screen active">
-        <h1>Set up nyaa-stream</h1>
-        <p class="lead">Choose where the app lives. Existing settings and watch progress stay with the Windows profile.</p>
-        <label class="field-label" for="path">Install location</label>
-        <div class="path-row"><input id="path" type="text" value="%LOCALAPPDATA%\Programs\nyaa-stream"><button class="browse" onclick="document.getElementById('path').focus()">Browse…</button></div>
-        <div class="choices"><label class="choice"><input type="checkbox" checked> Create Start menu shortcut</label><label class="choice"><input type="checkbox"> Create desktop shortcut</label></div>
-        <div class="footer-note" style="margin-top:20px">Per-user install · no administrator prompt</div>
+  <section class="window" aria-label="Installer prototype">
+    <header><img src="../../../src-tauri/icons/128x128.png" alt=""><strong>nyaa-stream</strong><span>Setup</span></header>
+    <main>
+      <section class="screen active" id="welcome">
+        <h1>Install nyaa-stream</h1><p>Choose where to install the app.</p>
+        <label for="path">Install location</label>
+        <div class="path"><input id="path" type="text" value="%LOCALAPPDATA%\Programs\nyaa-stream"><button class="browse">Browse</button></div>
+        <label class="shortcut"><input type="checkbox" checked> Add a Start menu shortcut</label>
       </section>
-      <section id="installing" class="screen">
-        <h1>Installing nyaa-stream</h1>
-        <p class="lead">The app is being copied to the selected location. Keep this window open until setup finishes.</p>
-        <div class="progress-wrap"><div class="progress-meta"><span id="progress-label">Preparing files…</span><span id="percent">0%</span></div><div class="track"><div class="fill" id="fill"></div></div><p class="detail" id="detail">Checking the install location</p></div>
+      <section class="screen" id="installing">
+        <h1>Installing…</h1><p id="progress-label">Copying app files</p>
+        <div class="progress"><div class="fill" id="fill"></div></div><div class="percent" id="percent">0%</div>
       </section>
-      <section id="done" class="screen">
-        <h1 id="done-title">You're all set</h1>
-        <p class="lead" id="done-copy">nyaa-stream is installed and ready to open.</p>
-        <div class="summary"><div class="summary-mark" id="done-mark">✓</div><div><strong id="summary-title">Installation complete</strong><span id="summary-copy">Your library, settings and watch progress are kept in your Windows profile.</span></div></div>
+      <section class="screen" id="done">
+        <h1>Installation complete</h1><p>Settings and watch progress are preserved.</p>
       </section>
-      <section id="error" class="screen">
-        <h1>Setup couldn't finish</h1>
-        <p class="lead">The existing installation was left in place. Close the app and retry setup. If the problem continues, use Apps in Windows Settings to repair or uninstall it.</p>
-        <div class="summary"><div class="summary-mark error">!</div><div><strong>Files could not be replaced</strong><span>Nothing in your library or playback history was removed.</span></div></div>
+      <section class="screen" id="error">
+        <h1>Couldn't complete setup</h1><p class="error">The existing install and personal data are unchanged.</p>
       </section>
-    </div>
-    <footer class="footer"><label class="footer-note">Preview state <select aria-label="Preview state" onchange="show(this.value)"><option value="welcome">Welcome</option><option value="installing">Installing</option><option value="done">Complete</option><option value="error">Error recovery</option></select></label><div class="actions"><button class="secondary" id="back" onclick="show('welcome')" hidden>Back</button><button class="primary" id="next" onclick="advance()">Install</button></div></footer>
-  </main>
+    </main>
+    <footer><label class="preview">Preview<select aria-label="Preview state" onchange="show(this.value)"><option value="welcome">Welcome</option><option value="installing">Progress</option><option value="done">Complete</option><option value="error">Error</option></select></label><div class="actions"><button class="secondary" id="back" onclick="show('welcome')" hidden>Back</button><button class="primary" id="next" onclick="advance()">Install</button></div></footer>
+  </section>
   <script>
-    const labels = ['Copying application files…', 'Registering shortcuts…', 'Finishing setup…'];
     let timer;
     function show(id) {
       clearInterval(timer);
       document.querySelectorAll('.screen').forEach(el => el.classList.toggle('active', el.id === id));
-      document.querySelectorAll('.steps li').forEach((el, i) => el.classList.toggle('active', i <= (id === 'welcome' ? 0 : id === 'installing' ? 1 : 2)));
+      document.querySelector('[aria-label="Preview state"]').value = id;
       document.getElementById('back').hidden = id !== 'error';
-      document.getElementById('next').textContent = id === 'welcome' ? 'Install' : id === 'installing' ? 'Installing…' : id === 'error' ? 'Retry' : 'Launch nyaa-stream';
-      document.getElementById('next').disabled = id === 'installing';
-      document.getElementById('next').onclick = id === 'welcome' || id === 'error' ? advance : () => show('welcome');
+      const next = document.getElementById('next');
+      next.textContent = id === 'welcome' || id === 'error' ? 'Install' : id === 'installing' ? 'Installing…' : 'Launch';
+      next.disabled = id === 'installing';
+      next.onclick = id === 'welcome' || id === 'error' ? advance : () => show('welcome');
       if (id === 'installing') runProgress();
     }
     function advance() { show('installing'); }
     function runProgress() {
       let value = 0;
       timer = setInterval(() => {
-        value = Math.min(100, value + 4);
+        value = Math.min(100, value + 5);
         document.getElementById('fill').style.width = value + '%';
         document.getElementById('percent').textContent = value + '%';
-        document.getElementById('progress-label').textContent = labels[Math.min(2, Math.floor(value / 34))];
-        document.getElementById('detail').textContent = value < 100 ? 'Installing for the current Windows profile' : 'Setup completed successfully';
-        if (value === 100) setTimeout(() => show('done'), 450);
-      }, 90);
+        if (value === 100) setTimeout(() => show('done'), 350);
+      }, 100);
     }
   </script>
 </body>
