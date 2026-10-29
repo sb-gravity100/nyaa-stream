@@ -1,5 +1,28 @@
 # PHASES.md — nyaa-stream
 
+## v0.6.0 — implementation order and readiness (2026-10-29)
+
+Canonical specifics: [v0.6.0 implementation lineup](docs/planning/V0_6_0.md). The detailed
+feature checklists later in this file remain authoritative task breakdowns.
+No implementation starts as part of this planning request.
+
+- [x] Installer visual direction confirmed by SB: compact dark layout matching the app
+- [ ] Review proposed update schedule, restart flow and first-install defaults
+- [ ] 0: Prove installer/updater backend, clean-machine bootstrap, signed
+      artifact, silent upgrade, old-install migration and restart lifecycle
+- [ ] 1: Shared context menus and clipboard integration, including custom-source actions
+- [ ] 2: Magnet parsing/direct play, permanent attachments, pack mapping and migration
+- [ ] 3: Revalidate artwork provider requirements; implement ID/cache/provider pipeline
+- [ ] 4: Release-page screenshots and missing-thumbnail build queue
+- [ ] 5: Verified-data-only seekbar storyboard/hover previews
+- [ ] 6: Bespoke installer UI with reviewed screens and proven backend
+- [ ] 7: Quiet update scheduler, flex-end header action and in-app progress/restart
+- [ ] 8: Integrated Windows verification, docs/changelog/index sync, local v0.6.0 tag
+
+Native supersampling, batch next-episode/preload work and continuous seekbar
+dragging remain v0.7.0; learned matching remains v0.6.1. Existing public-release
+policy remains unchanged.
+
 ## v0.5.10 — subtitle edge smoothness
 - [x] Add plain-text light hinting with ASS reset and bounded HLS supersampling
 - [x] Validate bundled libmpv live hinting changes, plain/ASS switching, 8 standard/high-DPI sizing cases and frontend production build

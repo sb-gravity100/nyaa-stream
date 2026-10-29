@@ -13,7 +13,13 @@
 | `scripts/make-installer-art.ps1`, `src-tauri/installer/{banner,dialog}.bmp` | Renders the MSI (WiX) banner + welcome-dialog artwork from the app icon and brand colors (System.Drawing); wired in via `bundle.windows.wix` in `tauri.conf.json` | config, release, installer |
 | `CHANGELOG.md` | Release history (Keep a Changelog), mirrors `src/changelog.ts` + `Unreleased` | docs |
 | `README.md` | Public overview: features, stack, build prerequisites, release steps | docs |
-| `PLAN.md` | Stack, architecture, data flow, known gaps | docs |
+| `PLAN.md` | Concise active roadmap, v0.6.0 order, constraints and index of detailed planning documents | docs |
+| `docs/planning/V0_6_0.md` | Consolidated v0.6.0 implementation order, feature specifications, proposed defaults and acceptance criteria | docs, planning |
+| `docs/planning/ARCHITECTURE.md` | Stack/build prerequisites, workspace/data flow, sbtl engines, development and legacy gap inventory | docs, architecture |
+| `docs/planning/PLAYBACK.md` | Playback/cache/resume/subtitle/desktop specifications and historical measurements | docs, player |
+| `docs/planning/MATCHING.md` | Release matching, AnimeTosho dataset, v0.6.1 learned matcher and search debugger | docs, search |
+| `docs/planning/ROADMAP.md` | Future milestone details: v0.7.0 player/memory/playback, navigation/Discover, x86 and Binge Mode | docs, planning |
+| `docs/planning/RELEASING.md` | Release policy/tooling and dated release decisions; defers to active roadmap and current SB instructions | docs, release |
 | `PHASES.md` | Build order / task list | docs |
 | `commits.md` | Commit log (prepend after every commit) | docs |
 | `src-tauri/Cargo.toml` | Tauri app crate manifest, depends on all `crates/*` | backend, config |

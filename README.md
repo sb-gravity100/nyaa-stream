@@ -197,7 +197,7 @@ Open them with the gear icon in the app bar.
 
 You don't need vcpkg or CMake. `npm run setup` downloads a prebuilt, checksum-verified archive of static
 **FFmpeg 7.1.2** into `vcpkg_installed/` (the current archive, about 1.3 GB, still holds libtorrent and OpenSSL from before sbtl; nothing links them). The first build also fetches [sbtl](https://github.com/sb-gravity100/sbtl) from GitHub and compiles its C sources with LLVM's `clang-cl`. You only need vcpkg to
-*rebuild* that archive after changing `vcpkg.json`. See [PLAN.md → Build prerequisites](PLAN.md#build-prerequisites).
+*rebuild* that archive after changing `vcpkg.json`. See [Build prerequisites](docs/planning/ARCHITECTURE.md#build-prerequisites).
 
 ### Run in development
 
