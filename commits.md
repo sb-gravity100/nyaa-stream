@@ -1,3 +1,9 @@
+### `389ace0` · 2026-10-29 · feat: add player surface context actions
+- `src/PlayerView.tsx`
+- `src/HlsPlayerView.tsx`
+- `FILE_INDEX.md`
+- `PHASES.md`
+
 ### `6272d7a` · 2026-10-29 · feat: add episode and source context actions
 - `src/MediaPage.tsx`
 - `src/PlayerView.tsx`
