@@ -82,7 +82,7 @@ export function AttachCustomSourceDialog({ input: initialInput, source, seasonFo
   const parsedTitle = parsed?.name?.trim() ?? "";
   const titleLabel = useMemo(() => parsedTitle ? inferredLabel(parsedTitle) : { kind: "unknown" } as const, [parsedTitle]);
   const eligibleFiles = files?.filter((file) => file.isVideo && !isExtra(file)) ?? [];
-  const inferredPack = eligibleFiles.length >= 2;
+  const inferredPack = eligibleFiles.length >= 2 || eligibleFiles.some((file) => episodesInFile(file).length > 1);
   const packRangeInvalid = episodeStart === null !== (episodeEnd === null)
     || (episodeStart !== null && episodeEnd !== null && (!Number.isInteger(episodeStart) || !Number.isInteger(episodeEnd) || episodeStart < 1 || episodeEnd < episodeStart));
 
@@ -106,7 +106,8 @@ export function AttachCustomSourceDialog({ input: initialInput, source, seasonFo
         setFiles(inspected);
         const parsedLabel = result.name ? inferredLabel(result.name) : { kind: "unknown" } as const;
         if (!source) {
-          if (eligibleCount(inspected) >= 2) {
+          const eligibleMetadata = inspected.filter((file) => file.isVideo && !isExtra(file));
+          if (eligibleMetadata.length >= 2 || eligibleMetadata.some((file) => episodesInFile(file).length > 1)) {
             setKind("pack");
             if (parsedLabel.kind === "batch" && !parsedLabel.extras && parsedLabel.episodeRange) {
               setSeason(parsedLabel.season);
@@ -180,10 +181,6 @@ export function AttachCustomSourceDialog({ input: initialInput, source, seasonFo
     }
     setResults([]);
     setQuery(displayLabel(candidate));
-  }
-
-  function eligibleCount(items: InspectedFile[]): number {
-    return items.filter((file) => file.isVideo && !isExtra(file)).length;
   }
 
   async function submit(event: Event) {
