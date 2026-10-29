@@ -41,6 +41,7 @@ impl EmbeddedMpv {
             "--scale=ewa_lanczossharp".to_string(),
             "--scale-blur=1.5".to_string(),
             "--dscale=mitchell".to_string(),
+            "--sub-blur=1.0".to_string(),
             "--background-color=#000000".to_string(),
             // Keep more already-played video demuxed (default 50 MiB) so a
             // jump back stays instant and its range stays on the seek bar.

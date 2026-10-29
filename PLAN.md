@@ -216,11 +216,12 @@ Building the workspace requires, beyond Rust/Node:
   renderer now uses native device-pixel output with libass's per-pixel glyph
   coverage and no CSS blur or supersampling. JASSUB composes with WebGL when
   available and falls back to Canvas2D. Embedded mpv now uses
-  `blend-subtitles=video`, EWA Lanczos sharp upscaling with blur 1.5, and
-  Mitchell downscaling on its GPU output path. As requested, the scaler blur
-  applies to the full image and video-stage blending can clip subtitles in
-  letterbox areas. The HLS fallback keeps its subtitle-only renderer. Visual
-  verification on standard/high-resolution HLS and mpv playback remains.
+  `blend-subtitles=video`, EWA Lanczos sharp upscaling with blur 1.5, Mitchell
+  downscaling, and `sub-blur=1.0` on its GPU output path. The scaler blur
+  applies to the full image; `sub-blur` affects subtitle borders only.
+  Video-stage blending can clip subtitles in letterbox areas. The HLS
+  fallback keeps its subtitle-only renderer. Visual verification on
+  standard/high-resolution HLS and mpv playback remains.
 - **Metadata:** AniList GraphQL API (`https://graphql.anilist.co`), no auth
   required for public queries; Kitsu API (`crates/kitsu-client`) as a
   secondary source for wide backdrop banners and per-episode thumbnails,

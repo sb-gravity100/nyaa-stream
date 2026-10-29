@@ -23,6 +23,7 @@ step when cutting a release.
 - The pointer remains visible across the player surface and hides only after inactivity, independently of control-bar hover state.
 - HLS fallback subtitles use native-resolution libass coverage antialiasing with WebGL composition when available.
 - Embedded mpv uses GPU video-stage subtitle blending with EWA Lanczos sharp, blur 1.5, and Mitchell downscaling; scaler blur applies to the image.
+- Embedded mpv adds sub-blur=1.0 to soften subtitle borders.
 
 ## [0.5.7] - 2026-10-27
 

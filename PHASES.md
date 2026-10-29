@@ -267,7 +267,7 @@
   - [x] Use libass's native-resolution glyph coverage with WebGL composition
         when available; remove blur and supersampling; retain Canvas2D fallback
   - [x] Apply mpv's video-stage subtitle blend, EWA Lanczos sharp scaler,
-        blur 1.5, and Mitchell downscaler
+        blur 1.5, Mitchell downscaler, and subtitle-border blur 1.0
   - [x] Improve high-value search, seek and mpv logs; avoid repetitive noise
   - [x] Sync changelog and in-app What's New
   - [x] `cargo check --workspace` and `npm run build`

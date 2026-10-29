@@ -21,6 +21,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       "The pointer remains visible across the player and hides only after inactivity.",
       "HLS fallback subtitles use native-resolution libass antialiasing with WebGL composition when available.",
       "Embedded mpv uses GPU subtitle blending with EWA Lanczos sharp, blur 1.5, and Mitchell downscaling; the blur affects the image.",
+      "Embedded mpv adds sub-blur 1.0 to soften subtitle borders.",
     ],
   },
   {
