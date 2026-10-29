@@ -1,5 +1,10 @@
 # PHASES.md — nyaa-stream
 
+## v0.5.9 — selective ASS subtitle styling
+- [ ] Add independently selectable dialogue style fields, retaining existing preferences
+- [ ] Apply matching field selection in mpv, HLS/libass, and clip export
+- [ ] Verify preserved authored fields, signs, and event tags; build and bump/tag v0.5.9
+
 ## v0.5.8 — implemented parser work (published 2026-10-29)
 - [x] Copy the supplied Python source into a tracked reference directory
 - [x] Port animebatch batch, season-range, alias and search behavior to Rust (40 parse cases and archive search examples pass)

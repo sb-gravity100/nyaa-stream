@@ -616,6 +616,9 @@ by an app-styled HTML menu whose items depend on what was right-clicked.
 
 ## Release plan (decided 2026-09-29)
 
+**v0.5.9 selective ASS styling (requested 2026-10-29).** Use the subtitle-settings screenshot as a reference: extend the existing opt-in dialogue restyle with independent font/weight, size, text-color, outline/background/shadow, and bottom-margin controls. Preserve existing defaults, authored event tags/animations, and non-dialogue styles. Apply the same field selection in embedded mpv, HLS/libass, and clip export. Keep the current rendering pipeline; the screenshot does not establish a renderer-speed or quality benefit. Validate selective preservation and parity, then bump/tag v0.5.9.
+
+
 **Version branches:** Give each new version its own branch named
 `release/<version>` (for example, `release/0.5.7`). Start version-specific
 work on that branch so its changes and release commit stay grouped by version.
