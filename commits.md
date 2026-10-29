@@ -1,3 +1,5 @@
+### `7dba978` · 2026-10-30 · fix(magnet): warn when pack numbering is unknown
+- `src/AttachCustomSourceDialog.tsx`
 ### `0f205f3` · 2026-10-30 · fix(player): skip extras in default pack playback
 - `src/PlayerView.tsx`
 ### `ab0f0a4` · 2026-10-30 · docs: describe magnet attachment workflow
