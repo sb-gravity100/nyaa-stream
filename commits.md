@@ -1,3 +1,18 @@
+### `8ad8969` · 2026-10-30 · feat: add artwork provider settings and home fallbacks
+- `crates/artwork-client/src/lib.rs`
+- `src-tauri/Cargo.toml`
+- `src-tauri/src/artwork.rs`
+- `src-tauri/src/lib.rs`
+- `src/artwork.ts`
+- `src/providerCredentials.ts`
+- `src/SettingsPanel.tsx`
+- `src/backup.ts`
+- `src/App.tsx`
+- `src/HomePage.tsx`
+- `src/App.css`
+- `FILE_INDEX.md`
+- `PHASES.md`
+
 ### `c7b129f` · 2026-10-29 · Merge branch `work/v0.6-installer`
 - `src/updater.ts`
 - `src/App.tsx`
