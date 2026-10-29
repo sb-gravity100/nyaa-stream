@@ -163,6 +163,22 @@ function baseName(path: string): string {
 /** Files that are not episodes: OVA/OAD/ONA, specials, creditless openings/endings. */
 const EXTRA_FILE = /\b(OVA|OAD|ONA|SP|Specials?|NCOP|NCED|Extras?|PV|Trailer)\d*\b/i;
 
+function isExtraFile(file: PlayFile): boolean {
+   const label = labelOf(file.label, baseName(file.name));
+   return EXTRA_FILE.test(baseName(file.name)) || label.kind === "special" || (label.kind === "batch" && label.extras === true);
+}
+
+function comparePackFiles(a: PlayFile, b: PlayFile): number {
+   const labelA = labelOf(a.label, baseName(a.name));
+   const labelB = labelOf(b.label, baseName(b.name));
+   const seasonA = "season" in labelA ? labelA.season : Number.MAX_SAFE_INTEGER;
+   const seasonB = "season" in labelB ? labelB.season : Number.MAX_SAFE_INTEGER;
+   if (seasonA !== seasonB) return seasonA - seasonB;
+   const episodeA = labelA.kind === "episode" ? labelA.number : labelA.kind === "batch" ? labelA.episodeRange?.[0] ?? Number.MAX_SAFE_INTEGER : Number.MAX_SAFE_INTEGER;
+   const episodeB = labelB.kind === "episode" ? labelB.number : labelB.kind === "batch" ? labelB.episodeRange?.[0] ?? Number.MAX_SAFE_INTEGER : Number.MAX_SAFE_INTEGER;
+   return episodeA - episodeB || a.name.localeCompare(b.name, undefined, { numeric: true });
+}
+
 /** The file inside the torrent to play: the one whose name parses to the
  * requested episode (batches), else the backend's default (largest video). */
 function pickFile(
@@ -172,15 +188,13 @@ function pickFile(
    season: number | null = null,
 ): PlayFile | null {
    const videos = files.filter((f) => f.isVideo);
-   if (videos.length > 1 && episode != null) {
-      const numbered = videos.filter((f) => {
+   const regularVideos = videos.filter((f) => !isExtraFile(f));
+   if (regularVideos.length === 0) return null;
+   if (regularVideos.length > 1 && episode != null) {
+      const matches = regularVideos.filter((f) => {
          const label = labelOf(f.label, baseName(f.name));
          return label.kind === "episode" && label.number === episode;
       });
-      // OVAs, openings and endings number from 1 too ("S01 - OVA1"): they are
-      // not the episode, unless nothing else is.
-      const regular = numbered.filter((f) => !EXTRA_FILE.test(baseName(f.name)));
-      const matches = regular.length > 0 ? regular : numbered;
       if (matches.length > 0) {
          // Several seasons in one pack: this entry's season first.
          const inSeason = season == null ? [] : matches.filter((f) => labelOf(f.label, baseName(f.name)).kind === "episode" && (labelOf(f.label, baseName(f.name)) as { season: number }).season === season);
@@ -193,20 +207,16 @@ function pickFile(
          return pick;
       }
       console.warn(
-         "[player] no file in torrent matched episode, using default",
+         "[hls-player] no regular file in torrent matched episode, using lowest regular episode",
          { episode },
       );
    }
    // A batch opened as a whole (no episode number): start from its first
-   // file by name rather than the largest, which is an arbitrary episode.
-   if (videos.length > 1 && episode == null) {
-      return [...videos].sort((x, y) =>
-         x.name.localeCompare(y.name, undefined, { numeric: true }),
-      )[0];
+   // regular season/episode rather than the largest or a file named NCOP.
+   if (regularVideos.length > 1 || episode == null) {
+      return [...regularVideos].sort(comparePackFiles)[0];
    }
-   return (
-      files.find((f) => f.index === defaultIdx) ?? videos[0] ?? files[0] ?? null
-   );
+   return regularVideos.find((f) => f.index === defaultIdx) ?? regularVideos[0] ?? null;
 }
 
 function fileLabel(file: PlayFile): string {
