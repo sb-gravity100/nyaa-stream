@@ -1,3 +1,7 @@
+### `25bf4ae` · 2026-10-29 · docs: plan v0.7.0 memory and branding work
+- `PLAN.md`
+- `PHASES.md`
+
 ### `108a51b` · 2026-10-29 · docs: consolidate v0.6.0 and resequence milestones
 - `PLAN.md`
 - `PHASES.md`
