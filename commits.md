@@ -1,3 +1,11 @@
+### `52013dc` · 2026-10-29 · feat: add native clipboard support
+- `package.json`
+- `package-lock.json`
+- `src-tauri/Cargo.toml`
+- `src-tauri/src/lib.rs`
+- `src-tauri/capabilities/default.json`
+- `PHASES.md`
+
 ### `94c33e8` · 2026-10-29 · style: enlarge installer primary button
 - `docs/prototypes/installer/index.html`
 
