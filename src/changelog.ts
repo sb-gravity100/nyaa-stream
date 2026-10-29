@@ -15,7 +15,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     features: [
       "ASS dialogue styling now has separate controls for font, size, text color, outline/background and bottom margin, while retaining unchecked authored style fields.",
     ],
-    fixes: [],
+    fixes: ["Embedded mpv blends subtitles onto upscaled video frames and uses EWA Lanczos video scaling."],
   },
   {
     version: "0.5.8",

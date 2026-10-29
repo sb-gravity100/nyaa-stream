@@ -35,10 +35,10 @@ impl EmbeddedMpv {
             "--cursor-autohide=no".to_string(),
             "--hwdec=auto-safe".to_string(),
             "--vo=gpu-next,gpu,".to_string(),
-            // User-selected subtitle treatment: blend ASS on the GPU video
-            // stage, using the same scalers as the image (including blur).
-            "--blend-subtitles=video".to_string(),
-            "--scale=ewa_lanczossharp".to_string(),
+            // Blend subtitles onto upscaled video frames. EWA Lanczos and
+            // the retained scaler blur apply to the video image.
+            "--blend-subtitles=yes".to_string(),
+            "--scale=ewa_lanczos".to_string(),
             "--scale-blur=1.5".to_string(),
             "--dscale=mitchell".to_string(),
             "--sub-blur=1.0".to_string(),
