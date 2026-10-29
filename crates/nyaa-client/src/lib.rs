@@ -29,6 +29,64 @@ pub use store::{release_id, write_release_database, AnidbTvdb, ImportStats, Tosh
 
 const NYAA_BASE_URL: &str = "https://nyaa.si";
 
+fn description_image_urls(document: &Html) -> Vec<String> {
+    tracing::debug!("extracting description image URLs from nyaa.si view page");
+    let panel_selector = Selector::parse(".panel").expect("static nyaa panel selector");
+    let heading_selector = Selector::parse(".panel-heading").expect("static nyaa heading selector");
+    let body_selector = Selector::parse(".panel-body").expect("static nyaa body selector");
+    let image_selector = Selector::parse("img[src], img[data-src], img[data-original]").expect("static image selector");
+    let description_selector = Selector::parse("#torrent-description, .torrent-description, .torrent-description-container")
+        .expect("static description selector");
+    let base = reqwest::Url::parse(NYAA_BASE_URL).expect("static nyaa base URL");
+    let mut containers = Vec::new();
+    for panel in document.select(&panel_selector) {
+        let is_description = panel
+            .select(&heading_selector)
+            .any(|heading| heading.text().collect::<String>().to_ascii_lowercase().contains("description"));
+        if is_description {
+            if let Some(body) = panel.select(&body_selector).next() {
+                containers.push(body);
+            }
+        }
+    }
+    if containers.is_empty() {
+        containers.extend(document.select(&description_selector));
+    }
+    let mut seen = std::collections::HashSet::new();
+    let mut urls = Vec::new();
+    for container in containers {
+        for image in container.select(&image_selector) {
+            let Some(src) = image.value().attr("src").or_else(|| image.value().attr("data-src")).or_else(|| image.value().attr("data-original")) else {
+                continue;
+            };
+            let src = src.trim();
+            if src.is_empty() || src.len() > 4096 || src.starts_with("data:") {
+                continue;
+            }
+            let joined = if let Some(protocol_relative) = src.strip_prefix("//") {
+                reqwest::Url::parse(&format!("https://{protocol_relative}"))
+            } else {
+                base.join(src)
+            };
+            let Ok(url) = joined else { continue };
+            if url.scheme() != "https" || url.host_str().is_none() {
+                continue;
+            }
+            let normalized = url.to_string();
+            if seen.insert(normalized.clone()) {
+                urls.push(normalized);
+                if urls.len() >= 256 {
+                    tracing::warn!("description image URL limit reached");
+                    break;
+                }
+            }
+        }
+        if urls.len() >= 256 { break; }
+    }
+    tracing::info!(count = urls.len(), "extracted description image URLs");
+    urls
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NyaaResult {
     pub title: String,
@@ -80,6 +138,11 @@ pub struct TorrentDetails {
     /// Union of the video files' seasons, ascending.
     #[serde(default)]
     pub seasons: Vec<u32>,
+    /// Image links found inside the release page's description panel. The
+    /// frontend requests these through the backend, which validates and
+    /// caches a selected frame instead of hotlinking an expiring host URL.
+    #[serde(default)]
+    pub image_urls: Vec<String>,
 }
 
 /// nyaa.si's search categories, passed as the `c` query param.
@@ -668,7 +731,7 @@ impl NyaaClient {
         seasons.sort_unstable();
         seasons.dedup();
         let file_count = files.len();
-        Some(TorrentDetails { submitter: "Anonymous".to_string(), is_batch: file_count > 1, file_count, files, seasons })
+        Some(TorrentDetails { submitter: "Anonymous".to_string(), is_batch: file_count > 1, file_count, files, seasons, image_urls: Vec::new() })
     }
 
     async fn fetch_details_uncached(&self, view_url: &str) -> anyhow::Result<TorrentDetails> {
@@ -705,13 +768,15 @@ impl NyaaClient {
         let is_batch = file_count > 1;
 
         let (files, seasons) = files::build_files(files::scrape_files(&document));
-        tracing::debug!(view_url, submitter, file_count, is_batch, listed = files.len(), ?seasons, "parsed nyaa.si view page");
+        let image_urls = description_image_urls(&document);
+        tracing::debug!(view_url, submitter, file_count, is_batch, listed = files.len(), ?seasons, images = image_urls.len(), "parsed nyaa.si view page");
         Ok(TorrentDetails {
             submitter,
             is_batch,
             file_count,
             files,
             seasons,
+            image_urls,
         })
     }
 }
@@ -759,7 +824,7 @@ INSERT INTO `toto_toto` (`id`, `nyaa_id`, `nyaa_subdom`, `name`, `btih`, `totals
         assert!(client.store.as_ref().unwrap().details(100).await.unwrap().is_none());
 
         // A stored scrape wins over the dataset.
-        let scraped = TorrentDetails { submitter: "Reza".into(), is_batch: true, file_count: 2, files: Vec::new(), seasons: vec![3] };
+        let scraped = TorrentDetails { submitter: "Reza".into(), is_batch: true, file_count: 2, files: Vec::new(), seasons: vec![3], image_urls: Vec::new() };
         client.store.as_ref().unwrap().save_details(200, &scraped).await.unwrap();
         let details = client.fetch_details("https://nyaa.si/view/200").await.unwrap();
         assert_eq!((details.submitter.as_str(), details.seasons), ("Reza", vec![3]));
