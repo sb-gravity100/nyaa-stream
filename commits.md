@@ -1,3 +1,7 @@
+### `108a51b` · 2026-10-29 · docs: consolidate v0.6.0 and resequence milestones
+- `PLAN.md`
+- `PHASES.md`
+
 ### `c24b250` · 2026-10-29 · docs: plan custom mpv build for v0.10.0
 - `PLAN.md`
 - `PHASES.md`
