@@ -52,6 +52,21 @@ export interface NyaaResult {
   season_ambiguous?: boolean | null;
 }
 
+export interface CustomSource {
+  id: number;
+  animeId: number;
+  infoHash: string;
+  magnet: string;
+  title: string;
+  kind: "episode" | "pack";
+  season: number | null;
+  episodeStart: number | null;
+  episodeEnd: number | null;
+  files: { path: string; size: number; index: number; season: number | null; episode: number | null; isVideo: boolean }[];
+  createdAt: number;
+  updatedAt: number;
+}
+
 /** One file of a torrent, from its nyaa.si view page. */
 export interface TorrentFile {
   /** Folders and file name joined with `/`. */

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { invoke } from "@tauri-apps/api/core";
-import { displayTitle, formatSeason, isMovie, type AnimeMedia, type KitsuMetadata, type NyaaResult } from "./types";
-import type { EpisodeLabel } from "./episodeParser";
+import { displayTitle, formatSeason, isMovie, type AnimeMedia, type CustomSource, type KitsuMetadata, type NyaaResult } from "./types";
+import { episodeLabelText, labelOf, type EpisodeLabel } from "./episodeParser";
 import { PlayerView } from "./PlayerView";
 import { progressForAnime, setWatched, subscribeProgress, type ProgressEntry } from "./watchProgress";
 import { BackIcon, CheckIcon, PlayIcon, PlusIcon } from "./icons";
@@ -47,6 +47,82 @@ interface Props {
   inLibrary: boolean;
   onAddToLibrary: () => void;
   onRemoveFromLibrary: () => void;
+  customSources: CustomSource[];
+  onSaveCustomSource: (input: string, title: string, kind: "episode" | "pack", season: number | null, start: number | null, end: number | null) => Promise<void>;
+  onRemoveCustomSource: (id: number) => Promise<void>;
+}
+
+function CustomSourcePicker({ sources, onSave, onRemove }: {
+  sources: CustomSource[];
+  onSave: Props["onSaveCustomSource"];
+  onRemove: Props["onRemoveCustomSource"];
+}) {
+  const [open, setOpen] = useState(false);
+  const [input, setInput] = useState("");
+  const [title, setTitle] = useState("");
+  const [kind, setKind] = useState<"episode" | "pack">("pack");
+  const [season, setSeason] = useState("");
+  const [start, setStart] = useState("");
+  const [end, setEnd] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [magnetPreview, setMagnetPreview] = useState<{ infoHash: string; name: string | null; trackers: number } | null>(null);
+  const [files, setFiles] = useState<{ path: string; season: number | null; episode: number | null; isVideo: boolean }[]>([]);
+  function edit(source: CustomSource) {
+    setInput(source.magnet); setTitle(source.title); setKind(source.kind);
+    setSeason(source.season?.toString() ?? ""); setStart(source.episodeStart?.toString() ?? ""); setEnd(source.episodeEnd?.toString() ?? "");
+    setOpen(true); setError(null); setMagnetPreview({ infoHash: source.infoHash, name: source.title, trackers: 0 }); setFiles(source.files);
+  }
+  async function save(event: Event) {
+    event.preventDefault(); setBusy(true); setError(null);
+    try {
+      await onSave(input, title, kind, season ? Number(season) : null, start ? Number(start) : null, end ? Number(end) : null);
+      setInput(""); setTitle(""); setSeason(""); setStart(""); setEnd("");
+    } catch (err) { setError(String(err)); }
+    finally { setBusy(false); }
+  }
+  async function inspect() {
+    setError(null); setFiles([]);
+    try {
+      const parsed = await invoke<{ infoHash: string; name: string | null; trackers: number }>("parse_custom_magnet", { input });
+      setMagnetPreview(parsed);
+      const inspected = await invoke<{ path: string; season: number | null; episode: number | null; isVideo: boolean }[]>("inspect_custom_magnet", { input });
+      setFiles(inspected);
+      const videos = inspected.filter((file) => file.isVideo);
+      if (videos.length === 1 && videos[0].episode != null) {
+        setKind("episode"); setSeason(videos[0].season?.toString() ?? ""); setStart(videos[0].episode.toString()); setEnd("");
+      } else {
+        setKind("pack");
+        const episodes = videos.map((file) => file.episode).filter((episode): episode is number => episode != null).sort((a, b) => a - b);
+        const seasons = Array.from(new Set(videos.map((file) => file.season).filter((value): value is number => value != null)));
+        if (seasons.length === 1) setSeason(String(seasons[0]));
+        if (episodes.length) { setStart(String(episodes[0])); setEnd(String(episodes[episodes.length - 1])); }
+      }
+    } catch (err) { setError(err instanceof Error ? err.message : String(err)); }
+  }
+  return <div class="custom-sources-picker">
+    <button class="link-button" onClick={() => setOpen((value) => !value)}>{open ? "Close custom sources" : `Custom sources${sources.length ? ` · ${sources.length}` : ""}`}</button>
+    {open && <div class="custom-source-panel">
+      {sources.map((source) => <div class="custom-source-entry" key={source.id}>
+        <span>{source.title} · {source.kind}{source.episodeStart != null ? ` · ${source.episodeStart}${source.episodeEnd && source.episodeEnd !== source.episodeStart ? `–${source.episodeEnd}` : ""}` : ""}</span>
+        <button class="link-button" onClick={() => edit(source)}>Edit</button>
+        <button class="link-button" onClick={() => void onRemove(source.id)}>Remove</button>
+      </div>)}
+      <form onSubmit={save} class="custom-source-form">
+        <input value={input} onInput={(e) => { setInput(e.currentTarget.value); setMagnetPreview(null); setFiles([]); }} placeholder="Magnet link or 40 digit hash" required maxlength={4096} />
+        <button type="button" class="button button-quiet" onClick={() => void inspect()}>Check magnet</button>
+        <input value={title} onInput={(e) => setTitle(e.currentTarget.value)} placeholder="Name (optional)" maxlength={200} />
+        <select value={kind} onChange={(e) => setKind(e.currentTarget.value as "episode" | "pack")}><option value="pack">Pack</option><option value="episode">Episode</option></select>
+        <input type="number" min="1" value={season} onInput={(e) => setSeason(e.currentTarget.value)} placeholder="Season" />
+        <input type="number" min="1" value={start} onInput={(e) => setStart(e.currentTarget.value)} placeholder="Episode / from" />
+        <input type="number" min="1" value={end} onInput={(e) => setEnd(e.currentTarget.value)} placeholder="To (optional)" />
+        <button class="button button-secondary" disabled={busy}>{busy ? "Saving…" : "Save source"}</button>
+      </form>
+      {magnetPreview && <p class="custom-source-preview">{magnetPreview.name || magnetPreview.infoHash} · {episodeLabelText(labelOf(undefined, magnetPreview.name || ""))} · {magnetPreview.trackers} trackers</p>}
+      {files.length > 0 && <ul class="custom-source-files">{files.filter((file) => file.isVideo).map((file) => <li key={file.path}>{file.path}{file.episode != null ? ` · S${file.season ?? "?"} E${file.episode}` : " · Batch / unnumbered"}</li>)}</ul>}
+      {error && <p class="error-banner" role="alert">{error}</p>}
+    </div>}
+  </div>;
 }
 
 // AniList's `description(asHtml: false)` has been observed to still leave
@@ -187,6 +263,9 @@ export function MediaPage({
   inLibrary,
   onAddToLibrary,
   onRemoveFromLibrary,
+  customSources,
+  onSaveCustomSource,
+  onRemoveCustomSource,
 }: Props) {
   const seasonLabel = formatSeason(anime.season, anime.seasonYear);
   const movie = isMovie(anime);
@@ -484,12 +563,13 @@ export function MediaPage({
                 {hiddenCount > 0 && ` · ${hiddenCount} unlisted ${hiddenCount === 1 ? "row" : "rows"} hidden`}
               </span>
             )}
+            <CustomSourcePicker sources={customSources} onSave={onSaveCustomSource} onRemove={onRemoveCustomSource} />
           </header>
           {error && <p class="error-banner">{error}</p>}
           {watchMissing && (
             <p class="error-banner">No release of {watchLabel} was found. Pick another episode below.</p>
           )}
-          {!sourcesLoading && sourcesCount === 0 && !error && (
+          {!sourcesLoading && sourcesCount === 0 && customSources.length === 0 && !error && (
             <p class="empty-state">Nobody has uploaded this to nyaa.si yet, or it's listed under a different title.</p>
           )}
           {!sourcesLoading && visibleSources.length === 0 && hiddenCount > 0 && (

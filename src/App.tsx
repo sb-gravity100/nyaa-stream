@@ -21,6 +21,7 @@ import { fetchKitsuMetadata, kitsuSnapshot } from "./kitsu";
 import { cachedTorrentThumbnail, fetchTorrentThumbnail } from "./torrentThumbnail";
 import { episodeNumbersByGroup } from "./releases";
 import { MediaPage } from "./MediaPage";
+import { PlayerView } from "./PlayerView";
 import { HomePage } from "./HomePage";
 import { SettingsPanel } from "./SettingsPanel";
 import { DebugPage, type SourceMappingRecord } from "./DebugPage";
@@ -35,6 +36,7 @@ import {
   MOVIE_KEY,
   type AiringEntry,
   type AnimeMedia,
+  type CustomSource,
   type KitsuMetadata,
   type NyaaResult,
   type TorrentDetails,
@@ -43,6 +45,10 @@ import "./App.css";
 
 const SEARCH_DEBOUNCE_MS = 350;
 const MAX_DROPDOWN_RESULTS = 20;
+function isCustomMagnetInput(value: string): boolean {
+  const trimmed = value.trim();
+  return /^magnet:/i.test(trimmed) || /^[a-f0-9]{40}$/i.test(trimmed);
+}
 // Results are rendered in chunks as the dropdown is scrolled.
 const DROPDOWN_CHUNK = 6;
 
@@ -87,6 +93,8 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [animeResults, setAnimeResults] = useState<AnimeMedia[]>([]);
+  const [directPlay, setDirectPlay] = useState<{ anime: AnimeMedia; source: NyaaResult } | null>(null);
+  const [directMagnetError, setDirectMagnetError] = useState<string | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   // Which page is showing comes from the URL (see router.ts); this is the
   // anime that page is about, once loaded.
@@ -113,6 +121,7 @@ function App() {
   // strip_season_suffix) and re-scrape every ambiguous title's view page
   // from scratch every single time.
   const [sourcesByMedia, setSourcesByMedia] = useState<Record<number, NyaaResult[]>>({});
+  const [customSourcesByMedia, setCustomSourcesByMedia] = useState<Record<number, CustomSource[]>>({});
   const [detailsByMedia, setDetailsByMedia] = useState<Record<number, Record<string, TorrentDetails>>>({});
   // Read synchronously: the route effect below looks anime up in it on the
   // very first render (a reload on an anime route).
@@ -168,6 +177,7 @@ function App() {
       return;
     }
     setDropdownOpen(true);
+    if (isCustomMagnetInput(query)) { setAnimeResults([]); setLoading(false); return; }
     const timer = window.setTimeout(() => runSearch(query), SEARCH_DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -191,6 +201,7 @@ function App() {
   }, [animeResults, visibleResults, dropdownOpen]);
 
   async function runSearch(q: string) {
+    if (isCustomMagnetInput(q)) return;
     console.debug("[search_anime] invoked", { query: q });
     setLoading(true);
     setError(null);
@@ -207,6 +218,20 @@ function App() {
       setAnimeResults([]);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function playCustomMagnet(input: string) {
+    setDirectMagnetError(null);
+    try {
+      const parsed = await invoke<{ infoHash: string; name: string | null; magnet: string }>("parse_custom_magnet", { input });
+      const title = parsed.name?.trim() || `Torrent ${parsed.infoHash.slice(0, 8)}`;
+      const anime: AnimeMedia = { id: -1, title: { romaji: title, english: null, native: null }, description: null, episodes: null, coverImage: { large: null, extraLarge: null }, averageScore: null, format: null, season: null, seasonYear: null, duration: null };
+      const source: NyaaResult = { title, magnet: parsed.magnet, torrent_url: "", view_url: `custom://${parsed.infoHash}`, size: "", seeders: 0, leechers: 0, published: "", label: { kind: "unknown" } };
+      setDirectPlay({ anime, source });
+      setDropdownOpen(false);
+    } catch (err) {
+      setDirectMagnetError(err instanceof Error ? err.message : String(err));
     }
   }
 
@@ -267,6 +292,11 @@ function App() {
     setDropdownOpen(false);
     setSelectedAnime(anime);
     setError(null);
+    if (isTauriAvailable()) {
+      void invoke<CustomSource[]>("list_custom_sources", { animeId: anime.id })
+        .then((items) => setCustomSourcesByMedia((current) => ({ ...current, [anime.id]: items })))
+        .catch((err) => console.warn("[custom sources] failed to load", { animeId: anime.id, err: String(err) }));
+    }
 
     const cachedSources = sourcesByMedia[anime.id];
     if (cachedSources && !forceDebugSearch) {
@@ -831,7 +861,43 @@ function App() {
     return { groups: sortedGroups, mapping: Array.from(mapping.values()) };
   }, [sources, details, currentAnimeSeason, currentEpisodeOffset, selectedAnime?.episodes, selectedAnime?.format, debugActive]);
 
-  const groupedSources = sourceAnalysis.groups;
+  const customSources = selectedAnime ? customSourcesByMedia[selectedAnime.id] ?? [] : [];
+  const customReleases = useMemo<NyaaResult[]>(() => customSources.map((source) => {
+    const season = source.season ?? currentAnimeSeason;
+    const label: EpisodeLabel = source.kind === "episode" && source.episodeStart != null
+      ? { kind: "episode", season, number: source.episodeStart, seasons: [season] }
+      : { kind: "batch", season, episodeRange: source.episodeStart != null && source.episodeEnd != null ? [source.episodeStart, source.episodeEnd] : null, extras: false, seasons: [season] };
+    return { title: source.title, magnet: source.magnet, torrent_url: "", view_url: `custom://${source.id}`, size: "", seeders: 0, leechers: 0, published: "", label };
+  }), [customSources, currentAnimeSeason]);
+  const groupedSources = useMemo(() => {
+    const groups = sourceAnalysis.groups.map(([key, group]) => [key, { ...group, releases: [...group.releases] }] as [string, { label: EpisodeLabel; releases: NyaaResult[] }]);
+    for (const release of customReleases) {
+      const label = labelOf(release.label, release.title);
+      const key = episodeLabelText(label);
+      const existing = groups.find(([groupKey]) => groupKey === key);
+      if (existing) existing[1].releases.push(release);
+      else groups.push([key, { label, releases: [release] }]);
+    }
+    const rank = (label: EpisodeLabel) => label.kind === "episode" ? 0 : label.kind === "batch" ? 1 : 2;
+    return groups.sort(([, a], [, b]) => {
+      const rankDiff = rank(a.label) - rank(b.label);
+      if (rankDiff) return rankDiff;
+      if (a.label.kind === "episode" && b.label.kind === "episode") return a.label.season - b.label.season || a.label.number - b.label.number;
+      if (a.label.kind === "batch" && b.label.kind === "batch") return a.label.season - b.label.season;
+      return 0;
+    });
+  }, [sourceAnalysis.groups, customReleases]);
+
+  async function saveCustomSource(input: string, title: string, kind: "episode" | "pack", season: number | null, start: number | null, end: number | null) {
+    if (!selectedAnime || !isTauriAvailable()) throw new Error("Custom sources are available in the desktop app.");
+    const saved = await invoke<CustomSource>("save_custom_source", { animeId: selectedAnime.id, input, title, kind, season, episodeStart: start, episodeEnd: end });
+    setCustomSourcesByMedia((current) => ({ ...current, [selectedAnime.id]: [...(current[selectedAnime.id] ?? []).filter((source) => source.infoHash !== saved.infoHash), saved] }));
+  }
+  async function removeCustomSource(id: number) {
+    if (!selectedAnime || !isTauriAvailable()) return;
+    await invoke<boolean>("remove_custom_source", { animeId: selectedAnime.id, id });
+    setCustomSourcesByMedia((current) => ({ ...current, [selectedAnime.id]: (current[selectedAnime.id] ?? []).filter((source) => source.id !== id) }));
+  }
 
   const settingsPanel = settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />;
   const settingsButton = (
@@ -863,6 +929,21 @@ function App() {
     />
   );
 
+  if (directPlay) return <main class="container"><PlayerView
+    key={directPlay.source.view_url}
+    anime={directPlay.anime}
+    episodeKey="Custom source"
+    progressKey="Custom source"
+    episode={null}
+    season={null}
+    releases={[directPlay.source]}
+    onClose={() => setDirectPlay(null)}
+    onNext={null}
+    nextLabel={null}
+    playlist={[]}
+    onSelectEpisode={() => {}}
+  /></main>;
+
   if (route.name === "anime" && selectedAnime?.id !== route.id) {
     // The route's anime is still loading (reload / back-forward into it).
     return (
@@ -893,6 +974,9 @@ function App() {
           anime={selectedAnime}
           kitsu={kitsuByMedia[selectedAnime.id] ?? null}
           groupedSources={groupedSources}
+          customSources={customSources}
+          onSaveCustomSource={saveCustomSource}
+          onRemoveCustomSource={removeCustomSource}
           entrySeason={entrySeasonByMedia[selectedAnime.id] ?? null}
           sourcesLoading={sourcesLoading}
           sourcesCount={sources.length}
@@ -925,7 +1009,8 @@ function App() {
             id="anime-search-input"
             class="search-bar"
             value={query}
-            onInput={(e) => setQuery(e.currentTarget.value)}
+            onInput={(e) => { setDirectMagnetError(null); setQuery(e.currentTarget.value); }}
+            onKeyDown={(e) => { if (e.key === "Enter" && isCustomMagnetInput(query)) { e.preventDefault(); void playCustomMagnet(query); } }}
             onFocus={handleInputFocus}
             onBlur={handleInputBlur}
             placeholder="Search anime"
@@ -966,7 +1051,13 @@ function App() {
 
           {dropdownOpen && query.trim() && (
             <div class="search-results-wrap" id="search-results" ref={resultsWrapRef}>
-              {loading && (
+              {isCustomMagnetInput(query) && <ul class="search-results">
+                <li><button class="search-result-row" onMouseDown={(e) => e.preventDefault()} onClick={() => void playCustomMagnet(query)}>
+                  <span class="result-title">Play magnet</span><span class="result-status">Open this torrent directly</span>
+                </button></li>
+                {directMagnetError && <li><div class="search-status search-status-error" role="alert">{directMagnetError}</div></li>}
+              </ul>}
+              {!isCustomMagnetInput(query) && loading && (
                 <ul class="search-results">
                   {Array.from({ length: 4 }, (_, i) => (
                     <li key={i}>
@@ -981,11 +1072,11 @@ function App() {
                   ))}
                 </ul>
               )}
-              {!loading && error && <div class="search-status search-status-error">{error}</div>}
-              {!loading && !error && animeResults.length === 0 && (
+              {!isCustomMagnetInput(query) && !loading && error && <div class="search-status search-status-error">{error}</div>}
+              {!isCustomMagnetInput(query) && !loading && !error && animeResults.length === 0 && (
                 <div class="search-status">No anime matches “{query}”. Try the romaji or English title.</div>
               )}
-              {!loading && animeResults.length > 0 && (
+              {!isCustomMagnetInput(query) && !loading && animeResults.length > 0 && (
                 <ul class="search-results" role="listbox">
                   {animeResults.slice(0, visibleResults).map((anime) => {
                     const seasonLabel = formatSeason(anime.season, anime.seasonYear);

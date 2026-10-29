@@ -10,6 +10,7 @@ mod files;
 mod peer_season;
 pub mod stem;
 mod store;
+pub mod magnet;
 mod throttle;
 pub mod sevenz_stream;
 pub mod tosho_pipeline;
@@ -25,7 +26,7 @@ pub use files::TorrentFile;
 pub use label::EpisodeLabel;
 pub use peer_season::{peer_seasons, PeerRelease};
 pub use stem::stem_of;
-pub use store::{release_id, write_release_database, AnidbTvdb, ImportStats, ToshoImportStats, ToshoInfo, ToshoRelease};
+pub use store::{release_id, write_release_database, AnidbTvdb, CustomSource, CustomSourceFile, CustomSourceInput, ImportStats, ToshoImportStats, ToshoInfo, ToshoRelease};
 
 const NYAA_BASE_URL: &str = "https://nyaa.si";
 
@@ -249,6 +250,21 @@ impl NyaaClient {
             tracing::warn!(%err, "reading the AnimeTosho dataset info failed");
             None
         })
+    }
+
+    pub async fn save_custom_source(&self, source: CustomSourceInput) -> anyhow::Result<CustomSource> {
+        let Some(store) = &self.store else { anyhow::bail!("the release database isn't open") };
+        store.save_custom_source(source).await
+    }
+
+    pub async fn custom_sources(&self, anime_id: i64) -> anyhow::Result<Vec<CustomSource>> {
+        let Some(store) = &self.store else { anyhow::bail!("the release database isn't open") };
+        store.custom_sources(anime_id).await
+    }
+
+    pub async fn remove_custom_source(&self, anime_id: i64, id: i64) -> anyhow::Result<bool> {
+        let Some(store) = &self.store else { anyhow::bail!("the release database isn't open") };
+        store.remove_custom_source(anime_id, id).await
     }
 
     /// AnimeTosho's AniDB resolution of nyaa.si release `nyaa_id` (see `Store::aid_of`).

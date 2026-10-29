@@ -16,7 +16,7 @@ sbtl torrent streaming, embedded libmpv playback and an HLS fallback.
 | Version | Scope | State |
 |---|---|---|
 | v0.5.8 | Implemented pre-v0.6.0 work | Published |
-| v0.6.0 | Subtitle styling/smoothing plus context menus, custom magnets, artwork, thumbnails, seek previews, updates and bespoke installer | Subtitle work implemented; remaining features planned; visual acceptance pending |
+| v0.6.0 | Subtitle styling/smoothing plus context menus, custom magnets, artwork, thumbnails, seek previews, updates and bespoke installer | Subtitle work and custom magnet implementation underway; manual magnet acceptance and remaining features open |
 | v0.7.0 | Custom libmpv, native subtitle supersampling, memory profiling, batch transitions, preload timing and continuous seek dragging | Planned |
 | v0.8.0 | Navigation/Home rehaul and Discover | Planned |
 | v1.0.0 | Stabilization and 32-bit Windows | Planned |
