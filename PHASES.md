@@ -1,6 +1,6 @@
 # PHASES.md — nyaa-stream
 
-## v0.6.0 — consolidated milestone (expanded 2026-10-29)
+## v0.5.8 — implemented parser work (published 2026-10-29)
 - [x] Copy the supplied Python source into a tracked reference directory
 - [x] Port animebatch batch, season-range, alias and search behavior to Rust (40 parse cases and archive search examples pass)
 - [x] Reuse the existing Rust anitopy port; port the guessit title, source and resolution fields used by animebatch (40-case Python oracle parity)
@@ -9,6 +9,7 @@
 - [x] Compare the 10,151-title corpus with pre-port parser: 65 changed records (58 kinds, 20 episode ranges, 2 seasons; no title changes)
 - [x] Title-matching fixture: the season-range correction restored the pre-port 118 wrongly kept Mushoku S1 releases (ceiling 128); all 39 active `title_match` tests pass
 - [x] Sync FILE_INDEX and CHANGELOG
+- [x] Publish all implemented pre-v0.6.0 work as v0.5.8: signed NSIS/MSI installers and updater manifest
 
 ## v0.7.0 — custom Windows libmpv build (planned 2026-10-29)
 - [ ] Record current bundled libmpv identity/options and a baseline for ASS

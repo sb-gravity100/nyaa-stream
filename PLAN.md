@@ -620,7 +620,7 @@ by an app-styled HTML menu whose items depend on what was right-clicked.
 `release/<version>` (for example, `release/0.5.7`). Start version-specific
 work on that branch so its changes and release commit stay grouped by version.
 
-**v0.6.0 parser replacement (requested 2026-10-28).** Port the supplied
+**v0.5.8 parser replacement (published 2026-10-29; requested 2026-10-28).** Port the supplied
 `animebatch.zip` into `crates/release-parse` and make its batch/season-range
 rules the app's release parsing path. Expose its season-aware search as a
 Rust API; keep the app's existing AniList-aware matcher. Retain the
@@ -629,7 +629,7 @@ title, season, resolution and source behavior used by animebatch to Rust,
 without a Python runtime dependency. Preserve the archive's 42 labeled
 regressions; compare app title-matching fixtures and the 10,151-title corpus
 before switching behavior. Keep the supplied Python source in the repository
-as a reference for parity. Ship with the v0.6.0 local milestone tag.
+as a reference for parity. Shipped with v0.5.8. SB requested all implemented pre-v0.6.0 work be published as v0.5.8 on 2026-10-29; the signed Windows installers and updater manifest are published at https://github.com/sb-gravity100/nyaa-stream/releases/tag/v0.5.8. Unimplemented v0.6.0 features remain planned.
 The 10,151-title comparison showed 1,812 title changes if guessit's shorter
 title were made the app's canonical title (including loss of movie and season
 qualifiers). Keep the anitopy title in `parse_release`; `parse_batch` exposes
