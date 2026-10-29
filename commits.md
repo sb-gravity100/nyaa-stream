@@ -1,3 +1,5 @@
+### `c2ae1c2` · 2026-10-30 · fix(magnet): return parsed episode label
+- `crates/nyaa-client/src/magnet.rs`
 ### `402f196` · 2026-10-30 · docs: mark magnet implementation complete
 - `PHASES.md`
 ### `614384d` · 2026-10-30 · fix: infer custom packs from file metadata
