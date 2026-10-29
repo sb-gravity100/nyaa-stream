@@ -156,6 +156,9 @@ export async function mpvSubtitleSettings(
   const px = (percent: number) => (percent / 100) * MPV_REFERENCE_HEIGHT;
   const backOpacity = style.backgroundOpacity / 100;
   const settings: Record<string, string | number | boolean> = {
+    // Light hinting aligns plain-text glyphs to the pixel grid. Authored
+    // ASS retains unhinted layout so signs and animated text do not snap.
+    "sub-hinting": styled ? "none" : "light",
     "sub-font": style.fontFamily,
     "sub-font-size": px(style.sizePercent),
     "sub-bold": style.bold,

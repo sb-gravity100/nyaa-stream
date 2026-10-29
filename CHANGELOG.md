@@ -9,6 +9,12 @@ step when cutting a release.
 
 ## [Unreleased]
 
+## [0.5.10] - 2026-10-29
+
+### Fixed
+- Plain-text subtitles use light font hinting in mpv playback and clip export; styled ASS tracks retain unhinted positioning and animation.
+- HLS subtitle rendering uses 1.5x device-pixel supersampling up to a 2160px threshold, retaining native resolution on larger outputs.
+
 ## [0.5.9] - 2026-10-29
 
 ### Added

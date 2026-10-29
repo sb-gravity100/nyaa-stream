@@ -36,10 +36,11 @@ const EMPTY_SCRIPT = [
   "",
 ].join("\n");
 
-// Render at the output's native device-pixel size. libass supplies
-// per-pixel glyph coverage, and JASSUB's WebGL compositor preserves those
-// masks without a post-blur or supersampling pass. 0 means no size cap.
-const PRESCALE_FACTOR = 1;
+// Render extra glyph coverage samples before composition for smoother
+// edges. JASSUB limits supersampling at 2160px but retains native output
+// above that threshold, avoiding both unbounded growth and downsampling.
+const PRESCALE_FACTOR = 1.5;
+const PRESCALE_HEIGHT_LIMIT = 2160;
 const MAX_RENDER_HEIGHT = 0;
 
 // Numpad alignments 1-3 are bottom-aligned - identical in libass's internal
@@ -105,6 +106,7 @@ export function useAssRenderer({ video, url, fonts, styled, style, timeOffset, d
       url,
       fonts: fonts.length,
       prescaleFactor: PRESCALE_FACTOR,
+      prescaleHeightLimit: PRESCALE_HEIGHT_LIMIT,
       maxRenderHeight: MAX_RENDER_HEIGHT,
     });
     const instance = new JASSUB({
@@ -126,7 +128,7 @@ export function useAssRenderer({ video, url, fonts, styled, style, timeOffset, d
       queryFonts: "local",
       timeOffset: offsetRef.current,
       prescaleFactor: PRESCALE_FACTOR,
-      prescaleHeightLimit: 4320,
+      prescaleHeightLimit: PRESCALE_HEIGHT_LIMIT,
       maxRenderHeight: MAX_RENDER_HEIGHT,
     });
     instanceRef.current = instance;

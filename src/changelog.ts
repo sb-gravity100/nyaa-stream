@@ -10,6 +10,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.5.10",
+    date: "2026-10-29",
+    features: [],
+    fixes: [
+      "Plain-text subtitles use light font hinting for cleaner pixel alignment; styled ASS retains authored positioning and animation.",
+      "HLS subtitles render with bounded supersampling to reduce rough text edges without blurring the video.",
+    ],
+  },
+  {
     version: "0.5.9",
     date: "2026-10-29",
     features: [
