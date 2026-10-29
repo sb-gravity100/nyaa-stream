@@ -1,3 +1,6 @@
+### `94c33e8` · 2026-10-29 · style: enlarge installer primary button
+- `docs/prototypes/installer/index.html`
+
 ### `4620482` · 2026-10-29 · feat: simplify installer prototype
 - `docs/prototypes/installer/index.html`
 - `PHASES.md`
