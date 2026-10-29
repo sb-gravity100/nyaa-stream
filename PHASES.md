@@ -753,8 +753,8 @@ policy remains unchanged.
             cut them to one line (`release.mjs --notes-file` since)
 - [ ] Context menus (v0.6.0, was v0.5.0, see PLAN.md "Context menus"): one commit each -
       - [x] `tauri-plugin-clipboard-manager` (Rust, capability, JS package)
-      - [ ] `contextMenu.ts` store + `ContextMenu.tsx` component
-      - [ ] Global listener: block native menu (dev Shift+right-click
+      - [x] `contextMenuStore.ts` store + `ContextMenu.tsx` component
+      - [x] Global listener: block native menu (dev Shift+right-click
             exempt), text-input Cut/Copy/Paste/Select all, selection Copy
       - [ ] Anime cards/posters + search dropdown + Continue watching
       - [ ] Episode rows + source/torrent rows

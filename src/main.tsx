@@ -7,6 +7,8 @@ import "@fontsource/zen-kaku-gothic-new/700.css";
 import "@fontsource-variable/outfit";
 import App from "./App";
 import { TitleBar } from "./TitleBar";
+import { ContextMenu } from "./ContextMenu";
+import { installGlobalContextMenu } from "./contextMenuStore";
 import { WhatsNew } from "./WhatsNew";
 import { installDevLogger } from "./devLogger";
 import { installDownloadCacheSync } from "./downloadCache";
@@ -15,11 +17,13 @@ import { installFullscreenHotkey } from "./fullscreen";
 installDevLogger();
 installFullscreenHotkey();
 installDownloadCacheSync();
+installGlobalContextMenu();
 render(
   <>
     <TitleBar />
     <App />
     <WhatsNew />
+    <ContextMenu />
   </>,
   document.getElementById("root")!,
 );

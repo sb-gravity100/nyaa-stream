@@ -70,7 +70,9 @@ const listeners = new Set<(route: Route) => void>();
 
 function notify() {
   const route = parseRoute(location.hash);
+  console.debug("[router] notify route listeners", { name: route.name });
   for (const listener of listeners) listener(route);
+  window.dispatchEvent(new Event("nyaa-stream:navigate"));
 }
 
 window.addEventListener("popstate", notify);
