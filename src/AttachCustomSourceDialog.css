@@ -1,0 +1,23 @@
+.attach-source-backdrop { z-index: 90; }
+.attach-source-dialog { width: min(540px, 100%); gap: 12px; }
+.attach-source-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.attach-source-heading h2 { margin: 0; font: 700 1.2rem var(--font-display); }
+.attach-source-heading p { margin: 4px 0 0; color: var(--muted); font-size: .82rem; }
+.attach-source-close { border: 0; background: transparent; color: var(--muted); font-size: 1.5rem; line-height: 1; cursor: pointer; }
+.attach-source-field { display: flex; flex-direction: column; gap: 6px; color: var(--text); font-size: .78rem; font-weight: 650; }
+.attach-source-field input, .attach-source-field textarea, .attach-source-field select { width: 100%; min-width: 0; border: 1px solid var(--glass-rim); border-radius: var(--radius-s); background: rgba(8, 9, 18, .42); color: var(--text); padding: 9px 10px; font: 400 .88rem var(--font-body); outline: none; }
+.attach-source-field textarea { resize: vertical; font-family: ui-monospace, Consolas, monospace; font-size: .76rem; }
+.attach-source-field input:focus, .attach-source-field textarea:focus, .attach-source-field select:focus { border-color: var(--accent); }
+.attach-source-options { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.attach-source-status, .attach-source-selected { color: var(--muted); font-size: .76rem; }
+.attach-source-selected { color: var(--text); }
+.attach-source-error { color: #ff9b9b; font-size: .78rem; overflow-wrap: anywhere; }
+.attach-source-results { max-height: 190px; overflow-y: auto; display: flex; flex-direction: column; border: 1px solid var(--glass-rim); border-radius: var(--radius-s); }
+.attach-source-results button { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 6px 9px; border: 0; border-bottom: 1px solid var(--glass-rim); background: transparent; color: var(--text); text-align: left; cursor: pointer; }
+.attach-source-results button:last-child { border-bottom: 0; }
+.attach-source-results button:hover, .attach-source-results button[aria-selected="true"] { background: rgba(255, 255, 255, .07); }
+.attach-source-results img { width: 28px; height: 38px; border-radius: 3px; object-fit: cover; }
+.attach-source-results span { font-size: .82rem; }
+.attach-source-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 4px; }
+.attach-source-actions button:disabled { opacity: .48; cursor: not-allowed; }
+@media (max-width: 520px) { .attach-source-options { grid-template-columns: 1fr 1fr; } .attach-source-dialog { padding: 18px; } }
