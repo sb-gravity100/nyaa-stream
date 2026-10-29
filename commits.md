@@ -1,3 +1,5 @@
+### `ed49be5` · 2026-10-30 · style: polish installer progress page
+- `src-tauri/installer/installer.nsi`
 ### `77a7222` · 2026-10-30 · fix(installer): label setup action Install
 - `src-tauri/installer/installer.nsi`
 ### `8c0d2d0` · 2026-10-30 · fix(hls): skip extras in pack playback
