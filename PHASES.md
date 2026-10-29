@@ -4,7 +4,7 @@
 
 Canonical specifics: [v0.6.0 implementation lineup](docs/planning/V0_6_0.md). The detailed
 feature checklists later in this file remain authoritative task breakdowns.
-No implementation starts as part of this planning request.
+Feature work follows this order; remaining acceptance checks stay open below.
 
 ### Completed subtitle work included in v0.6.0
 
@@ -28,7 +28,13 @@ No implementation starts as part of this planning request.
 - [ ] 0: Prove installer/updater backend, clean-machine bootstrap, signed
       artifact, silent upgrade, old-install migration and restart lifecycle
 - [ ] 1: Shared context menus and clipboard integration, including custom-source actions
-- [ ] 2: Magnet parsing/direct play, permanent attachments, pack mapping and migration
+- [~] 2: Magnet parsing/direct play, permanent attachments, pack mapping and migration
+  - [x] Bounded btih parsing for magnet links (hex/base32), display name and tracker count
+  - [x] Magnet/hash search detection bypasses AniList search; direct playback uses the existing player
+  - [x] Additive `custom_sources` SQLite schema and list/save/remove commands; no destructive database migration
+  - [x] Attach/edit/remove picker with explicit episode or pack mapping; attached sources merge into episode/Batch groups
+  - [x] Metadata-only pack inspection and persisted video file list; no file reader is opened during inspection
+  - [ ] Manual acceptance for sparse/multi-season pack selection, restart persistence, and malformed/hash input cases
 - [ ] 3: Revalidate artwork provider requirements; implement ID/cache/provider pipeline
 - [ ] 4: Release-page screenshots and missing-thumbnail build queue
 - [ ] 5: Verified-data-only seekbar storyboard/hover previews

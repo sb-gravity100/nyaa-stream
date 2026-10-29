@@ -108,6 +108,63 @@ const TOSHO_TABLES: &str = "CREATE TABLE IF NOT EXISTS release_aid (
      );
      CREATE TABLE IF NOT EXISTS tosho_meta (key TEXT PRIMARY KEY, value TEXT);";
 
+const CUSTOM_SOURCE_TABLE: &str = "CREATE TABLE IF NOT EXISTS custom_sources (
+    id INTEGER PRIMARY KEY,
+    anilist_id INTEGER NOT NULL,
+    info_hash TEXT NOT NULL,
+    magnet TEXT NOT NULL,
+    title TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    season INTEGER,
+    episode_start INTEGER,
+    episode_end INTEGER,
+    files_json TEXT NOT NULL DEFAULT '[]',
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    UNIQUE(anilist_id, info_hash)
+);";
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CustomSourceFile {
+    pub path: String,
+    pub size: u64,
+    pub index: usize,
+    pub season: Option<u32>,
+    pub episode: Option<u32>,
+    pub is_video: bool,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CustomSource {
+    pub id: i64,
+    pub anime_id: i64,
+    pub info_hash: String,
+    pub magnet: String,
+    pub title: String,
+    pub kind: String,
+    pub season: Option<i32>,
+    pub episode_start: Option<i32>,
+    pub episode_end: Option<i32>,
+    pub files: Vec<CustomSourceFile>,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+#[derive(Debug, Clone)]
+pub struct CustomSourceInput {
+    pub anime_id: i64,
+    pub info_hash: String,
+    pub magnet: String,
+    pub title: String,
+    pub kind: String,
+    pub season: Option<i32>,
+    pub episode_start: Option<i32>,
+    pub episode_end: Option<i32>,
+    pub files: Vec<CustomSourceFile>,
+}
+
 /// Insert a release unless its id is already stored (dataset building). The
 /// `words` column is left empty: `import` recomputes it.
 pub(crate) const INSERT_RELEASE_IF_NEW: &str = "INSERT OR IGNORE INTO releases (id, category, title, words, magnet, torrent_url, view_url, size, published, seeders, leechers, first_seen, updated_at)
@@ -234,6 +291,7 @@ impl Store {
         conn.execute_batch(PRAGMAS)?;
         conn.execute_batch(RELEASE_TABLES)?;
         conn.execute_batch(TOSHO_TABLES)?;
+        conn.execute_batch(CUSTOM_SOURCE_TABLE)?;
         tracing::info!(path = %path.display(), "nyaa release database opened");
         Ok(Self { conn: Arc::new(Mutex::new(conn)) })
     }
@@ -242,6 +300,34 @@ impl Store {
     async fn run<T: Send + 'static>(&self, work: impl FnOnce(&mut Connection) -> rusqlite::Result<T> + Send + 'static) -> anyhow::Result<T> {
         let conn = self.conn.clone();
         Ok(tokio::task::spawn_blocking(move || work(&mut conn.lock().unwrap())).await??)
+    }
+
+    pub(crate) async fn save_custom_source(&self, source: CustomSourceInput) -> anyhow::Result<CustomSource> {
+        let files = serde_json::to_string(&source.files)?;
+        self.run(move |conn| {
+            let stamp = now();
+            conn.execute(
+                "INSERT INTO custom_sources (anilist_id, info_hash, magnet, title, kind, season, episode_start, episode_end, files_json, created_at, updated_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?10)
+                 ON CONFLICT(anilist_id, info_hash) DO UPDATE SET magnet=excluded.magnet, title=excluded.title, kind=excluded.kind,
+                 season=excluded.season, episode_start=excluded.episode_start, episode_end=excluded.episode_end, files_json=excluded.files_json, updated_at=excluded.updated_at",
+                params![source.anime_id, source.info_hash, source.magnet, source.title, source.kind, source.season, source.episode_start, source.episode_end, files, stamp],
+            )?;
+            let id: i64 = conn.query_row("SELECT id FROM custom_sources WHERE anilist_id=?1 AND info_hash=?2", params![source.anime_id, source.info_hash], |row| row.get(0))?;
+            read_custom_source(conn, id)
+        }).await
+    }
+
+    pub(crate) async fn custom_sources(&self, anime_id: i64) -> anyhow::Result<Vec<CustomSource>> {
+        self.run(move |conn| {
+            let mut stmt = conn.prepare("SELECT id FROM custom_sources WHERE anilist_id=?1 ORDER BY created_at, id")?;
+            let ids = stmt.query_map(params![anime_id], |row| row.get::<_, i64>(0))?.collect::<rusqlite::Result<Vec<_>>>()?;
+            ids.into_iter().map(|id| read_custom_source(conn, id)).collect()
+        }).await
+    }
+
+    pub(crate) async fn remove_custom_source(&self, anime_id: i64, id: i64) -> anyhow::Result<bool> {
+        self.run(move |conn| conn.execute("DELETE FROM custom_sources WHERE anilist_id=?1 AND id=?2", params![anime_id, id]).map(|changed| changed > 0)).await
     }
 
     /// Stores `results` (upserting each release by id) and records them as
@@ -559,6 +645,21 @@ fn row_to_tosho_release(row: &rusqlite::Row<'_>) -> rusqlite::Result<ToshoReleas
     Ok(ToshoRelease { aid: row.get::<_, i64>(0)?.max(0) as u32, eid: row.get::<_, i64>(1)?.max(0) as u32, approved: row.get::<_, i64>(2)?.clamp(0, 255) as u8 })
 }
 
+fn read_custom_source(conn: &Connection, id: i64) -> rusqlite::Result<CustomSource> {
+    conn.query_row(
+        "SELECT id, anilist_id, info_hash, magnet, title, kind, season, episode_start, episode_end, files_json, created_at, updated_at FROM custom_sources WHERE id=?1",
+        params![id],
+        |row| {
+            let files: String = row.get(9)?;
+            Ok(CustomSource {
+                id: row.get(0)?, anime_id: row.get(1)?, info_hash: row.get(2)?, magnet: row.get(3)?, title: row.get(4)?, kind: row.get(5)?,
+                season: row.get(6)?, episode_start: row.get(7)?, episode_end: row.get(8)?,
+                files: serde_json::from_str(&files).unwrap_or_default(), created_at: row.get(10)?, updated_at: row.get(11)?,
+            })
+        },
+    )
+}
+
 /// Errors unless the attached `src` database has a `releases` table with
 /// every column an import needs.
 fn check_release_columns(conn: &Connection) -> anyhow::Result<()> {
@@ -735,6 +836,8 @@ INSERT INTO `toto_anidb_tvdb` (`anidbid`, `tvdbid`, `defaulttvdbseason`, `episod
             submitter: "Reza".into(),
             is_batch: true,
             file_count: 1,
+            image_urls: Vec::new(),
+            images_scanned: false,
             files: vec![crate::TorrentFile { path: "Season 2/a S02E01.mkv".into(), size: 5, index: 0, season: Some(2), episode: Some(1) }],
             seasons: vec![2],
             image_urls: Vec::new(),

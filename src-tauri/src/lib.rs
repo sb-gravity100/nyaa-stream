@@ -3,6 +3,7 @@ mod cache;
 mod download_cache;
 mod franchise_cache;
 mod load_trace;
+mod magnet;
 mod logs_export;
 mod media_keys;
 mod metadata_fallback;
@@ -1931,6 +1932,11 @@ pub fn run() {
             capture_torrent_thumbnail,
             cached_torrent_thumbnail,
             build_view_page_thumbnail,
+            magnet::parse_custom_magnet,
+            magnet::inspect_custom_magnet,
+            magnet::list_custom_sources,
+            magnet::save_custom_source,
+            magnet::remove_custom_source,
             save_frame_thumbnail,
             search_torrents,
             search_torrents_for_anime,
