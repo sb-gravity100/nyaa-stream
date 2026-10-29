@@ -1,3 +1,7 @@
+### `a3d8bd8` · 2026-10-29 · docs: plan v0.7.0 playback transitions
+- `PLAN.md`
+- `PHASES.md`
+
 ### `2df5a71` · 2026-10-29 · docs: defer native subtitle supersampling
 - `PLAN.md`
 - `PHASES.md`
