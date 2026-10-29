@@ -1,3 +1,11 @@
+### `1482850` · 2026-10-29 · docs: revise milestone scope
+- `PHASES.md`
+- `PLAN.md`
+- `docs/planning/MATCHING.md`
+- `docs/planning/RELEASING.md`
+- `docs/planning/ROADMAP.md`
+- `docs/planning/V0_6_0.md`
+
 ### `69a355b` · 2026-10-29 · chore: consolidate subtitle work into v0.6.0
 - `CHANGELOG.md`
 - `PHASES.md`
