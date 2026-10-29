@@ -436,6 +436,9 @@ Function PageInstallChoices
   ${If} $PassiveMode = 1
     Abort
   ${EndIf}
+  !if "${STARTMENUFOLDER}" != ""
+    Call RestoreStartMenuShortcutChoice
+  !endif
   ; This is the final interactive choice page; label the wizard's Next action clearly.
   GetDlgItem $R8 $HWNDPARENT 1
   SendMessage $R8 ${WM_SETTEXT} 0 "STR:Install"
@@ -527,6 +530,35 @@ Function LoadStartMenuFolder
     StrCpy $AppStartMenuFolder $R0
   ${EndIf}
   StrCpy $PreviousStartMenuFolder $AppStartMenuFolder
+FunctionEnd
+
+Function RestoreStartMenuShortcutChoice
+  ; Keep the fresh-install default, but mirror the current shortcut on upgrades.
+  ${If} $OldMainBinaryName == ""
+  ${AndIf} $WixMode != 1
+    Return
+  ${EndIf}
+
+  StrCpy $StartMenuShortcutState ${BST_UNCHECKED}
+  !insertmacro IsShortcutTarget "$SMPROGRAMS\$PreviousStartMenuFolder\${PRODUCTNAME}.lnk" "$INSTDIR\${MAINBINARYNAME}.exe"
+  Pop $R0
+  ${If} $R0 != 1
+  ${AndIf} $OldMainBinaryName != ""
+    !insertmacro IsShortcutTarget "$SMPROGRAMS\$PreviousStartMenuFolder\${PRODUCTNAME}.lnk" "$INSTDIR\$OldMainBinaryName"
+    Pop $R0
+  ${EndIf}
+  ${If} $R0 != 1
+    !insertmacro IsShortcutTarget "$SMPROGRAMS\${PRODUCTNAME}.lnk" "$INSTDIR\${MAINBINARYNAME}.exe"
+    Pop $R0
+  ${EndIf}
+  ${If} $R0 != 1
+  ${AndIf} $OldMainBinaryName != ""
+    !insertmacro IsShortcutTarget "$SMPROGRAMS\${PRODUCTNAME}.lnk" "$INSTDIR\$OldMainBinaryName"
+    Pop $R0
+  ${EndIf}
+  ${If} $R0 == 1
+    StrCpy $StartMenuShortcutState ${BST_CHECKED}
+  ${EndIf}
 FunctionEnd
 
 Function un.LoadStartMenuFolder

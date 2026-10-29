@@ -854,6 +854,7 @@ policy remains unchanged.
       - [x] Prototype install path/shortcuts, progress/completion/errors, fresh
             install and recovery screens
       - [x] Implement custom install-location, Start Menu and desktop shortcut choices
+      - [x] Restore existing Start Menu shortcut selection alongside desktop choice on upgrades
       - [ ] Cover install path/shortcuts, progress/completion/errors, fresh
             install, upgrade, repair/uninstall and silent updater compatibility
       - [ ] Verify Windows end-to-end update failures/retries, signature

@@ -11,7 +11,7 @@
 | `.githooks/pre-commit` | Non-blocking reminder to bump the version when code changed since the latest tag (enable: `git config core.hooksPath .githooks`) | config, release |
 | `scripts/fetch-native-deps.mjs` | `npm run setup`: downloads + checksum-verifies + extracts the prebuilt native libs (`native-deps-v1` release asset) into `vcpkg_installed/`, replacing a local vcpkg build | build-config, setup |
 | `scripts/make-installer-art.ps1`, `src-tauri/installer/{banner,dialog}.bmp` | Renders the MSI (WiX) banner + welcome-dialog artwork from the app icon and brand colors (System.Drawing); wired in via `bundle.windows.wix` in `tauri.conf.json` | config, release, installer |
-| `scripts/make-nsis-art.ps1`, `src-tauri/installer/{installer.nsi,nsis-header.bmp,nsis-sidebar.bmp}` | Builds the branded NSIS template and image assets; custom install-choice page offers destination and shortcut choices while NSIS supplies progress/completion pages | config, installer |
+| `scripts/make-nsis-art.ps1`, `src-tauri/installer/{installer.nsi,nsis-header.bmp,nsis-sidebar.bmp}` | Builds the branded NSIS template and image assets; custom install-choice page offers destination and shortcut choices and restores those choices on upgrades, while NSIS supplies progress/completion pages | config, installer |
 | `CHANGELOG.md` | Release history (Keep a Changelog), mirrors `src/changelog.ts` + `Unreleased` | docs |
 | `README.md` | Public overview: features, stack, build prerequisites, release steps | docs |
 | `PLAN.md` | Concise active roadmap, v0.6.0 order, constraints and index of detailed planning documents | docs |

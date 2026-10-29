@@ -18,6 +18,7 @@ step when cutting a release.
 - TMDB/fanart.tv artwork fallbacks (including IMDb-based TMDB lookup when an ID crosswalk is missing), provider-key settings, episode stills, release-page screenshots and a cancellable missing-thumbnail queue.
 - Seek-bar frame previews generated only from verified local torrent data.
 - Quiet update checks, in-app download/verification progress, deferred restart and a branded NSIS install-choice page.
+- Interactive upgrades retain the user's existing Start Menu and desktop shortcut choices.
 
 ### Removed
 - Experimental ML training/scoring tools, debugger predictions and unused dataset-mapper training. Rule-based matching and existing dataset compatibility are retained.
