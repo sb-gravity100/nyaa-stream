@@ -1,3 +1,11 @@
+### `22aafdd` · 2026-10-30 · feat: attach magnets and map custom packs
+- `src-tauri/src/lib.rs`
+- `src/App.tsx`
+- `src/AttachCustomSourceDialog.tsx`
+- `src/HlsPlayerView.tsx`
+- `src/MediaPage.tsx`
+- `src/PlayerView.tsx`
+- `src/types.ts`
 ### `8226ce7` · 2026-10-30 · fix(installer): use planned per-user install path
 - `src-tauri/installer/installer.nsi`
 ### `b333ce0` · 2026-10-30 · docs: index player source editing
