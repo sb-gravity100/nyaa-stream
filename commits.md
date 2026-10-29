@@ -1,3 +1,5 @@
+### `ef5d028` · 2026-10-30 · test(magnet): cover source migration and persistence
+- `crates/nyaa-client/src/store.rs`
 ### `1ff9b07` · 2026-10-30 · docs: record signed v0.6.0 installer builds
 - `PHASES.md`
 - `docs/prototypes/installer/FEASIBILITY.md`
