@@ -1,3 +1,14 @@
+### `69a355b` · 2026-10-29 · chore: consolidate subtitle work into v0.6.0
+- `CHANGELOG.md`
+- `PHASES.md`
+- `PLAN.md`
+- `docs/planning/RELEASING.md`
+- `docs/planning/V0_6_0.md`
+- `package.json`
+- `src-tauri/Cargo.toml`
+- `src-tauri/tauri.conf.json`
+- `src/changelog.ts`
+
 ### `975469c` · 2026-10-29 · docs: organize project planning
 - `FILE_INDEX.md`
 - `PHASES.md`
