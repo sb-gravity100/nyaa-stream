@@ -1,3 +1,17 @@
+### `48aadc5` · 2026-10-29 · feat: add custom magnet sources
+- `crates/nyaa-client/src/magnet.rs`
+- `crates/nyaa-client/src/store.rs`
+- `crates/nyaa-client/src/lib.rs`
+- `src-tauri/src/magnet.rs`
+- `src/App.tsx`
+- `src/MediaPage.tsx`
+- `src/types.ts`
+- `src/App.css`
+- `docs/planning/V0_6_0.md`
+- `PLAN.md`
+- `PHASES.md`
+- `FILE_INDEX.md`
+
 ### `389ace0` · 2026-10-29 · feat: add player surface context actions
 - `src/PlayerView.tsx`
 - `src/HlsPlayerView.tsx`
