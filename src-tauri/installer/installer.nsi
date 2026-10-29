@@ -422,13 +422,7 @@ FunctionEnd
 
 ; Start menu state is retained for the uninstaller and future upgrades.
 Var AppStartMenuFolder
-!if "${STARTMENUFOLDER}" != ""
-  !define MUI_STARTMENUPAGE_Application_VARIABLE "AppStartMenuFolder"
-  !define MUI_STARTMENUPAGE_Application_DEFAULTFOLDER "${STARTMENUFOLDER}"
-  !define MUI_STARTMENUPAGE_Application_REGISTRY_ROOT "SHCTX"
-  !define MUI_STARTMENUPAGE_Application_REGISTRY_KEY "${UNINSTKEY}"
-  !define MUI_STARTMENUPAGE_Application_REGISTRY_VALUENAME "StartMenuFolder"
-!endif
+Var PreviousStartMenuFolder
 
 Var InstallPathControl
 Var BrowseInstallPathButton
@@ -521,6 +515,63 @@ Function PageLeaveInstallChoices
     ${EndIf}
   !endif
   ${NSD_GetState} $DesktopShortcutControl $DesktopShortcutState
+FunctionEnd
+
+Function LoadStartMenuFolder
+  StrCpy $AppStartMenuFolder "${STARTMENUFOLDER}"
+  ReadRegStr $R0 SHCTX "${UNINSTKEY}" "StartMenuFolder"
+  ${If} $R0 != ""
+    StrCpy $AppStartMenuFolder $R0
+  ${EndIf}
+  StrCpy $PreviousStartMenuFolder $AppStartMenuFolder
+FunctionEnd
+
+Function un.LoadStartMenuFolder
+  StrCpy $AppStartMenuFolder "${STARTMENUFOLDER}"
+  ReadRegStr $R0 SHCTX "${UNINSTKEY}" "StartMenuFolder"
+  ${If} $R0 != ""
+    StrCpy $AppStartMenuFolder $R0
+  ${EndIf}
+FunctionEnd
+
+Function RemovePreviousStartMenuShortcut
+  ${If} $PreviousStartMenuFolder != ""
+    !insertmacro IsShortcutTarget "$SMPROGRAMS\$PreviousStartMenuFolder\${PRODUCTNAME}.lnk" "$INSTDIR\${MAINBINARYNAME}.exe"
+    Pop $R0
+    ${If} $R0 != 1
+    ${AndIf} $OldMainBinaryName != ""
+      !insertmacro IsShortcutTarget "$SMPROGRAMS\$PreviousStartMenuFolder\${PRODUCTNAME}.lnk" "$INSTDIR\$OldMainBinaryName"
+      Pop $R0
+    ${EndIf}
+    ${If} $R0 = 1
+      Delete "$SMPROGRAMS\$PreviousStartMenuFolder\${PRODUCTNAME}.lnk"
+      RMDir "$SMPROGRAMS\$PreviousStartMenuFolder"
+    ${EndIf}
+  ${EndIf}
+  ; Tidy the old flat shortcut layout as well, but only when it targets this app.
+  !insertmacro IsShortcutTarget "$SMPROGRAMS\${PRODUCTNAME}.lnk" "$INSTDIR\${MAINBINARYNAME}.exe"
+  Pop $R0
+  ${If} $R0 != 1
+  ${AndIf} $OldMainBinaryName != ""
+    !insertmacro IsShortcutTarget "$SMPROGRAMS\${PRODUCTNAME}.lnk" "$INSTDIR\$OldMainBinaryName"
+    Pop $R0
+  ${EndIf}
+  ${If} $R0 = 1
+    Delete "$SMPROGRAMS\${PRODUCTNAME}.lnk"
+  ${EndIf}
+FunctionEnd
+
+Function RemoveDesktopShortcut
+  !insertmacro IsShortcutTarget "$DESKTOP\${PRODUCTNAME}.lnk" "$INSTDIR\${MAINBINARYNAME}.exe"
+  Pop $R0
+  ${If} $R0 != 1
+  ${AndIf} $OldMainBinaryName != ""
+    !insertmacro IsShortcutTarget "$DESKTOP\${PRODUCTNAME}.lnk" "$INSTDIR\$OldMainBinaryName"
+    Pop $R0
+  ${EndIf}
+  ${If} $R0 = 1
+    Delete "$DESKTOP\${PRODUCTNAME}.lnk"
+  ${EndIf}
 FunctionEnd
 
 ; 7. Installation page
@@ -627,8 +678,9 @@ Function .onInit
   !insertmacro SetContext
 
   !if "${STARTMENUFOLDER}" != ""
-    !insertmacro MUI_STARTMENU_GETFOLDER Application $AppStartMenuFolder
+    Call LoadStartMenuFolder
   !endif
+  ReadRegStr $OldMainBinaryName SHCTX "${UNINSTKEY}" "MainBinaryName"
 
   ${If} $INSTDIR == "${PLACEHOLDER_INSTALL_DIR}"
     ; Set default install location
@@ -649,6 +701,19 @@ Function .onInit
     !endif
 
     Call RestorePreviousInstallLocation
+  ${EndIf}
+
+  ; Preserve the desktop shortcut choice on upgrades after the old install path is restored.
+  !insertmacro IsShortcutTarget "$DESKTOP\${PRODUCTNAME}.lnk" "$INSTDIR\${MAINBINARYNAME}.exe"
+  Pop $R0
+  ${If} $R0 == 1
+    StrCpy $DesktopShortcutState ${BST_CHECKED}
+  ${ElseIf} $OldMainBinaryName != ""
+    !insertmacro IsShortcutTarget "$DESKTOP\${PRODUCTNAME}.lnk" "$INSTDIR\$OldMainBinaryName"
+    Pop $R0
+    ${If} $R0 == 1
+      StrCpy $DesktopShortcutState ${BST_CHECKED}
+    ${EndIf}
   ${EndIf}
 
 
@@ -866,20 +931,21 @@ Section Install
 
   ; Create the selected Start menu shortcut. Updater installs keep the stored folder.
   !if "${STARTMENUFOLDER}" != ""
-    ${If} $UpdateMode = 1
-      !insertmacro MUI_STARTMENU_WRITE_BEGIN Application
-        Call CreateOrUpdateStartMenuShortcut
-      !insertmacro MUI_STARTMENU_WRITE_END
+  ${If} $UpdateMode = 1
+      Call CreateOrUpdateStartMenuShortcut
     ${ElseIf} $PassiveMode = 1
     ${OrIf} ${Silent}
-      !insertmacro MUI_STARTMENU_WRITE_BEGIN Application
-        Call CreateOrUpdateStartMenuShortcut
-      !insertmacro MUI_STARTMENU_WRITE_END
+      Call CreateOrUpdateStartMenuShortcut
     ${ElseIf} $StartMenuShortcutState == ${BST_CHECKED}
+      ${If} $PreviousStartMenuFolder != ""
+      ${AndIf} $PreviousStartMenuFolder != $AppStartMenuFolder
+        Call RemovePreviousStartMenuShortcut
+      ${EndIf}
       WriteRegStr SHCTX "${UNINSTKEY}" "StartMenuFolder" "$AppStartMenuFolder"
-      !insertmacro MUI_STARTMENU_WRITE_BEGIN Application
-        Call CreateOrUpdateStartMenuShortcut
-      !insertmacro MUI_STARTMENU_WRITE_END
+      Call CreateOrUpdateStartMenuShortcut
+    ${Else}
+      Call RemovePreviousStartMenuShortcut
+      DeleteRegValue SHCTX "${UNINSTKEY}" "StartMenuFolder"
     ${EndIf}
   !endif
 
@@ -889,6 +955,8 @@ Section Install
     Call CreateOrUpdateDesktopShortcut
   ${ElseIf} $DesktopShortcutState == ${BST_CHECKED}
     Call CreateOrUpdateDesktopShortcut
+  ${Else}
+    Call RemoveDesktopShortcut
   ${EndIf}
 
   !ifmacrodef NSIS_HOOK_POSTINSTALL
@@ -985,7 +1053,7 @@ Section Uninstall
     !insertmacro DeleteAppUserModelId
 
     ; Remove start menu shortcut
-    !insertmacro MUI_STARTMENU_GETFOLDER Application $AppStartMenuFolder
+    Call un.LoadStartMenuFolder
     !insertmacro IsShortcutTarget "$SMPROGRAMS\$AppStartMenuFolder\${PRODUCTNAME}.lnk" "$INSTDIR\${MAINBINARYNAME}.exe"
     Pop $0
     ${If} $0 = 1
