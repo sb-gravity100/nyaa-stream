@@ -1,3 +1,7 @@
+### `2df5a71` · 2026-10-29 · docs: defer native subtitle supersampling
+- `PLAN.md`
+- `PHASES.md`
+
 ### `ddbe3ab` · 2026-10-29 · docs: require supersampling in the native player
 - `PLAN.md`
 - `PHASES.md`
