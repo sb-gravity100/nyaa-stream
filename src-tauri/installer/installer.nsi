@@ -578,6 +578,12 @@ Function RemoveDesktopShortcut
 FunctionEnd
 
 ; 7. Installation page
+!define MUI_INSTFILESPAGE_COLORS "ECEAF6 171A2B"
+!define MUI_INSTFILESPAGE_PROGRESSBAR "smooth"
+!define MUI_INSTFILESPAGE_FINISHHEADER_TEXT "Files installed"
+!define MUI_INSTFILESPAGE_FINISHHEADER_SUBTEXT "nyaa-stream is ready to finish setup."
+!define MUI_INSTFILESPAGE_ABORTHEADER_TEXT "Installation stopped"
+!define MUI_INSTFILESPAGE_ABORTHEADER_SUBTEXT "Close setup and try again."
 !insertmacro MUI_PAGE_INSTFILES
 
 ; 8. Finish page
