@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { displayTitle, type AiringEntry, type AnimeMedia, type KitsuMetadata } from "./types";
-import { continueWatching, dismissContinueWatching, isEpisodeWatched, libraryStats, subscribeProgress, type ProgressEntry } from "./watchProgress";
+import { continueWatching, dismissContinueWatching, isEpisodeWatched, libraryStats, setWatched, subscribeProgress, type ProgressEntry } from "./watchProgress";
 import { PlayIcon, SearchIcon } from "./icons";
 import { cachedTorrentThumbnail, subscribeFrameSaved } from "./torrentThumbnail";
 import { useEnhancedImage } from "./enhanceImage";
+import { copyToClipboard, openAniListPage, openContextMenu } from "./contextMenuStore";
 
 interface Props {
   library: AnimeMedia[];
@@ -13,6 +14,8 @@ interface Props {
   torrentThumbnails: Record<string, string | null>;
   onSelectAnime: (anime: AnimeMedia) => void;
   onSelectEpisode: (anime: AnimeMedia, episode: number) => void;
+  onAddToLibrary: (anime: AnimeMedia) => void;
+  onRemoveFromLibrary: (animeId: number) => void;
 }
 
 function formatAiringDate(unixSeconds: number): string {
@@ -196,11 +199,34 @@ export function HomePage({
   torrentThumbnails,
   onSelectAnime,
   onSelectEpisode,
+  onAddToLibrary,
+  onRemoveFromLibrary,
 }: Props) {
   const inProgress = useContinueWatching();
   const stats = useLibraryStats();
   const [sort, setSort] = useState(loadSort);
   const [filter, setFilter] = useState("");
+  function showAnimeContextMenu(event: MouseEvent, anime: AnimeMedia) {
+    const saved = library.some((entry) => entry.id === anime.id);
+    console.debug("[home] open anime context menu", { animeId: anime.id, saved });
+    openContextMenu(event, [
+      { label: "Open", action: () => { console.info("[home] context menu open anime", { animeId: anime.id }); onSelectAnime(anime); } },
+      { label: saved ? "Remove from library" : "Add to library", action: () => saved ? onRemoveFromLibrary(anime.id) : onAddToLibrary(anime) },
+      { label: "Copy title", action: () => copyToClipboard(displayTitle(anime.title), "anime-title") },
+      { label: "Open on AniList", action: () => openAniListPage(anime.id) },
+    ]);
+  }
+  function showContinueContextMenu(event: MouseEvent, entry: ProgressEntry) {
+    const anime = asAnime(entry);
+    console.debug("[home] open Continue watching context menu", { animeId: entry.animeId, episodeKey: entry.episodeKey });
+    openContextMenu(event, [
+      { label: "Resume", action: () => entry.episode != null ? onSelectEpisode(anime, entry.episode) : onSelectAnime(anime) },
+      { label: "Mark watched", action: () => setWatched(anime, entry.episodeKey, entry.episode, true) },
+      { label: "Remove from Continue watching", action: () => dismissContinueWatching(entry.animeId) },
+      { separator: true },
+      { label: "Go to anime", action: () => onSelectAnime(anime) },
+    ]);
+  }
   const shownLibrary = useMemo(() => {
     const needle = filter.trim().toLowerCase();
     const matches = needle
@@ -341,6 +367,7 @@ export function HomePage({
                   <button
                     class="card-button"
                     onClick={() => (entry.episode != null ? onSelectEpisode(asAnime(entry), entry.episode) : onSelectAnime(asAnime(entry)))}
+                    onContextMenu={(event) => showContinueContextMenu(event, entry)}
                   >
                     <div class="episode-card-thumbnail">
                       {thumbnail && <img src={thumbnail} alt="" loading="lazy" />}
@@ -398,6 +425,7 @@ export function HomePage({
                     <button
                       class="card-button"
                       onClick={() => onSelectEpisode(airingAsAnime(entry), entry.episode)}
+                      onContextMenu={(event) => showAnimeContextMenu(event, airingAsAnime(entry))}
                     >
                       <div class="episode-card-thumbnail">
                         {thumbnail && <img src={thumbnail} alt="" loading="lazy" />}
@@ -459,7 +487,7 @@ export function HomePage({
               const watched = stats.get(anime.id)?.watched ?? 0;
               return (
                 <li key={anime.id} class="library-card" style={{ "--i": index }}>
-                  <button class="card-button" onClick={() => onSelectAnime(anime)}>
+                  <button class="card-button" onClick={() => onSelectAnime(anime)} onContextMenu={(event) => showAnimeContextMenu(event, anime)}>
                     <div class="library-thumbnail">
                       {anime.coverImage.large && <img src={anime.coverImage.large} alt="" loading="lazy" />}
                       {watched > 0 && (

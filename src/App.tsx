@@ -26,6 +26,7 @@ import { SettingsPanel } from "./SettingsPanel";
 import { DebugPage, type SourceMappingRecord } from "./DebugPage";
 import { BrandMark, SearchIcon, SettingsIcon } from "./icons";
 import { Buffering } from "./Buffering";
+import { copyToClipboard, openAniListPage, openContextMenu } from "./contextMenuStore";
 import { goBack, navigate, useRoute, type WatchTarget } from "./router";
 import {
   displayTitle,
@@ -210,6 +211,7 @@ function App() {
   }
 
   function pickAnime(anime: AnimeMedia) {
+    console.info("[search] selected anime", { animeId: anime.id });
     knownAnime.current.set(anime.id, anime);
     setRecentSearches(addRecentSearch(query));
     setDropdownOpen(false);
@@ -447,11 +449,24 @@ function App() {
   }
 
   function handleAddToLibrary(anime: AnimeMedia) {
+    console.info("[library] add anime requested", { animeId: anime.id });
     setLibrary((current) => addToLibrary(anime, current));
   }
 
   function handleRemoveFromLibrary(id: number) {
+    console.info("[library] remove anime requested", { animeId: id });
     setLibrary((current) => removeFromLibrary(id, current));
+  }
+
+  function showSearchAnimeContextMenu(event: MouseEvent, anime: AnimeMedia) {
+    const saved = isInLibrary(anime.id, library);
+    console.debug("[search] open anime context menu", { animeId: anime.id, saved });
+    openContextMenu(event, [
+      { label: "Open", action: () => pickAnime(anime) },
+      { label: saved ? "Remove from library" : "Add to library", action: () => saved ? handleRemoveFromLibrary(anime.id) : handleAddToLibrary(anime) },
+      { label: "Copy title", action: () => copyToClipboard(displayTitle(anime.title), "anime-title") },
+      { label: "Open on AniList", action: () => openAniListPage(anime.id) },
+    ]);
   }
 
   async function loadDetails(mediaId: number, results: NyaaResult[]) {
@@ -986,7 +1001,7 @@ function App() {
                       seasonLabel,
                     ].filter(Boolean);
                     return (
-                      <li key={anime.id} role="option">
+                      <li key={anime.id} role="option" onContextMenu={(event) => showSearchAnimeContextMenu(event, anime)}>
                         <a onMouseDown={(e) => e.preventDefault()} onClick={() => pickAnime(anime)}>
                           <div class="result-thumbnail">
                             {anime.coverImage.large && <img src={anime.coverImage.large} alt="" loading="lazy" decoding="async" />}
@@ -1019,6 +1034,8 @@ function App() {
         torrentThumbnails={torrentThumbnails}
         onSelectAnime={pickAnime}
         onSelectEpisode={selectEpisode}
+        onAddToLibrary={handleAddToLibrary}
+        onRemoveFromLibrary={handleRemoveFromLibrary}
       />
       {settingsPanel}
     </main>

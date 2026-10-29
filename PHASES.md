@@ -756,7 +756,7 @@ policy remains unchanged.
       - [x] `contextMenuStore.ts` store + `ContextMenu.tsx` component
       - [x] Global listener: block native menu (dev Shift+right-click
             exempt), text-input Cut/Copy/Paste/Select all, selection Copy
-      - [ ] Anime cards/posters + search dropdown + Continue watching
+      - [x] Anime cards/posters + search dropdown + Continue watching
       - [ ] Episode rows + source/torrent rows
       - [ ] Player surface (flat, no Subtitles/Speed)
       - [ ] FILE_INDEX.md/PLAN.md sync

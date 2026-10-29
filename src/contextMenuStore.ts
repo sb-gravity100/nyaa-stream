@@ -1,4 +1,5 @@
 import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { isTypingTarget } from "./keyboard";
 
 export type ContextMenuItem = {
@@ -53,6 +54,26 @@ export function openContextMenu(event: MouseEvent, items: ContextMenuItem[]): vo
   }
   currentMenu = { x: event.clientX, y: event.clientY, items };
   publishContextMenu("opened");
+}
+
+export async function copyToClipboard(text: string, purpose: string): Promise<void> {
+  console.info("[context-menu] copy requested", { purpose, length: text.length });
+  try {
+    await writeText(text);
+    console.debug("[context-menu] copy completed", { purpose, length: text.length });
+  } catch (error) {
+    console.error("[context-menu] copy failed", { purpose, error: String(error) });
+  }
+}
+
+export async function openAniListPage(animeId: number): Promise<void> {
+  const url = `https://anilist.co/anime/${animeId}`;
+  console.info("[context-menu] open AniList page", { animeId });
+  try {
+    await openUrl(url);
+  } catch (error) {
+    console.error("[context-menu] AniList open failed", { animeId, error: String(error) });
+  }
 }
 
 function textSelection(target: HTMLElement): { text: string; start?: number; end?: number } {
