@@ -22,6 +22,7 @@ step when cutting a release.
 - Search and request failure logs include concise query size and HTTP status details.
 - The pointer remains visible across the player surface and hides only after inactivity, independently of control-bar hover state.
 - HLS fallback subtitles use native-resolution libass coverage antialiasing with WebGL composition when available.
+- Embedded mpv uses GPU video-stage subtitle blending with EWA Lanczos sharp, blur 1.5, and Mitchell downscaling; scaler blur applies to the image.
 
 ## [0.5.7] - 2026-10-27
 

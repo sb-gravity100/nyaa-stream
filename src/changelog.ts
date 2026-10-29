@@ -20,6 +20,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Search failure logs show concise query size and HTTP status details.",
       "The pointer remains visible across the player and hides only after inactivity.",
       "HLS fallback subtitles use native-resolution libass antialiasing with WebGL composition when available.",
+      "Embedded mpv uses GPU subtitle blending with EWA Lanczos sharp, blur 1.5, and Mitchell downscaling; the blur affects the image.",
     ],
   },
   {

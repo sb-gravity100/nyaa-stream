@@ -35,6 +35,12 @@ impl EmbeddedMpv {
             "--cursor-autohide=no".to_string(),
             "--hwdec=auto-safe".to_string(),
             "--vo=gpu-next,gpu,".to_string(),
+            // User-selected subtitle treatment: blend ASS on the GPU video
+            // stage, using the same scalers as the image (including blur).
+            "--blend-subtitles=video".to_string(),
+            "--scale=ewa_lanczossharp".to_string(),
+            "--scale-blur=1.5".to_string(),
+            "--dscale=mitchell".to_string(),
             "--background-color=#000000".to_string(),
             // Keep more already-played video demuxed (default 50 MiB) so a
             // jump back stays instant and its range stays on the seek bar.

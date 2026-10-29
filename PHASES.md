@@ -266,7 +266,8 @@
         after inactivity while controls may fade outside their hover zones
   - [x] Use libass's native-resolution glyph coverage with WebGL composition
         when available; remove blur and supersampling; retain Canvas2D fallback
-  - [x] Keep mpv's GPU output path and letterbox subtitle placement intact
+  - [x] Apply mpv's video-stage subtitle blend, EWA Lanczos sharp scaler,
+        blur 1.5, and Mitchell downscaler
   - [x] Improve high-value search, seek and mpv logs; avoid repetitive noise
   - [x] Sync changelog and in-app What's New
   - [x] `cargo check --workspace` and `npm run build`
