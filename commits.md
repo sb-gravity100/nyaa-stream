@@ -1,3 +1,7 @@
+### `cb824ec` · 2026-10-29 · docs: plan v0.6.0 update experience
+- `PLAN.md`
+- `PHASES.md`
+
 ### `a3d8bd8` · 2026-10-29 · docs: plan v0.7.0 playback transitions
 - `PLAN.md`
 - `PHASES.md`
