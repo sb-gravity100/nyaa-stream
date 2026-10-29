@@ -38,14 +38,14 @@ interactive page. The custom page explicitly skips passive updater runs, so
 Do not switch to `quiet` without isolated proof of elevation and install-mode
 behavior.
 
-The Windows NSIS bundle completed with the configured `nyaa-stream` Start Menu
-folder and produced `target/release/bundle/nsis/nyaa-stream_0.6.0_x64-setup.exe`
-plus its `.sig` using the local release key. The generated script was also
-recompiled directly with makensis after the registry and shortcut fixes; it
-exited successfully with only unused/duplicate localization warnings. These
-artifacts were not uploaded. The interactive page, install, error recovery,
-uninstaller and updater flow have not been exercised on an isolated Windows
-profile.
+The current v0.6.0 code built both
+`target/release/bundle/nsis/nyaa-stream_0.6.0_x64-setup.exe` and
+`target/release/bundle/msi/nyaa-stream_0.6.0_x64_en-US.msi`, with updater
+signatures generated from the local release key. The NSIS script compiled
+successfully with the configured `nyaa-stream` Start Menu folder and custom
+install choices. These artifacts were not uploaded. The interactive page,
+install, error recovery, uninstaller and updater flow have not been exercised
+on an isolated Windows profile.
 
 ## Still requires an isolated Windows environment
 

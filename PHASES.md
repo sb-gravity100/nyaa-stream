@@ -29,7 +29,7 @@ Feature work follows this order; remaining acceptance checks stay open below.
       Start menu on, desktop shortcut off)
 - [ ] 0: Prove installer/updater backend, clean-machine bootstrap, signed
       artifact, silent upgrade, old-install migration and restart lifecycle
-  - [x] Local signed NSIS setup and signature generated; final custom template compiles
+  - [x] Current code built into signed local NSIS and MSI installers with updater signatures; no artifacts uploaded
   - [ ] Isolated fresh install, upgrade, migration, WebView2, uninstall and signed updater/relaunch checks
 - [~] 1: Shared context menus and clipboard integration, including custom-source actions; manual Windows acceptance remains open
 - [~] 2: Magnet parsing/direct play, permanent attachments, pack mapping and migration
