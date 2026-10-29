@@ -8,7 +8,6 @@ Query (title + season) -> only matching files from a large filename set (single 
 - [x] M1b Batch rules from 2nd crawl (1,500 batch-heavy titles) -> `animebatch/` library, 42 tests
 - [ ] M2 Hand-labeled hard set (~200): bare "- 03" that is really S2, season in title, absolute numbering
 - [ ] M3 Alias/season mapping via AniList/TVDB
-- [ ] M4 ML tagger (CRF -> small BERT) only for residue: low-confidence + disc_pack + no-season cases
 
 ## Design
 parse (own batch rules > SxxEyy > guessit > anitopy) -> aliases -> fuzzy title match -> HARD season filter.

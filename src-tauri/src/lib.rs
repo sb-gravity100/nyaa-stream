@@ -21,7 +21,7 @@ use anilist_client::{AiringEntry, AniListClient, AnimeMedia, AnimeTitle};
 use kitsu_client::{KitsuClient, KitsuMetadata};
 use mpv_player::MpvPlayer;
 use nyaa_client::{Category, NyaaClient, NyaaResult, TorrentDetails};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use tauri::{Emitter, Manager, State};
 use tokio::sync::Mutex;
 use torrent_engine::{largest_video_file, DecoderSupport, StreamStats, SubtitleTrack, TorrentEngine, TorrentFile, TorrentId};
@@ -97,17 +97,6 @@ struct BackendReleaseAnalysis {
     decision: String,
     reason: String,
     checks: Vec<SourceMatchCriterion>,
-    ml: Option<MlPrediction>,
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-struct MlPrediction {
-    view_url: String,
-    predicted_entry: Option<i64>,
-    top_entry: i64,
-    confidence: f64,
-    margin: f64,
-    target_match: Option<bool>,
 }
 
 #[derive(Clone, Serialize)]
@@ -130,53 +119,6 @@ struct SourceMatchAnalytics {
     accepted: usize,
     rejected: usize,
     releases: Vec<BackendReleaseAnalysis>,
-    ml_status: String,
-}
-
-/// Runs the offline prototype only for a debugger request. Its model and
-/// training metadata stay in the user's local Tosho directory.
-async fn debugger_ml_predictions(title: &AnimeTitle, anilist_id: Option<i64>, results: &[NyaaResult]) -> Result<Vec<MlPrediction>, String> {
-    let id = anilist_id.ok_or("AniList id unavailable")?;
-    let appdata = std::env::var_os("APPDATA").ok_or("APPDATA unavailable")?;
-    let data = PathBuf::from(appdata).join("nyaa-stream").join("tosho");
-    let model = data.join("ml-model.json");
-    let entries = data.join("ml-entries.json");
-    let fribb = data.join("fribb.json");
-    for path in [&model, &entries, &fribb] {
-        if !path.is_file() { return Err(format!("Missing {}", path.display())); }
-    }
-    let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).parent().ok_or("Repo path unavailable")?.to_path_buf();
-    let parser = repo.join("target/release/examples/ml_parse.exe");
-    if !parser.is_file() { return Err("ML parser executable unavailable".into()); }
-    let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_err(|e| e.to_string())?.as_nanos();
-    let input = data.join(format!("ml-debug-{}-{stamp}.jsonl", std::process::id()));
-    let output = data.join(format!("ml-debug-{}-{stamp}.json", std::process::id()));
-    let run = async {
-        let mut lines = String::new();
-        for result in results {
-            lines.push_str(&serde_json::to_string(result).map_err(|e| e.to_string())?);
-            lines.push('\n');
-        }
-        tokio::fs::write(&input, lines).await.map_err(|e| e.to_string())?;
-        let search = title.romaji.as_deref().or(title.english.as_deref()).or(title.native.as_deref()).ok_or("Anime title unavailable")?;
-        let process = tokio::process::Command::new("python")
-            .arg(repo.join("ml/score_search.py"))
-            .arg(&model).arg(&entries).arg(&fribb).arg(&input)
-            .arg(search).arg(id.to_string())
-            .arg("--parser").arg(&parser)
-            .arg("--cache").arg(data.join(format!("ml-franchise-{id}.json")))
-            .arg("--json-out").arg(&output)
-            .env("PYTHONIOENCODING", "utf-8")
-            .current_dir(&repo).output().await.map_err(|e| e.to_string())?;
-        if !process.status.success() {
-            return Err(String::from_utf8_lossy(&process.stderr).chars().take(500).collect());
-        }
-        let bytes = tokio::fs::read(&output).await.map_err(|e| e.to_string())?;
-        serde_json::from_slice(&bytes).map_err(|e| e.to_string())
-    }.await;
-    let _ = tokio::fs::remove_file(&input).await;
-    let _ = tokio::fs::remove_file(&output).await;
-    run
 }
 
 #[tauri::command]
@@ -820,7 +762,6 @@ async fn search_torrents_for_anime(
                 accepted: 0,
                 rejected: 0,
                 releases: Vec::new(),
-                ml_status: "No releases to score".into(),
             };
             if let Err(err) = app.emit("source-match-analytics", empty) {
                 tracing::warn!(%err, "could not send empty matching analytics to debug view");
@@ -882,7 +823,6 @@ async fn search_torrents_for_anime(
         }
     }
 
-    let ml_input = diagnostics.unwrap_or(false).then(|| merged.clone());
     let matcher = show_matcher(&state, &title, &synonyms, anilist_id, franchise.as_ref());
     let unique_releases = merged.len();
     let mut release_analysis = filter_for_show(&state, &matcher, anilist_id, &mut merged, |_| true, diagnostics.unwrap_or(false)).await;
@@ -903,35 +843,11 @@ async fn search_torrents_for_anime(
             accepted,
             rejected: release_analysis.len().saturating_sub(accepted),
             releases: release_analysis,
-            ml_status: "ML scoring started".into(),
         };
-        if let Err(err) = app.emit("source-match-analytics", analytics.clone()) {
+        if let Err(err) = app.emit("source-match-analytics", analytics) {
             tracing::warn!(%err, "could not send source matching analytics to debug view");
         }
-        if let Some(input) = ml_input {
-            let app = app.clone();
-            let title = title.clone();
-            tauri::async_runtime::spawn(async move {
-                let mut updated = analytics;
-                match debugger_ml_predictions(&title, anilist_id, &input).await {
-                    Ok(predictions) => {
-                        tracing::info!(scored = predictions.len(), "debugger ML scoring completed");
-                        let by_url: std::collections::HashMap<_, _> = predictions.into_iter().map(|prediction| (prediction.view_url.clone(), prediction)).collect();
-                        for release in &mut updated.releases {
-                            release.ml = by_url.get(&release.view_url).cloned();
-                        }
-                        updated.ml_status = "Experimental ML scores; non-anime false matches remain".into();
-                    }
-                    Err(err) => {
-                        tracing::warn!(%err, "debugger ML scoring unavailable");
-                        updated.ml_status = format!("ML unavailable: {err}");
-                    }
-                }
-                if let Err(err) = app.emit("source-match-analytics", updated) {
-                    tracing::warn!(%err, "could not send ML analysis to debug view");
-                }
-            });
-        }
+
     }
 
     // A preferred fansubber whose nyaa.si account isn't known yet: learn it
@@ -1157,7 +1073,6 @@ async fn filter_for_show(
                 decision: decision_name.into(),
                 reason: if !title_match_keep { reason } else if !extra_keep { "Additional source filter rejected this release".into() } else { reason },
                 checks,
-                ml: None,
             });
         }
         keep

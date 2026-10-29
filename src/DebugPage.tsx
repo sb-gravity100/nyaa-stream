@@ -33,9 +33,7 @@ type BackendRelease = {
   decision: string;
   reason: string;
   checks: Check[];
-  ml: MlPrediction | null;
 };
-type MlPrediction = { viewUrl: string; predictedEntry: number | null; topEntry: number; confidence: number; margin: number; targetMatch: boolean | null };
 type SearchAnalytics = {
   animeId: number | null;
   entrySeason: number | null;
@@ -46,7 +44,6 @@ type SearchAnalytics = {
   accepted: number;
   rejected: number;
   releases: BackendRelease[];
-  mlStatus: string;
 };
 
 type Props = {
@@ -80,7 +77,6 @@ type ReleaseRow = {
   reason: string;
   checks: Check[];
   queryMatches: string[];
-  ml: MlPrediction | null;
 };
 
 export function DebugPage(props: Props) {
@@ -125,7 +121,6 @@ export function DebugPage(props: Props) {
         reason: mapping?.reason ?? (props.sourcesLoading ? "Search results are still arriving" : "Waiting for mapping data"),
         checks: [...(backend?.checks ?? []), ...(mapping?.checks ?? [])],
         queryMatches: backend?.queryMatches ?? [],
-        ml: backend?.ml ?? null,
       });
     }
     for (const backend of analytics?.releases ?? []) {
@@ -145,7 +140,6 @@ export function DebugPage(props: Props) {
         reason: backend.reason,
         checks: backend.checks,
         queryMatches: backend.queryMatches,
-        ml: backend.ml,
       });
     }
     return Array.from(records.values());
@@ -194,14 +188,13 @@ export function DebugPage(props: Props) {
 
       <section class="debug-overview">
         <div class="debug-overview-head"><h2>What survived each decision</h2><span>{props.error ? "Search failed" : props.sourcesLoading ? "Updating results" : analytics ? "Analysis complete" : "Waiting for backend analysis"}</span></div>
-        <p class="debug-ml-status">{analytics?.mlStatus ?? "ML analysis pending"} · debugger only</p>
         {props.error && <div class="debug-search-error">{props.error}</div>}
         <div class="debug-funnel">{stages.map((stage, index) => <div class="debug-funnel-step">
           <div class="debug-funnel-count"><b>{stage.value.toLocaleString()}</b><span>{stage.label}</span></div>
           <div class="debug-funnel-track"><i class={stage.color} style={{ width: `${overall ? Math.max(2, stage.value / overall * 100) : 0}%` }} /></div>
           {index < stages.length - 1 && <span class="debug-funnel-chevron">›</span>}
         </div>)}</div>
-        <div class="debug-stats"><span><b>{analytics?.duplicateHits ?? "—"}</b> duplicate hits removed</span><span><b>{analytics?.rejected ?? 0}</b> rejected by show match</span><span><b>{mapped}</b> mapped to page rows</span><span><b>{unresolved}</b> kept but unresolved</span><span><b>{rows.filter((row) => row.ml?.targetMatch === true).length}</b> ML matches</span><span><b>{rows.filter((row) => row.ml && row.ml.targetMatch == null).length}</b> ML abstentions</span></div>
+        <div class="debug-stats"><span><b>{analytics?.duplicateHits ?? "—"}</b> duplicate hits removed</span><span><b>{analytics?.rejected ?? 0}</b> rejected by show match</span><span><b>{mapped}</b> mapped to page rows</span><span><b>{unresolved}</b> kept but unresolved</span></div>
       </section>
 
       <section class="debug-query-panel">
@@ -220,13 +213,12 @@ export function DebugPage(props: Props) {
           {visibleRows.map((row) => <article class={`debug-release ${row.status}`}>
             <button class="debug-release-main" onClick={() => setExpanded(expanded === row.key ? null : row.key)}>
               <span class={`debug-state-mark ${row.status}`}>{row.status === "mapped" ? "✓" : row.status === "rejected" || row.status === "filtered" ? "×" : "?"}</span>
-              <span class="debug-release-name"><b>{row.title}</b><small>{row.label} · {row.size}{row.ml && <> · <strong class={row.ml.targetMatch === true ? "debug-ml-yes" : row.ml.targetMatch === false ? "debug-ml-no" : "debug-ml-wait"}>ML {row.ml.targetMatch === true ? "match" : row.ml.targetMatch === false ? "other entry" : "abstain"} {(row.ml.confidence * 100).toFixed(0)}%</strong></>}</small></span>
+              <span class="debug-release-name"><b>{row.title}</b><small>{row.label} · {row.size}</small></span>
               <span class="debug-destination">{row.destinations.length ? row.destinations.join(" · ") : row.status === "rejected" || row.status === "filtered" ? "Filtered out" : "No episode row"}</span>
               <span class="debug-seeders">↑ {row.seeders}</span><span class="debug-expand">{expanded === row.key ? "−" : "+"}</span>
             </button>
             {expanded === row.key && <div class="debug-release-detail">
               <p class="debug-reason">{row.reason}</p>
-              {row.ml && <p class="debug-ml-result">ML: {row.ml.predictedEntry == null ? "abstained" : row.ml.targetMatch ? "matches selected entry" : `assigned to entry #${row.ml.predictedEntry}`} · confidence {(row.ml.confidence * 100).toFixed(1)}% · margin {(row.ml.margin * 100).toFixed(1)}%</p>}
               {row.queryMatches.length > 0 && <div class="debug-release-queries"><b>Found by</b>{row.queryMatches.map((query) => <code>{query}</code>)}</div>}
               <div class="debug-criteria">{row.checks.length ? row.checks.map((check) => <div class={`debug-criterion ${check.outcome.replace(/ /g, "-")}`}>
                 <span>{check.outcome === "passed" || check.outcome === "not needed" ? "✓" : check.outcome === "failed" ? "×" : "·"}</span><b>{check.name}</b><small>{check.evidence}</small>

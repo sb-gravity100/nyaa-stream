@@ -20,7 +20,7 @@ No implementation starts as part of this planning request.
 
 - [ ] Preserve permanent release data, source attachments and playback/resume state through migrations, upgrades, failed updates and restart; verify existing-profile resume
 
-- [ ] Remove cancelled ML training/scoring prototype and dataset trainer; preserve rule matching and dataset compatibility
+- [x] Remove cancelled ML training/scoring prototype and dataset trainer; retain rule matching and legacy dataset compatibility. Frontend build, workspace/all-target checks, 54 nyaa-client tests and 39 matching tests passed.
 
 - [x] Installer visual direction confirmed by SB: compact dark layout matching the app
 - [ ] Review proposed update schedule, restart flow and first-install defaults
@@ -305,15 +305,8 @@ policy remains unchanged.
         and the Food Wars / Mushoku / Slime entries (results in PLAN.md
         "Verification (T8)"; `NyaaResult.aid_trusted` + `groupedSources` bypass;
         `search_local` AllAnime fix)
-  - [~] T9 static stem mapper trained on the dump (`stem_aid` table, built by
-        `build_tosho`, holdout eval pre/post 2025-01-01, precision >= 99%,
-        used as a T5 hint for releases without a dataset `aid`; never
-        updated from new data). Built, imported and queryable
-        (`aid_for_stem`); holdout precision is 38% (season carry-over), so
-        the T5 hint is deliberately NOT enabled - see PLAN.md "Stem mapper
-        result"
   - [x] Settings panel as a centered modal instead of a right drawer (PLAN.md "Settings as a centered modal"; CSS only)
-  - [x] FILE_INDEX.md/PLAN.md sync, CHANGELOG, `npm run bump -- minor`, tag v0.5.0, published (T9 stem mapper stays built but unused: holdout precision 38%, see PLAN.md; not shipped as a feature) or
+  - [x] FILE_INDEX.md/PLAN.md sync, CHANGELOG, `npm run bump -- minor`, tag v0.5.0, published or
         patch per the Release plan, tag
 
 - [ ] Custom magnet in the search bar - v0.6.0 (user 2026-10-13; was v0.4.5; minor feature, see PLAN.md
@@ -851,8 +844,9 @@ policy remains unchanged.
       - [ ] Browse page: filters, sort, infinite scroll, URL state
       - [ ] Recommendations rows from library/watch history
       - [ ] Airing schedule calendar
-      - [ ] PLAN.md/FILE_INDEX.md sync, `npm run bump -- patch`, tag
-            `v0.8.0` locally (not pushed/published)
+      - [ ] Complete navigation/Home and Discover together; sync docs,
+            set version 0.8.0 with `npm run bump -- 0.8.0`, tag locally
+            (not pushed/published)
 - [ ] 32-bit Windows (v1.0.0, see PLAN.md "32-bit Windows support"): one
       commit each -
       - [ ] Audit 64-bit assumptions (`usize` casts, sizes/offsets as `u64`,

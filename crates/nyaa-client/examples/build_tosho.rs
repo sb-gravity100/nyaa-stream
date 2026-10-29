@@ -21,7 +21,6 @@ use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 
 use nyaa_client::sevenz_stream;
-use nyaa_client::stem::{self, TrainConfig};
 use nyaa_client::tosho::InsertReader;
 use nyaa_client::tosho_build::{dataset_file_name, ToshoBuilder};
 
@@ -42,12 +41,6 @@ fn main() -> anyhow::Result<()> {
         }
         return Ok(());
     }
-    if let Some(i) = args.iter().position(|a| a == "--holdout-only") {
-        args.remove(i);
-        let config = stem_config(&mut args)?;
-        anyhow::ensure!(args.len() == 2, "usage: build_tosho --holdout-only <dataset.db> YYYY-MM-DD [--stem-share F] [--stem-releases N] [--stem-groups N]");
-        return holdout(&PathBuf::from(&args[0]), &args[1], config);
-    }
     build(args)
 }
 
@@ -58,41 +51,6 @@ fn take_switch(args: &mut Vec<String>, name: &str) -> bool {
         args.remove(i);
     }
     found.is_some()
-}
-
-/// Removes `--name value` from `args`.
-fn take_flag(args: &mut Vec<String>, name: &str) -> anyhow::Result<Option<String>> {
-    let Some(i) = args.iter().position(|a| a == name) else { return Ok(None) };
-    anyhow::ensure!(i + 1 < args.len(), "{name} needs a value");
-    let value = args.remove(i + 1);
-    args.remove(i);
-    Ok(Some(value))
-}
-
-fn stem_config(args: &mut Vec<String>) -> anyhow::Result<TrainConfig> {
-    let mut config = TrainConfig::default();
-    if let Some(v) = take_flag(args, "--stem-share")? {
-        config.min_share = v.parse()?;
-    }
-    if let Some(v) = take_flag(args, "--stem-releases")? {
-        config.min_releases = v.parse()?;
-    }
-    if let Some(v) = take_flag(args, "--stem-groups")? {
-        config.min_groups = v.parse()?;
-    }
-    Ok(config)
-}
-
-fn holdout(dataset: &std::path::Path, cutoff: &str, config: TrainConfig) -> anyhow::Result<()> {
-    let started = std::time::Instant::now();
-    let conn = rusqlite::Connection::open_with_flags(dataset, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
-    let (stems, e) = stem::holdout(&conn, cutoff, config)?;
-    println!("stem holdout (train < {cutoff}, test = trusted releases from {cutoff}), {config:?}");
-    println!("  stems kept {stems}; test releases {}; resolved {}; correct {}", e.test, e.resolved, e.correct);
-    println!("  coverage {:.2}% (of series seen in training: {:.2}% of {}); precision {:.3}%", e.coverage() * 100.0, e.known_series_coverage() * 100.0, e.known_series, e.precision() * 100.0);
-    println!("  wrong resolutions {}; of them same TVDB show (season carry-over) {}", e.resolved - e.correct, e.wrong_same_show);
-    println!("  took {:.0}s", started.elapsed().as_secs_f64());
-    Ok(())
 }
 
 fn spawn_7z(archive: &str, inner: &str) -> anyhow::Result<Child> {
@@ -154,9 +112,7 @@ fn build(mut args: Vec<String>) -> anyhow::Result<()> {
     } else {
         true
     };
-    let holdout_date = take_flag(&mut args, "--holdout")?;
-    let config = stem_config(&mut args)?;
-    anyhow::ensure!(args.len() == 2, "usage: build_tosho <database-dump.7z> <out.db | out-dir> [--dump-date YYYY-MM-DD] [--no-archive] [--external-7z] [--holdout YYYY-MM-DD] [--stem-share F] [--stem-releases N] [--stem-groups N]  |  build_tosho --stats [--external-7z] <database-dump.7z> [inner.sql ...]");
+    anyhow::ensure!(args.len() == 2, "usage: build_tosho <database-dump.7z> <out.db | out-dir> [--dump-date YYYY-MM-DD] [--no-archive] [--external-7z]  |  build_tosho --stats [--external-7z] <database-dump.7z> [inner.sql ...]");
     let (archive, out) = (args.remove(0), PathBuf::from(args.remove(0)));
     let date = match date {
         Some(d) => d,
@@ -165,7 +121,6 @@ fn build(mut args: Vec<String>) -> anyhow::Result<()> {
     let out = if out.is_dir() || out.extension().is_none() { out.join(dataset_file_name(&date)) } else { out };
     let started = std::time::Instant::now();
     let mut builder = ToshoBuilder::create(&out, &date)?;
-    builder.set_stem_config(config);
 
     let mut src = Source::open(&archive, r"data\toto_repl.sql", external)?;
     builder.read_toto(&mut src.reader)?;
@@ -179,9 +134,6 @@ fn build(mut args: Vec<String>) -> anyhow::Result<()> {
     }
     let counts = builder.finish()?;
     println!("wrote {} ({:.0} MB) in {:.0}s: {counts:?}", out.display(), std::fs::metadata(&out)?.len() as f64 / 1e6, started.elapsed().as_secs_f64());
-    if let Some(cutoff) = holdout_date {
-        holdout(&out, &cutoff, config)?;
-    }
     Ok(())
 }
 

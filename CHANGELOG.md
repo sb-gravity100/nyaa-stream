@@ -11,6 +11,9 @@ step when cutting a release.
 
 ## [0.6.0] - Unreleased
 
+### Removed
+- Experimental ML training/scoring tools, debugger predictions and unused dataset-mapper training. Rule-based matching and existing dataset compatibility are retained.
+
 ### Added
 - Selective ASS dialogue style overrides for font/weight, size, text color, outline/background/shadow and bottom margin, shared by embedded mpv, HLS playback and clip export. Unchecked fields and authored inline effects are retained.
 

@@ -16,6 +16,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       "ASS dialogue styling now has separate controls for font, size, text color, outline/background and bottom margin, while retaining unchecked authored style fields.",
     ],
     fixes: [
+      "Removed experimental ML scoring and training tools; source matching continues to use trusted dataset ids and title rules.",
       "Embedded mpv blends subtitles onto upscaled video frames and uses EWA Lanczos video scaling.",
       "Plain-text subtitles use light font hinting for cleaner pixel alignment; styled ASS retains authored positioning and animation.",
       "HLS subtitles render with bounded supersampling to reduce rough text edges without blurring the video.",

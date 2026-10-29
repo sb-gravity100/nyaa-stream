@@ -11,8 +11,7 @@
 //! - `release_files(nyaa_id, idx, path, size)`: file lists of those
 //!   releases that hold more than one file.
 //! - `anidb_tvdb(anidb_id, tvdb_id, season, episode_offset, mapping)`.
-//! - `stem_aid(stem, aid, votes)`: the static stem mapper trained on the
-//!   dump's own releases (`stem.rs`, PLAN.md T9).
+//! - `stem_aid(stem, aid, votes)`: an empty legacy compatibility table.
 //! - `releases` (+ the empty query-cache tables): the same schema and row
 //!   shape as `store.rs`, so `Store::import` merges it like any release
 //!   database; `category` is nyaa.si's code (legacy `1_37`/`1_11`/`1_38`/`1_32`
@@ -27,7 +26,6 @@ use std::path::{Path, PathBuf};
 
 use rusqlite::{params, Connection};
 
-use crate::stem::{self, TrainConfig};
 use crate::store::{INSERT_RELEASE_IF_NEW, RELEASE_TABLES};
 use crate::tosho::{Header, InsertReader, Value};
 
@@ -69,7 +67,7 @@ pub struct BuildStats {
     /// Releases that have a file list.
     pub release_files_torrents: u64,
     pub anidb_tvdb: u64,
-    /// Rows of the trained `stem_aid` table.
+    /// Rows of the legacy `stem_aid` compatibility table (always zero in new builds).
     pub stem_aid: u64,
 }
 
@@ -82,7 +80,6 @@ pub struct ToshoBuilder {
     dump_date: String,
     dump_unix: i64,
     stats: BuildStats,
-    stem_config: TrainConfig,
 }
 
 fn num(v: &Value) -> i64 {
@@ -213,12 +210,7 @@ impl ToshoBuilder {
              CREATE TABLE stage.files (toto_id INTEGER NOT NULL, filename TEXT NOT NULL, size INTEGER NOT NULL);
              CREATE TABLE stage.wanted (toto_id INTEGER PRIMARY KEY, nyaa_id INTEGER NOT NULL);",
         )?;
-        Ok(Self { conn, out: out.to_path_buf(), stage, dump_date: dump_date.to_string(), dump_unix, stats: BuildStats::default(), stem_config: TrainConfig::default() })
-    }
-
-    /// Vote thresholds for the `stem_aid` table written by `finish`.
-    pub fn set_stem_config(&mut self, config: TrainConfig) {
-        self.stem_config = config;
+        Ok(Self { conn, out: out.to_path_buf(), stage, dump_date: dump_date.to_string(), dump_unix, stats: BuildStats::default() })
     }
 
     /// Reads `toto_repl.sql`: `toto_files`, `toto_toto` and `toto_anidb_tvdb`
@@ -399,7 +391,6 @@ impl ToshoBuilder {
             self.conn.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?1, ?2)", params![key, value])?;
         }
         self.conn.execute_batch("COMMIT; DETACH DATABASE stage;")?;
-        self.stats.stem_aid = stem::train_dataset(&self.conn, self.stem_config)?;
         self.conn.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('stem_aid', ?1)", params![self.stats.stem_aid.to_string()])?;
         let Self { conn, out, stage, stats, .. } = self;
         drop(conn);

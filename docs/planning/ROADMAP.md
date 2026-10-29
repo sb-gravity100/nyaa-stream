@@ -136,9 +136,9 @@ until then, but must not add 64-bit-only assumptions).
 
 ## Navigation and home rehaul + Discover (planned, v0.8.0 navigation, Home and Discover)
 
-Scope decided 2026-09-29: rework **navigation and the home page** only. The
-media page, player and settings keep their layouts (they inherit new
-navigation chrome and the existing theme, nothing more). The consolidated v0.8.0 rehaul/Discover milestone is a local-only tag, so v1.0.0 remains the
+Scope consolidated by SB on 2026-10-29: **navigation, Home rehaul and
+Discover ship together in v0.8.0**. The media page, player and settings
+keep their layouts while inheriting the navigation chrome and theme. The consolidated v0.8.0 rehaul/Discover milestone is a local-only tag, so v1.0.0 remains the
 first published build with the new UI (see "Release plan").
 
 **v0.8.0 - navigation and home rehaul**

@@ -405,56 +405,10 @@ shown inline in the Settings row; the button becomes Cancel while running.
 Never starts without the confirm dialog; offline or tracker failure shows a
 clear error and the manual ".db" path still works.
 
-**Stem mapper (T9, decided 2026-10-13: static, trained only on the dump;
-newly collected data never feeds back).** Releases newer than the dump have
-no `aid`. The mapper generalises the dump's ground truth to them:
-- *Training (offline, in `build_tosho`):* for every dataset release with a
-  trusted `aid` (`approved` 1-3, plus 0 only when consistent with its
-  group), parse the title (`release-parse`), normalise the show name (the
-  same `normalize` as `title_match.rs`, season markers and episode numbers
-  removed) into a **stem**, and count `stem -> aid` votes. Keep a stem only
-  when one `aid` holds at least 90% of its votes and at least 3 releases (or
-  2 groups); conflicting stems are dropped, not guessed. Table
-  `stem_aid(stem TEXT PRIMARY KEY, aid INTEGER, votes INTEGER)` in the
-  dataset, imported with it (wholesale replace like the other tables).
-- *Use:* a release with no dataset `aid` looks up its stem; a hit gives an
-  `aid` with `approved = 0` weight (a hint under the T5 rule), a miss uses the
-  title rules. Nothing is written back: the table changes only when a newer
-  dump is built and imported, so there is no feedback loop.
-- *Evaluation (holdout):* train on releases before 2025-01-01, test on the
-  releases after it (they all have true `aid`s): report coverage (share of
-  test releases the stems resolve) and precision (share correct); ship only
-  if precision >= 99% on resolved releases, otherwise raise the vote
-  thresholds. Series that debuted after the dump have no stems and fall to
-  title rules by design.
-
-**Stem mapper result (T9, measured 2026-10-13 on the real dump).** Built:
-`nyaa-client/src/stem.rs` (`parse_stem`/`stem_of` = `release-parse` show name
-through a copy of `normalize`, `train`, `evaluate`, `holdout`),
-`ToshoBuilder::finish` writes `stem_aid` (10,284 stems from 531,419 aid rows;
-dataset still 500 MB, build 118 s), `Store::import_tosho` replaces `stem_aid`
-(older datasets without the table import and clear it), `NyaaClient::
-aid_for_stem` / `aids_for_stems`. `build_tosho ... --holdout 2025-01-01` (and
-`--holdout-only <dataset.db> <date>` on a built dataset) prints the evaluation;
-`--stem-share/--stem-releases/--stem-groups` set the thresholds (default 0.90 /
-3 releases / 2 groups). A guess (`approved` 0) votes only when every release
-of its group for that stem agrees on one `aid`.
-- Holdout (train < 2025-01-01: 449,946 releases, 9,040 stems; test = 47,366
-  trusted releases from 2025-01-01): coverage 18.99%, **precision 38.3%**
-  (8,994 resolved, 3,446 correct). Of the 5,548 wrong, 5,395 name another
-  AniDB entry of the *same TVDB show* (a returning series' new season/cour has
-  a new `aid`, the stem still maps to the old one); only 153 are another show.
-  Counting a same-show answer as right gives 98.3%, still under 99%.
-- Raising the thresholds makes it worse, not better: share 0.99 / 20 releases
-  / 4 groups gives 16.9% coverage, 36.3% precision; share 1.0 / 50 / 6 gives
-  12.7%, 22.3%. Strict thresholds favour long-running stems, which are exactly
-  the ones that gain new seasons. Cutoff 2024-07-01: 17.7%, 32.4%.
-- **Verdict: the hook is NOT enabled.** The 99% gate cannot be met by vote
-  thresholds because the error is structural (a stem cannot name a season).
-  `filter_for_show` / `ShowMatcher::decide` are unchanged, nothing reads
-  `stem_aid` yet, and the table ships unused. Possible later fixes, each
-  needing its own plan entry: stems only for shows whose TVDB group has a
-  single AniDB entry, or season-aware stems (stem + season marker).
+**Legacy dataset compatibility.** Existing datasets may contain a
+`stem_aid` table. Its schema/import compatibility is retained, but new builds
+leave it empty and no training or holdout evaluation is performed. Current
+matching uses trusted dataset ids and title rules.
 
 **Matching rule (T5).** `ShowMatcher::decide(title, known, entry_aids)` ->
 `Accept | Reject | UseTitleRules`; `entry_aids` = `AnimeLists::anidb_ids` of
