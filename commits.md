@@ -1,3 +1,8 @@
+### `8cf6f60` · 2026-10-30 · fix: handle custom sources in context menus
+- `src/ContextMenu.css`
+- `src/MediaPage.tsx`
+- `src/PlayerView.tsx`
+- `docs/planning/V0_6_0.md`
 ### `da25111` · 2026-10-30 · feat: add arm-server artwork ID fallback
 - `crates/artwork-client/src/lib.rs`
 - `docs/planning/V0_6_0.md`
