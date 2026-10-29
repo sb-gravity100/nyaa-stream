@@ -264,21 +264,15 @@
         damaged video or triggering an inappropriate buffer rebuild
   - [x] Keep the pointer visible across the player surface; hide it only
         after inactivity while controls may fade outside their hover zones
-  - [x] Improve high-value search, seek and mpv logs; avoid repetitive noise
-  - [x] Sync changelog and in-app What's New
-  - [x] `cargo check --workspace` and `npm run build`
-  - [ ] Verify live Slime search and seek/audio diagnostics
-  - [x] Bump/tag v0.5.8 locally
-
-- [ ] Subtitle edge quality - v0.5.9 patch (user 2026-10-29; see PLAN.md
-      "v0.5.9 subtitle edge quality"):
   - [x] JASSUB: render at 2x with a 2880px cap; remove the CSS blur; retain
         WebGL composition and Canvas2D fallback
   - [x] Keep mpv's GPU output path and letterbox subtitle placement intact
-  - [ ] Verify HLS and mpv subtitle edges at standard and high resolutions,
-        including animated ASS subtitles
-  - [x] Sync FILE_INDEX.md/changelogs; `npm run build`
-  - [ ] Bump/tag v0.5.9 on its version branch
+  - [x] Improve high-value search, seek and mpv logs; avoid repetitive noise
+  - [x] Sync changelog and in-app What's New
+  - [x] `cargo check --workspace` and `npm run build`
+  - [ ] Verify live Slime search, seek/audio diagnostics, and subtitle edges
+        on HLS/mpv at standard and high resolutions
+  - [x] Bump/tag v0.5.8 locally
 
 - [ ] Learned release-to-entry matcher - v0.6.1 (user 2026-10-15; see PLAN.md
       "Learned release-to-entry matcher"; replaces the unused stem mapper).

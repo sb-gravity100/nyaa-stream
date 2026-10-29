@@ -212,7 +212,7 @@ Building the workspace requires, beyond Rust/Node:
   moving outside control zones may hide the controls immediately, but the
   cursor hides only after the idle timeout.
 
-  **v0.5.9 subtitle edge quality (2026-10-29).** The HLS fallback's JASSUB
+  **v0.5.8 subtitle edge quality (2026-10-29).** The HLS fallback's JASSUB
   renderer now rasterizes at 2x with a 2880px cap; the CSS blur is removed.
   JASSUB uses WebGL composition when available and falls back to Canvas2D.
   Supersampling increases libass/WASM raster work, bounded by the cap. The
@@ -613,10 +613,9 @@ by an app-styled HTML menu whose items depend on what was right-clicked.
 
 ## Release plan (decided 2026-09-29)
 
-**Version branches:** Give each new version its own branch, following
-`release/<version>-<short-topic>` (for example,
-`release/0.5.7-animebatch`). Start version-specific work on that branch so
-its changes and release commit stay grouped by version.
+**Version branches:** Give each new version its own branch named
+`release/<version>` (for example, `release/0.5.7`). Start version-specific
+work on that branch so its changes and release commit stay grouped by version.
 
 **v0.6.0 parser replacement (requested 2026-10-28).** Port the supplied
 `animebatch.zip` into `crates/release-parse` and make its batch/season-range
