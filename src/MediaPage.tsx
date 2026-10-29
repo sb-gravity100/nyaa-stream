@@ -56,10 +56,12 @@ interface Props {
   onRemoveCustomSource: (id: number) => Promise<void>;
 }
 
-function CustomSourcePicker({ sources, onSave, onRemove }: {
+function CustomSourcePicker({ sources, onSave, onRemove, editSourceId, onEditComplete }: {
   sources: CustomSource[];
   onSave: Props["onSaveCustomSource"];
   onRemove: Props["onRemoveCustomSource"];
+  editSourceId: number | null;
+  onEditComplete: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
@@ -77,6 +79,12 @@ function CustomSourcePicker({ sources, onSave, onRemove }: {
     setSeason(source.season?.toString() ?? ""); setStart(source.episodeStart?.toString() ?? ""); setEnd(source.episodeEnd?.toString() ?? "");
     setOpen(true); setError(null); setMagnetPreview({ infoHash: source.infoHash, name: source.title, trackers: 0 }); setFiles(source.files);
   }
+  useEffect(() => {
+    if (editSourceId == null) return;
+    const source = sources.find((candidate) => candidate.id === editSourceId);
+    if (source) edit(source);
+    onEditComplete();
+  }, [editSourceId, sources]);
   async function save(event: Event) {
     event.preventDefault(); setBusy(true); setError(null);
     try {
@@ -275,6 +283,7 @@ export function MediaPage({
   const seasonLabel = formatSeason(anime.season, anime.seasonYear);
   const movie = isMovie(anime);
   const settings = useSettings();
+  const [editCustomSourceId, setEditCustomSourceId] = useState<number | null>(null);
   // What the page and the player's episode list show; the route still
   // resolves against every group, so a direct link to a hidden row plays.
   const visibleSources = useMemo(
@@ -610,6 +619,10 @@ export function MediaPage({
       playlist={playlist}
       onSelectEpisode={selectFromPlayer}
       onRemoveCustomSource={onRemoveCustomSource}
+      onEditCustomSource={(id) => {
+        setEditCustomSourceId(id);
+        onCloseWatch();
+      }}
     />
   );
 
@@ -758,7 +771,13 @@ export function MediaPage({
                 {hiddenCount > 0 && ` · ${hiddenCount} unlisted ${hiddenCount === 1 ? "row" : "rows"} hidden`}
               </span>
             )}
-            <CustomSourcePicker sources={customSources} onSave={onSaveCustomSource} onRemove={onRemoveCustomSource} />
+            <CustomSourcePicker
+              sources={customSources}
+              onSave={onSaveCustomSource}
+              onRemove={onRemoveCustomSource}
+              editSourceId={editCustomSourceId}
+              onEditComplete={() => setEditCustomSourceId(null)}
+            />
             {!movie && missingThumbnailEpisodes.length > 0 && !watch && <button class="button button-secondary thumbnail-build-button" onClick={() => {
               if (thumbnailBuild) {
                 thumbnailCancelRef.current = true;
