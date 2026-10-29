@@ -1,3 +1,5 @@
+### `b333ce0` · 2026-10-30 · docs: index player source editing
+- `FILE_INDEX.md`
 ### `5fc05ca` · 2026-10-30 · feat: edit attached sources from player
 - `src/MediaPage.tsx`
 - `src/PlayerView.tsx`
