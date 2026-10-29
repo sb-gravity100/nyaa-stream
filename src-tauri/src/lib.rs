@@ -1838,21 +1838,21 @@ async fn stop_playback(state: State<'_, Arc<AppState>>, resume: Option<resume::R
     let generation = state.stop_generation.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
     let app = state.inner().clone();
     let playing = app.current_torrent.lock().await.clone();
-    tokio::spawn(async move {
-        let started = tokio::time::Instant::now();
-        let keep_storyboard = match (resume, playing) {
-            (Some(request), Some(torrent_id)) if magnet_info_hash(&request.magnet).is_some_and(|h| h.eq_ignore_ascii_case(&torrent_id)) => {
-                match resume::save(&app.torrent_engine, &torrent_id, request).await {
-                    Ok(saved) => saved,
-                    Err(err) => {
-                        tracing::warn!(torrent_id = %torrent_id, %err, "resume buffer not saved");
-                        false
-                    }
+    let keep_storyboard = match (resume, playing.clone()) {
+        (Some(request), Some(torrent_id)) if magnet_info_hash(&request.magnet).is_some_and(|h| h.eq_ignore_ascii_case(&torrent_id)) => {
+            match resume::save(&app.torrent_engine, &torrent_id, request).await {
+                Ok(saved) => saved,
+                Err(err) => {
+                    tracing::warn!(torrent_id = %torrent_id, %err, "resume buffer not saved");
+                    false
                 }
             }
-            (Some(_), playing) => { tracing::debug!(?playing, "resume request doesn't match the playing torrent, no buffer"); false }
-            (None, _) => false
-        };
+        }
+        (Some(_), playing) => { tracing::debug!(?playing, "resume request doesn't match the playing torrent, no buffer"); false }
+        (None, _) => false
+    };
+    tokio::spawn(async move {
+        let started = tokio::time::Instant::now();
         tokio::time::sleep(KEEP_FOR_NEXT_EPISODE.saturating_sub(started.elapsed())).await;
         if app.stop_generation.load(std::sync::atomic::Ordering::SeqCst) == generation {
             cleanup_playback(&app, keep_storyboard).await;
@@ -1862,6 +1862,26 @@ async fn stop_playback(state: State<'_, Arc<AppState>>, resume: Option<resume::R
         }
     });
     Ok(())
+}
+
+/// Waits for playback teardown to finish before an explicit updater restart.
+/// `stop_playback` saves resume data before scheduling its delayed cleanup.
+#[tauri::command]
+async fn wait_for_playback_stop(state: State<'_, Arc<AppState>>) -> Result<(), String> {
+    const TIMEOUT: Duration = Duration::from_secs(15);
+    let started = tokio::time::Instant::now();
+    tracing::debug!("wait_for_playback_stop invoked");
+    loop {
+        if state.current_torrent.lock().await.is_none() {
+            tracing::info!(elapsed_ms = started.elapsed().as_millis() as u64, "playback teardown complete for update restart");
+            return Ok(());
+        }
+        if started.elapsed() >= TIMEOUT {
+            tracing::warn!(elapsed_ms = started.elapsed().as_millis() as u64, "timed out waiting for playback teardown");
+            return Err("Playback is still stopping. Close playback and try again.".into());
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
 }
 
 /// The player opened `file_idx` (mpv's `file-loaded`): what it read so far
@@ -2208,6 +2228,7 @@ pub fn run() {
             set_decoder_support,
             copy_frame_to_clipboard,
             stop_playback,
+            wait_for_playback_stop,
             export_clip,
             media_keys::set_media_keys,
             cache::get_cache_sizes,

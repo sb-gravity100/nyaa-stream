@@ -1,6 +1,7 @@
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { getVersion } from "@tauri-apps/api/app";
+import { invoke } from "@tauri-apps/api/core";
 import { UPDATED_FROM_KEY } from "./WhatsNew";
 
 const FIRST_CHECK_DELAY_MS = 30_000;
@@ -157,6 +158,8 @@ export async function applyPreparedUpdate(): Promise<void> {
   let marker: string | null = null;
   console.info("[updater] applying prepared update", { version: update.version });
   try {
+    console.info("[updater] waiting for playback resume data and teardown before install");
+    await invoke("wait_for_playback_stop");
     const from = await getVersion();
     marker = JSON.stringify({ from, to: update.version });
     localStorage.setItem(UPDATED_FROM_KEY, marker);
