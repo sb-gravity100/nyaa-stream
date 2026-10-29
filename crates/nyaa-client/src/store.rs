@@ -950,6 +950,7 @@ INSERT INTO `toto_anidb_tvdb` (`anidbid`, `tvdbid`, `defaulttvdbseason`, `episod
         assert_eq!(moved.files[0].episode_range, Some([1, 3]));
 
         let duplicate = store.save_custom_source(custom_source_input(20, &"c".repeat(40), "Duplicate", "episode")).await.unwrap();
+        let duplicate_created_at = duplicate.created_at;
         let merged = store.update_custom_source(
             20,
             moved.id,
@@ -957,6 +958,7 @@ INSERT INTO `toto_anidb_tvdb` (`anidbid`, `tvdbid`, `defaulttvdbseason`, `episod
             custom_source_input(20, &"c".repeat(40), "Merged pack", "pack"),
         ).await.unwrap().unwrap();
         assert_eq!((merged.id, merged.title.as_str(), merged.kind.as_str()), (duplicate.id, "Merged pack", "pack"));
+        assert_eq!(merged.created_at, duplicate_created_at);
         assert!(store.custom_sources(10).await.unwrap().is_empty());
         assert_eq!(store.custom_sources(20).await.unwrap().len(), 1);
         assert!(store.update_custom_source(10, original.id, 20, custom_source_input(20, &"d".repeat(40), "Wrong owner", "episode")).await.unwrap().is_none());
