@@ -35,7 +35,8 @@ Feature work follows this order; remaining acceptance checks stay open below.
   - [x] Attach/edit/remove picker with explicit episode or pack mapping; attached sources merge into episode/Batch groups
   - [x] Metadata-only pack inspection and persisted video file list; no file reader is opened during inspection
   - [ ] Manual acceptance for sparse/multi-season pack selection, restart persistence, and malformed/hash input cases
-- [ ] 3: Revalidate artwork provider requirements; implement ID/cache/provider pipeline
+- [ ] 3: Wire the implemented ID/cache/provider foundation; add app settings,
+      About attribution, and frontend fallbacks
 - [ ] 4: Release-page screenshots and missing-thumbnail build queue
 - [ ] 5: Verified-data-only seekbar storyboard/hover previews
 - [ ] 6: Bespoke installer UI with reviewed screens and proven backend
@@ -788,20 +789,24 @@ policy remains unchanged.
       - [ ] PLAN.md/FILE_INDEX.md sync
 - [ ] HD banner sources (v0.6.0, see PLAN.md "HD banner sources"): one
       commit each -
-      - [ ] Fribb anime-lists id map: download, weekly refresh, offline
-            lookup, arm-server fallback
-      - [ ] `crates/artwork-client`: TMDB backdrops + logos
-      - [ ] fanart.tv `showbackground`/`clearlogo`
-      - [ ] Simkl fanart
+      - [x] Fribb anime-lists ID map: runtime download, weekly refresh, offline
+            lookup (upstream data license remains to be resolved before publish)
+      - [ ] arm-server lookup fallback for IDs absent from the downloaded map
+      - [x] `crates/artwork-client`: TMDB backdrops + logos, fanart.tv
+            `showbackground`/`clearlogo`, provider response cache
+      - [x] TMDB episode still client with TMDB episode-offset correction
+      - [x] Providers skip cleanly when credentials or mapped IDs are absent;
+            secrets are not logged; attribution is returned with artwork
+      - [x] Rechecked provider requirements: Simkl omitted because current API
+            terms require Simkl login and sync for this app category
       - [ ] `get_artwork` command + disk cache; frontend backdrop chain
             (media page, home hero, Continue watching)
-      - [ ] TMDB episode stills as the first episode-thumbnail fallback
-            after Kitsu/AniList (split-cour offset correction)
       - [ ] Title logos on the home hero and media page
       - [ ] Settings: user-supplied TMDB read access token (Bearer, never
-            logged, not bundled); TMDB steps skipped without one
+            logged, not bundled) and fanart.tv project/personal keys;
+            TMDB steps skipped without a token
       - [ ] About attribution: TMDB logo (`src/assets/tmdb-logo.svg`) +
-            notice, fanart.tv, Simkl; TMDB cache max 6 months
+            notice and fanart.tv; TMDB cache max 180 days
       - [ ] PLAN.md/FILE_INDEX.md sync
 - [ ] Seek-bar thumbnail preview (v0.6.0, see PLAN.md "Seek-bar thumbnail
       preview"): one commit each -

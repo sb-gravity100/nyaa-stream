@@ -40,8 +40,8 @@ and verification remain valid. Tag v0.6.0 only after the milestone is complete.
 
 Installer direction confirmed by SB: **compact dark layout matching the app**.
 The update schedule and first-install defaults in the specification are proposed
-implementation choices. Packaging backend selection and current provider terms
-still require feasibility checks. Continuous drag behavior, batch transition
+implementation choices. Provider terms were rechecked: Simkl is excluded until
+the app provides Simkl login and sync. Continuous drag behavior, batch transition
 work and native supersampling remain v0.7.0.
 
 ## Architecture constraints
