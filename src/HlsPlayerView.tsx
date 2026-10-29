@@ -979,10 +979,12 @@ export function HlsPlayerView({
       if (!tooltip) return;
       const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
       const x = Math.min(rect.width, Math.max(0, e.clientX - rect.left));
-      tooltip.textContent = formatTime((x / rect.width) * episodeDuration);
-      tooltip.style.transform = `translateX(${x}px) translateX(-50%)`;
+      const at = (x / rect.width) * episodeDuration;
+      const tooltipX = Math.min(Math.max(120, x), Math.max(120, rect.width - 120));
+      tooltip.textContent = formatTime(at);
+      tooltip.style.transform = `translateX(${tooltipX}px) translateX(-50%)`;
       tooltip.classList.add("shown");
-      const seconds = (x / rect.width) * episodeDuration;
+      const seconds = at;
       if (storyboardHoverTimerRef.current != null) window.clearTimeout(storyboardHoverTimerRef.current);
       const token = ++storyboardHoverTokenRef.current;
       if (torrentId && selectedFile) storyboardHoverTimerRef.current = window.setTimeout(() => {
@@ -1289,6 +1291,22 @@ export function HlsPlayerView({
 
    const displayTime = seekPreview ?? episodeTime;
    const buffering = !error && !ready;
+   useEffect(() => {
+      if (!torrentId || !selectedFile) return;
+      invoke("pause_storyboard", { torrentId, fileIdx: selectedFile.index, paused: buffering }).catch((err) =>
+         console.debug("[storyboard] pause state update failed", { err: String(err) }),
+      );
+   }, [torrentId, selectedFile?.index, buffering]);
+   useEffect(() => {
+      if (!torrentId || !selectedFile) return;
+      const activeTorrentId = torrentId;
+      const activeFileIdx = selectedFile.index;
+      return () => {
+         invoke("stop_storyboard", { torrentId: activeTorrentId, fileIdx: activeFileIdx }).catch((err) =>
+            console.debug("[storyboard] stop request failed", { err: String(err) }),
+         );
+      };
+   }, [torrentId, selectedFile?.index]);
 
    // Seek bar fill/thumb and the clock are written straight to the DOM from
    // a requestAnimationFrame loop instead of from React state: `timeupdate`

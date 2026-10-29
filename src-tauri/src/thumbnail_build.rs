@@ -86,12 +86,15 @@ fn crop_black_bars(image: image::DynamicImage) -> Option<image::DynamicImage> {
 
 fn decode_frame_jpeg(bytes: &[u8]) -> anyhow::Result<Option<Vec<u8>>> {
     tracing::debug!(bytes = bytes.len(), "decoding release description image");
-    let reader = image::ImageReader::new(Cursor::new(bytes)).with_guessed_format()?;
+    let mut reader = image::ImageReader::new(Cursor::new(bytes)).with_guessed_format()?;
+    if reader.format() == Some(image::ImageFormat::Gif) {
+        tracing::debug!("skipping animated GIF release image");
+        return Ok(None);
+    }
     let mut limits = image::Limits::default();
     limits.max_image_width = Some(MAX_DIMENSION);
     limits.max_image_height = Some(MAX_DIMENSION);
     limits.max_alloc = Some(160 * 1024 * 1024);
-    let mut reader = reader;
     reader.limits(limits);
     let decoded = reader.decode()?;
     let Some(cropped) = crop_black_bars(decoded) else { return Ok(None) };
@@ -109,25 +112,39 @@ fn sampled_indices(len: usize) -> Vec<usize> {
     (0..MAX_CANDIDATES).map(|i| i * (len - 1) / (MAX_CANDIDATES - 1)).collect()
 }
 
-pub async fn best_frame_jpeg(image_urls: &[String]) -> anyhow::Result<Option<Vec<u8>>> {
+pub struct FrameSearch {
+    pub jpeg: Option<Vec<u8>>,
+    /// False when a remote candidate could not be fetched, so the group
+    /// should not be permanently learned as having no usable frames.
+    pub conclusive: bool,
+}
+
+pub async fn search_frames(image_urls: &[String]) -> anyhow::Result<FrameSearch> {
     tracing::info!(candidates = image_urls.len(), "searching release page for a usable episode frame");
-    if image_urls.is_empty() { return Ok(None); }
+    if image_urls.is_empty() { return Ok(FrameSearch { jpeg: None, conclusive: true }); }
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(12))
         .redirect(reqwest::redirect::Policy::none())
         .user_agent("nyaa-stream/0.6.0 thumbnail")
         .build()?;
     let mut valid = Vec::new();
+    let mut conclusive = true;
     for index in sampled_indices(image_urls.len()) {
         let Some(url) = public_https_url(&image_urls[index]) else { continue };
-        match download_image(&client, &url).await.and_then(|bytes| decode_frame_jpeg(&bytes)) {
-            Ok(Some(jpeg)) => valid.push(jpeg),
-            Ok(None) => tracing::debug!(index, "release image was not an episode frame"),
-            Err(error) => tracing::warn!(index, %error, "release image candidate could not be used"),
+        match download_image(&client, &url).await {
+            Ok(bytes) => match decode_frame_jpeg(&bytes) {
+                Ok(Some(jpeg)) => valid.push(jpeg),
+                Ok(None) => tracing::debug!(index, "release image was not an episode frame"),
+                Err(error) => tracing::warn!(index, %error, "release image candidate could not be decoded"),
+            },
+            Err(error) => {
+                conclusive = false;
+                tracing::warn!(index, %error, "release image candidate could not be fetched");
+            }
         }
     }
-    if valid.is_empty() { return Ok(None); }
+    if valid.is_empty() { return Ok(FrameSearch { jpeg: None, conclusive }); }
     let middle = valid.len() / 2;
     tracing::info!(valid = valid.len(), selected = middle, "selected middle valid release frame");
-    Ok(Some(valid.swap_remove(middle)))
+    Ok(FrameSearch { jpeg: Some(valid.swap_remove(middle)), conclusive: true })
 }

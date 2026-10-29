@@ -23,7 +23,7 @@ use anilist_client::{AiringEntry, AniListClient, AnimeMedia, AnimeTitle};
 use kitsu_client::{KitsuClient, KitsuMetadata};
 use mpv_player::MpvPlayer;
 use nyaa_client::{Category, NyaaClient, NyaaResult, TorrentDetails};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::{Emitter, Manager, State};
 use tokio::sync::Mutex;
 use torrent_engine::{largest_video_file, DecoderSupport, StreamStats, SubtitleTrack, TorrentEngine, TorrentFile, TorrentId};
@@ -54,6 +54,8 @@ struct AppState {
     /// headless mpv decode, and a home page full of art-less cards used to
     /// start them all at once.
     thumbnail_captures: tokio::sync::Semaphore,
+    /// A batch build stops between file captures when the user cancels.
+    thumbnail_batch_cancelled: std::sync::atomic::AtomicBool,
     /// Played torrents kept in `downloads/` - see `download_cache`.
     download_cache: download_cache::DownloadCache,
 }
@@ -350,8 +352,31 @@ async fn thumbnail_failed_recently(state: &AppState, cache_key: &str) -> bool {
 fn thumbnail_protocol(state: &AppState, request: &tauri::http::Request<Vec<u8>>) -> tauri::http::Response<Vec<u8>> {
     use tauri::http::{header, Response, StatusCode};
     let file = request.uri().path().trim_start_matches('/');
-    let key = file.strip_suffix(".jpg").unwrap_or("");
     let not_found = || Response::builder().status(StatusCode::NOT_FOUND).body(Vec::new()).unwrap();
+    if let Some(storyboard) = file.strip_prefix("storyboard/") {
+        let parts: Vec<_> = storyboard.split('/').collect();
+        if parts.len() == 3 {
+            let id = parts[0];
+            let file_idx = parts[1].parse::<usize>().ok();
+            let bucket = parts[2].strip_suffix(".jpg").and_then(|value| value.parse::<u64>().ok());
+            if id.len() >= 16 && id.len() <= 64 && id.chars().all(|c| c.is_ascii_alphanumeric()) {
+                if let (Some(file_idx), Some(bucket)) = (file_idx, bucket) {
+                    if let Some(path) = state.torrent_engine.storyboard_frame(&id.to_string(), file_idx, bucket as f64 * 5.0) {
+                        return match std::fs::read(path) {
+                            Ok(bytes) => Response::builder().header(header::CONTENT_TYPE, "image/jpeg").header(header::CACHE_CONTROL, "public, max-age=31536000, immutable").body(bytes).unwrap(),
+                            Err(error) => {
+                                tracing::debug!(torrent_id = id, file_idx, bucket, %error, "storyboard protocol cache miss");
+                                not_found()
+                            }
+                        };
+                    }
+                }
+            }
+            tracing::warn!(path = file, "storyboard protocol rejected or missed path");
+        }
+        return not_found();
+    }
+    let key = file.strip_suffix(".jpg").unwrap_or("");
     if !valid_thumbnail_key(key) {
         tracing::warn!(path = file, "thumbnail protocol rejected path");
         return not_found();
@@ -371,6 +396,13 @@ fn thumbnail_protocol(state: &AppState, request: &tauri::http::Request<Vec<u8>>)
             not_found()
         }
     }
+}
+
+fn storyboard_url(path: &std::path::Path, torrent_id: &str, file_idx: usize, seconds: f64) -> Option<String> {
+    let modified = std::fs::metadata(path).ok()?.modified().ok()?;
+    let version = modified.duration_since(std::time::UNIX_EPOCH).map(|duration| duration.as_millis()).unwrap_or(0);
+    let base = if cfg!(any(windows, target_os = "android")) { "http://thumb.localhost" } else { "thumb://localhost" };
+    Some(format!("{base}/storyboard/{torrent_id}/{file_idx}/{}.jpg?v={version}", (seconds / 5.0).floor() as u64))
 }
 
 /// Saves the player's last shown frame as the episode's thumbnail, in the
@@ -497,8 +529,9 @@ async fn build_view_page_thumbnail(
             if !group.is_empty() { let _ = state.nyaa.remember_screenshot_group(group, false).await; }
             continue;
         }
-        match thumbnail_build::best_frame_jpeg(&image_urls).await {
-            Ok(Some(jpeg)) => {
+        match thumbnail_build::search_frames(&image_urls).await {
+            Ok(search) if search.jpeg.is_some() => {
+                let jpeg = search.jpeg.expect("guarded Some frame");
                 if !group.is_empty() { let _ = state.nyaa.remember_screenshot_group(group, true).await; }
                 if let Some(parent) = cache_path.parent() {
                     tokio::fs::create_dir_all(parent).await.map_err(|error| error.to_string())?;
@@ -510,9 +543,9 @@ async fn build_view_page_thumbnail(
                 tracing::info!(cache_key, bytes = jpeg.len(), "built thumbnail from release-page frame");
                 return thumbnail_url(&cache_path, &cache_key).await.ok_or_else(|| "saved thumbnail vanished".to_string()).map(Some);
             }
-            Ok(None) => {
+            Ok(search) => {
                 tracing::debug!("release page images contained no usable episode frame");
-                if !group.is_empty() { let _ = state.nyaa.remember_screenshot_group(group, false).await; }
+                if search.conclusive && !group.is_empty() { let _ = state.nyaa.remember_screenshot_group(group, false).await; }
             }
             Err(error) => tracing::warn!(%error, "release page frame processing failed"),
         }
@@ -635,7 +668,13 @@ async fn capture_thumbnail_uncached(
     // Largest video file rather than index 0: single-episode torrents
     // sometimes lead with a sample/NCOP, and index 0 was never a real
     // choice anyway - just the only one available before file listing.
-    let files = state.torrent_engine.files(&added.id).await?;
+    let files = match state.torrent_engine.files(&added.id).await {
+        Ok(files) => files,
+        Err(error) => {
+            let _ = state.torrent_engine.remove(added.id.clone()).await;
+            return Err(error);
+        }
+    };
     let file_idx = requested_file_idx.filter(|index| files.get(*index).is_some_and(|file| file.is_video)).unwrap_or_else(|| largest_video_file(&files).unwrap_or(0));
     let stream_url = state.torrent_engine.stream_url(&added.id, file_idx);
 
@@ -698,6 +737,155 @@ async fn capture_thumbnail_uncached(
         Ok(Err(err)) => Err(err),
         Err(_) => anyhow::bail!("thumbnail capture timed out after {THUMBNAIL_CAPTURE_TIMEOUT:?}"),
     }
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ThumbnailCaptureRequest {
+    cache_key: String,
+    file_idx: usize,
+    duration_minutes: Option<f64>,
+}
+
+/// Captures several episode files from one pack while keeping its scratch
+/// torrent alive. Requests are bounded and each output shares the normal
+/// thumbnail cache key and failure marker.
+#[tauri::command]
+async fn capture_torrent_thumbnail_batch(
+    state: State<'_, Arc<AppState>>,
+    magnet: String,
+    requests: Vec<ThumbnailCaptureRequest>,
+    force: Option<bool>,
+) -> Result<Vec<Option<String>>, String> {
+    const MAX_BATCH: usize = 100;
+    tracing::info!(requests = requests.len(), force = force.unwrap_or(false), "capture_torrent_thumbnail_batch invoked");
+    if requests.is_empty() || requests.len() > MAX_BATCH || requests.iter().any(|request| !valid_thumbnail_key(&request.cache_key)) {
+        tracing::warn!(requests = requests.len(), "capture_torrent_thumbnail_batch rejected request");
+        return Err("invalid thumbnail batch".into());
+    }
+    let _permit = state.thumbnail_captures.acquire().await.map_err(|err| err.to_string())?;
+    if state.current_torrent.lock().await.is_some() {
+        return Err(THUMBNAIL_DEFERRED.into());
+    }
+    let mut cached: Vec<Option<String>> = Vec::with_capacity(requests.len());
+    let mut skip_recent_failure = Vec::with_capacity(requests.len());
+    for request in &requests {
+        let path = thumbnail_path(&state, &request.cache_key);
+        let url = thumbnail_url(&path, &request.cache_key).await;
+        skip_recent_failure.push(url.is_none() && !force.unwrap_or(false) && thumbnail_failed_recently(&state, &request.cache_key).await);
+        cached.push(url);
+    }
+    if cached.iter().all(Option::is_some) || skip_recent_failure.iter().all(|skip| *skip) { return Ok(cached); }
+    let added = state.torrent_engine.add(&magnet).await.map_err(|err| err.to_string())?;
+    let files_result = state.torrent_engine.files(&added.id).await;
+    let files = match files_result {
+        Ok(files) => files,
+        Err(error) => {
+            let _ = state.torrent_engine.remove(added.id.clone()).await;
+            return Err(error.to_string());
+        }
+    };
+    let active: Vec<_> = requests.iter().zip(&cached).zip(&skip_recent_failure).filter(|((request, url), skip)| {
+        url.is_some() || (!**skip && files.get(request.file_idx).is_some_and(|file| file.is_video))
+    }).map(|((request, _), _)| request).collect();
+    let first_file = active.first().map(|request| request.file_idx).unwrap_or_else(|| largest_video_file(&files).unwrap_or(0));
+    let swarm_wait = async {
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(20);
+        loop {
+            if state.thumbnail_batch_cancelled.load(std::sync::atomic::Ordering::Relaxed) { anyhow::bail!("thumbnail batch cancelled"); }
+            if state.torrent_engine.stats(&added.id, first_file).await.map(|stats| stats.connected_peers > 0).unwrap_or(false) { break; }
+            if tokio::time::Instant::now() >= deadline { anyhow::bail!("no peer connected within 20 seconds"); }
+            tokio::time::sleep(Duration::from_millis(500)).await;
+        }
+        Ok::<(), anyhow::Error>(())
+    }.await;
+    let mut output = Vec::with_capacity(requests.len());
+    if let Err(error) = swarm_wait {
+        for (request, cached_url) in requests.into_iter().zip(cached) {
+            if cached_url.is_none() && !state.thumbnail_batch_cancelled.load(std::sync::atomic::Ordering::Relaxed) {
+                let _ = tokio::fs::write(thumbnail_failure_path(&state, &request.cache_key), b"").await;
+            }
+            output.push(cached_url);
+        }
+        tracing::warn!(torrent_id = %added.id, %error, "thumbnail batch ended before captures started");
+    } else {
+        for (index, request) in requests.into_iter().enumerate() {
+            if state.thumbnail_batch_cancelled.load(std::sync::atomic::Ordering::Relaxed) {
+                output.extend(cached[index..].iter().cloned());
+                break;
+            }
+            let cache_path = thumbnail_path(&state, &request.cache_key);
+            if let Some(url) = cached[index].clone() {
+                output.push(Some(url));
+                continue;
+            }
+            if skip_recent_failure[index] { output.push(None); continue; }
+            if !files.get(request.file_idx).is_some_and(|file| file.is_video) {
+                output.push(None);
+                continue;
+            }
+            match capture_thumbnail_file(&state, &added.id, request.file_idx, &cache_path, request.duration_minutes).await {
+                Ok(()) => {
+                    let _ = tokio::fs::remove_file(thumbnail_failure_path(&state, &request.cache_key)).await;
+                    output.push(thumbnail_url(&cache_path, &request.cache_key).await);
+                }
+                Err(error) => {
+                    tracing::warn!(cache_key = request.cache_key, %error, "batch thumbnail frame capture failed");
+                    let _ = tokio::fs::write(thumbnail_failure_path(&state, &request.cache_key), b"").await;
+                    output.push(None);
+                }
+            }
+        }
+    }
+    let torrent_id = added.id;
+    if let Err(error) = state.torrent_engine.remove(torrent_id.clone()).await {
+        tracing::warn!(%torrent_id, %error, "failed to remove batch thumbnail torrent");
+    }
+    let app = state.inner().clone();
+    tokio::spawn(async move {
+        tokio::time::sleep(FILE_RELEASE_DELAY).await;
+        let _ = tokio::task::spawn_blocking(move || app.download_cache.discard_unindexed(&torrent_id, &files)).await;
+    });
+    Ok(output)
+}
+
+async fn capture_thumbnail_file(
+    state: &AppState,
+    torrent_id: &TorrentId,
+    file_idx: usize,
+    cache_path: &std::path::Path,
+    duration_minutes: Option<f64>,
+) -> anyhow::Result<()> {
+    if let Some(parent) = cache_path.parent() { tokio::fs::create_dir_all(parent).await?; }
+    let stream_url = state.torrent_engine.stream_url(torrent_id, file_idx);
+    let target_seconds = duration_minutes.filter(|minutes| *minutes > 0.0).map(|minutes| minutes * 60.0 / 2.0);
+    tokio::time::timeout(THUMBNAIL_CAPTURE_TIMEOUT, async {
+        let mut player = MpvPlayer::spawn_headless(&stream_url, target_seconds).await?;
+        let effective_target = target_seconds.unwrap_or(THUMBNAIL_SEEK_SECONDS);
+        let deadline = tokio::time::Instant::now() + THUMBNAIL_CAPTURE_TIMEOUT;
+        loop {
+            let position = player.get_time_position().await.unwrap_or(0.0);
+            let reached = target_seconds.map_or(position >= effective_target, |_| position >= effective_target - THUMBNAIL_SEEK_TOLERANCE_SECONDS);
+            if reached { break; }
+            if tokio::time::Instant::now() >= deadline { anyhow::bail!("timed out waiting for playback to reach {effective_target}s"); }
+            tokio::time::sleep(THUMBNAIL_POLL_INTERVAL).await;
+        }
+        let screenshot = player.screenshot_to_file(&cache_path.to_string_lossy()).await;
+        let _ = player.quit().await;
+        screenshot
+    }).await.map_err(|_| anyhow::anyhow!("thumbnail capture timed out after {THUMBNAIL_CAPTURE_TIMEOUT:?}"))?
+}
+
+#[tauri::command]
+fn reset_thumbnail_build(state: State<'_, Arc<AppState>>) {
+    tracing::debug!("reset_thumbnail_build invoked");
+    state.thumbnail_batch_cancelled.store(false, std::sync::atomic::Ordering::Relaxed);
+}
+
+#[tauri::command]
+fn cancel_thumbnail_build(state: State<'_, Arc<AppState>>) {
+    tracing::info!("cancel_thumbnail_build invoked");
+    state.thumbnail_batch_cancelled.store(true, std::sync::atomic::Ordering::Relaxed);
 }
 
 /// Settings -> "nyaa.si release database" Import: merges another release
@@ -1320,7 +1508,7 @@ async fn play_magnet(
             current
         }
         _ => {
-            cleanup_playback(&state).await;
+            cleanup_playback(&state, false).await;
             let started = std::time::Instant::now();
             let added = match state.torrent_engine.add(&magnet).await {
                 Ok(added) => added,
@@ -1459,10 +1647,15 @@ const FILE_RELEASE_DELAY: Duration = Duration::from_secs(2);
 /// `stop_playback` and defensively by `play_magnet` before starting a new
 /// session. Its files stay in the download cache, which is then trimmed to
 /// its cap.
-async fn cleanup_playback(state: &Arc<AppState>) {
+async fn cleanup_playback(state: &Arc<AppState>, keep_storyboard: bool) {
     if let Some(torrent_id) = state.current_torrent.lock().await.take() {
         if let Err(err) = state.torrent_engine.remove(torrent_id.clone()).await {
             tracing::warn!(torrent_id = %torrent_id, %err, "cleanup_playback: failed to remove torrent");
+        }
+        if !keep_storyboard {
+            if let Err(err) = state.torrent_engine.clear_storyboard_cache(&torrent_id).await {
+                tracing::warn!(torrent_id = %torrent_id, %err, "cleanup_playback: failed to clear storyboard cache");
+            }
         }
         let app = state.clone();
         tokio::spawn(async move {
@@ -1479,10 +1672,30 @@ async fn cleanup_playback(state: &Arc<AppState>) {
 /// `torrent_engine::StreamStats` doc comment).
 #[tauri::command]
 async fn get_stream_stats(state: State<'_, Arc<AppState>>, torrent_id: TorrentId, file_idx: usize) -> Result<StreamStats, String> {
-    state.torrent_engine.stats(&torrent_id, file_idx).await.map_err(|err| {
+    let stats = state.torrent_engine.stats(&torrent_id, file_idx).await.map_err(|err| {
         tracing::debug!(torrent_id = %torrent_id, file_idx, %err, "get_stream_stats failed");
         err.to_string()
-    })
+    })?;
+    if let Err(error) = state.torrent_engine.start_storyboard(&torrent_id, file_idx) {
+        tracing::debug!(torrent_id = %torrent_id, file_idx, %error, "could not start storyboard worker");
+    }
+    Ok(stats)
+}
+
+#[tauri::command]
+fn pause_storyboard(state: State<'_, Arc<AppState>>, torrent_id: TorrentId, file_idx: usize, paused: bool) -> bool {
+    state.torrent_engine.pause_storyboard(&torrent_id, file_idx, paused)
+}
+
+#[tauri::command]
+fn stop_storyboard(state: State<'_, Arc<AppState>>, torrent_id: TorrentId, file_idx: usize) -> bool {
+    state.torrent_engine.stop_storyboard(&torrent_id, file_idx)
+}
+
+#[tauri::command]
+async fn storyboard_frame(state: State<'_, Arc<AppState>>, torrent_id: TorrentId, file_idx: usize, seconds: f64) -> Result<Option<String>, String> {
+    let Some(path) = state.torrent_engine.storyboard_frame(&torrent_id, file_idx, seconds) else { return Ok(None) };
+    Ok(storyboard_url(&path, &torrent_id, file_idx, seconds))
 }
 
 #[derive(Serialize)]
@@ -1626,18 +1839,22 @@ async fn stop_playback(state: State<'_, Arc<AppState>>, resume: Option<resume::R
     let playing = app.current_torrent.lock().await.clone();
     tokio::spawn(async move {
         let started = tokio::time::Instant::now();
-        match (resume, playing) {
+        let keep_storyboard = match (resume, playing) {
             (Some(request), Some(torrent_id)) if magnet_info_hash(&request.magnet).is_some_and(|h| h.eq_ignore_ascii_case(&torrent_id)) => {
-                if let Err(err) = resume::save(&app.torrent_engine, &torrent_id, request).await {
-                    tracing::warn!(torrent_id = %torrent_id, %err, "resume buffer not saved");
+                match resume::save(&app.torrent_engine, &torrent_id, request).await {
+                    Ok(saved) => saved,
+                    Err(err) => {
+                        tracing::warn!(torrent_id = %torrent_id, %err, "resume buffer not saved");
+                        false
+                    }
                 }
             }
-            (Some(_), playing) => tracing::debug!(?playing, "resume request doesn't match the playing torrent, no buffer"),
-            (None, _) => {}
-        }
+            (Some(_), playing) => { tracing::debug!(?playing, "resume request doesn't match the playing torrent, no buffer"); false }
+            (None, _) => false
+        };
         tokio::time::sleep(KEEP_FOR_NEXT_EPISODE.saturating_sub(started.elapsed())).await;
         if app.stop_generation.load(std::sync::atomic::Ordering::SeqCst) == generation {
-            cleanup_playback(&app).await;
+            cleanup_playback(&app, keep_storyboard).await;
             tracing::info!("stop_playback completed");
         } else {
             tracing::debug!("stop_playback removal cancelled, the torrent is in use again");
@@ -1896,6 +2113,7 @@ pub fn run() {
             franchise_cache: franchise_cache::FranchiseCache::new(dirs::cache_dir().unwrap_or_else(std::env::temp_dir).join("nyaa-stream").join("franchise")),
             anilist_cooldown: Default::default(),
             thumbnail_captures: tokio::sync::Semaphore::new(1),
+            thumbnail_batch_cancelled: std::sync::atomic::AtomicBool::new(false),
             download_cache,
         })
     });
@@ -1954,6 +2172,9 @@ pub fn run() {
             get_latest_episodes,
             get_kitsu_metadata,
             capture_torrent_thumbnail,
+            capture_torrent_thumbnail_batch,
+            reset_thumbnail_build,
+            cancel_thumbnail_build,
             cached_torrent_thumbnail,
             build_view_page_thumbnail,
             magnet::parse_custom_magnet,
@@ -1977,6 +2198,9 @@ pub fn run() {
             get_entry_episode_offset,
             play_magnet,
             get_stream_stats,
+            pause_storyboard,
+            stop_storyboard,
+            storyboard_frame,
             get_subtitle_tracks,
             set_decoder_support,
             copy_frame_to_clipboard,

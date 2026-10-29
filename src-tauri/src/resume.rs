@@ -93,7 +93,7 @@ fn remove(dir: &PathBuf, meta: &EntryMeta, reason: &str) {
 /// Saves the resume buffer for `request` from the torrent `torrent_id`
 /// (still in the engine). Best effort: bytes not verified locally are
 /// skipped.
-pub async fn save(engine: &TorrentEngine, torrent_id: &TorrentId, request: ResumeRequest) -> anyhow::Result<()> {
+pub async fn save(engine: &TorrentEngine, torrent_id: &TorrentId, request: ResumeRequest) -> anyhow::Result<bool> {
     tracing::debug!(torrent_id = %torrent_id, ?request, "saving resume buffer");
     let file = engine.verified_file(torrent_id, request.file_idx).await?;
     let mut wanted = engine.open_read_ranges(torrent_id, request.file_idx);
@@ -105,7 +105,7 @@ pub async fn save(engine: &TorrentEngine, torrent_id: &TorrentId, request: Resum
     let ranges = intersect_ranges(&merge_ranges(wanted), &file.verified);
     if ranges.is_empty() {
         tracing::info!(torrent_id = %torrent_id, "nothing verified to buffer, resume buffer skipped");
-        return Ok(());
+        return Ok(false);
     }
 
     // Through the engine, not the file on disk (see `read_ranges`).
@@ -144,7 +144,7 @@ pub async fn save(engine: &TorrentEngine, torrent_id: &TorrentId, request: Resum
     })
     .await??;
     tracing::info!(episode = %meta.episode(), bytes = meta.bytes, position = meta.position, file = %meta.file_name, "resume buffer saved");
-    Ok(())
+    Ok(true)
 }
 
 /// Oldest buffers go until at most `MAX_BUFFERS` / `MAX_TOTAL_BYTES` remain.
