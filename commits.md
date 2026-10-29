@@ -6,6 +6,18 @@
 - `src/MediaPage.tsx`
 - `src/PlayerView.tsx`
 - `src/types.ts`
+### `9b0d8ae` · 2026-10-30 · fix: exclude extras from pack inference
+- `src/AttachCustomSourceDialog.tsx`
+
+### `26fa230` · 2026-10-30 · feat: add custom source attach dialog
+- `src/AttachCustomSourceDialog.tsx`
+- `src/AttachCustomSourceDialog.css`
+
+### `8aaa290` · 2026-10-30 · fix: preserve custom source identity on edits
+- `crates/nyaa-client/src/lib.rs`
+- `crates/nyaa-client/src/magnet.rs`
+- `crates/nyaa-client/src/store.rs`
+- `src-tauri/src/magnet.rs`
 ### `8226ce7` · 2026-10-30 · fix(installer): use planned per-user install path
 - `src-tauri/installer/installer.nsi`
 ### `b333ce0` · 2026-10-30 · docs: index player source editing
