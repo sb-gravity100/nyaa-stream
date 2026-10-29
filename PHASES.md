@@ -264,8 +264,8 @@
         damaged video or triggering an inappropriate buffer rebuild
   - [x] Keep the pointer visible across the player surface; hide it only
         after inactivity while controls may fade outside their hover zones
-  - [x] JASSUB: render at 2x with a 2880px cap; remove the CSS blur; retain
-        WebGL composition and Canvas2D fallback
+  - [x] Use libass's native-resolution glyph coverage with WebGL composition
+        when available; remove blur and supersampling; retain Canvas2D fallback
   - [x] Keep mpv's GPU output path and letterbox subtitle placement intact
   - [x] Improve high-value search, seek and mpv logs; avoid repetitive noise
   - [x] Sync changelog and in-app What's New

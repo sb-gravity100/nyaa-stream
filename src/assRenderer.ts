@@ -36,11 +36,11 @@ const EMPTY_SCRIPT = [
   "",
 ].join("\n");
 
-// Render above display size so the browser's WebGL canvas downsampling
-// smooths libass's glyph edges. Cap the raster size to control work on 4K
-// displays; JASSUB falls back to Canvas2D if WebGL is unavailable.
-const PRESCALE_FACTOR = 2;
-const MAX_RENDER_HEIGHT = 2880;
+// Render at the output's native device-pixel size. libass supplies
+// per-pixel glyph coverage, and JASSUB's WebGL compositor preserves those
+// masks without a post-blur or supersampling pass. 0 means no size cap.
+const PRESCALE_FACTOR = 1;
+const MAX_RENDER_HEIGHT = 0;
 
 // Numpad alignments 1-3 are bottom-aligned - identical in libass's internal
 // encoding, so this holds whichever form getStyles returns.

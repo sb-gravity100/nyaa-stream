@@ -21,7 +21,7 @@ step when cutting a release.
 - Audio decoder errors include playback and track context and no longer trigger video-buffer recovery.
 - Search and request failure logs include concise query size and HTTP status details.
 - The pointer remains visible across the player surface and hides only after inactivity, independently of control-bar hover state.
-- HLS fallback subtitles use 2x supersampling with WebGL composition when available for smoother edges.
+- HLS fallback subtitles use native-resolution libass coverage antialiasing with WebGL composition when available.
 
 ## [0.5.7] - 2026-10-27
 

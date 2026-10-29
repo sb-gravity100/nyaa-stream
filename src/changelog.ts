@@ -19,7 +19,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Audio decoding errors now include playback and track context in the logs.",
       "Search failure logs show concise query size and HTTP status details.",
       "The pointer remains visible across the player and hides only after inactivity.",
-      "HLS fallback subtitles now render with 2x supersampling for smoother edges, using WebGL composition when available.",
+      "HLS fallback subtitles use native-resolution libass antialiasing with WebGL composition when available.",
     ],
   },
   {

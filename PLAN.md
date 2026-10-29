@@ -213,13 +213,12 @@ Building the workspace requires, beyond Rust/Node:
   cursor hides only after the idle timeout.
 
   **v0.5.8 subtitle edge quality (2026-10-29).** The HLS fallback's JASSUB
-  renderer now rasterizes at 2x with a 2880px cap; the CSS blur is removed.
-  JASSUB uses WebGL composition when available and falls back to Canvas2D.
-  Supersampling increases libass/WASM raster work, bounded by the cap. The
-  embedded mpv path already uses `gpu-next`/GPU video output and
-  `hwdec=auto-safe`; subtitle placement in letterbox areas is preserved.
-  Visual verification on standard/high-resolution HLS and mpv playback
-  remains.
+  renderer now uses native device-pixel output with libass's per-pixel glyph
+  coverage and no CSS blur or supersampling. JASSUB composes with WebGL when
+  available and falls back to Canvas2D. The embedded mpv path already uses
+  `gpu-next`/GPU video output and `hwdec=auto-safe`; subtitle placement in
+  letterbox areas is preserved. Visual verification on standard/high-
+  resolution HLS and mpv playback remains.
 - **Metadata:** AniList GraphQL API (`https://graphql.anilist.co`), no auth
   required for public queries; Kitsu API (`crates/kitsu-client`) as a
   secondary source for wide backdrop banners and per-episode thumbnails,
@@ -476,8 +475,9 @@ nyaa_stream/
    `assRenderer.ts` loads the script once, then every 3s feeds only new
    lines to libass (`processData`) instead of re-fetching and re-parsing
    the whole script (a 40 MB, ~77k-event Kaleido-subs track). libass renders
-   at display resolution with a slight CSS blur on its canvas (replaced 2x
-   supersampling). Fonts are dumped once (`-dump_attachment`) and served at
+   at the output's native device-pixel size; JASSUB preserves its coverage
+   masks in the WebGL composition, with Canvas2D fallback. Fonts are dumped
+   once (`-dump_attachment`) and served at
    `/fonts/...` for libass. Plain (SRT/WebVTT) tracks become ASS with a
    single `Default` style that the user's default-subtitle-style setting
    rewrites - by default Crunchyroll's own dialogue style (Gandhi Sans bold,
