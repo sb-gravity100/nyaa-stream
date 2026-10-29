@@ -1,3 +1,6 @@
+### `ab0f0a4` · 2026-10-30 · docs: describe magnet attachment workflow
+- `CHANGELOG.md`
+- `src/changelog.ts`
 ### `c2ae1c2` · 2026-10-30 · fix(magnet): return parsed episode label
 - `crates/nyaa-client/src/magnet.rs`
 ### `402f196` · 2026-10-30 · docs: mark magnet implementation complete
