@@ -33,7 +33,7 @@ Feature work follows this order; remaining acceptance checks stay open below.
 - [~] 2: Magnet parsing/direct play, permanent attachments, pack mapping and migration
   - [x] Bounded btih parsing for magnet links (hex/base32), display name and tracker count
   - [x] Magnet/hash search detection bypasses AniList search; direct playback uses the existing player
-  - [x] Additive `custom_sources` SQLite schema and list/save/remove commands; no destructive database migration
+  - [x] Additive `custom_sources` SQLite schema and list/save/update/move/remove commands; no destructive database migration
   - [x] Attach/edit/remove picker with explicit episode or pack mapping; attached sources merge into episode/Batch groups
   - [x] Metadata-only pack inspection and persisted video file list; no file reader is opened during inspection
   - [ ] Manual acceptance for sparse/multi-season pack selection, restart persistence, and malformed/hash input cases
