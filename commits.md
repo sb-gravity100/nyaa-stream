@@ -1,3 +1,11 @@
+### `37be1f3` · 2026-10-29 · chore: finalize v0.5.8 subtitle blur
+- `CHANGELOG.md`
+- `FILE_INDEX.md`
+- `PHASES.md`
+- `PLAN.md`
+- `crates/mpv-player/src/embedded.rs`
+- `src/changelog.ts`
+
 ### `70ba18e` · 2026-10-29 · chore: finalize v0.5.8 subtitle settings
 - `CHANGELOG.md`
 - `FILE_INDEX.md`
