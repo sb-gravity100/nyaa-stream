@@ -1,3 +1,7 @@
+### `7e31b59` · 2026-10-29 · docs: require v0.6.0 user data preservation
+- `docs/planning/V0_6_0.md`
+- `PHASES.md`
+
 ### `1482850` · 2026-10-29 · docs: revise milestone scope
 - `PHASES.md`
 - `PLAN.md`
