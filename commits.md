@@ -1,3 +1,6 @@
+### `1ff9b07` · 2026-10-30 · docs: record signed v0.6.0 installer builds
+- `PHASES.md`
+- `docs/prototypes/installer/FEASIBILITY.md`
 ### `d38dc8b` · 2026-10-30 · fix(test): remove duplicate torrent detail fields
 - `crates/nyaa-client/src/store.rs`
 ### `0a3b272` · 2026-10-30 · docs: record v0.6.0 updater defaults
