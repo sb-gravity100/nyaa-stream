@@ -29,6 +29,7 @@ import { BrandMark, SearchIcon, SettingsIcon } from "./icons";
 import { Buffering } from "./Buffering";
 import { copyToClipboard, openAniListPage, openContextMenu } from "./contextMenuStore";
 import { goBack, navigate, useRoute, type WatchTarget } from "./router";
+import { getUpdateState, startBackgroundUpdateChecks, subscribeUpdateState, type UpdateState } from "./updater";
 import {
   displayTitle,
   formatSeason,
@@ -127,6 +128,8 @@ function App() {
   // very first render (a reload on an anime route).
   const [library, setLibrary] = useState<AnimeMedia[]>(getLibrary);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsShowUpdates, setSettingsShowUpdates] = useState(false);
+  const [updateState, setUpdateState] = useState<UpdateState>(getUpdateState);
   const [latestEpisodes, setLatestEpisodes] = useState<AiringEntry[]>([]);
   const [latestEpisodesLoading, setLatestEpisodesLoading] = useState(false);
   // Shared by MediaPage (selected anime's backdrop + video thumbnails) and
@@ -155,6 +158,15 @@ function App() {
   // Bumped per openAnime call: slower phases of an earlier open must not overwrite a newer one.
   const openSeq = useRef(0);
   const blurTimeout = useRef<number | undefined>(undefined);
+
+  useEffect(() => {
+    const unsubscribe = subscribeUpdateState(setUpdateState);
+    const stopBackgroundChecks = startBackgroundUpdateChecks();
+    return () => {
+      unsubscribe();
+      stopBackgroundChecks();
+    };
+  }, []);
 
   useEffect(() => {
     loadLatestEpisodes();
@@ -899,10 +911,15 @@ function App() {
     setCustomSourcesByMedia((current) => ({ ...current, [selectedAnime.id]: (current[selectedAnime.id] ?? []).filter((source) => source.id !== id) }));
   }
 
-  const settingsPanel = settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />;
+  const settingsPanel = settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} playbackActive={route.name === "anime" && route.watch != null} showUpdates={settingsShowUpdates} />;
   const settingsButton = (
-    <button class="icon-button app-settings-button" onClick={() => setSettingsOpen(true)} aria-label="Settings" title="Settings">
+    <button class="icon-button app-settings-button" onClick={() => { setSettingsShowUpdates(false); setSettingsOpen(true); }} aria-label="Settings" title="Settings">
       <SettingsIcon />
+    </button>
+  );
+  const updateButton = updateState.update && (
+    <button class="button button-update" onClick={() => { setSettingsShowUpdates(true); setSettingsOpen(true); }} title={`nyaa-stream v${updateState.update.version} is available`}>
+      {updateState.status === "ready" ? "Restart update" : "Update"}
     </button>
   );
   const debugButton = import.meta.env.DEV && (
@@ -968,7 +985,7 @@ function App() {
     const animeId = selectedAnime.id;
     return (
       <main class="container">
-        <div class="media-settings-anchor">{debugButton}{settingsButton}</div>
+        <div class="media-settings-anchor">{debugButton}{updateButton}{settingsButton}</div>
         <MediaPage
           key={animeId}
           anime={selectedAnime}
@@ -1114,7 +1131,7 @@ function App() {
             </div>
           )}
         </div>
-        <div class="app-bar-actions">{debugButton}{settingsButton}</div>
+        <div class="app-bar-actions">{updateButton}{debugButton}{settingsButton}</div>
       </header>
 
       <HomePage

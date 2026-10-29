@@ -39,10 +39,15 @@ and verification remain valid. Tag v0.6.0 only after the milestone is complete.
 9. Run integrated Windows acceptance, sync docs and cut the local milestone.
 
 Installer direction confirmed by SB: **compact dark layout matching the app**.
-The update schedule and first-install defaults in the specification are proposed
-implementation choices. Provider terms were rechecked: Simkl is excluded until
-the app provides Simkl login and sync. Continuous drag behavior, batch transition
-work and native supersampling remain v0.7.0.
+Tauri's custom NSIS template and split updater download/install APIs fit the
+planned architecture. The in-app quiet checker and staged download flow are
+implemented; the Windows installer lifecycle is still unproven. Keep the
+existing passive updater mode until isolated Windows checks establish elevation,
+existing MSI/NSIS migration, WebView2 bootstrap and relaunch behavior. See
+`docs/prototypes/installer/FEASIBILITY.md`. Update timing and first-install
+defaults remain proposed choices. Provider terms were rechecked: Simkl is
+excluded until the app provides Simkl login and sync. Continuous drag behavior,
+batch transition work and native supersampling remain v0.7.0.
 
 ## Architecture constraints
 
