@@ -1,3 +1,6 @@
+### `da25111` · 2026-10-30 · feat: add arm-server artwork ID fallback
+- `crates/artwork-client/src/lib.rs`
+- `docs/planning/V0_6_0.md`
 ### `6f79f46` · 2026-10-30 · feat: connect artwork to media pages
 - `src/App.css`
 - `src/App.tsx`
