@@ -444,7 +444,9 @@ impl NyaaClient {
 
     async fn search_page(&self, user: Option<&str>, sanitized_query: &str, category: Category, page: u32) -> anyhow::Result<Vec<NyaaResult>> {
         let url = search_url(user, sanitized_query, category, page);
-        tracing::debug!(query = sanitized_query, url, page, "fetching nyaa.si search page");
+        let query_chars = sanitized_query.chars().count();
+        let alternatives = sanitized_query.matches('|').count() + 1;
+        tracing::debug!(query_chars, alternatives, page, "fetching nyaa.si search page");
 
         // A rate-limited (429) or failing page parses to zero rows - it must
         // be an error, not "no results", or it would be cached as such.
@@ -452,13 +454,16 @@ impl NyaaClient {
             Ok(resp) => match resp.text().await {
                 Ok(body) => body,
                 Err(err) => {
-                    tracing::error!(query = sanitized_query, page, %err, "failed to read nyaa.si search page body");
-                    return Err(err.into());
+                    let reason = err.to_string().split(" for url").next().unwrap_or("request failed").to_string();
+                    tracing::error!(query_chars, alternatives, page, error = %reason, "failed to read nyaa.si search page body");
+                    return Err(anyhow::anyhow!(reason));
                 }
             },
             Err(err) => {
-                tracing::error!(query = sanitized_query, page, %err, "nyaa.si search page request failed to send");
-                return Err(err.into());
+                let status = err.downcast_ref::<reqwest::Error>().and_then(reqwest::Error::status);
+                let reason = err.to_string().split(" for url").next().unwrap_or("request failed").to_string();
+                tracing::error!(query_chars, alternatives, page, ?status, error = %reason, "nyaa.si search page request failed");
+                return Err(anyhow::anyhow!(reason));
             }
         };
 

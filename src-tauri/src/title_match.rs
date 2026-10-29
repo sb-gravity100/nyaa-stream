@@ -64,6 +64,9 @@ const MIN_BASE_NAME_LEN: usize = 5;
 const MAX_SEARCH_NAMES: usize = 12;
 const MAX_SEARCH_BASES: usize = 6;
 const MAX_QUERY_PHRASES: usize = 32;
+const MAX_REMOTE_QUERIES: usize = 16;
+const MAX_QUERY_ALTERNATIVES: usize = 8;
+const MAX_QUERY_CHARS: usize = 600;
 
 /// Apostrophes and their lookalikes: dropped, not separators, so "Journey's"
 /// and "Journeys" both become `journeys` (groups write either).
@@ -199,6 +202,26 @@ impl NyaaSearchQuery {
             format!("{positives} -{negatives}")
         }
     }
+}
+
+/// Keep nyaa.si expressions short enough for its search endpoint while
+/// preserving every exact phrase and the same exclusion rules per chunk.
+fn split_search_query(query: NyaaSearchQuery) -> Vec<NyaaSearchQuery> {
+    let mut chunks = Vec::new();
+    let mut includes = Vec::new();
+    for phrase in query.includes {
+        let mut candidate = includes.clone();
+        candidate.push(phrase.clone());
+        let rendered = NyaaSearchQuery { includes: candidate, excludes: query.excludes.clone() }.render();
+        if !includes.is_empty() && (includes.len() >= MAX_QUERY_ALTERNATIVES || rendered.chars().count() > MAX_QUERY_CHARS) {
+            chunks.push(NyaaSearchQuery { includes: std::mem::take(&mut includes), excludes: query.excludes.clone() });
+        }
+        includes.push(phrase);
+    }
+    if !includes.is_empty() {
+        chunks.push(NyaaSearchQuery { includes, excludes: query.excludes });
+    }
+    chunks
 }
 
 fn quote_phrase(text: &str) -> Option<String> {
@@ -367,10 +390,18 @@ pub fn build_search_queries(
         }
     }
 
+    let queries = queries.into_iter().flat_map(split_search_query).collect::<Vec<_>>();
     let mut seen = BTreeSet::new();
-    queries.retain(|query| seen.insert(query.render()));
-    tracing::debug!(?queries, primary, is_tv_entry, "built entry-specific nyaa queries");
-    queries.into_iter().take(MAX_CANDIDATES).collect()
+    let queries = queries.into_iter().filter(|query| seen.insert(query.render())).collect::<Vec<_>>();
+    tracing::debug!(
+        query_count = queries.len(),
+        query_chars = ?queries.iter().map(|query| query.render().chars().count()).collect::<Vec<_>>(),
+        alternatives = ?queries.iter().map(|query| query.includes.len()).collect::<Vec<_>>(),
+        primary,
+        is_tv_entry,
+        "built entry-specific nyaa queries"
+    );
+    queries.into_iter().take(MAX_REMOTE_QUERIES).collect()
 }
 
 fn sibling_exclusion_phrases(bases: &[String], franchise: Option<&Franchise>) -> Vec<String> {

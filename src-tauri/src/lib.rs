@@ -829,7 +829,7 @@ async fn search_torrents_for_anime(
         return Ok(Vec::new());
     }
     let candidates: Vec<String> = queries.into_iter().map(|query| query.render()).collect();
-    tracing::debug!(?candidates, "search_torrents_for_anime invoked");
+    tracing::debug!(candidate_count = candidates.len(), query_bytes = ?candidates.iter().map(String::len).collect::<Vec<_>>(), "search_torrents_for_anime invoked");
 
     let mut searches = tokio::task::JoinSet::new();
     for (order, candidate) in candidates.into_iter().enumerate() {
@@ -861,7 +861,7 @@ async fn search_torrents_for_anime(
             Ok(results) => {
                 raw_hits += results.len();
                 query_metrics.push(CandidateSearchMetric { query: candidate.clone(), hits: results.len(), error: None });
-                tracing::info!(query = candidate, count = results.len(), "candidate search completed");
+                tracing::info!(query_bytes = candidate.len(), alternatives = candidate.matches('|').count() + 1, count = results.len(), "candidate search completed");
                 for result in results {
                     query_matches.entry(result.view_url.clone()).or_default().push(candidate.clone());
                     if seen_view_urls.insert(result.view_url.clone()) {
@@ -871,7 +871,7 @@ async fn search_torrents_for_anime(
             }
             Err(err) => {
                 query_metrics.push(CandidateSearchMetric { query: candidate.clone(), hits: 0, error: Some(err.to_string()) });
-                tracing::error!(query = candidate, %err, "candidate search failed");
+                tracing::error!(query_bytes = candidate.len(), alternatives = candidate.matches('|').count() + 1, %err, "candidate search failed");
                 last_err = Some(err);
             }
         }
