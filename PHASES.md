@@ -5,7 +5,7 @@
 - [x] Apply matching field selection in mpv, HLS/libass, and clip export
 - [x] Verify all 32 field combinations, preserved authored fields/signs/event tags, plain-track behavior, legacy defaults, and mpv/export parity; frontend production build
 - [x] Set embedded mpv `blend-subtitles=yes` and `scale=ewa_lanczos`; workspace check and bundled libmpv headless option initialization passed
-- [ ] Bump/tag v0.5.9
+- [x] Bump/tag v0.5.9 locally; publication pending
 
 ## v0.5.8 — implemented parser work (published 2026-10-29)
 - [x] Copy the supplied Python source into a tracked reference directory
