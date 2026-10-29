@@ -136,7 +136,13 @@ pub struct CustomSourceFile {
     pub index: usize,
     pub season: Option<u32>,
     pub episode: Option<u32>,
+    #[serde(default)]
+    pub episode_range: Option<[u32; 2]>,
     pub is_video: bool,
+    /// Full parsed file label (episode, range/batch, extra, movie, or unknown).
+    /// `None` for non-video files; default preserves older stored JSON.
+    #[serde(default)]
+    pub label: Option<crate::EpisodeLabel>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -333,6 +339,28 @@ impl Store {
             )?;
             let id: i64 = conn.query_row("SELECT id FROM custom_sources WHERE anilist_id=?1 AND info_hash=?2", params![source.anime_id, source.info_hash], |row| row.get(0))?;
             read_custom_source(conn, id)
+        }).await
+    }
+
+    /// Replaces the attachment details for an existing row without changing its
+    /// durable id. The anime id is part of the predicate to prevent cross-show edits.
+    pub(crate) async fn update_custom_source(&self, anime_id: i64, id: i64, target_anime_id: i64, source: CustomSourceInput) -> anyhow::Result<Option<CustomSource>> {
+        let files = serde_json::to_string(&source.files)?;
+        self.run(move |conn| {
+            let tx = conn.transaction()?;
+            let exists: bool = tx.query_row(
+                "SELECT EXISTS(SELECT 1 FROM custom_sources WHERE anilist_id=?1 AND id=?2)",
+                params![anime_id, id], |row| row.get(0),
+            )?;
+            if !exists { return Ok(None); }
+            let stamp = now();
+            tx.execute(
+                "UPDATE custom_sources SET anilist_id=?3, info_hash=?4, magnet=?5, title=?6, kind=?7, season=?8, episode_start=?9, episode_end=?10, files_json=?11, updated_at=?12 WHERE anilist_id=?1 AND id=?2",
+                params![anime_id, id, target_anime_id, source.info_hash, source.magnet, source.title, source.kind, source.season, source.episode_start, source.episode_end, files, stamp],
+            )?;
+            let updated = read_custom_source(&tx, id)?;
+            tx.commit()?;
+            Ok(Some(updated))
         }).await
     }
 

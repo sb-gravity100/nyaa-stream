@@ -324,6 +324,15 @@ impl NyaaClient {
         store.save_custom_source(source).await
     }
 
+    /// Updates an attached source in place, retaining its stable row id.
+    /// Moves or updates an attached source without changing its stable row id.
+    /// Returns `None` when `id` does not belong to the existing `anime_id`.
+    pub async fn update_custom_source(&self, anime_id: i64, id: i64, target_anime_id: i64, source: CustomSourceInput) -> anyhow::Result<Option<CustomSource>> {
+        tracing::info!(anime_id, source_id = id, target_anime_id, info_hash = %source.info_hash, "updating custom source");
+        let Some(store) = &self.store else { anyhow::bail!("the release database isn't open") };
+        store.update_custom_source(anime_id, id, target_anime_id, source).await
+    }
+
     pub async fn custom_sources(&self, anime_id: i64) -> anyhow::Result<Vec<CustomSource>> {
         let Some(store) = &self.store else { anyhow::bail!("the release database isn't open") };
         store.custom_sources(anime_id).await

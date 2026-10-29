@@ -24,9 +24,15 @@ pub fn parse(input: &str) -> Result<ParsedMagnet> {
         let mut trackers: Vec<String> = Vec::new();
         for pair in query.split('&') {
             let (key, value) = pair.split_once('=').unwrap_or((pair, ""));
+            // Decode only enough to identify supported keys. Invalid or malformed
+            // unrelated parameters are outside our contract and must not make a
+            // valid btih magnet unusable.
+            let Ok(key) = urlencoding::decode(key) else { continue };
+            let key = key.to_ascii_lowercase();
+            if !matches!(key.as_str(), "xt" | "dn" | "tr") { continue; }
             let plus_decoded = value.replace('+', " ");
-            let key = urlencoding::decode(key).map_err(|_| anyhow::anyhow!("magnet contains invalid parameter encoding"))?.to_ascii_lowercase();
-            let value = urlencoding::decode(&plus_decoded).map_err(|_| anyhow::anyhow!("magnet contains invalid parameter encoding"))?;
+            let value = urlencoding::decode(&plus_decoded)
+                .map_err(|_| anyhow::anyhow!("magnet contains invalid supported parameter encoding"))?;
             match key.as_str() {
                 "xt" if hash.is_none() => {
                     let xt = value.as_ref();
