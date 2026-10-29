@@ -1,3 +1,14 @@
+### `c7b129f` · 2026-10-29 · Merge branch `work/v0.6-installer`
+- `src/updater.ts`
+- `src/App.tsx`
+- `src/SettingsPanel.tsx`
+- `src/App.css`
+- `docs/prototypes/installer/FEASIBILITY.md`
+- `docs/prototypes/installer/index.html`
+- `PLAN.md`
+- `PHASES.md`
+- `FILE_INDEX.md`
+
 ### `8198f77` · 2026-10-29 · Merge branch `work/v0.6-artwork`
 - `crates/artwork-client/Cargo.toml`
 - `crates/artwork-client/src/lib.rs`
