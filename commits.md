@@ -1,3 +1,8 @@
+### `3fcb2d4` · 2026-10-29 · feat: prototype compact installer screens
+- `docs/prototypes/installer/index.html`
+- `FILE_INDEX.md`
+- `PHASES.md`
+
 ### `ef55db8` · 2026-10-29 · refactor: remove experimental ML pipeline
 - `CHANGELOG.md`
 - `FILE_INDEX.md`
