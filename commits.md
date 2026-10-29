@@ -1,3 +1,10 @@
+### `d749cea` · 2026-10-29 · fix: update subtitle blending and video scaler
+- `crates/mpv-player/src/embedded.rs`
+- `src/changelog.ts`
+- `CHANGELOG.md`
+- `FILE_INDEX.md`
+- `PHASES.md`
+
 ### `f24d149` · 2026-10-29 · docs: specify v0.5.9 subtitle blending
 - `PLAN.md`
 - `PHASES.md`
