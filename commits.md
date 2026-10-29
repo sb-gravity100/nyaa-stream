@@ -1,3 +1,11 @@
+### `aa84766` · 2026-10-29 · fix: use native libass AA for subtitles
+- `CHANGELOG.md`
+- `FILE_INDEX.md`
+- `PHASES.md`
+- `PLAN.md`
+- `src/assRenderer.ts`
+- `src/changelog.ts`
+
 ### `8980bbe` · 2026-10-29 · chore: finalize v0.5.8 subtitle AA
 - `CHANGELOG.md`
 - `PHASES.md`
