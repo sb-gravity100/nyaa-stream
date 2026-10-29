@@ -1,3 +1,5 @@
+### `77a7222` · 2026-10-30 · fix(installer): label setup action Install
+- `src-tauri/installer/installer.nsi`
 ### `8c0d2d0` · 2026-10-30 · fix(hls): skip extras in pack playback
 - `src/HlsPlayerView.tsx`
 ### `3eec94e` · 2026-10-30 · fix(installer): label setup action Install
