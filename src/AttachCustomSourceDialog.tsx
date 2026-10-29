@@ -65,7 +65,8 @@ export function AttachCustomSourceDialog({ input: initialInput, source, seasonFo
 
   const parsedTitle = parsed?.name?.trim() ?? "";
   const titleLabel = useMemo(() => parsedTitle ? inferredLabel(parsedTitle) : { kind: "unknown" } as const, [parsedTitle]);
-  const inferredPack = files?.some((file) => file.isVideo && file.label?.kind === "batch" && !file.label.extras) ?? false;
+  const eligibleFiles = files?.filter((file) => file.isVideo && !file.label?.extras && file.label?.kind !== "special") ?? [];
+  const inferredPack = eligibleFiles.length >= 2 && (titleLabel.kind === "batch" || eligibleFiles.some((file) => file.label?.kind === "batch"));
 
   useEffect(() => {
     let cancelled = false;
@@ -92,7 +93,7 @@ export function AttachCustomSourceDialog({ input: initialInput, source, seasonFo
             setSeason(parsedLabel.season);
             setEpisodeStart(parsedLabel.number);
             setEpisodeEnd(parsedLabel.number);
-          } else if ((parsedLabel.kind === "batch" && !parsedLabel.extras) || inspected.some((file) => file.isVideo && file.label?.kind === "batch" && !file.label.extras)) {
+          } else if (eligibleCount(inspected) >= 2 && ((parsedLabel.kind === "batch" && !parsedLabel.extras) || inspected.some((file) => file.isVideo && !file.label?.extras && file.label?.kind === "batch"))) {
             setKind("pack");
             if (parsedLabel.kind === "batch") {
               setSeason(parsedLabel.season);
@@ -142,6 +143,10 @@ export function AttachCustomSourceDialog({ input: initialInput, source, seasonFo
     setQuery(displayLabel(candidate));
   }
 
+  function eligibleCount(items: InspectedFile[]): number {
+    return items.filter((file) => file.isVideo && !file.label?.extras && file.label?.kind !== "special").length;
+  }
+
   async function submit(event: Event) {
     event.preventDefault();
     if (!anime || !parsed || !files || inspecting || saving) return;
@@ -175,7 +180,7 @@ export function AttachCustomSourceDialog({ input: initialInput, source, seasonFo
           <textarea value={input} onInput={(event) => setInput((event.currentTarget as HTMLTextAreaElement).value)} rows={3} spellcheck={false} />
         </label>
         <div class="attach-source-status" aria-live="polite">
-          {inspecting ? "Inspecting torrent metadata…" : parsed && files ? `${files.filter((file) => file.isVideo).length} video files found · ${parsed.infoHash.slice(0, 12)}…` : inspectionError ? `Inspection failed: ${inspectionError}` : "Enter a magnet link or info hash."}
+          {inspecting ? "Inspecting torrent metadata…" : parsed && files ? `${eligibleFiles.length} eligible video files · ${parsed.infoHash.slice(0, 12)}…` : inspectionError ? `Inspection failed: ${inspectionError}` : "Enter a magnet link or info hash."}
         </div>
 
         <label class="attach-source-field">Search AniList
@@ -215,7 +220,7 @@ export function AttachCustomSourceDialog({ input: initialInput, source, seasonFo
         {saveError && <div class="attach-source-error">Couldn’t attach source: {saveError}</div>}
         <div class="attach-source-actions">
           <button type="button" class="button button-secondary" onClick={onClose}>Cancel</button>
-          <button type="submit" class="button" disabled={!parsed || !files || inspecting || !anime || saving || !Number.isInteger(season) || season < 1 || (kind === "episode" && (!Number.isInteger(episodeStart) || episodeStart < 1)) || (kind === "pack" && (!Number.isInteger(episodeStart) || !Number.isInteger(episodeEnd) || episodeStart < 1 || episodeEnd < episodeStart))}>{saving ? "Attaching…" : source ? "Move source" : "Attach source"}</button>
+          <button type="submit" class="button" disabled={!parsed || !files || eligibleFiles.length === 0 || inspecting || !anime || saving || !Number.isInteger(season) || season < 1 || (kind === "episode" && (!Number.isInteger(episodeStart) || episodeStart < 1)) || (kind === "pack" && (!Number.isInteger(episodeStart) || !Number.isInteger(episodeEnd) || episodeStart < 1 || episodeEnd < episodeStart))}>{saving ? "Attaching…" : source ? "Move source" : "Attach source"}</button>
         </div>
       </form>
     </div>
