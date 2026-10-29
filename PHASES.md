@@ -38,7 +38,8 @@ Feature work follows this order; remaining acceptance checks stay open below.
   - [x] Additive `custom_sources` SQLite schema and list/save/update/move/remove commands; no destructive database migration
   - [x] Attach/edit/remove picker with explicit episode or pack mapping; attached sources merge into episode/Batch groups
   - [x] Metadata-only pack inspection and persisted video file list; no file reader is opened during inspection
-  - [ ] Manual acceptance for sparse/multi-season pack selection, restart persistence, and malformed/hash input cases
+  - [x] Store tests cover additive migration, move/edit, duplicate-hash merge, restart persistence, and removal
+  - [ ] Manual app acceptance for sparse/multi-season selection, restart persistence, and malformed/hash input cases
 - [~] 3: Artwork providers are connected; IMDb-based TMDB fallback covers unambiguous IDs, while missing crosswalks and Fribb's data license remain unresolved
       - [x] Cached provider client and AniList ID mapping (TMDB + fanart.tv)
       - [x] User-supplied keys stored locally, omitted from backup, and never logged
@@ -332,6 +333,8 @@ policy remains unchanged.
   - [x] M2 search-bar detection, "Play this magnet" row, invalid hint and row/player context actions
   - [x] M3 `custom_sources` store table + API (`kind` episode|pack, season,
         optional episode range, stored file list)
+  - [x] Store tests cover old-database migration, move/edit, duplicate-hash
+        merge, restart persistence, and removal
   - [x] M4 searchable attach/move picker (single episode / whole pack /
         range, detected kind with override, metadata-only file list),
         merged into `groupedSources` by covered episode
