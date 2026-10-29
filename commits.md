@@ -1,3 +1,15 @@
+### `0513336` · 2026-10-29 · Merge branch `work/v0.6-magnets`
+- `crates/nyaa-client/src/magnet.rs`
+- `crates/nyaa-client/src/store.rs`
+- `src-tauri/src/magnet.rs`
+- `src-tauri/src/lib.rs`
+- `src/App.tsx`
+- `src/MediaPage.tsx`
+- `src/types.ts`
+- `PLAN.md`
+- `PHASES.md`
+- `FILE_INDEX.md`
+
 ### `5bb46a6` · 2026-10-29 · feat: validate release-page thumbnail frames
 - `Cargo.toml`
 - `src-tauri/Cargo.toml`
