@@ -824,6 +824,26 @@
       - [ ] Seek-bar hover shows the frame above the time tooltip
             (debounced, cached; time only when not downloaded)
       - [ ] PLAN.md/FILE_INDEX.md sync
+- [ ] Background update checks and custom installation (v0.6.0, requested
+      2026-10-29; see PLAN.md "v0.6.0 background updates and custom installer"):
+      - [ ] Add unobtrusive startup/periodic checks, focus/resume throttling,
+            request deduplication and offline/server backoff; keep manual checks
+      - [ ] Show Update at the header flex-end only when a newer published
+            version is available; preserve drag/window controls and player chrome
+      - [ ] Build custom in-app release summary and download/verify/stage/
+            restart UI with truthful progress, retry and safe cancellation
+      - [ ] Preserve updater signatures, What's new marker and current install
+            on preparation failure; keep background checks non-installing
+      - [ ] Audit Windows/Tauri installation lifecycle; stage inside the app,
+            apply through a silent helper/backend at shutdown, then relaunch
+      - [ ] Save resume state and allow restart to be deferred during playback
+      - [ ] Design and implement a bespoke branded installer/bootstrapper UI;
+            generic NSIS wizard artwork changes alone are insufficient
+      - [ ] Cover install path/shortcuts, progress/completion/errors, fresh
+            install, upgrade, repair/uninstall and silent updater compatibility
+      - [ ] Verify Windows end-to-end update failures/retries, signature
+            rejection, known/unknown download lengths, deferred/successful
+            restart and installed version; sync docs and release packaging
 - [ ] Bump/tag the consolidated v0.6.0 milestone locally on `release/0.6.0`
 - [ ] Navigation and home rehaul (v0.8.0, see PLAN.md "Navigation and home
       rehaul + Discover"): one commit each -

@@ -616,6 +616,46 @@ by an app-styled HTML menu whose items depend on what was right-clicked.
 
 ## Release plan (decided 2026-09-29)
 
+**v0.6.0 background updates and custom installer (requested 2026-10-29).**
+- Check for updates unobtrusively after startup and periodically during normal
+  use. Throttle checks across focus/resume events, avoid duplicate requests,
+  and back off on offline/server failures. Keep manual checks in Settings.
+  Background checks must not interrupt playback, open dialogs, or install an
+  update without an explicit action.
+- When a newer published version is available, show an Update button at the
+  header's flex-end, alongside existing header actions without obstructing
+  window controls or dragging. Hide it when up to date; retain availability
+  across route changes. Keep playback/fullscreen header visibility consistent
+  with the existing player chrome.
+- Use a custom in-app update flow: release summary, download with byte/percent
+  progress when the size is known, signature verification, staging, and a clear
+  restart action. Show indeterminate progress for stages without measurable
+  totals rather than fabricated percentages. Expose retry/cancel where safe;
+  retain the usable installed version on download/verification/staging failure.
+  Preserve signed updater verification and the existing What's new marker.
+- Keep update download/preparation and progress inside nyaa-stream. Apply
+  staged files at controlled shutdown with a silent installer or small updater
+  helper as required by Windows file locks, then relaunch the updated app.
+  Save playback/resume state before exit; allow restart to be deferred during
+  playback. Audit Tauri's updater exit/relaunch behavior before choosing the
+  mechanism: do not promise that running executables/DLLs can be overwritten
+  in place or that Windows elevation prompts can always be suppressed.
+- Design a bespoke branded installer experience with its own layout,
+  typography, artwork, transitions, install-location/shortcut choices,
+  installation progress, completion, and useful error/retry states. A banner
+  swap on the generic NSIS wizard does not satisfy this requirement. Evaluate
+  a custom bootstrapper/UI with a silent installation backend; NSIS may remain
+  an internal packaging engine, but its generic wizard must not be the primary
+  experience. Cover first install, upgrade, repair/uninstall compatibility,
+  supported Windows environments and required notices. Keep silent in-app
+  upgrades separate from the interactive first-install experience.
+- Verify the full published-artifact flow on Windows: no update, available
+  update, offline/retry, known/unknown download length, invalid signature,
+  failed preparation, deferred restart, successful restart/version check,
+  fresh install and upgrade/uninstall. Preserve the existing release-publishing
+  policy; planning this feature does not authorize a new public release.
+
+
 **v0.5.10 subtitle edge smoothness (2026-10-29).** Target jagged text edges: use light FreeType hinting for plain subtitles in embedded mpv and clip export, but no hinting for styled ASS to retain authored positioning/animation. HLS renders subtitle coverage at 1.5x output device-pixel size up to a 2160px supersampling threshold; larger outputs retain native resolution. Keep video scaling and the requested `blend-subtitles=yes` unchanged. Validate track-switch hinting reset, HLS sizing at standard/high DPI, frontend build, and workspace checks. Visual playback acceptance remains required. SB clarified that supersampling must also cover embedded mpv, not only HLS. Deferred by SB on 2026-10-29 to the v0.7.0 custom libmpv work: the current mpv change is plain-text hinting, not supersampling. Native implementation must render subtitle masks at a bounded 1.5x resolution, downsample coverage before composition, preserve authored size/position/animation and video resolution, and cover the active GPU backend plus screenshots/export consistently. The bundled DLL exposes no verified control for this; evaluate a custom libmpv renderer build or a shared subtitle overlay during that future milestone before implementation. The custom build environment is not yet set up (Docker daemon unavailable; only docker-desktop is installed in WSL).
 
 
