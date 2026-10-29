@@ -1,3 +1,7 @@
+### `4171719` · 2026-10-29 · docs: plan v0.5.9 selective subtitle styling
+- `PLAN.md`
+- `PHASES.md`
+
 ### `d73086f` · 2026-10-29 · docs: record v0.5.8 publication
 - `PLAN.md`
 - `PHASES.md`
