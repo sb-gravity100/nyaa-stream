@@ -1,16 +1,18 @@
 //! Artwork lookups for AniList entries. Secrets are passed by the caller and
 //! are deliberately excluded from Debug output, URLs, and tracing fields.
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::{path::{Path, PathBuf}, time::{SystemTime, UNIX_EPOCH}};
 
 const MAP_URL: &str = "https://raw.githubusercontent.com/Fribb/anime-lists/master/anime-list-full.json";
 const TMDB_API: &str = "https://api.themoviedb.org/3";
 const FANART_API: &str = "https://webservice.fanart.tv/v3.2";
+const ARM_API: &str = "https://arm.haglund.dev/api/v2";
 const MAP_TTL_SECS: u64 = 7 * 24 * 60 * 60;
 const TMDB_TTL_SECS: u64 = 180 * 24 * 60 * 60;
 const FANART_TTL_SECS: u64 = 7 * 24 * 60 * 60;
+const ARM_TTL_SECS: u64 = 7 * 24 * 60 * 60;
 pub const TMDB_API_SETTINGS_URL: &str = "https://www.themoviedb.org/settings/api";
 pub const FANART_API_KEY_URL: &str = "https://fanart.tv/get-an-api-key/";
 pub const TMDB_ATTRIBUTION: &str = "This product uses the TMDB API but is not endorsed or certified by TMDB.";
@@ -45,6 +47,10 @@ pub struct AnimeIds {
     pub tmdb_episode_offset: Option<i32>,
     pub tvdb_id: Option<u64>,
     pub simkl_id: Option<u64>,
+    pub anidb_id: Option<u64>,
+    pub kitsu_id: Option<u64>,
+    pub myanimelist_id: Option<u64>,
+    pub imdb_id: Option<String>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -58,6 +64,18 @@ struct MapRow {
     simkl_id: Option<u64>,
     season: Option<SeasonMap>,
     episode_offset: Option<EpisodeOffset>,
+}
+
+/// arm-server v2 `/ids` fields available from an AniList query. TMDB and
+/// TVDB are intentionally absent: those IDs are one-to-many in the API spec.
+#[derive(Serialize, Deserialize, Default)]
+struct ArmIds {
+    anilist: Option<i64>,
+    anidb: Option<u64>,
+    kitsu: Option<u64>,
+    myanimelist: Option<u64>,
+    simkl: Option<u64>,
+    imdb: Option<String>,
 }
 #[derive(Serialize, Deserialize)]
 struct TmdbIds { tv: Option<u64>, movie: Option<u64> }
@@ -168,13 +186,61 @@ impl ArtworkClient {
     }
 
     pub async fn ids(&self, anilist_id: i64) -> Result<AnimeIds> {
-        let rows = self.mapping().await?;
+        let rows = match self.mapping().await {
+            Ok(rows) => rows,
+            Err(err) => {
+                tracing::warn!(anilist_id, error = %err, "Fribb artwork ID map unavailable; trying arm-server fallback");
+                Vec::new()
+            }
+        };
         let mut found: Vec<_> = rows.into_iter().filter(|row| row.anilist_id == Some(anilist_id)).collect();
         // Prefer entries with explicit seasonal coordinates for split-cour mapping.
         found.sort_by_key(|row| row.season.as_ref().and_then(|s| s.tmdb).is_none());
-        let row = found.into_iter().next().ok_or_else(|| anyhow!("AniList id has no artwork ID mapping"))?;
-        let tmdb = row.themoviedb_id.unwrap_or(TmdbIds { tv: None, movie: None });
-        Ok(AnimeIds { tmdb_tv_id: tmdb.tv, tmdb_movie_id: tmdb.movie, tmdb_season: row.season.and_then(|s| s.tmdb), tmdb_episode_offset: row.episode_offset.and_then(|o| o.tmdb), tvdb_id: row.tvdb_id, simkl_id: row.simkl_id })
+        let row = found.into_iter().next();
+        let arm_needed = row.is_none();
+        let arm = if arm_needed {
+            match self.arm_ids(anilist_id).await {
+                Ok(ids) => ids,
+                Err(err) => {
+                    tracing::warn!(anilist_id, error = %err, "arm-server artwork ID fallback failed");
+                    ArmIds::default()
+                }
+            }
+        } else { ArmIds::default() };
+        let tmdb = row.as_ref().and_then(|r| r.themoviedb_id.as_ref());
+        Ok(AnimeIds {
+            tmdb_tv_id: tmdb.and_then(|id| id.tv),
+            tmdb_movie_id: tmdb.and_then(|id| id.movie),
+            tmdb_season: row.as_ref().and_then(|r| r.season.as_ref()).and_then(|s| s.tmdb),
+            tmdb_episode_offset: row.as_ref().and_then(|r| r.episode_offset.as_ref()).and_then(|o| o.tmdb),
+            tvdb_id: row.as_ref().and_then(|r| r.tvdb_id),
+            simkl_id: row.as_ref().and_then(|r| r.simkl_id).or(arm.simkl),
+            anidb_id: arm.anidb,
+            kitsu_id: arm.kitsu,
+            myanimelist_id: arm.myanimelist,
+            imdb_id: arm.imdb,
+        })
+    }
+
+    async fn arm_ids(&self, anilist_id: i64) -> Result<ArmIds> {
+        let key = format!("arm-ids-anilist-{anilist_id}");
+        self.cached_json(&key, ARM_TTL_SECS, || async {
+            tracing::debug!(anilist_id, "requesting arm-server ID fallback");
+            let id = anilist_id.to_string();
+            let value: serde_json::Value = self.client.get(format!("{ARM_API}/ids"))
+                .query(&[("source", "anilist"), ("id", id.as_str()), ("include", "anilist,anidb,kitsu,myanimelist,simkl,imdb")])
+                .send().await?.error_for_status()?.json().await?;
+            let relations = match value {
+                serde_json::Value::Null => Vec::new(),
+                serde_json::Value::Array(items) => items,
+                item => vec![item],
+            };
+            for relation in relations.into_iter().filter(|v| !v.is_null()) {
+                let ids: ArmIds = serde_json::from_value(relation)?;
+                if ids.anilist == Some(anilist_id) { return Ok(ids); }
+            }
+            Ok(ArmIds::default())
+        }).await
     }
 
     async fn mapping(&self) -> Result<Vec<MapRow>> {
