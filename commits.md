@@ -1,3 +1,8 @@
+### `5bb557d` · 2026-10-30 · docs: record signed installer build
+- `PHASES.md`
+- `PLAN.md`
+- `docs/planning/V0_6_0.md`
+- `docs/prototypes/installer/FEASIBILITY.md`
 ### `714c399` · 2026-10-30 · fix(installer): preserve shortcut choices across upgrades
 - `docs/prototypes/installer/FEASIBILITY.md`
 - `src-tauri/installer/installer.nsi`
