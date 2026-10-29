@@ -1,3 +1,5 @@
+### `0f205f3` · 2026-10-30 · fix(player): skip extras in default pack playback
+- `src/PlayerView.tsx`
 ### `ab0f0a4` · 2026-10-30 · docs: describe magnet attachment workflow
 - `CHANGELOG.md`
 - `src/changelog.ts`
