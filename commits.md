@@ -1,3 +1,9 @@
+### `a0c2613` · 2026-10-29 · docs: record artwork provider decisions
+- `FILE_INDEX.md`
+- `PHASES.md`
+- `PLAN.md`
+- `docs/planning/V0_6_0.md`
+
 ### `daf4a6e` · 2026-10-29 · feat: add artwork provider client foundation
 - `crates/artwork-client/Cargo.toml`
 - `crates/artwork-client/src/lib.rs`
