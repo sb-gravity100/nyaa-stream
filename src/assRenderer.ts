@@ -36,11 +36,11 @@ const EMPTY_SCRIPT = [
   "",
 ].join("\n");
 
-// libass renders at the displayed size (capped so 4K fullscreen doesn't ask
-// for a huge canvas); edges are softened with a light CSS blur on the canvas
-// (App.css) instead of the 2x supersampling this used to do, which doubled
-// libass's work on every frame.
-const MAX_RENDER_HEIGHT = 1440;
+// Render above display size so the browser's WebGL canvas downsampling
+// smooths libass's glyph edges. Cap the raster size to control work on 4K
+// displays; JASSUB falls back to Canvas2D if WebGL is unavailable.
+const PRESCALE_FACTOR = 2;
+const MAX_RENDER_HEIGHT = 2880;
 
 // Numpad alignments 1-3 are bottom-aligned - identical in libass's internal
 // encoding, so this holds whichever form getStyles returns.
@@ -101,7 +101,12 @@ export function useAssRenderer({ video, url, fonts, styled, style, timeOffset, d
     let loadedEvents = 0;
     let loaded = false;
     rawRef.current = "";
-    console.info("[subtitles] starting renderer", { url, fonts: fonts.length });
+    console.info("[subtitles] starting renderer", {
+      url,
+      fonts: fonts.length,
+      prescaleFactor: PRESCALE_FACTOR,
+      maxRenderHeight: MAX_RENDER_HEIGHT,
+    });
     const instance = new JASSUB({
       video,
       subContent: EMPTY_SCRIPT,
@@ -120,7 +125,7 @@ export function useAssRenderer({ video, url, fonts, styled, style, timeOffset, d
       },
       queryFonts: "local",
       timeOffset: offsetRef.current,
-      prescaleFactor: 1,
+      prescaleFactor: PRESCALE_FACTOR,
       prescaleHeightLimit: 4320,
       maxRenderHeight: MAX_RENDER_HEIGHT,
     });

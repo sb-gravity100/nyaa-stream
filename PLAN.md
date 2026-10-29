@@ -212,14 +212,14 @@ Building the workspace requires, beyond Rust/Node:
   moving outside control zones may hide the controls immediately, but the
   cursor hides only after the idle timeout.
 
-  **v0.5.9 subtitle edge quality (planned 2026-10-29).** The HLS fallback's
-  JASSUB renderer already uses WebGL for subtitle composition when available,
-  but currently rasterizes at 1x and softens the canvas with CSS blur. Render
-  at 2x resolution with a 2880px cap and remove the blur; keep JASSUB's WebGL
-  path and its Canvas2D fallback. This raises libass/WASM raster work, so cap
-  the render size. The embedded mpv path already uses `gpu-next`/GPU video
-  output and `hwdec=auto-safe`; keep subtitles in letterbox areas rather
-  than enabling mpv's video-stage blend mode, which clips those margins.
+  **v0.5.9 subtitle edge quality (2026-10-29).** The HLS fallback's JASSUB
+  renderer now rasterizes at 2x with a 2880px cap; the CSS blur is removed.
+  JASSUB uses WebGL composition when available and falls back to Canvas2D.
+  Supersampling increases libass/WASM raster work, bounded by the cap. The
+  embedded mpv path already uses `gpu-next`/GPU video output and
+  `hwdec=auto-safe`; subtitle placement in letterbox areas is preserved.
+  Visual verification on standard/high-resolution HLS and mpv playback
+  remains.
 - **Metadata:** AniList GraphQL API (`https://graphql.anilist.co`), no auth
   required for public queries; Kitsu API (`crates/kitsu-client`) as a
   secondary source for wide backdrop banners and per-episode thumbnails,

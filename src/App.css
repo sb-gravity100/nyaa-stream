@@ -1985,11 +1985,9 @@ html.mpv-active .player-view {
 }
 
 /* JASSUB's libass canvas sits right after the <video>; keep it under the
-   UI layers. The slight blur softens libass's native-resolution edges
-   (replaced 2x supersampling, which doubled the render cost). */
+   UI layers. Supersampling in the renderer handles edge smoothing. */
 .player-view canvas.JASSUB {
   z-index: 0;
-  filter: blur(0.35px);
 }
 
 /* Catches clicks on the picture; mpv itself never sees input. */

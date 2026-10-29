@@ -10,6 +10,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.5.9",
+    date: "2026-10-29",
+    features: [],
+    fixes: [
+      "HLS fallback subtitles now render with 2x supersampling for smoother edges, using WebGL composition when available.",
+    ],
+  },
+  {
     version: "0.5.8",
     date: "2026-10-29",
     features: [],
