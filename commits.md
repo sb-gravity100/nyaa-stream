@@ -1,3 +1,12 @@
+### `272037f` · 2026-10-29 · chore: release v0.5.8
+- `CHANGELOG.md`
+- `PHASES.md`
+- `PLAN.md`
+- `package.json`
+- `src-tauri/Cargo.toml`
+- `src-tauri/tauri.conf.json`
+- `src/changelog.ts`
+
 ### `64b3aae` · 2026-10-29 · fix: add audio decoder playback context
 - `crates/mpv-player/src/libmpv.rs`
 - `src/mpvVideo.ts`
