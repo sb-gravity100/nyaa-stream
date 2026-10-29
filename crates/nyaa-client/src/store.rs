@@ -354,11 +354,27 @@ impl Store {
             )?;
             if !exists { return Ok(None); }
             let stamp = now();
-            tx.execute(
-                "UPDATE custom_sources SET anilist_id=?3, info_hash=?4, magnet=?5, title=?6, kind=?7, season=?8, episode_start=?9, episode_end=?10, files_json=?11, updated_at=?12 WHERE anilist_id=?1 AND id=?2",
-                params![anime_id, id, target_anime_id, source.info_hash, source.magnet, source.title, source.kind, source.season, source.episode_start, source.episode_end, files, stamp],
-            )?;
-            let updated = read_custom_source(&tx, id)?;
+            let duplicate_id: Option<i64> = tx.query_row(
+                "SELECT id FROM custom_sources WHERE anilist_id=?1 AND info_hash=?2 AND id<>?3",
+                params![target_anime_id, source.info_hash, id], |row| row.get(0),
+            ).optional()?;
+            let surviving_id = if let Some(duplicate_id) = duplicate_id {
+                // The target attachment already represents this torrent. Keep its
+                // durable ID, apply the edited metadata, and remove the old row.
+                tx.execute(
+                    "UPDATE custom_sources SET magnet=?2, title=?3, kind=?4, season=?5, episode_start=?6, episode_end=?7, files_json=?8, updated_at=?9 WHERE id=?1",
+                    params![duplicate_id, source.magnet, source.title, source.kind, source.season, source.episode_start, source.episode_end, files, stamp],
+                )?;
+                tx.execute("DELETE FROM custom_sources WHERE anilist_id=?1 AND id=?2", params![anime_id, id])?;
+                duplicate_id
+            } else {
+                tx.execute(
+                    "UPDATE custom_sources SET anilist_id=?3, info_hash=?4, magnet=?5, title=?6, kind=?7, season=?8, episode_start=?9, episode_end=?10, files_json=?11, updated_at=?12 WHERE anilist_id=?1 AND id=?2",
+                    params![anime_id, id, target_anime_id, source.info_hash, source.magnet, source.title, source.kind, source.season, source.episode_start, source.episode_end, files, stamp],
+                )?;
+                id
+            };
+            let updated = read_custom_source(&tx, surviving_id)?;
             tx.commit()?;
             Ok(Some(updated))
         }).await
