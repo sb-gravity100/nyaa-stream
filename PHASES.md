@@ -758,7 +758,7 @@ policy remains unchanged.
             exempt), text-input Cut/Copy/Paste/Select all, selection Copy
       - [x] Anime cards/posters + search dropdown + Continue watching
       - [x] Episode rows + source/torrent rows
-      - [ ] Player surface (flat, no Subtitles/Speed)
+      - [x] Player surface (flat, no Subtitles/Speed)
       - [ ] FILE_INDEX.md/PLAN.md sync
 - [ ] Build thumbnails button (v0.6.0, see PLAN.md "Build thumbnails
       button"): one commit each -

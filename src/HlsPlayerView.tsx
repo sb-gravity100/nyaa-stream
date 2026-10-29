@@ -275,6 +275,26 @@ export function HlsPlayerView({
          } },
       ]);
    }
+   function showPlayerContextMenu(event: MouseEvent) {
+      const video = videoRef.current;
+      console.debug("[hls-player] open surface context menu", { hasVideo: video !== null, ready: video?.readyState ?? 0, hasStats: stats !== null });
+      openContextMenu(event, [
+         { label: paused ? "Play" : "Pause", action: () => {
+            const current = videoRef.current;
+            if (!current) return;
+            console.info("[hls-player] surface play-pause", { action: paused ? "play" : "pause" });
+            if (paused) void current.play().catch((error) => console.error("[hls-player] play failed", { error: String(error) }));
+            else current.pause();
+         } },
+         { label: "Copy frame", disabled: !video || video.videoWidth === 0, action: () => copyFrame() },
+         { label: "Save screenshot", disabled: !video || video.videoWidth === 0, action: () => saveFrame() },
+         { label: "Statistics", disabled: !stats, action: () => { setPlaylistOpen(false); setMenu("stats"); } },
+         { separator: true },
+         { label: pip ? "Exit picture-in-picture" : "Picture-in-picture", action: () => togglePip() },
+         { label: fullscreen ? "Exit fullscreen" : "Fullscreen", action: () => toggleFullscreen() },
+      ]);
+   }
+
    const [torrentId, setTorrentId] = useState<string | null>(null);
    const [files, setFiles] = useState<PlayFile[]>([]);
    const [selectedFile, setSelectedFile] = useState<PlayFile | null>(null);
@@ -1077,6 +1097,54 @@ export function HlsPlayerView({
       }
    }
 
+   async function saveFrame() {
+      const video = videoRef.current;
+      if (!video || video.videoWidth === 0) {
+         console.warn("[hls-player] screenshot skipped", { reason: "video-not-ready" });
+         return;
+      }
+      console.info("[hls-player] screenshot requested", { width: video.videoWidth, height: video.videoHeight });
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const context = canvas.getContext("2d");
+      if (!context) {
+         console.error("[hls-player] screenshot failed", { reason: "canvas-context-unavailable" });
+         showToast("Couldn't save the frame");
+         return;
+      }
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const subtitleCanvas = rootRef.current?.querySelector<HTMLCanvasElement>("canvas.JASSUB");
+      let withSubtitles = false;
+      if (subtitleCanvas && activeSubtitleIndex != null) {
+         try {
+            const videoBox = video.getBoundingClientRect();
+            const subtitleBox = subtitleCanvas.getBoundingClientRect();
+            const scale = canvas.width / videoBox.width;
+            context.drawImage(subtitleCanvas, (subtitleBox.left - videoBox.left) * scale, (subtitleBox.top - videoBox.top) * scale, subtitleBox.width * scale, subtitleBox.height * scale);
+            withSubtitles = true;
+         } catch (error) {
+            console.debug("[hls-player] subtitle layer not capturable", { error: String(error) });
+         }
+      }
+      try {
+         const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+         if (!blob) throw new Error("PNG encoding returned no data");
+         const url = URL.createObjectURL(blob);
+         const anchor = document.createElement("a");
+         const stamp = formatTime(video.currentTime).replace(/:/g, ".");
+         anchor.href = url;
+         anchor.download = `${displayTitle(anime.title)} ${episodeKey} ${stamp}.png`.replace(/[\\/:*?"<>|]/g, " ");
+         anchor.click();
+         window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
+         console.info("[hls-player] screenshot saved", { width: canvas.width, height: canvas.height, withSubtitles });
+         showToast("Screenshot downloaded");
+      } catch (error) {
+         console.error("[hls-player] screenshot save failed", { error: String(error) });
+         showToast("Couldn't save the frame");
+      }
+   }
+
    function cycleSubtitles() {
       const order: (number | null)[] = [
          null,
@@ -1343,6 +1411,7 @@ export function HlsPlayerView({
          ref={rootRef}
          class={`player-view hls-player${controlsVisible || menu ? " controls-shown" : ""}${playlistOpen ? " playlist-open" : ""}`}
          style={{ cursor: cursorHidden ? "none" : "auto" }}
+         onContextMenu={showPlayerContextMenu}
       >
          {selectedFile && (
             <video

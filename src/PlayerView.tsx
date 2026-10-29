@@ -466,6 +466,26 @@ function MpvPlayerView({
       ]);
    }
 
+   function showPlayerContextMenu(event: MouseEvent) {
+      const video = videoRef.current;
+      console.debug("[player] open surface context menu", { hasVideo: video !== null, ready: video?.readyState ?? 0, hasStats: stats !== null });
+      openContextMenu(event, [
+         { label: paused ? "Play" : "Pause", action: () => {
+            const current = videoRef.current;
+            if (!current) return;
+            console.info("[player] surface play-pause", { action: paused ? "play" : "pause" });
+            if (paused) void current.play().catch((error) => console.error("[player] play failed", { error: String(error) }));
+            else current.pause();
+         } },
+         { label: "Copy frame", disabled: !video || video.readyState < 2, action: () => copyFrame() },
+         { label: "Save screenshot", disabled: !video || video.readyState < 2, action: () => saveFrame() },
+         { label: "Statistics", disabled: !stats, action: () => { setPlaylistOpen(false); setMenu("stats"); } },
+         { separator: true },
+         { label: pip ? "Exit picture-in-picture" : "Picture-in-picture", action: () => togglePip() },
+         { label: fullscreen ? "Exit fullscreen" : "Fullscreen", action: () => toggleFullscreen() },
+      ]);
+   }
+
    function showToast(message: string) {
       setToast(message);
       window.clearTimeout(toastTimerRef.current);
@@ -1683,6 +1703,7 @@ function MpvPlayerView({
          ref={rootRef}
          class={`player-view${controlsVisible || menu ? " controls-shown" : ""}${playlistOpen ? " playlist-open" : ""}`}
          style={{ cursor: cursorHidden ? "none" : "auto" }}
+         onContextMenu={showPlayerContextMenu}
       >
          {/* mpv draws under the transparent webview; this layer sits over
           the picture and deliberately does nothing on click or double-click
