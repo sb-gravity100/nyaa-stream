@@ -752,7 +752,7 @@ policy remains unchanged.
             "Release plan") - published 2026-10-04; notes fixed up after npm
             cut them to one line (`release.mjs --notes-file` since)
 - [ ] Context menus (v0.6.0, was v0.5.0, see PLAN.md "Context menus"): one commit each -
-      - [ ] `tauri-plugin-clipboard-manager` (Rust, capability, JS)
+      - [x] `tauri-plugin-clipboard-manager` (Rust, capability, JS package)
       - [ ] `contextMenu.ts` store + `ContextMenu.tsx` component
       - [ ] Global listener: block native menu (dev Shift+right-click
             exempt), text-input Cut/Copy/Paste/Select all, selection Copy
