@@ -1,3 +1,7 @@
+### `6f79f46` · 2026-10-30 · feat: connect artwork to media pages
+- `src/App.css`
+- `src/App.tsx`
+- `src/MediaPage.tsx`
 ### `c91efcb` · 2026-10-30 · Merge branch `work/v0.6-thumbnails`
 - `crates/torrent-engine/src/media.rs`
 - `crates/torrent-engine/src/lib.rs`
