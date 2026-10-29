@@ -1,3 +1,18 @@
+### `dd747e0` · 2026-10-30 · feat: add frame generation workflows
+- `FILE_INDEX.md`
+- `PHASES.md`
+- `crates/torrent-engine/Cargo.toml`
+- `crates/torrent-engine/src/lib.rs`
+- `crates/torrent-engine/src/media.rs`
+- `docs/planning/V0_6_0.md`
+- `src-tauri/src/cache.rs`
+- `src-tauri/src/lib.rs`
+- `src-tauri/src/resume.rs`
+- `src-tauri/src/thumbnail_build.rs`
+- `src/HlsPlayerView.tsx`
+- `src/MediaPage.tsx`
+- `src/PlayerView.tsx`
+
 ### `36f6998` · 2026-10-29 · feat: build missing episode thumbnails
 - `FILE_INDEX.md`
 - `PHASES.md`
