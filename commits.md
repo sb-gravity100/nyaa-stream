@@ -1,3 +1,5 @@
+### `cb329d5` · 2026-10-30 · docs: update nyaa test count
+- `PHASES.md`
 ### `91e3acf` · 2026-10-30 · docs: record custom source persistence coverage
 - `PHASES.md`
 ### `ef5d028` · 2026-10-30 · test(magnet): cover source migration and persistence
