@@ -1,5 +1,6 @@
 //! Bounded parsing for user supplied BitTorrent magnet links.
 use anyhow::{bail, ensure, Result};
+use crate::EpisodeLabel;
 
 const MAX_MAGNET_BYTES: usize = 4096;
 const MAX_TRACKERS: usize = 32;
@@ -11,6 +12,7 @@ pub struct ParsedMagnet {
     pub name: Option<String>,
     pub trackers: usize,
     pub magnet: String,
+    pub label: EpisodeLabel,
 }
 
 pub fn parse(input: &str) -> Result<ParsedMagnet> {
@@ -59,7 +61,8 @@ pub fn parse(input: &str) -> Result<ParsedMagnet> {
     let mut magnet = format!("magnet:?xt=urn:btih:{info_hash}");
     if let Some(name) = &name { magnet.push_str(&format!("&dn={}", urlencoding::encode(name))); }
     for tracker in &tracker_values { magnet.push_str(&format!("&tr={}", urlencoding::encode(tracker))); }
-    Ok(ParsedMagnet { info_hash, name, trackers: tracker_values.len(), magnet })
+    let label = name.as_deref().map(EpisodeLabel::of).unwrap_or_default();
+    Ok(ParsedMagnet { info_hash, name, trackers: tracker_values.len(), magnet, label })
 }
 
 fn normalize_hash(value: &str) -> Result<String> {
