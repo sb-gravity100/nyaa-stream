@@ -1,3 +1,8 @@
+### `d73086f` · 2026-10-29 · docs: record v0.5.8 publication
+- `PLAN.md`
+- `PHASES.md`
+- `CHANGELOG.md`
+
 ### `7f5b618` · 2026-10-29 · docs: prioritize opt-in memory profiling
 - `PLAN.md`
 - `PHASES.md`
