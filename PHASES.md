@@ -18,6 +18,8 @@ No implementation starts as part of this planning request.
 
 ### Remaining v0.6.0 work
 
+- [ ] Preserve permanent release data, source attachments and playback/resume state through migrations, upgrades, failed updates and restart; verify existing-profile resume
+
 - [ ] Remove cancelled ML training/scoring prototype and dataset trainer; preserve rule matching and dataset compatibility
 
 - [x] Installer visual direction confirmed by SB: compact dark layout matching the app
