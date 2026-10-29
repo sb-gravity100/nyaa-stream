@@ -16,7 +16,7 @@ sbtl torrent streaming, embedded libmpv playback and an HLS fallback.
 | Version | Scope | State |
 |---|---|---|
 | v0.5.8 | Implemented pre-v0.6.0 work | Published |
-| v0.6.0 | Subtitle styling/smoothing plus context menus, custom magnets, artwork, thumbnails, seek previews, updates and bespoke installer | Subtitle work and custom magnet implementation underway; manual magnet acceptance and remaining features open |
+| v0.6.0 | Subtitle styling/smoothing plus context menus, custom magnets, artwork, thumbnails, seek previews, updates and bespoke installer | Feature code is integrated; Windows lifecycle, live acceptance, Fribb data licensing and final release checks remain open |
 | v0.7.0 | Custom libmpv, native subtitle supersampling, memory profiling, batch transitions, preload timing and continuous seek dragging | Planned |
 | v0.8.0 | Navigation/Home rehaul and Discover | Planned |
 | v1.0.0 | Stabilization and 32-bit Windows | Planned |
@@ -39,15 +39,17 @@ and verification remain valid. Tag v0.6.0 only after the milestone is complete.
 9. Run integrated Windows acceptance, sync docs and cut the local milestone.
 
 Installer direction confirmed by SB: **compact dark layout matching the app**.
-Tauri's custom NSIS template and split updater download/install APIs fit the
-planned architecture. The in-app quiet checker and staged download flow are
-implemented; the Windows installer lifecycle is still unproven. Keep the
-existing passive updater mode until isolated Windows checks establish elevation,
-existing MSI/NSIS migration, WebView2 bootstrap and relaunch behavior. See
-`docs/prototypes/installer/FEASIBILITY.md`. Update timing and first-install
-defaults remain proposed choices. Provider terms were rechecked: Simkl is
-excluded until the app provides Simkl login and sync. Continuous drag behavior,
-batch transition work and native supersampling remain v0.7.0.
+The custom NSIS template and branded install-choice page are integrated; NSIS
+still owns progress and completion. The in-app quiet checker, staged download,
+resume-buffer save and teardown wait are implemented. The signed installer
+lifecycle remains unverified; keep passive updater mode until isolated Windows
+checks establish elevation, existing MSI/NSIS migration, WebView2 bootstrap and
+relaunch behavior. See `docs/prototypes/installer/FEASIBILITY.md`. Update
+timing and first-install defaults remain proposed choices. Provider terms were
+rechecked: Simkl is excluded until the app provides Simkl login and sync.
+Fribb's mapping data has no stated license; do not publish until resolved.
+Continuous drag behavior, batch transition work and native supersampling remain
+v0.7.0.
 
 ## Architecture constraints
 

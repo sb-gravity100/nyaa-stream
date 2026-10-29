@@ -18,16 +18,16 @@ Feature work follows this order; remaining acceptance checks stay open below.
 
 ### Remaining v0.6.0 work
 
-- [ ] Preserve permanent release data, source attachments and playback/resume state through migrations, upgrades, failed updates and restart; verify existing-profile resume
+- [~] Preserve permanent release data, source attachments and playback/resume state through migrations, upgrades, failed updates and restart; updater restart now waits for resume-buffer save and teardown. Existing-profile upgrade/failure preservation still needs isolated Windows verification.
 
 - [x] Remove cancelled ML training/scoring prototype and dataset trainer; retain rule matching and legacy dataset compatibility. Frontend build, workspace/all-target checks, 54 nyaa-client tests and 39 matching tests passed.
 
 - [x] Installer visual direction confirmed by SB: compact dark layout matching the app
 - [x] Create simplified installer prototype using the app's dusk-indigo and sakura palette; reviewed and refined by SB
-- [ ] Review proposed update schedule, restart flow and first-install defaults
+- [ ] Review proposed update schedule and first-install defaults
 - [ ] 0: Prove installer/updater backend, clean-machine bootstrap, signed
       artifact, silent upgrade, old-install migration and restart lifecycle
-- [ ] 1: Shared context menus and clipboard integration, including custom-source actions
+- [~] 1: Shared context menus and clipboard integration, including custom-source actions; manual Windows acceptance remains open
 - [~] 2: Magnet parsing/direct play, permanent attachments, pack mapping and migration
   - [x] Bounded btih parsing for magnet links (hex/base32), display name and tracker count
   - [x] Magnet/hash search detection bypasses AniList search; direct playback uses the existing player
@@ -35,15 +35,17 @@ Feature work follows this order; remaining acceptance checks stay open below.
   - [x] Attach/edit/remove picker with explicit episode or pack mapping; attached sources merge into episode/Batch groups
   - [x] Metadata-only pack inspection and persisted video file list; no file reader is opened during inspection
   - [ ] Manual acceptance for sparse/multi-season pack selection, restart persistence, and malformed/hash input cases
-- [~] 3: Wire the ID/cache/provider foundation into the app
+- [~] 3: Artwork providers are connected; Fribb's map license and complete missing-TMDB-ID fallback remain unresolved
       - [x] Cached provider client and AniList ID mapping (TMDB + fanart.tv)
       - [x] User-supplied keys stored locally, omitted from backup, and never logged
       - [x] Tauri artwork/backdrop/still commands and About attribution settings
-      - [ ] Connect artwork fallbacks to media pages, hero and episode cards
-- [ ] 4: Release-page screenshots and missing-thumbnail build queue
-- [ ] 5: Verified-data-only seekbar storyboard/hover previews
-- [ ] 6: Bespoke installer UI with reviewed screens and proven backend
-- [ ] 7: Quiet update scheduler, flex-end header action and in-app progress/restart
+      - [x] Connect artwork fallbacks to media pages, hero, Continue watching and episode cards
+      - [x] arm-server v2 fallback for missing map rows/map failures (AniDB, Kitsu, MAL, Simkl, IMDb); API cannot map AniList to TMDB/TVDB IDs
+      - [ ] Resolve Fribb mapping-data license before publication
+- [~] 4: Release-page screenshots and missing-thumbnail build queue; live-swarm acceptance remains open
+- [~] 5: Verified-data-only seekbar storyboard/hover previews; generation covers only the contiguous verified prefix, and Windows acceptance remains open
+- [~] 6: Branded NSIS template and install-choice page; NSIS handles progress/completion, and isolated lifecycle checks remain open
+- [~] 7: Quiet update scheduler, flex-end header action and in-app progress/restart; signed apply/relaunch remains unverified
 - [ ] 8: Integrated Windows verification, docs/changelog/index sync, local v0.6.0 tag
 
 Native supersampling, batch next-episode/preload work and continuous seekbar
@@ -769,8 +771,8 @@ policy remains unchanged.
       - [x] Anime cards/posters + search dropdown + Continue watching
       - [x] Episode rows + source/torrent rows
       - [x] Player surface (flat, no Subtitles/Speed)
-      - [ ] FILE_INDEX.md/PLAN.md sync
-- [ ] Build thumbnails button (v0.6.0, see PLAN.md "Build thumbnails
+      - [x] FILE_INDEX.md/PLAN.md sync
+- [~] Build thumbnails button (v0.6.0, see PLAN.md "Build thumbnails
       button"): one commit each -
       - [x] nyaa view-page scrape collects description image URLs
       - [x] Frame thumbnail from a view-page image: frame filter, backend
@@ -790,11 +792,12 @@ policy remains unchanged.
             spinner on rows being captured
       - [ ] Verify live on a show with no Kitsu/AniList thumbnails
       - [x] PLAN.md/FILE_INDEX.md sync
-- [ ] HD banner sources (v0.6.0, see PLAN.md "HD banner sources"): one
+- [~] HD banner sources (v0.6.0, see PLAN.md "HD banner sources"): one
       commit each -
       - [x] Fribb anime-lists ID map: runtime download, weekly refresh, offline
             lookup (upstream data license remains to be resolved before publish)
-      - [ ] arm-server lookup fallback for IDs absent from the downloaded map
+      - [x] arm-server v2 fallback for missing map rows/map failures (AniDB,
+            Kitsu, MAL, Simkl, IMDb); API cannot map AniList to TMDB/TVDB IDs
       - [x] `crates/artwork-client`: TMDB backdrops + logos, fanart.tv
             `showbackground`/`clearlogo`, provider response cache
       - [x] TMDB episode still client with TMDB episode-offset correction
@@ -802,16 +805,16 @@ policy remains unchanged.
             secrets are not logged; attribution is returned with artwork
       - [x] Rechecked provider requirements: Simkl omitted because current API
             terms require Simkl login and sync for this app category
-      - [ ] `get_artwork` command + disk cache; frontend backdrop chain
+      - [x] `get_artwork` command + disk cache; frontend backdrop chain
             (media page, home hero, Continue watching)
-      - [ ] Title logos on the home hero and media page
-      - [ ] Settings: user-supplied TMDB read access token (Bearer, never
+      - [x] Title logos on the home hero and media page
+      - [x] Settings: user-supplied TMDB read access token (Bearer, never
             logged, not bundled) and fanart.tv project/personal keys;
             TMDB steps skipped without a token
-      - [ ] About attribution: TMDB logo (`src/assets/tmdb-logo.svg`) +
+      - [x] About attribution: TMDB logo +
             notice and fanart.tv; TMDB cache max 180 days
-      - [ ] PLAN.md/FILE_INDEX.md sync
-- [ ] Seek-bar thumbnail preview (v0.6.0, see PLAN.md "Seek-bar thumbnail
+      - [x] PLAN.md/FILE_INDEX.md sync
+- [~] Seek-bar thumbnail preview (v0.6.0, see PLAN.md "Seek-bar thumbnail
       preview"): one commit each -
       - [x] `media.rs`: keyframe-only storyboard job (5s buckets, 240x135
             JPEG) over verified pieces only, revisiting as pieces arrive
@@ -821,9 +824,10 @@ policy remains unchanged.
       - [x] Seek-bar hover shows the frame above the time tooltip
             (debounced, cached; time only when not downloaded)
       - [x] PLAN.md/FILE_INDEX.md sync
+      - [ ] Decode frames from disjoint verified ranges beyond missing-piece gaps
       - [ ] Verify partially downloaded files, arbitrary seeks, resume retention,
             buffering pauses and both mpv/HLS surfaces on Windows
-- [ ] Background update checks and custom installation (v0.6.0, requested
+- [~] Background update checks and custom installation (v0.6.0, requested
       2026-10-29; see PLAN.md "v0.6.0 background updates and custom installer"):
       - [x] Add unobtrusive startup/periodic checks, focus/resume throttling,
             request deduplication and offline/server backoff; keep manual checks
@@ -835,11 +839,13 @@ policy remains unchanged.
             on preparation failure; keep background checks non-installing
       - [ ] Audit Windows/Tauri installation lifecycle; stage inside the app,
             apply through a silent helper/backend at shutdown, then relaunch
-      - [ ] Save resume state and allow restart to be deferred during playback
-      - [ ] Design and implement a bespoke branded installer/bootstrapper UI;
-            generic NSIS wizard artwork changes alone are insufficient
+      - [x] Save resume buffer before controlled restart; wait for playback
+            teardown and keep restart disabled during playback
+      - [~] Add a bespoke branded NSIS template and install-choice page; NSIS
+            still owns progress/completion, so full installer lifecycle remains open
       - [x] Prototype install path/shortcuts, progress/completion/errors, fresh
-            install and recovery screens; actual installer implementation stays open
+            install and recovery screens
+      - [x] Implement custom install-location, Start Menu and desktop shortcut choices
       - [ ] Cover install path/shortcuts, progress/completion/errors, fresh
             install, upgrade, repair/uninstall and silent updater compatibility
       - [ ] Verify Windows end-to-end update failures/retries, signature
