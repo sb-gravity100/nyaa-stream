@@ -1,3 +1,18 @@
+### `8980bbe` · 2026-10-29 · chore: finalize v0.5.8 subtitle AA
+- `CHANGELOG.md`
+- `PHASES.md`
+- `PLAN.md`
+- `src/changelog.ts`
+
+### `2347cf5` · 2026-10-29 · fix: supersample HLS subtitle edges
+- `CHANGELOG.md`
+- `FILE_INDEX.md`
+- `PHASES.md`
+- `PLAN.md`
+- `src/App.css`
+- `src/assRenderer.ts`
+- `src/changelog.ts`
+
 ### `3689e99` · 2026-10-29 · docs: plan subtitle AA improvement
 - `PLAN.md`
 - `PHASES.md`
