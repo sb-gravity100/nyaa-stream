@@ -5,6 +5,7 @@
 - [x] Validate bundled libmpv live hinting changes, plain/ASS switching, 8 standard/high-DPI sizing cases and frontend production build
 - [x] Refresh version and run workspace checks; bump/tag v0.5.10 locally (unpublished)
 - [ ] Visually compare text edges and HLS rendering cost on real playback
+- [ ] Extend bounded 1.5x subtitle supersampling to embedded mpv; current hinting does not meet this requirement. Resolve native-build versus shared-overlay architecture, then verify ASS layout, screenshots/export, GPU compatibility and rendering cost.
 
 ## v0.5.9 — selective ASS subtitle styling
 - [x] Add independently selectable dialogue style fields, retaining existing preferences
