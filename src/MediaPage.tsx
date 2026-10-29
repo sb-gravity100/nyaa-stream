@@ -8,7 +8,8 @@ import { BackIcon, CheckIcon, PlayIcon, PlusIcon } from "./icons";
 import { Buffering } from "./Buffering";
 import type { WatchTarget } from "./router";
 import { useSettings } from "./settings";
-import { cachedTorrentThumbnail, subscribeFrameSaved } from "./torrentThumbnail";
+import { cachedTorrentThumbnail, notifyThumbnailSaved, subscribeFrameSaved } from "./torrentThumbnail";
+import { releaseGroup } from "./releases";
 import { useEnhancedImage } from "./enhanceImage";
 import { copyToClipboard, openContextMenu } from "./contextMenuStore";
 
@@ -360,6 +361,98 @@ export function MediaPage({
     visibleSources.flatMap(([, group]) => (group.label.kind === "episode" && !kitsuThumbnails?.[group.label.number] ? [group.label.number] : [])),
   );
   const thumbnails = useMemo(() => ({ ...localThumbnails, ...kitsuThumbnails }), [localThumbnails, kitsuThumbnails]);
+  const autoFrameChecks = useRef(new Set<string>());
+  useEffect(() => {
+    const known = new Set(["asw", "toonshub", "doomdos", "judas", "varyg", "anime time"]);
+    for (const [, group] of visibleSources) {
+      if (group.label.kind !== "episode" || thumbnails[group.label.number]) continue;
+      const episode = group.label.number;
+      const key = `${anime.id}-${episode}`;
+      if (autoFrameChecks.current.has(key)) continue;
+      const release = group.releases.find((candidate) => known.has((releaseGroup(candidate) ?? "").toLowerCase()));
+      if (!release) continue;
+      autoFrameChecks.current.add(key);
+      void invoke<string | null>("build_view_page_thumbnail", {
+        cacheKey: key,
+        viewUrls: [release.view_url],
+        groups: [releaseGroup(release) ?? ""],
+        force: false,
+      }).then((url) => { if (url) notifyThumbnailSaved(anime.id, episode, url); })
+        .catch((err) => console.debug("[thumbnail-build] automatic screenshot lookup failed", { key, err: String(err) }));
+    }
+  }, [anime.id, visibleSources, thumbnails]);
+  const [thumbnailBuild, setThumbnailBuild] = useState<{ current: number; total: number; episode: number | null; failed: number; noSeed: number } | null>(null);
+  const thumbnailCancelRef = useRef(false);
+  const [thumbnailBuildDone, setThumbnailBuildDone] = useState<{ failed: number; noSeed: number } | null>(null);
+  const missingThumbnailEpisodes = visibleSources.flatMap(([, group]) => group.label.kind === "episode" && !thumbnails[group.label.number] ? [group.label.number] : []);
+  async function buildMissingThumbnails() {
+    if (thumbnailBuild || missingThumbnailEpisodes.length === 0) return;
+    const episodes = [...missingThumbnailEpisodes];
+    let failed = 0;
+    let noSeed = 0;
+    thumbnailCancelRef.current = false;
+    setThumbnailBuildDone(null);
+    setThumbnailBuild({ current: 0, total: episodes.length, episode: null, failed, noSeed });
+    for (let index = 0; index < episodes.length; index++) {
+      const episode = episodes[index];
+      if (thumbnailCancelRef.current) break;
+      setThumbnailBuild({ current: index + 1, total: episodes.length, episode, failed, noSeed });
+      const row = visibleSources.find(([, group]) => group.label.kind === "episode" && group.label.number === episode);
+      if (!row) continue;
+      const releases = row[1].releases;
+      const groupName = (release: NyaaResult) => releaseGroup(release)?.toLowerCase() ?? "";
+      const screenshotGroups = new Set(["asw", "toonshub", "doomdos", "judas", "varyg", "anime time"]);
+      const noScreenshotGroups = new Set(["subsplease", "erai-raws", "ember", "dkb", "new-raws", "sankyuu", "minimtbb", "tsundere-raws", "yameii", "kaleido-subs"]);
+      const pages = [...releases].sort((a, b) => Number(screenshotGroups.has(groupName(b))) - Number(screenshotGroups.has(groupName(a))));
+      for (const release of pages) {
+        if (noScreenshotGroups.has(groupName(release))) continue;
+        try {
+          const url = await invoke<string | null>("build_view_page_thumbnail", { cacheKey: `${anime.id}-${episode}`, viewUrls: [release.view_url], groups: [releaseGroup(release) ?? ""], force: true });
+          if (url) {
+            notifyThumbnailSaved(anime.id, episode, url);
+            setThumbnailBuild({ current: index + 1, total: episodes.length, episode, failed, noSeed });
+            break;
+          }
+        } catch (err) { console.warn("[thumbnail-build] release-page frame lookup failed", { episode, err: String(err) }); }
+        if (thumbnailCancelRef.current) break;
+      }
+      const cached = await cachedTorrentThumbnail(anime.id, episode);
+      if (!cached) {
+        const candidates = releases.filter((release) => {
+          const label = labelOf(release.label, release.title);
+          return release.seeders > 0 && label.kind === "episode" && label.number === episode;
+        });
+        const subsPlease = candidates.filter((release) => groupName(release) === "subsplease" && /480p/i.test(release.title));
+        const sizeBytes = (value: string) => {
+          const match = value.match(/([\d.]+)\s*(B|KB|MB|GB|TB)/i);
+          if (!match) return Number.MAX_SAFE_INTEGER;
+          const power = { B: 0, KB: 1, MB: 2, GB: 3, TB: 4 }[match[2].toUpperCase() as "B" | "KB" | "MB" | "GB" | "TB"];
+          return Number(match[1]) * 1024 ** power;
+        };
+        const tierSort = (a: NyaaResult, b: NyaaResult) => (Number(b.seeders >= 3) - Number(a.seeders >= 3)) || (sizeBytes(a.size) - sizeBytes(b.size));
+        const ordered = [...subsPlease.sort(tierSort), ...candidates.filter((r) => !subsPlease.includes(r)).sort(tierSort)].slice(0, 3);
+        const hadSeededSource = ordered.length > 0;
+        if (!hadSeededSource) noSeed++;
+        for (const release of ordered) {
+          if (thumbnailCancelRef.current) break;
+          try {
+            const url = await invoke<string | null>("capture_torrent_thumbnail", { magnet: release.magnet, cacheKey: `${anime.id}-${episode}`, durationMinutes: anime.duration, force: true });
+            if (url) { notifyThumbnailSaved(anime.id, episode, url); break; }
+          } catch (err) {
+            if (String(err).includes("thumbnail-deferred")) {
+              while (!thumbnailCancelRef.current) await new Promise((resolve) => window.setTimeout(resolve, 1000));
+              break;
+            }
+            console.warn("[thumbnail-build] capture failed", { episode, title: release.title, err: String(err) });
+          }
+        }
+        if (hadSeededSource && !(await cachedTorrentThumbnail(anime.id, episode))) failed++;
+      }
+    }
+    setThumbnailBuild(null);
+    setThumbnailBuildDone({ failed, noSeed });
+    thumbnailCancelRef.current = false;
+  }
   const paragraphs = anime.description ? descriptionParagraphs(anime.description) : [];
   const watchedCount = Object.values(progress).filter((p) => p.completed).length;
   const continueEntry = continueTarget ? progressOf(continueTarget[0], continueTarget[1]) : undefined;
@@ -564,6 +657,15 @@ export function MediaPage({
               </span>
             )}
             <CustomSourcePicker sources={customSources} onSave={onSaveCustomSource} onRemove={onRemoveCustomSource} />
+            {!movie && missingThumbnailEpisodes.length > 0 && !watch && <button class="button button-secondary thumbnail-build-button" onClick={() => {
+              if (thumbnailBuild) thumbnailCancelRef.current = true;
+              else void buildMissingThumbnails();
+            }}>
+              {thumbnailBuild ? `Building ${thumbnailBuild.current}/${thumbnailBuild.total} · Cancel` : `Build thumbnails (${missingThumbnailEpisodes.length})`}
+            </button>}
+            {thumbnailBuildDone != null && (thumbnailBuildDone.failed > 0 || thumbnailBuildDone.noSeed > 0) && <span class="thumbnail-build-result">
+              {[thumbnailBuildDone.failed > 0 ? `${thumbnailBuildDone.failed} failed` : "", thumbnailBuildDone.noSeed > 0 ? `${thumbnailBuildDone.noSeed} no seeded source` : ""].filter(Boolean).join(" · ")}
+            </span>}
           </header>
           {error && <p class="error-banner">{error}</p>}
           {watchMissing && (
@@ -607,6 +709,7 @@ export function MediaPage({
                     <button class="video-row-main" onClick={() => play(key)} aria-label={`Play ${key}`}>
                       <div class="video-thumbnail">
                         {thumbnail ? <img src={thumbnail} alt="" loading="lazy" /> : <span class="video-thumbnail-number">{episodeNumber ?? "All"}</span>}
+                        {thumbnailBuild?.episode === episodeNumber && <span class="thumbnail-build-spinner" aria-label="Building thumbnail" />}
                         <span class="video-thumbnail-play">
                           <PlayIcon size={22} />
                         </span>

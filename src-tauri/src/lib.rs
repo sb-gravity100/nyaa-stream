@@ -453,6 +453,7 @@ async fn build_view_page_thumbnail(
     state: State<'_, Arc<AppState>>,
     cache_key: String,
     view_urls: Vec<String>,
+    groups: Vec<String>,
     force: bool,
 ) -> Result<Option<String>, String> {
     tracing::info!(cache_key, candidate_pages = view_urls.len(), force, "build_view_page_thumbnail invoked");
@@ -474,7 +475,12 @@ async fn build_view_page_thumbnail(
         tracing::debug!(cache_key, "thumbnail was filled while waiting for the build slot");
         return Ok(Some(url));
     }
-    for view_url in view_urls.into_iter().take(12) {
+    for (index, view_url) in view_urls.into_iter().take(12).enumerate() {
+        let group = groups.get(index).map(String::as_str).unwrap_or_default().trim();
+        if !group.is_empty() && state.nyaa.screenshot_group_has_frames(group).await.ok().flatten() == Some(false) {
+            tracing::debug!(group, "skipping release group known to have no screenshots");
+            continue;
+        }
         if !valid_nyaa_view_url(&view_url) {
             tracing::warn!("thumbnail candidate URL rejected");
             continue;
@@ -488,10 +494,12 @@ async fn build_view_page_thumbnail(
         };
         if image_urls.is_empty() {
             tracing::debug!("release page has no description images");
+            if !group.is_empty() { let _ = state.nyaa.remember_screenshot_group(group, false).await; }
             continue;
         }
         match thumbnail_build::best_frame_jpeg(&image_urls).await {
             Ok(Some(jpeg)) => {
+                if !group.is_empty() { let _ = state.nyaa.remember_screenshot_group(group, true).await; }
                 if let Some(parent) = cache_path.parent() {
                     tokio::fs::create_dir_all(parent).await.map_err(|error| error.to_string())?;
                 }
@@ -502,7 +510,10 @@ async fn build_view_page_thumbnail(
                 tracing::info!(cache_key, bytes = jpeg.len(), "built thumbnail from release-page frame");
                 return thumbnail_url(&cache_path, &cache_key).await.ok_or_else(|| "saved thumbnail vanished".to_string()).map(Some);
             }
-            Ok(None) => tracing::debug!("release page images contained no usable episode frame"),
+            Ok(None) => {
+                tracing::debug!("release page images contained no usable episode frame");
+                if !group.is_empty() { let _ = state.nyaa.remember_screenshot_group(group, false).await; }
+            }
             Err(error) => tracing::warn!(%error, "release page frame processing failed"),
         }
     }
@@ -531,7 +542,7 @@ const THUMBNAIL_SEEK_TOLERANCE_SECONDS: f64 = 5.0;
 /// to deliver enough data to reach THUMBNAIL_SEEK_SECONDS, screenshot).
 /// Deliberately short: this is a best-effort background enhancement for a
 /// home-page thumbnail, not something worth blocking on if peers are slow.
-const THUMBNAIL_CAPTURE_TIMEOUT: Duration = Duration::from_secs(25);
+const THUMBNAIL_CAPTURE_TIMEOUT: Duration = Duration::from_secs(60);
 const THUMBNAIL_POLL_INTERVAL: Duration = Duration::from_millis(500);
 
 /// Last-resort thumbnail source, used only when Kitsu and AniList both have
@@ -562,6 +573,8 @@ async fn capture_torrent_thumbnail(
     magnet: String,
     cache_key: String,
     duration_minutes: Option<f64>,
+    file_idx: Option<usize>,
+    force: Option<bool>,
 ) -> Result<Option<String>, String> {
     if !valid_thumbnail_key(&cache_key) {
         tracing::warn!(cache_key, "capture_torrent_thumbnail rejected cache key");
@@ -573,7 +586,7 @@ async fn capture_torrent_thumbnail(
         tracing::debug!(cache_key, "capture_torrent_thumbnail cache hit");
         return Ok(Some(url));
     }
-    if thumbnail_failed_recently(&state, &cache_key).await {
+    if !force.unwrap_or(false) && thumbnail_failed_recently(&state, &cache_key).await {
         tracing::debug!(cache_key, "capture_torrent_thumbnail skipped, failed recently");
         return Ok(None);
     }
@@ -595,7 +608,7 @@ async fn capture_torrent_thumbnail(
         return Err(THUMBNAIL_DEFERRED.to_string());
     }
     tracing::info!(cache_key, "capture_torrent_thumbnail cache miss, capturing from torrent");
-    match capture_thumbnail_uncached(&state, &magnet, &cache_path, duration_minutes).await {
+    match capture_thumbnail_uncached(&state, &magnet, &cache_path, duration_minutes, file_idx).await {
         Ok(()) => Ok(thumbnail_url(&cache_path, &cache_key).await),
         Err(err) => {
             tracing::warn!(cache_key, %err, "capture_torrent_thumbnail failed, falling back to no thumbnail");
@@ -612,6 +625,7 @@ async fn capture_thumbnail_uncached(
     magnet: &str,
     cache_path: &std::path::Path,
     duration_minutes: Option<f64>,
+    requested_file_idx: Option<usize>,
 ) -> anyhow::Result<()> {
     if let Some(parent) = cache_path.parent() {
         tokio::fs::create_dir_all(parent).await?;
@@ -622,7 +636,7 @@ async fn capture_thumbnail_uncached(
     // sometimes lead with a sample/NCOP, and index 0 was never a real
     // choice anyway - just the only one available before file listing.
     let files = state.torrent_engine.files(&added.id).await?;
-    let file_idx = largest_video_file(&files).unwrap_or(0);
+    let file_idx = requested_file_idx.filter(|index| files.get(*index).is_some_and(|file| file.is_video)).unwrap_or_else(|| largest_video_file(&files).unwrap_or(0));
     let stream_url = state.torrent_engine.stream_url(&added.id, file_idx);
 
     // Some(_) means "seek there via mpv's --start", None means "no
@@ -632,6 +646,16 @@ async fn capture_thumbnail_uncached(
     let target_seconds = duration_minutes.filter(|m| *m > 0.0).map(|minutes| minutes * 60.0 / 2.0);
 
     let capture_result = tokio::time::timeout(THUMBNAIL_CAPTURE_TIMEOUT, async {
+        let swarm_deadline = tokio::time::Instant::now() + Duration::from_secs(20);
+        loop {
+            if state.torrent_engine.stats(&added.id, file_idx).await.map(|stats| stats.connected_peers > 0).unwrap_or(false) {
+                break;
+            }
+            if tokio::time::Instant::now() >= swarm_deadline {
+                anyhow::bail!("no peer connected within 20 seconds");
+            }
+            tokio::time::sleep(Duration::from_millis(500)).await;
+        }
         let mut player = MpvPlayer::spawn_headless(&stream_url, target_seconds).await?;
 
         let effective_target = target_seconds.unwrap_or(THUMBNAIL_SEEK_SECONDS);

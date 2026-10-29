@@ -354,6 +354,8 @@ function MpvPlayerView({
    // mousemove through React state re-rendered the whole player per event,
    // so the tooltip trailed behind the cursor.
    const seekTooltipRef = useRef<HTMLDivElement>(null);
+   const storyboardHoverTimerRef = useRef<number | null>(null);
+   const storyboardHoverTokenRef = useRef(0);
    const [volume, setVolumeState] = useState(loadVolume);
    const [muted, setMuted] = useState(false);
    const [menu, setMenu] = useState<Menu>(null);
@@ -1100,9 +1102,26 @@ function MpvPlayerView({
       tooltip.textContent = chapter?.title ? `${formatTime(at)} · ${chapter.title}` : formatTime(at);
       tooltip.style.transform = `translateX(${x}px) translateX(-50%)`;
       tooltip.classList.add("shown");
+      if (storyboardHoverTimerRef.current != null) window.clearTimeout(storyboardHoverTimerRef.current);
+      const token = ++storyboardHoverTokenRef.current;
+      if (torrentId && selectedFile) storyboardHoverTimerRef.current = window.setTimeout(() => {
+         invoke<string | null>("storyboard_frame", { torrentId, fileIdx: selectedFile.index, seconds: at })
+            .then((url) => {
+               if (token !== storyboardHoverTokenRef.current || !url || !seekTooltipRef.current) return;
+               const image = document.createElement("img");
+               image.src = url;
+               image.alt = "";
+               image.className = "player-storyboard-frame";
+               tooltip.prepend(image);
+            })
+            .catch((err) => console.debug("[storyboard] hover lookup failed", { seconds: at, err: String(err) }));
+      }, 80);
    }
 
    function hideSeekTooltip() {
+      if (storyboardHoverTimerRef.current != null) window.clearTimeout(storyboardHoverTimerRef.current);
+      storyboardHoverTokenRef.current++;
+      seekTooltipRef.current?.querySelector("img")?.remove();
       seekTooltipRef.current?.classList.remove("shown");
    }
 
