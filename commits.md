@@ -1,3 +1,8 @@
+### `63e402c` · 2026-10-30 · docs(release): waive legacy updater baseline check
+- `PHASES.md`
+- `PLAN.md`
+- `docs/planning/V0_6_0.md`
+
 ### `8d30b59` · 2026-10-30 · docs(release): record v0.6.0 dry-run
 - `PHASES.md`
 
