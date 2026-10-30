@@ -1,3 +1,5 @@
+### `4ca6869` · 2026-10-30 · docs: specify branded installer progress UI
+- `docs/planning/V0_6_0.md`
 ### `0df8150` · 2026-10-30 · fix(installer): restore Start Menu choice on upgrades
 - `src-tauri/installer/installer.nsi`
 - `CHANGELOG.md`
