@@ -1,3 +1,9 @@
+### `550d912` · 2026-10-30 · docs: generalize player references
+- `PHASES.md`
+- `commits.md`
+- `docs/planning/ARCHITECTURE.md`
+- `docs/planning/ROADMAP.md`
+
 ### `a37cb48` · 2026-10-30 · fix(dev): move Vite off Windows-reserved port
 - `FILE_INDEX.md`
 - `src-tauri/tauri.conf.json`
