@@ -1,3 +1,8 @@
+### `8b4ba90` · 2026-10-31 · fix: scope ASS render controls to video outputs
+- `src/PlayerView.tsx`
+- `src/SettingsPanel.tsx`
+- `docs/planning/MPV_BUILD.md`
+
 ### `9ba6a96` · 2026-10-31 · feat: add mpv subtitle rendering controls
 - `src/App.css`
 - `src/PlayerView.tsx`
