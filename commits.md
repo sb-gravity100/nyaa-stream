@@ -1,3 +1,10 @@
+### `dfb5c54` · 2026-10-31 · build: prepare isolated native libmpv tools
+- `scripts/prepare-mpv.py`
+- `native/mpv/tools.lock.json`
+- `FILE_INDEX.md`
+- `PHASES.md`
+- `docs/planning/MPV_BUILD.md`
+
 ### `501c05f` · 2026-10-31 · docs: plan isolated libmpv tool setup
 - `docs/planning/MPV_BUILD.md`
 - `PHASES.md`
