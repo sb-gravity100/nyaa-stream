@@ -1,3 +1,11 @@
+### `c326463` · 2026-10-30 · fix(dev): write debug logs under logs folder
+- `FILE_INDEX.md`
+- `README.md`
+- `docs/planning/PLAYBACK.md`
+- `package.json`
+- `scripts/tauri.ps1`
+- `src-tauri/src/lib.rs`
+
 ### `e57b031` · 2026-10-30 · feat(dev): pipe Tauri output to a log file
 - `FILE_INDEX.md`
 - `README.md`
