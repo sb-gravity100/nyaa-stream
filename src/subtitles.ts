@@ -213,6 +213,11 @@ export async function mpvSubtitleRenderingSettings(
 ): Promise<Record<string, string | number | boolean>> {
   console.debug("[subtitles] preparing mpv ASS rendering options", { resolution: rendering.resolution });
   try {
+    const currentVo = String(await mpv.getProperty("current-vo") ?? "");
+    if (currentVo !== "gpu-next") {
+      console.debug("[subtitles] independent ASS sampling requires gpu-next", { currentVo });
+      return {};
+    }
     await mpv.getProperty("ass-scale");
   } catch (error) {
     console.debug("[subtitles] independent ASS renderer options are unavailable in this libmpv", { error: String(error) });
