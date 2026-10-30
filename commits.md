@@ -1,3 +1,12 @@
+### `8824c1b` · 2026-10-30 · perf(thumbnails): prefer smallest viable source and bound captures
+- `CHANGELOG.md`
+- `FILE_INDEX.md`
+- `PHASES.md`
+- `docs/planning/V0_6_0.md`
+- `src-tauri/src/lib.rs`
+- `src/MediaPage.tsx`
+- `src/changelog.ts`
+
 ### `1dfaf69` · 2026-10-30 · docs: record Win10Lite installer acceptance
 - `FILE_INDEX.md`
 - `PHASES.md`
