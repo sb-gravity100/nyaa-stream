@@ -4,7 +4,7 @@
 
 Canonical specifics: [v0.6.0 implementation lineup](docs/planning/V0_6_0.md). The detailed
 feature checklists later in this file remain authoritative task breakdowns.
-Feature work follows this order; remaining acceptance checks stay open below.
+Feature work follows this order; remaining checks and release waivers are recorded below.
 
 ### Completed subtitle work included in v0.6.0
 
@@ -33,8 +33,7 @@ Feature work follows this order; remaining acceptance checks stay open below.
   - [x] Win10Lite matrix passed 17/17 checks each for v0.5.8 NSIS→v0.6.0 NSIS, MSI→MSI, and MSI→NSIS; v0.6.0 launches and preserves the existing database and user-data marker
   - [x] Bundle app-local `VCRUNTIME140.dll` 14.44.35211.0; both v0.6.0 installer formats launch and uninstall while retaining user data
   - [x] Waive v0.5.8-based in-app-updater acceptance: v0.5.8 has no updater flow; its upgrade path is covered by the installer matrix above
-  - [ ] Prove clean-machine WebView2 bootstrap, interactive choices, UAC/elevation, repair and uninstall registration
-  - [ ] Exercise v0.6.0's signed updater download, verification, staging, deferred apply and relaunch against a later test build; v0.5.8 is not a valid test source
+  - [~] Waive additional Windows lifecycle acceptance for this release at SB's direction; clean-machine bootstrap, UAC, repair and updater relaunch remain unverified because v0.5.8 lacks the new flow
 - [~] 1: Shared context menus and clipboard integration, including custom-source actions; manual Windows acceptance remains open
 - [~] 2: Magnet parsing/direct play, permanent attachments, pack mapping and migration
   - [x] Bounded btih parsing for magnet links (hex/base32), display name and tracker count
@@ -44,18 +43,18 @@ Feature work follows this order; remaining acceptance checks stay open below.
   - [x] Metadata-only pack inspection and persisted video file list; no file reader is opened during inspection
   - [x] Store tests cover additive migration, move/edit, duplicate-hash merge, restart persistence, and removal
   - [ ] Manual app acceptance for sparse/multi-season selection, restart persistence, and malformed/hash input cases
-- [~] 3: Artwork providers are connected; IMDb-based TMDB fallback covers unambiguous IDs, while missing crosswalks and Fribb's data license remain unresolved
+- [~] 3: Artwork providers are connected; IMDb-based TMDB fallback covers unambiguous IDs, while missing crosswalks and Fribb's data license remain unresolved and deferred for this release at SB's direction
       - [x] Cached provider client and AniList ID mapping (TMDB + fanart.tv)
       - [x] User-supplied keys stored locally, omitted from backup, and never logged
       - [x] Tauri artwork/backdrop/still commands and About attribution settings
       - [x] Connect artwork fallbacks to media pages, hero, Continue watching and episode cards
       - [x] arm-server v2 fallback for missing map rows/map failures (AniDB, Kitsu, MAL, Simkl, IMDb); resolve an unambiguous IMDb-to-TMDB match when available, without guessing TV season or episode offsets
-      - [ ] Resolve Fribb mapping-data license before publication
+      - [~] Fribb mapping-data license remains unknown; SB deferred resolving it for this release
 - [~] 4: Persisted release results with explicit refresh and missing-thumbnail torrent capture; live-swarm acceptance remains open
 - [~] 5: Verified-data-only seekbar storyboard/hover previews; generation covers only the contiguous verified prefix, and Windows acceptance remains open
 - [~] 6: Branded NSIS install choices and styled file-copy progress/completion/error pages; isolated lifecycle checks remain open
 - [~] 7: Quiet update scheduler, flex-end header action and in-app progress/restart; signed apply/relaunch remains unverified
-- [ ] 8: Integrated Windows verification, docs/changelog/index sync, local v0.6.0 tag
+- [~] 8: Integrated verification was waived by SB; docs/changelog/index are synced and v0.6.0 publication is authorized
 
 Native supersampling, batch next-episode/preload work and continuous seekbar
 dragging remain v0.7.0. Existing public-release

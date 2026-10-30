@@ -9,7 +9,7 @@ step when cutting a release.
 
 ## [Unreleased]
 
-## [0.6.0] - Unreleased
+## [0.6.0] - 2026-10-30
 
 ### Added
 - Flat, keyboard-accessible context menus for inputs, anime, episode/source rows and the player, including custom-source actions.
