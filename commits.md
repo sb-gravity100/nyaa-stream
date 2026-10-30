@@ -1,3 +1,7 @@
+### `113bd01` · 2026-10-31 · fix: gate ASS sampling controls to gpu-next
+- `src/SettingsPanel.tsx`
+- `src/subtitles.ts`
+
 ### `8b4ba90` · 2026-10-31 · fix: scope ASS render controls to video outputs
 - `src/PlayerView.tsx`
 - `src/SettingsPanel.tsx`
