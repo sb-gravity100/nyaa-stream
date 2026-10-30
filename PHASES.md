@@ -845,8 +845,10 @@ policy remains unchanged.
             restart UI with truthful progress, retry and playback deferral
       - [x] Preserve updater signatures, What's new marker and current install
             on preparation failure; keep background checks non-installing
-      - [ ] Audit Windows/Tauri installation lifecycle; stage inside the app,
-            apply through a silent helper/backend at shutdown, then relaunch
+      - [x] Static lifecycle audit: verified updater bytes hand off to Tauri's
+            unattended passive installer (`/P /UPDATE`) with relaunch enabled
+      - [ ] Isolated runtime proof for staging, UAC/elevation, install migration,
+            and successful relaunch into the updated version
       - [x] Save resume buffer before controlled restart; wait for playback
             teardown and keep restart disabled during playback
       - [~] Add a bespoke branded NSIS template and install-choice page; NSIS
