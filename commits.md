@@ -1,3 +1,13 @@
+### `f68d0c8` · 2026-10-31 · build: lock native libmpv dependency sources
+- `scripts/prepare-mpv.py`
+- `native/mpv/sources.lock.json`
+- `native/mpv/wraps/`
+- `native/mpv/patches/x264-clang-cl.patch`
+- `docs/planning/MPV_BUILD.md`
+- `PLAN.md`
+- `PHASES.md`
+- `FILE_INDEX.md`
+
 ### `2ece7c2` · 2026-10-31 · build: lock custom libmpv core sources
 - `scripts/prepare-mpv.py`
 - `native/mpv/sources.lock.json`
