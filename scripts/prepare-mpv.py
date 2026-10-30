@@ -1,5 +1,6 @@
 """Prepare isolated native libmpv build tools; does not build or install libmpv."""
 
+import argparse
 import hashlib
 import json
 import logging
@@ -126,10 +127,35 @@ def compiler_environment():
     return environment
 
 
-def main():
-    LOG.info("Starting isolated libmpv tool preparation")
+def fetch_sources():
+    LOG.info("Starting locked source preparation; compilation is disabled in this mode")
+    lock_path = REPO / "native/mpv/sources.lock.json"
+    lock = json.loads(lock_path.read_text(encoding="utf-8"))
+    if lock["schema"] != 1:
+        raise RuntimeError("Unsupported source lock schema")
+    directories = {}
+    for name, entry in lock["packages"].items():
+        LOG.info("Preparing source %s at %s", name, entry["commit"])
+        archive = fetch(entry)
+        directories[name] = str(unpack(archive, ROOT / "sources", entry["directory"]))
+    manifest = {"source_lock_sha256": digest(lock_path), "directories": directories,
+                "transitive_lock_complete": lock["transitive_lock_complete"],
+                "pending": lock["pending"]}
+    (ROOT / "sources-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    if lock["transitive_lock_complete"]:
+        LOG.info("Locked sources prepared; no compilation performed")
+    else:
+        LOG.warning("Core sources prepared; %s transitive lock items still pending", len(lock["pending"]))
+
+
+def main(sources_only=False):
+    LOG.info("Starting isolated libmpv preparation; sources_only=%s", sources_only)
     if os.name != "nt":
         raise RuntimeError("Native Windows tool setup requires Windows")
+    if sources_only:
+        LOG.info("Selecting source-only mode")
+        fetch_sources()
+        return
     lock = json.loads((REPO / "native/mpv/tools.lock.json").read_text(encoding="utf-8"))
     if lock["schema"] != 1:
         raise RuntimeError("Unsupported tools lock schema")
@@ -185,8 +211,11 @@ if __name__ == "__main__":
     (ROOT / "logs").mkdir(parents=True, exist_ok=True)
     logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(levelname)s %(message)s",
                         handlers=[logging.StreamHandler(), logging.FileHandler(ROOT / "logs/prepare-tools.log", encoding="utf-8")])
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--sources-only", action="store_true", help="fetch locked source archives without compiling")
+    arguments = parser.parse_args()
     try:
-        main()
+        main(sources_only=arguments.sources_only)
     except Exception:
         LOG.exception("Tool preparation failed")
         sys.exit(1)

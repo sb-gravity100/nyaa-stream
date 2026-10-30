@@ -87,6 +87,9 @@ override this order.
 - [x] Prepare isolated Meson/NASM/pkgconf with `scripts/prepare-mpv.py` and
       `native/mpv/tools.lock.json`; native LLVM pkgconf build and tool versions verified
 - [x] SB approved FFmpeg 8.0.3, libass 0.17.5, libplacebo 7.387.0 and dav1d 1.5.3
+- [x] SB approved LuaJIT scripting and x264 software H.264 export
+- [x] Lock/fetch the five core source commits with archive SHA-256;
+      `scripts/prepare-mpv.py --sources-only` verifies and extracts them
 - [ ] Resolve the complete source/archive lock; SB selected separate FFmpeg
       builds and authorized source locking
 - [ ] Improve batch next-episode transitions by reusing torrent/file metadata and

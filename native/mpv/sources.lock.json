@@ -1,0 +1,64 @@
+{
+  "schema": 1,
+  "transitive_lock_complete": false,
+  "identity_source": "Upstream release tags resolved with git ls-remote; archive SHA-256 recorded from HTTPS downloads of those exact commits",
+  "packages": {
+    "mpv": {
+      "ref": "v0.41.0",
+      "commit": "41f6a645068483470267271e1d09966ca3b9f413",
+      "repository": "https://github.com/mpv-player/mpv.git",
+      "file": "mpv-41f6a645068483470267271e1d09966ca3b9f413.zip",
+      "directory": "mpv-41f6a645068483470267271e1d09966ca3b9f413",
+      "url": "https://codeload.github.com/mpv-player/mpv/zip/41f6a645068483470267271e1d09966ca3b9f413",
+      "sha256": "56116d55aab308c0f1c6d7e48a2e8a34ff50f516f7f06ec863e1eef82a5b6ccc"
+    },
+    "ffmpeg": {
+      "ref": "n8.0.3",
+      "commit": "8ae0b34901ba60a802f183ee75a250a9fc3e09a5",
+      "repository": "https://github.com/FFmpeg/FFmpeg.git",
+      "file": "ffmpeg-8ae0b34901ba60a802f183ee75a250a9fc3e09a5.zip",
+      "directory": "FFmpeg-8ae0b34901ba60a802f183ee75a250a9fc3e09a5",
+      "url": "https://codeload.github.com/FFmpeg/FFmpeg/zip/8ae0b34901ba60a802f183ee75a250a9fc3e09a5",
+      "sha256": "3e3aefdecc50088effd29d33ae19607f42b333bdfefcae438efa817cf30c2fac"
+    },
+    "libass": {
+      "ref": "0.17.5",
+      "commit": "4a05d8127f525943ebf45fdc6497c9e665947f0d",
+      "repository": "https://github.com/libass/libass.git",
+      "file": "libass-4a05d8127f525943ebf45fdc6497c9e665947f0d.zip",
+      "directory": "libass-4a05d8127f525943ebf45fdc6497c9e665947f0d",
+      "url": "https://codeload.github.com/libass/libass/zip/4a05d8127f525943ebf45fdc6497c9e665947f0d",
+      "sha256": "8fcae6d8cf274372f25e71e755f3d35763e9255aebb150bbcb0bcee7f267fe29"
+    },
+    "libplacebo": {
+      "ref": "v7.387.0",
+      "commit": "275f7dea27924cdd34ab2e6c20e448b6bc4fab65",
+      "repository": "https://github.com/haasn/libplacebo.git",
+      "file": "libplacebo-275f7dea27924cdd34ab2e6c20e448b6bc4fab65.zip",
+      "directory": "libplacebo-275f7dea27924cdd34ab2e6c20e448b6bc4fab65",
+      "url": "https://codeload.github.com/haasn/libplacebo/zip/275f7dea27924cdd34ab2e6c20e448b6bc4fab65",
+      "sha256": "4cf86d1d08a9d537b4ddaafff37a4e1f46c6b9a26c45350594d6147a02724558"
+    },
+    "dav1d": {
+      "ref": "1.5.3",
+      "commit": "b546257f770768b2c88258c533da38b91a06f737",
+      "repository": "https://github.com/videolan/dav1d.git",
+      "file": "dav1d-b546257f770768b2c88258c533da38b91a06f737.zip",
+      "directory": "dav1d-b546257f770768b2c88258c533da38b91a06f737",
+      "url": "https://codeload.github.com/videolan/dav1d/zip/b546257f770768b2c88258c533da38b91a06f737",
+      "sha256": "9b5d9f397069856bf6384e2a964009c837291fb83b1c764b83be8193ea9574a4"
+    }
+  },
+  "pending": [
+    "Approved LuaJIT: source and build-definition revisions",
+    "Approved x264: source and native build-definition revisions",
+    "Font shaping, rasterization, bidi and line breaking",
+    "Character encoding detection and conversion",
+    "Compression and screenshot/image libraries",
+    "LCMS2 and any hashing/math helper dependencies",
+    "Shader compiler, SPIR-V tools, headers and conversion",
+    "Vulkan headers/loader and vendored graphics sources",
+    "NVIDIA codec headers, AMD AMF and Intel QSV dispatcher",
+    "All submodule revisions, build definitions and patches"
+  ]
+}

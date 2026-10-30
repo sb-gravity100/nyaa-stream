@@ -10,7 +10,12 @@ setup/source locking. SB also approved the four core dependency versions below.
 The v0.7.0 setup implementation `scripts/prepare-mpv.py` bootstraps
 isolated tools from `native/mpv/tools.lock.json`, records local tool identity,
 and leaves all downloads/build output under `target/mpv-build/`. The source
-lock is resolved separately after version approval, before compilation.
+lock is recorded separately in `native/mpv/sources.lock.json`, before compilation.
+The first pass locks/fetches the five approved core projects; it remains marked
+incomplete until every transitive dependency, vendored source and patch is pinned.
+`scripts/prepare-mpv.py --sources-only` fetches locked source archives without
+compiling them. SB approved LuaJIT and x264; their exact source/build-definition
+revisions remain part of the transitive lock work.
 
 ## Build layout and toolchain
 
@@ -74,7 +79,7 @@ Docker, MinGW binaries or a prebuilt full-featured DLL if it fails.
 ## Configuration policy
 
 - mpv: `libmpv=true`, `cplayer=false`, `buildtype=release`, `build-date=false`,
-  `gpl=true`; shared mpv with static dependencies. Retain Lua (proposed LuaJIT).
+  `gpl=true`; shared mpv with static dependencies. Retain Lua through approved LuaJIT.
 - Disable `javascript`, `cplugins`, `cdda`, `dvdnav`, `libbluray`, `dvbin`,
   `libavdevice`, `vapoursynth`, `sdl2-gamepad` and `libarchive`.
 - Preserve WASAPI, D3D11, applicable Windows hardware decoding and GPU/OpenGL/
@@ -83,7 +88,7 @@ Docker, MinGW binaries or a prebuilt full-featured DLL if it fails.
   decoders, and AAC, AC-3, E-AC-3, FLAC and Opus audio decoders. Retain subtitle
   and image support needed by the app; do not confuse these with extra requested
   media codecs. Prefer dav1d rather than building redundant AV1 software libraries.
-- Export: retain native AAC, software H.264 (proposed x264) and H.264 NVENC,
+- Export: retain native AAC, software H.264 through approved x264 and H.264 NVENC,
   QSV and AMF, with required driver APIs/headers. Keep MP4 muxing and PNG/JPEG
   screenshot output. Validate required bitstream filters, parsers and conversion
   paths, including the app's `vf=format=yuv420p` export option.
