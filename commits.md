@@ -1,3 +1,8 @@
+### `e28cfc6` · 2026-10-30 · docs(release): record v0.6.0 publication
+- `FILE_INDEX.md`
+- `PHASES.md`
+- `PLAN.md`
+
 ### `06f23ff` · 2026-10-30 · chore: release v0.6.0
 - `CHANGELOG.md`
 - `PHASES.md`
