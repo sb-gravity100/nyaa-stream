@@ -5,6 +5,12 @@ Current version order and scope: [PLAN.md](../../PLAN.md). Detailed task status:
 
 ## v0.7.0 player, memory and playback work
 
+Execution priority set by SB on 2026-10-31: complete the custom Windows
+libmpv build and its playback acceptance first. Begin with the existing DLL
+baseline and dependency audit, then prove a reproducible candidate build before
+optimizing subtitles, seeking or stream delivery. Memory work, batch
+transitions, preload timing and seek dragging follow.
+
 Native subtitle supersampling remains deferred to this milestone by SB.
 Render subtitle masks at bounded 1.5x resolution and downsample before
 composition; preserve authored layout/animation and video resolution. Verify

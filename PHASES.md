@@ -72,6 +72,12 @@ policy remains unchanged.
 - [x] Publish all implemented pre-v0.6.0 work as v0.5.8: signed NSIS/MSI installers and updater manifest
 
 ## v0.7.0 — custom Windows libmpv build (planned 2026-10-29)
+Execution priority set by SB on 2026-10-31: custom libmpv first. Start with
+the current DLL baseline and API/dependency audit, prove a reproducible x64
+build, then measure and integrate it. Native subtitle supersampling follows
+the build baseline; memory, batch transitions, preload timing and seek dragging
+follow libmpv acceptance. The checklist below groups related work and does not
+override this order.
 - [ ] Improve batch next-episode transitions by reusing torrent/file metadata and
       verified data; preserve season-aware file selection and source fallback
 - [ ] Measure next-episode click/autoplay to first frame on cached, partial,
