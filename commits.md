@@ -1,3 +1,15 @@
+### `d881960` · 2026-10-30 · feat(artwork): select seasonal Fanart logos
+- `CHANGELOG.md`
+- `FILE_INDEX.md`
+- `PHASES.md`
+- `PLAN.md`
+- `crates/artwork-client/src/lib.rs`
+- `docs/planning/V0_6_0.md`
+- `src-tauri/src/artwork.rs`
+- `src/App.tsx`
+- `src/artwork.ts`
+- `src/changelog.ts`
+
 ### `8c82438` · 2026-10-30 · fix(home): prefer Fanart hero backgrounds
 - `CHANGELOG.md`
 - `FILE_INDEX.md`
