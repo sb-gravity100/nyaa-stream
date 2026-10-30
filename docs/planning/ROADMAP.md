@@ -36,8 +36,9 @@ Custom-build scope approved by SB on 2026-10-31:
 - Trim encoders and output containers to the H.264/AAC MP4 clip-export and
   screenshot paths after dependency checks. Input containers are a separate
   decision; this approval does not limit them to the output-container list.
-- Use a native Windows LLVM build, approved by SB; exact dependency revisions,
-  setup commands and remaining optional-component cuts await review.
+- Use mpv v0.41.0 stable and a native Windows LLVM build, approved by SB.
+  The agreed trimming scope is frozen; dependency locks and setup commands
+  are reviewed through [the native build recipe](MPV_BUILD.md).
 - Baseline x64 applies to this DLL. The existing Rust/HLS build still targets
   x86-64-v3; changing the whole app's CPU requirement is outside this build scope.
 

@@ -81,6 +81,10 @@ override this order.
 - [x] Agree custom-DLL scope with SB: baseline x64, Lua, selected video/audio
       codecs, HDR/tone mapping, broad GPU support and software/hardware clip
       encoding; remove unused integrations (ROADMAP.md records the exact scope)
+- [x] SB approved mpv v0.41.0 stable and freezing the agreed trimming scope
+- [~] Prepare native LLVM build recipe (docs/planning/MPV_BUILD.md); core
+      versions proposed, complete source lock and setup approval remain open
+- [ ] Prepare isolated tools and resolve source/archive hashes after SB review
 - [ ] Improve batch next-episode transitions by reusing torrent/file metadata and
       verified data; preserve season-aware file selection and source fallback
 - [ ] Measure next-episode click/autoplay to first frame on cached, partial,
