@@ -788,7 +788,7 @@ policy remains unchanged.
             candidates; never 0 seeders
       - [x] Quick midpoint capture through sbtl's range stream: 8s peer gate,
             25s per-frame cap, and transfer-byte/peer diagnostics
-      - [x] Capture queue (pause while playing, cancel; concurrency capped at five)
+      - [x] Capture queue (pause while playing, cancel; ten refillable workers)
       - [x] Episodes header button with count/progress/failed state,
             spinner on rows being captured
       - [ ] Verify live on a show with no Kitsu/AniList thumbnails

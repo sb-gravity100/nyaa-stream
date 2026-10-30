@@ -504,7 +504,7 @@ export function MediaPage({
     const completed = new Set<number>();
     const activeEpisodes = new Set<number>();
     const updateBuildProgress = () => setThumbnailBuild({ current: completed.size, total: episodes.length, episodes: [...activeEpisodes], failed: 0, noSeed: 0 });
-    const maxParallelBatches = 5;
+    const maxParallelBatches = 10;
     const maxCandidates = Math.max(0, ...plans.map((plan) => plan.candidates.length));
     for (let rank = 0; rank < maxCandidates && !thumbnailCancelRef.current; rank++) {
       const groups = new Map<string, { requests: { cacheKey: string; fileIdx: number; durationMinutes: number | null }[]; episodes: number[] }>();
@@ -518,10 +518,12 @@ export function MediaPage({
         groups.set(candidate.release.magnet, group);
       }
       const batches = [...groups.entries()];
-      for (let start = 0; start < batches.length && !thumbnailCancelRef.current; start += maxParallelBatches) {
-        const wave = batches.slice(start, start + maxParallelBatches);
-        await Promise.all(wave.map(async ([magnet, group]) => {
-          if (thumbnailCancelRef.current) return;
+      let nextBatchIndex = 0;
+      const runNextBatch = async () => {
+        while (!thumbnailCancelRef.current) {
+          const batch = batches[nextBatchIndex++];
+          if (!batch) return;
+          const [magnet, group] = batch;
           group.episodes.forEach((episode) => activeEpisodes.add(episode));
           updateBuildProgress();
           try {
@@ -546,8 +548,9 @@ export function MediaPage({
             group.episodes.forEach((episode) => activeEpisodes.delete(episode));
             updateBuildProgress();
           }
-        }));
-      }
+        }
+      };
+      await Promise.all(Array.from({ length: Math.min(maxParallelBatches, batches.length) }, () => runNextBatch()));
     }
     let failed = 0;
     if (!thumbnailCancelRef.current) {

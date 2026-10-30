@@ -49,7 +49,7 @@ struct AppState {
     franchise_cache: franchise_cache::FranchiseCache,
     /// Set after AniList turns us away - see `metadata_fallback`.
     anilist_cooldown: metadata_fallback::AniListCooldown,
-    /// Bound scratch torrent capture commands to five concurrent commands.
+    /// Bound scratch torrent capture commands to ten concurrent commands.
     thumbnail_captures: tokio::sync::Semaphore,
     /// Bound actual FFmpeg frame extractions across all active batches.
     thumbnail_frame_captures: tokio::sync::Semaphore,
@@ -480,7 +480,7 @@ const THUMBNAIL_PEER_TIMEOUT: Duration = Duration::from_secs(8);
 /// Upper bound on one FFmpeg midpoint seek and frame extraction. The separate peer
 /// connection gate is shorter; a slow source should not stall the build queue.
 const THUMBNAIL_CAPTURE_TIMEOUT: Duration = Duration::from_secs(25);
-const THUMBNAIL_CAPTURE_CONCURRENCY: usize = 5;
+const THUMBNAIL_CAPTURE_CONCURRENCY: usize = 10;
 const THUMBNAIL_POLL_INTERVAL: Duration = Duration::from_millis(250);
 
 /// Last-resort thumbnail source, used only when Kitsu and AniList both have
