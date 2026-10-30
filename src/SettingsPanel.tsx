@@ -4,7 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { open as pickFolder, open as pickFile } from "@tauri-apps/plugin-dialog";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import type { JSX } from "preact";
-import { DEFAULT_SUBTITLE_STYLE, resetSettings, updateSettings, useSettings, type PreferredResolution, type SubtitleStyle } from "./settings";
+import { DEFAULT_MPV_SUBTITLE_RENDERING, DEFAULT_SUBTITLE_STYLE, resetSettings, updateSettings, useSettings, type PreferredResolution, type SubtitleStyle } from "./settings";
 import { CloseIcon } from "./icons";
 import { exportBackup, importBackup } from "./backup";
 import { applyPreparedUpdate, checkForUpdate, getUpdateState, prepareUpdate, subscribeUpdateState, type UpdateState } from "./updater";
@@ -727,6 +727,7 @@ function ArtworkProviderSection() {
 export function SettingsPanel({ onClose, playbackActive = false, showUpdates = false }: Props) {
   const settings = useSettings();
   const style = settings.subtitleStyle;
+  const rendering = settings.subtitleRendering;
   const panelRef = useRef<HTMLDivElement>(null);
   const [popularFansubbers, setPopularFansubbers] = useState<string[]>([]);
   const [defaultScreenshotFolder, setDefaultScreenshotFolder] = useState("");
@@ -936,6 +937,58 @@ yaa-stream screenshots.">
                 <p class="settings-hint">Unchecked fields keep the track's original style. Inline positioning, colors and animation can still take precedence.</p>
               </>
             )}
+            <div class="setting-subsection">
+              <h4>Embedded mpv ASS rendering</h4>
+              <p class="settings-hint">These controls independently scale and smooth ASS subtitle edges. The HLS fallback keeps its existing 1.5× subtitle rendering.</p>
+              <Row label="Render resolution" hint="Video resolution scales subtitles with the picture. Window resolution renders subtitles at the window size.">
+                <select
+                  value={rendering.resolution}
+                  onChange={(event) => updateSettings({ subtitleRendering: { ...rendering, resolution: (event.currentTarget as HTMLSelectElement).value as typeof rendering.resolution } })}
+                >
+                  <option value="video">Scale with video</option>
+                  <option value="window">Window resolution</option>
+                </select>
+              </Row>
+              <Row label="ASS upscaler">
+                <select
+                  value={rendering.upscale}
+                  onChange={(event) => updateSettings({ subtitleRendering: { ...rendering, upscale: (event.currentTarget as HTMLSelectElement).value as typeof rendering.upscale } })}
+                >
+                  <option value="ewa_lanczos">EWA Lanczos</option>
+                  <option value="bicubic">Bicubic</option>
+                </select>
+              </Row>
+              <Row label="ASS downscaler">
+                <select
+                  value={rendering.downscale}
+                  onChange={(event) => updateSettings({ subtitleRendering: { ...rendering, downscale: (event.currentTarget as HTMLSelectElement).value as typeof rendering.downscale } })}
+                >
+                  <option value="mitchell">Mitchell</option>
+                  <option value="bicubic">Bicubic</option>
+                </select>
+              </Row>
+              <Toggle
+                label="Antialias video-scaled ASS edges"
+                checked={rendering.videoAntialias}
+                onChange={(value) => updateSettings({ subtitleRendering: { ...rendering, videoAntialias: value } })}
+              />
+              <Row label={`Video-scaled ASS blur (${rendering.videoBlur.toFixed(1)})`}>
+                <input type="range" min={0} max={2} step={0.1} value={rendering.videoBlur} onInput={(event) => updateSettings({ subtitleRendering: { ...rendering, videoBlur: Number((event.currentTarget as HTMLInputElement).value) } })} />
+              </Row>
+              <Toggle
+                label="Antialias window-resolution ASS edges"
+                checked={rendering.windowAntialias}
+                onChange={(value) => updateSettings({ subtitleRendering: { ...rendering, windowAntialias: value } })}
+              />
+              <Row label={`Window-resolution ASS blur (${rendering.windowBlur.toFixed(1)})`}>
+                <input type="range" min={0} max={2} step={0.1} value={rendering.windowBlur} onInput={(event) => updateSettings({ subtitleRendering: { ...rendering, windowBlur: Number((event.currentTarget as HTMLInputElement).value) } })} />
+              </Row>
+              <div class="settings-inline-actions">
+                <button class="link-button" onClick={() => updateSettings({ subtitleRendering: DEFAULT_MPV_SUBTITLE_RENDERING })}>
+                  Reset ASS rendering
+                </button>
+              </div>
+            </div>
             <div class="settings-inline-actions">
               <button class="link-button" onClick={() => updateSettings({ subtitleStyle: DEFAULT_SUBTITLE_STYLE })}>
                 Reset subtitle style

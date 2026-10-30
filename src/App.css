@@ -1768,6 +1768,19 @@ html.mpv-active .titlebar {
   box-shadow: 0 0 10px var(--accent);
 }
 
+.setting-subsection {
+  margin-top: 18px;
+  padding-top: 12px;
+  border-top: 1px solid var(--glass-rim);
+}
+
+.setting-subsection h4 {
+  margin: 0 0 6px;
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
 .setting-row {
   display: flex;
   align-items: center;

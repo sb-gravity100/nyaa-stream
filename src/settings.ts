@@ -37,10 +37,36 @@ export interface SubtitleStyle {
   assOverrideMargin: boolean;
 }
 
+export type SubtitleUpscaler = "ewa_lanczos" | "bicubic";
+export type SubtitleDownscaler = "mitchell" | "bicubic";
+
+/** Embedded mpv's ASS-only overlay sampling. HLS keeps its JASSUB renderer. */
+export interface MpvSubtitleRendering {
+  /** Scale the ASS raster with the video or render it at window resolution. */
+  resolution: "video" | "window";
+  upscale: SubtitleUpscaler;
+  downscale: SubtitleDownscaler;
+  videoAntialias: boolean;
+  videoBlur: number;
+  windowAntialias: boolean;
+  windowBlur: number;
+}
+
+export const DEFAULT_MPV_SUBTITLE_RENDERING: MpvSubtitleRendering = {
+  resolution: "window",
+  upscale: "ewa_lanczos",
+  downscale: "mitchell",
+  videoAntialias: true,
+  videoBlur: 1.6,
+  windowAntialias: true,
+  windowBlur: 1.12,
+};
+
 export type PreferredResolution = "any" | "2160" | "1080" | "720" | "480";
 
 export interface Settings {
   subtitleStyle: SubtitleStyle;
+  subtitleRendering: MpvSubtitleRendering;
   subtitlesEnabled: boolean;
   /** ISO 639 prefix matched against track language tags (e.g. "en"). */
   subtitleLanguage: string;
@@ -101,6 +127,7 @@ const SUBTITLE_STYLE_VERSION = 2;
 
 export const DEFAULT_SETTINGS: Settings = {
   subtitleStyle: DEFAULT_SUBTITLE_STYLE,
+  subtitleRendering: DEFAULT_MPV_SUBTITLE_RENDERING,
   subtitlesEnabled: true,
   subtitleLanguage: "en",
   preferredResolution: "1080",
@@ -129,6 +156,7 @@ function load(): Settings {
       ...DEFAULT_SETTINGS,
       ...parsed,
       subtitleStyle: styleCurrent ? { ...DEFAULT_SUBTITLE_STYLE, ...(parsed.subtitleStyle ?? {}) } : DEFAULT_SUBTITLE_STYLE,
+      subtitleRendering: { ...DEFAULT_MPV_SUBTITLE_RENDERING, ...(parsed.subtitleRendering ?? {}) },
     };
   } catch (err) {
     console.error("[settings] failed to read from localStorage", { err });

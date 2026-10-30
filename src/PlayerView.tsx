@@ -19,7 +19,7 @@ import { labelOf } from "./episodeParser";
 import { Buffering } from "./Buffering";
 import { StatisticsMenu } from "./StatisticsMenu";
 import { getSettings as getSettingsSnapshot, useSettings } from "./settings";
-import { applyMpvSubtitleStyle, mpvSubtitleSettings, defaultSubtitleIndex, isStyledTrack, subtitleTrackLabel } from "./subtitles";
+import { applyMpvSubtitleStyle, mpvSubtitleRenderingSettings, mpvSubtitleSettings, defaultSubtitleIndex, isStyledTrack, subtitleTrackLabel } from "./subtitles";
 import { COMPLETED_FRACTION, MIN_RESUME_SECONDS, getProgress, resumePosition, saveProgress } from "./watchProgress";
 import { PlayerPlaylist, type PlaylistItem } from "./PlayerPlaylist";
 import { copyToClipboard, openContextMenu, openNyaaPage } from "./contextMenuStore";
@@ -811,8 +811,8 @@ function MpvPlayerView({
    // so it re-runs when the header arrives (`subtitleHeaderSeq`).
    useEffect(() => {
       if (!videoEl) return;
-      void applyMpvSubtitleStyle(videoEl, settings.subtitleStyle, activeSubtitle ? isStyledTrack(activeSubtitle) : false);
-   }, [videoEl, settings.subtitleStyle, activeSubtitle?.index, subtitleHeaderSeq]);
+      void applyMpvSubtitleStyle(videoEl, settings.subtitleStyle, activeSubtitle ? isStyledTrack(activeSubtitle) : false, settings.subtitleRendering);
+   }, [videoEl, settings.subtitleStyle, settings.subtitleRendering, activeSubtitle?.index, subtitleHeaderSeq]);
 
    // mpv reports real file time and the file's own exact duration.
    const episodeTime = position;
@@ -1325,7 +1325,10 @@ function MpvPlayerView({
       const burnSubs = request.includeSubs && activeSubtitle != null && videoEl != null;
       console.info("[player] exporting clip", { start: request.start, end: request.end, folder: request.folder || "(default)", subs: burnSubs });
       try {
-         const subtitleSettings = burnSubs ? await mpvSubtitleSettings(videoEl, settings.subtitleStyle, isStyledTrack(activeSubtitle)) : null;
+         const subtitleSettings = burnSubs ? {
+            ...await mpvSubtitleSettings(videoEl, settings.subtitleStyle, isStyledTrack(activeSubtitle)),
+            ...await mpvSubtitleRenderingSettings(videoEl, settings.subtitleRendering),
+         } : null;
          const out = await invoke<string>("export_clip", {
             torrentId,
             fileIdx: selectedFile.index,

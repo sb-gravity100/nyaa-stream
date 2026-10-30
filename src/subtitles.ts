@@ -1,5 +1,5 @@
 import type { SubtitleTrack } from "./types";
-import type { SubtitleStyle } from "./settings";
+import type { MpvSubtitleRendering, SubtitleStyle } from "./settings";
 
 /** Codecs that carry their own real styling - everything else reaches us
  * as ffmpeg-converted ASS with a single generic `Default` style. */
@@ -206,9 +206,39 @@ export async function mpvSubtitleSettings(
   return settings;
 }
 
+/** Translates Settings preferences to the custom embedded mpv VO options. */
+export async function mpvSubtitleRenderingSettings(
+  mpv: MpvSubtitleTarget,
+  rendering: MpvSubtitleRendering,
+): Promise<Record<string, string | number | boolean>> {
+  console.debug("[subtitles] preparing mpv ASS rendering options", { resolution: rendering.resolution });
+  try {
+    await mpv.getProperty("ass-scale");
+  } catch (error) {
+    console.debug("[subtitles] independent ASS renderer options are unavailable in this libmpv", { error: String(error) });
+    return {};
+  }
+  return {
+    "sub-ass-scale-with-window": rendering.resolution === "window",
+    "ass-autoscaling": rendering.resolution === "window",
+    "ass-scale": rendering.upscale,
+    "ass-dscale": rendering.downscale,
+    "ass-aa": rendering.videoAntialias,
+    "ass-blur": rendering.videoBlur,
+    "wns-ass-aa": rendering.windowAntialias,
+    "wns-ass-blur": rendering.windowBlur,
+  };
+}
+
 /** Applies the user's default subtitle style to the playing mpv. */
-export async function applyMpvSubtitleStyle(mpv: MpvSubtitleTarget, style: SubtitleStyle, styled: boolean): Promise<void> {
+export async function applyMpvSubtitleStyle(
+  mpv: MpvSubtitleTarget,
+  style: SubtitleStyle,
+  styled: boolean,
+  rendering: MpvSubtitleRendering,
+): Promise<void> {
   console.debug("[subtitles] applying mpv style", { styled });
   const settings = await mpvSubtitleSettings(mpv, style, styled);
-  await Promise.all(Object.entries(settings).map(([name, value]) => mpv.setProperty(name, value)));
+  const renderingSettings = await mpvSubtitleRenderingSettings(mpv, rendering);
+  await Promise.all(Object.entries({ ...settings, ...renderingSettings }).map(([name, value]) => mpv.setProperty(name, value)));
 }
