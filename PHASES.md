@@ -30,6 +30,8 @@ Feature work follows this order; remaining acceptance checks stay open below.
 - [ ] 0: Prove installer/updater backend, clean-machine bootstrap, signed
       artifact, silent upgrade, old-install migration and restart lifecycle
   - [x] Current code built into signed local NSIS and MSI installers with updater signatures; no artifacts uploaded
+  - [x] Win10Lite NSIS run proved v0.5.8 install, v0.6.0 passive upgrade/version, marker retention, WebView2 detection, uninstall and user-data retention
+  - [ ] Fix the discovered `sbtl.dll` → `VCRUNTIME140.dll` launch failure with an app-local redistributable, then repeat launch acceptance
   - [ ] Isolated fresh install, upgrade, migration, WebView2, uninstall and signed updater/relaunch checks
 - [~] 1: Shared context menus and clipboard integration, including custom-source actions; manual Windows acceptance remains open
 - [~] 2: Magnet parsing/direct play, permanent attachments, pack mapping and migration

@@ -29,6 +29,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       "HLS subtitles render with bounded supersampling to reduce rough text edges without blurring the video.",
       "Updating saves the playback resume buffer and waits for torrent teardown before starting the installer.",
       "Artwork provider credentials are kept out of exported and imported backups.",
+      "Windows installs include the MSVC runtime required by the native torrent bridge.",
     ],
   },
   {

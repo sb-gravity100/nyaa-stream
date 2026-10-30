@@ -16,7 +16,7 @@ sbtl torrent streaming, embedded libmpv playback and an HLS fallback.
 | Version | Scope | State |
 |---|---|---|
 | v0.5.8 | Implemented pre-v0.6.0 work | Published |
-| v0.6.0 | Subtitle styling/smoothing plus context menus, custom magnets, artwork, thumbnails, seek previews, updates and bespoke installer | Feature code is integrated; Windows lifecycle, live acceptance, Fribb data licensing and final release checks remain open |
+| v0.6.0 | Subtitle styling/smoothing plus context menus, custom magnets, artwork, thumbnails, seek previews, updates and bespoke installer | Feature code is integrated; Windows lifecycle, native runtime deployment, live acceptance, Fribb data licensing and final release checks remain open |
 | v0.7.0 | Custom libmpv, native subtitle supersampling, memory profiling, batch transitions, preload timing and continuous seek dragging | Planned |
 | v0.8.0 | Navigation/Home rehaul and Discover | Planned |
 | v1.0.0 | Stabilization and 32-bit Windows | Planned |
@@ -44,7 +44,10 @@ still owns progress and completion. The in-app quiet checker, staged download,
 resume-buffer save and teardown wait are implemented. A local signed NSIS
 artifact was generated, but its install/update lifecycle remains unverified;
 keep passive updater mode until isolated Windows checks establish elevation,
-existing MSI/NSIS migration, WebView2 bootstrap and relaunch behavior. See
+existing MSI/NSIS migration, WebView2 bootstrap, native runtime availability
+and relaunch behavior. A VM launch exposed `sbtl.dll`'s `VCRUNTIME140.dll`
+dependency; bundle the licensed app-local runtime beside the executable and
+retest launch in both installer paths. See
 `docs/prototypes/installer/FEASIBILITY.md`. The selected update schedule is
 30 seconds after readiness, then every six hours, with 15-minute to 6-hour
 failure backoff. First install defaults to `%LOCALAPPDATA%/Programs/nyaa-stream`,

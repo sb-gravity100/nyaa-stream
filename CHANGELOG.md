@@ -19,6 +19,7 @@ step when cutting a release.
 - Seek-bar frame previews generated only from verified local torrent data.
 - Quiet update checks, in-app download/verification progress, deferred restart and branded NSIS install-choice and progress pages.
 - Interactive upgrades retain the user's existing Start Menu and desktop shortcut choices.
+- The Windows installers include the MSVC runtime required by the native torrent bridge.
 
 ### Removed
 - Experimental ML training/scoring tools, debugger predictions and unused dataset-mapper training. Rule-based matching and existing dataset compatibility are retained.
