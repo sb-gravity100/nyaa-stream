@@ -1,3 +1,6 @@
+### `b482144` · 2026-10-30 · fix(dev): anchor logs to project folder
+- `src-tauri/src/lib.rs`
+
 ### `c326463` · 2026-10-30 · fix(dev): write debug logs under logs folder
 - `FILE_INDEX.md`
 - `README.md`
