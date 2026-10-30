@@ -189,9 +189,27 @@ def fetch_sources():
         directories.update(fetch_wrap_sources(lock["wraps"]))
     for patch in lock.get("patches", []):
         LOG.info("Verifying locked native build patch: %s", patch["file"])
-        payload = (REPO / patch["file"]).read_bytes().replace(b"\r\n", b"\n")
+        patch_file = REPO / patch["file"]
+        payload = patch_file.read_bytes().replace(b"\r\n", b"\n")
         if hashlib.sha256(payload).hexdigest() != patch["sha256_lf"]:
             raise RuntimeError("Native build patch checksum mismatch")
+        target = patch.get("apply_to")
+        if target:
+            source_dir = Path(directories[target]).relative_to(REPO)
+            base = ["git", "-C", REPO, "apply", "--directory", source_dir, "-p1"]
+            check = subprocess.run(base + ["--check", patch_file], stdout=subprocess.PIPE,
+                                   stderr=subprocess.PIPE, text=True)
+            if check.returncode == 0:
+                run(base + [patch_file])
+                LOG.info("Applied locked patch to %s", target)
+            else:
+                reverse = subprocess.run(base + ["--reverse", "--check", patch_file],
+                                          stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                          text=True)
+                if reverse.returncode != 0:
+                    raise RuntimeError(f"Patch does not apply cleanly to {target}: {patch['file']}\n"
+                                       f"{check.stderr.strip()}")
+                LOG.info("Locked patch already applied to %s", target)
     manifest = {"source_lock_sha256": digest(lock_path), "directories": directories,
                 "transitive_lock_complete": lock["transitive_lock_complete"],
                 "pending": lock["pending"]}

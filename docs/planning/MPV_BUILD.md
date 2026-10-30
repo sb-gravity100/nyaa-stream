@@ -1,7 +1,9 @@
 # v0.7.0 custom libmpv native build recipe
 
-Status: local tools and selected source closure prepared, 2026-10-31.
-No custom DLL has been compiled.
+Status: local tools and selected source closure prepared; independent ASS
+overlay sampling patches authored and added to the source lock, 2026-10-31.
+No custom DLL has been compiled, so configure, compiler compatibility and runtime
+behavior remain unproven.
 SB approved mpv v0.41.0 stable, native Windows LLVM, baseline x64 and the
 frozen scope in [ROADMAP.md](ROADMAP.md). Further changes require SB review.
 SB selected keeping separate FFmpeg builds and proceeding with local tool
@@ -12,9 +14,10 @@ isolated tools from `native/mpv/tools.lock.json`, records local tool identity,
 and leaves all downloads/build output under `target/mpv-build/`. The source
 lock is recorded separately in `native/mpv/sources.lock.json`, before compilation.
 The source lock covers 21 repository archives, 15 Meson source/build definitions
-and one native compiler patch. Their archives/patches have been fetched and
-SHA-256 checked. This proves source preparation, not successful configuration,
-media compilation or runtime compatibility.
+and three native patches. Their archives/patches are SHA-256 checked; the two
+ASS source patches are applied to the extracted mpv and libplacebo trees. This
+proves source preparation, not successful configuration, media compilation or
+runtime compatibility.
 `scripts/prepare-mpv.py --sources-only` fetches locked source archives without
 compiling them. SB approved LuaJIT and x264; their exact source/build-definition
 revisions are recorded in the source lock.
@@ -23,10 +26,10 @@ and build-patch hashes for portable dependencies. Source-only preparation may
 use Meson's download operation to verify those archives without configuring
 or compiling media libraries. Vendored graphics/shader sources are pinned
 separately from their parent project's release archive.
-The source audit identified one native compiler-name adjustment for x264:
-`native/mpv/patches/x264-clang-cl.patch` makes its existing MSVC-style flag
-path recognize `clang-cl`. The patch is pinned and checked against the locked
-source; configuration/compilation still needs to prove the complete path.
+The source audit includes the x264 compiler-name adjustment and the independent
+ASS overlay sampler patches. All are pinned by SHA-256. Source preparation
+checks and applies the mpv/libplacebo patches; configuration/compilation still
+needs to prove the complete path.
 
 ## Build layout and toolchain
 
@@ -114,11 +117,14 @@ Docker, MinGW binaries or a prebuilt full-featured DLL if it fails.
   video, retain ASS/font/style overrides and outline blur, use light hinting for
   plain text and no hinting for authored ASS. The first candidate should match
   current rendering behavior against the recorded baseline.
-- After the custom DLL baseline is accepted, implement bounded 1.5x supersampling
-  for embedded subtitles in v0.7.0. Downsample subtitle masks while preserving
-  video resolution, authored ASS layout and animation; compare edges and cost
-  with the existing HLS supersampling path. Keep screenshot/export rendering
-  consistent and verify GPU compatibility.
+- Independent ASS overlay sampling is implemented in the locked native patches
+  `mpv-ass-overlay-sampling.patch` and `libplacebo-ass-overlay-sampling.patch`.
+  mpv registers `ass-scale`, `ass-dscale`, `ass-aa`, `ass-blur`, `wns-ass-aa`,
+  and `wns-ass-blur`; the built-in `sub-ass-scale-with-window` selects the
+  window-resolution path. gpu-next passes ASS masks through libplacebo's filter
+  sampler, with the video scaler untouched. HLS retains its existing 1.5x
+  JASSUB path; clip export remains on its ASS style/encode path. These patches
+  have not been compiled or visually verified yet.
 - FFmpeg: explicitly select approved H.264, HEVC and AV1 software/hardware
   decoders, and AAC, AC-3, E-AC-3, FLAC and Opus audio decoders. Retain subtitle
   and image support needed by the app; do not confuse these with extra requested
@@ -142,10 +148,8 @@ Docker, MinGW binaries or a prebuilt full-featured DLL if it fails.
   window resolution, separate up/down filters, and independent AA/blur values
   for both resolutions. Keep video `scale`/`dscale` behavior independent.
   These behaviors will use original mpv/libplacebo renderer patches; the
-  `ass-*`/`wns-*` examples in mpv issue 2820 are not options in mpv v0.41.0.
-  Proposed option names follow the examples (`ass-scale`, `ass-dscale`,
-  `ass-aa`, `ass-blur`, `ass-autoscaling`, `wns-ass-aa`, `wns-ass-blur`); the
-  implementation will register these new options.
+  `ass-*`/`wns-*` examples in mpv issue 2820 were not options in mpv v0.41.0;
+  the locked native patches register and implement the selected controls.
   HLS keeps its existing 1.5x JASSUB path and does not consume these controls.
 - Keep saved-frame screenshots aligned with the embedded playback renderer.
   Subtitle-burned clip export retains the selected ASS track/style, without
@@ -177,11 +181,12 @@ Core dependency versions are approved. Full-build
 execution, installed-player replacement and publication remain later steps.
 
 Stage 1 passed: tool bootstrap completed and pkgconf compiled with LLVM.
-Stage 2 source locking/fetching passed: the source-only command verified all
-locked archives/build patches and native patch identity. The x264 patch also
-passed `git apply --check`. Full media-stack configuration/compilation is the
-next approval gate. Required build definitions may need adjustment when that
-configuration is exercised; record and review any changes to the source lock.
+Stage 2 previously passed for the original source closure. The updated
+source-only command must verify archive and patch hashes and apply the ASS
+patches before that stage can be marked complete again. Full media-stack
+configuration/compilation remains the next approval gate. Required build
+definitions may need adjustment when configuration is exercised; record and
+review any changes to the source lock.
 
 ## Acceptance and evidence
 

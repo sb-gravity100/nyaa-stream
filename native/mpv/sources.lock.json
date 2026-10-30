@@ -400,7 +400,21 @@
       "file": "native/mpv/patches/x264-clang-cl.patch",
       "sha256_lf": "f592f35ac5e1b23d948615ea1909af6203a98f9becb07b58588885d8bf4282ab",
       "reason": "Recognize clang-cl as the existing MSVC-style compiler path"
+    },
+    {
+      "package": "mpv",
+      "file": "native/mpv/patches/mpv-ass-overlay-sampling.patch",
+      "sha256_lf": "e7cd9493b305bdbf3a21cc430df76183270369e48c91cb3a40bbab9f5907c816",
+      "reason": "Register ASS overlay sampling controls and pass their filters from gpu-next",
+      "apply_to": "mpv"
+    },
+    {
+      "package": "libplacebo",
+      "file": "native/mpv/patches/libplacebo-ass-overlay-sampling.patch",
+      "sha256_lf": "9ae2be585e346f6efb61581ea80f18a3827ad4e8662dfda0c60b6688b14609aa",
+      "reason": "Apply independent filtered sampling to subtitle overlays",
+      "apply_to": "libplacebo"
     }
   ],
-  "source_audit_status": "Selected source closure pinned and downloaded; configure/build compatibility not yet proven"
+  "source_audit_status": "Selected source closure pinned; independent ASS mpv/libplacebo patches locked and applied by source preparation; configure/build compatibility not yet proven"
 }

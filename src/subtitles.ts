@@ -225,7 +225,6 @@ export async function mpvSubtitleRenderingSettings(
   }
   return {
     "sub-ass-scale-with-window": rendering.resolution === "window",
-    "ass-autoscaling": rendering.resolution === "window",
     "ass-scale": rendering.upscale,
     "ass-dscale": rendering.downscale,
     "ass-aa": rendering.videoAntialias,

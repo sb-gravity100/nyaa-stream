@@ -1,0 +1,123 @@
+--- a/options/options.c
++++ b/options/options.c
+@@ -185,6 +185,16 @@
+     {"display-fps-override", OPT_DOUBLE(display_fps_override),
+         M_RANGE(0, DBL_MAX)},
+     {"video-timing-offset", OPT_DOUBLE(timing_offset), M_RANGE(0.0, 1.0)},
++    {"ass-scale", OPT_CHOICE(ass_scale,
++        {"ewa_lanczos", 0}, {"ewa_lanczossharp", 1}, {"bicubic", 2}),
++        .flags = UPDATE_VIDEO},
++    {"ass-dscale", OPT_CHOICE(ass_dscale,
++        {"mitchell", 0}, {"bicubic", 1}, {"ewa_lanczos", 2}),
++        .flags = UPDATE_VIDEO},
++    {"ass-aa", OPT_BOOL(ass_aa), .flags = UPDATE_VIDEO},
++    {"ass-blur", OPT_FLOAT(ass_blur), M_RANGE(0.0, 2.0), .flags = UPDATE_VIDEO},
++    {"wns-ass-aa", OPT_BOOL(wns_ass_aa), .flags = UPDATE_VIDEO},
++    {"wns-ass-blur", OPT_FLOAT(wns_ass_blur), M_RANGE(0.0, 2.0), .flags = UPDATE_VIDEO},
+     {"video-sync", OPT_CHOICE(video_sync,
+         {"audio", VS_DEFAULT},
+         {"display-resample", VS_DISP_RESAMPLE},
+@@ -288,6 +298,12 @@
+         .ontop_level = -1,
+         .timing_offset = 0.050,
+         .swapchain_depth = 2,
++        .ass_scale = 0,
++        .ass_dscale = 0,
++        .ass_aa = true,
++        .ass_blur = 1.6,
++        .wns_ass_aa = true,
++        .wns_ass_blur = 1.12,
+         .focus_on = 1,
+     },
+ };
+--- a/options/options.h
++++ b/options/options.h
+@@ -91,6 +91,14 @@
+     int swapchain_depth;  // max number of images to render ahead
+ 
+     struct m_geometry video_crop;
++
++    // ASS overlay sampling, independent of the video scaler.
++    int ass_scale;
++    int ass_dscale;
++    bool ass_aa;
++    float ass_blur;
++    bool wns_ass_aa;
++    float wns_ass_blur;
+ } mp_vo_opts;
+ 
+ // Subtitle options needed by the subtitle decoders/renderers.
+--- a/video/out/vo_gpu_next.c
++++ b/video/out/vo_gpu_next.c
+@@ -18,6 +18,7 @@
+  */
+ 
+ #include <sys/stat.h>
++#include <math.h>
+ #include <time.h>
+ 
+ #include <libplacebo/colorspace.h>
+@@ -138,6 +139,9 @@
+     pl_options pars;
+     struct m_config_cache *opts_cache;
+     struct m_config_cache *next_opts_cache;
++    struct m_config_cache *vo_opts_cache;
++    struct m_config_cache *sub_opts_cache;
++    struct pl_filter_config subtitle_filter;
+     struct gl_next_opts *next_opts;
+     struct cache shader_cache, icc_cache;
+     struct mp_csp_equalizer_state *video_eq;
+@@ -313,6 +317,10 @@
+                             struct mp_image *src)
+ {
+     struct priv *p = vo->priv;
++    m_config_cache_update(p->vo_opts_cache);
++    m_config_cache_update(p->sub_opts_cache);
++    const struct mp_vo_opts *vo_opts = p->vo_opts_cache->opts;
++    const struct mp_subtitle_opts *sub_opts = p->sub_opts_cache->opts;
+     double pts = src ? src->pts : 0;
+     struct sub_bitmap_list *subs = osd_render(vo->osd, res, pts, flags, mp_draw_sub_formats);
+ 
+@@ -379,6 +387,33 @@
+             },
+             .coords = coords,
+         };
++
++        if (item->format == SUBBITMAP_LIBASS && res.w > 0 && res.h > 0 &&
++            vo->dwidth > 0 && vo->dheight > 0) {
++            const bool window_scale = sub_opts->ass_scale_with_window;
++            const bool upscale = vo->dwidth >= res.w && vo->dheight >= res.h;
++            const int selected = upscale ? vo_opts->ass_scale : vo_opts->ass_dscale;
++            const struct pl_filter_config *filter = NULL;
++            if (upscale) {
++                switch (selected) {
++                case 0: filter = &pl_filter_ewa_lanczos; break;
++                case 1: filter = &pl_filter_ewa_lanczossharp; break;
++                default: filter = &pl_filter_bicubic; break;
++                }
++            } else {
++                switch (selected) {
++                case 1: filter = &pl_filter_bicubic; break;
++                case 2: filter = &pl_filter_ewa_lanczos; break;
++                default: filter = &pl_filter_mitchell; break;
++                }
++            }
++            p->subtitle_filter = *filter;
++            p->subtitle_filter.blur = window_scale ? vo_opts->wns_ass_blur : vo_opts->ass_blur;
++            ol->sample_filter = &p->subtitle_filter;
++            ol->sample_w = MPMAX(1, lrintf(item->packed_w * (float) vo->dwidth / res.w));
++            ol->sample_h = MPMAX(1, lrintf(item->packed_h * (float) vo->dheight / res.h));
++            ol->sample_antialias = window_scale ? vo_opts->wns_ass_aa : vo_opts->ass_aa;
++        }
+ 
+         switch (item->format) {
+         case SUBBITMAP_BGRA:
+@@ -2132,6 +2167,8 @@
+     struct priv *p = vo->priv;
+     p->opts_cache = m_config_cache_alloc(p, vo->global, &gl_video_conf);
+     p->next_opts_cache = m_config_cache_alloc(p, vo->global, &gl_next_conf);
++    p->vo_opts_cache = m_config_cache_alloc(p, vo->global, &vo_sub_opts);
++    p->sub_opts_cache = m_config_cache_alloc(p, vo->global, &mp_subtitle_sub_opts);
+     p->next_opts = p->next_opts_cache->opts;
+     p->video_eq = mp_csp_equalizer_create(p, vo->global);
+     p->global = vo->global;

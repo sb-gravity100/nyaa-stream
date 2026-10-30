@@ -74,10 +74,11 @@ policy remains unchanged.
 ## v0.7.0 — custom Windows libmpv build (planned 2026-10-29)
 Execution priority set by SB on 2026-10-31: custom libmpv first. Start with
 the current DLL baseline and API/dependency audit, prove a reproducible x64
-build, then measure and integrate it. Native subtitle supersampling follows
-the build baseline; memory, batch transitions, preload timing and seek dragging
-follow libmpv acceptance. The checklist below groups related work and does not
-override this order.
+build, then measure and integrate it. Independent ASS sampling patches are now
+part of the locked source recipe and still need build/runtime verification;
+memory, batch transitions, preload timing and seek dragging follow libmpv
+acceptance. The checklist below groups related work and does not override this
+order.
 - [x] Agree custom-DLL scope with SB: baseline x64, Lua, selected video/audio
       codecs, HDR/tone mapping, broad GPU support and software/hardware clip
       encoding; remove unused integrations (ROADMAP.md records the exact scope)
@@ -91,8 +92,11 @@ override this order.
       controls in Settings, for video- and window-resolution subtitle rendering
 - [x] Lock/fetch the five core source commits with archive SHA-256;
       `scripts/prepare-mpv.py --sources-only` verifies and extracts them
+- [x] Add independent ASS filter/AA/blur behavior to mpv gpu-next and libplacebo;
+      clean source patches apply through the locked source-prep recipe
 - [x] Resolve/fetch selected source closure: 21 repository archives, 15 hashed
-      source/build definitions and one checked native patch; archive hashes verified
+      source/build definitions and three locked native patches; verify archive
+      and patch hashes with `scripts/prepare-mpv.py --sources-only` (no compilation)
 - [ ] Review and authorize the first full dependency/DLL configure/build;
       source preparation does not prove compilation or runtime acceptance
 - [ ] Improve batch next-episode transitions by reusing torrent/file metadata and
@@ -109,11 +113,12 @@ override this order.
       the final target on release; handle cancel, unknown duration and source changes
 - [ ] Verify mpv/HLS scrubbing in fullscreen, paused/backward/undownloaded seeks,
       keyboard seeking, and rejection of stale seek completions
-- [ ] Implement independent ASS overlay up/downscaling and AA/blur controls in
-      Settings; support video-resolution and window-resolution rendering while
-      preserving the video scaler, ASS layout and animation.
-- [ ] Add bounded 1.5x embedded-mpv subtitle-mask supersampling; verify settings,
-      high-DPI, fullscreen, screenshots, subtitle-burned export and both mpv VOs.
+- [x] Implement independent ASS overlay filters and AA/blur options in the
+      locked mpv gpu-next/libplacebo source patches; source application and hashes
+      verified without compiling.
+- [ ] Verify both subtitle-resolution modes, filter/AA/blur changes, high-DPI,
+      fullscreen and screenshots against a compiled custom DLL; clip export
+      keeps its current ASS encode path.
 - [ ] Record current bundled libmpv identity/options and a baseline for ASS
       edge quality, E-AC-3 playback, seek latency, and hardware decoding
 - [x] Inspect `msedgewebview2.DMP` structure: about 2.56 GiB captured and

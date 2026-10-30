@@ -1,0 +1,94 @@
+--- a/src/include/libplacebo/renderer.h
++++ b/src/include/libplacebo/renderer.h
+@@ -528,6 +528,12 @@
+     // The number of parts for this overlay.
+     const struct pl_overlay_part *parts;
+     int num_parts;
++
++    // Optional sampling policy for rasterized subtitle overlays. If unset,
++    // overlays use the renderer's normal linear/nearest texture sampling.
++    const struct pl_filter_config *sample_filter;
++    int sample_w, sample_h;
++    bool sample_antialias;
+ };
+ 
+ // High-level description of a complete frame, including metadata and planes
+--- a/src/renderer.c
++++ b/src/renderer.c
+@@ -71,6 +71,7 @@
+     pl_shader_obj grain_state[4];
+     pl_shader_obj lut_state[3];
+     pl_shader_obj icc_state[2];
++    pl_shader_obj overlay_sample_state;
+     PL_ARRAY(pl_tex) fbos[PL_RENDER_STAGE_COUNT];
+     struct sampler sampler_main;
+     struct sampler sampler_contrast;
+@@ -164,6 +165,7 @@
+         pl_shader_obj_destroy(&rr->grain_state[i]);
+     for (int i = 0; i < PL_ARRAY_SIZE(rr->icc_state); i++)
+         pl_shader_obj_destroy(&rr->icc_state[i]);
++    pl_shader_obj_destroy(&rr->overlay_sample_state);
+ 
+     // Free all samplers
+     sampler_destroy(rr, &rr->sampler_main);
+@@ -999,16 +1001,35 @@
+         sh_describe(sh, "overlay");
+         GLSL("// overlay \n");
+ 
+-        switch (ol.mode) {
+-        case PL_OVERLAY_NORMAL:
+-            GLSL("vec4 color = textureLod("$", coord, 0.0); \n", tex);
+-            break;
+-        case PL_OVERLAY_MONOCHROME:
+-            GLSL("vec4 color = osd_color; \n");
+-            break;
+-        case PL_OVERLAY_MODE_COUNT:
+-            pl_unreachable();
+-        };
++        const bool custom_sample = ol.sample_filter && ol.sample_w > 0 && ol.sample_h > 0;
++        if (custom_sample) {
++            struct pl_filter_config filter = *ol.sample_filter;
++            filter.polar = true;
++            struct pl_sample_filter_params fparams = {
++                .filter = filter,
++                .no_widening = !ol.sample_antialias,
++                .lut = &rr->overlay_sample_state,
++            };
++            pl_shader_sample_polar(sh, pl_sample_src(
++                .tex = ol.tex,
++                .rect = {0, 0, ol.tex->params.w, ol.tex->params.h},
++                .new_w = ol.sample_w,
++                .new_h = ol.sample_h,
++            ), &fparams);
++            if (ol.mode == PL_OVERLAY_MONOCHROME)
++                GLSL("vec4 overlay_mask = color; color = osd_color; \n");
++        } else {
++            switch (ol.mode) {
++            case PL_OVERLAY_NORMAL:
++                GLSL("vec4 color = textureLod("$", coord, 0.0); \n", tex);
++                break;
++            case PL_OVERLAY_MONOCHROME:
++                GLSL("vec4 color = osd_color; \n");
++                break;
++            case PL_OVERLAY_MODE_COUNT:
++                pl_unreachable();
++            };
++        }
+ 
+         static const struct pl_color_map_params osd_params = {
+             PL_COLOR_MAP_DEFAULTS
+@@ -1047,8 +1068,12 @@
+         if (encode_xyz)
+             pl_shader_delinearize(sh, &fbo_color);
+         if (ol.mode == PL_OVERLAY_MONOCHROME) {
+-            GLSL("color.%s *= textureLod("$", coord, 0.0).r; \n",
+-                 premul ? "rgba" : "a", tex);
++            if (custom_sample) {
++                GLSL("color.%s *= overlay_mask.r; \n", premul ? "rgba" : "a");
++            } else {
++                GLSL("color.%s *= textureLod("$", coord, 0.0).r; \n",
++                     premul ? "rgba" : "a", tex);
++            }
+         }
+ 
+         swizzle_color(sh, comps, comp_map, true, &repr, fbo->params.format);
