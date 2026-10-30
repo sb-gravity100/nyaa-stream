@@ -1,3 +1,11 @@
+### `cd29bc1` · 2026-10-30 · fix(artwork): decode Fribb movie ID arrays
+- `CHANGELOG.md`
+- `FILE_INDEX.md`
+- `PHASES.md`
+- `crates/artwork-client/src/lib.rs`
+- `docs/planning/V0_6_0.md`
+- `src/changelog.ts`
+
 ### `1808857` · 2026-10-30 · fix(artwork): load fanart backgrounds and TMDB stills
 - `CHANGELOG.md`
 - `FILE_INDEX.md`
