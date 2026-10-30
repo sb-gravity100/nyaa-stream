@@ -1976,12 +1976,12 @@ async fn export_clip(
     }
 }
 
-/// Development logs live in the launch working directory; release logs use
-/// `<local data dir>/nyaa-stream/logs`.
+/// Development logs live in a `logs/` folder under the launch working
+/// directory; release logs use `<local data dir>/nyaa-stream/logs`.
 fn log_dir() -> std::path::PathBuf {
     #[cfg(debug_assertions)]
     {
-        return std::env::current_dir().unwrap_or_else(|_| std::env::temp_dir());
+        return std::env::current_dir().unwrap_or_else(|_| std::env::temp_dir()).join("logs");
     }
     #[cfg(not(debug_assertions))]
     dirs::data_local_dir()

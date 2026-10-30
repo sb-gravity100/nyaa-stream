@@ -598,7 +598,7 @@ yaa-stream\logs`, the last 7 daily files) plus a
   - **GitHub** - opens a new issue on the repo prefilled (title, app version,
     OS, "describe what happened"); the user attaches the zip. The modal notes
     that GitHub issues are public.
-- **Development log location:** dev builds write daily logs directly into
+- **Development log location:** dev builds write daily logs into `logs/` in
   the working directory from which the app was launched; release builds keep
   using `%LOCALAPPDATA%\nyaa-stream\logs`.
 - **Windows username hidden:** while zipping, every occurrence of the
@@ -695,4 +695,3 @@ short scale+fade pop instead of the slide. Behaviour unchanged: same
 `role="dialog"`/`aria-modal`, Esc and backdrop click close it, focus is
 trapped as before. Phone-width windows (<600px) fall back to full-screen.
 CSS only; no component logic change.
-

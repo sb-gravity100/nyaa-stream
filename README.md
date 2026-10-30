@@ -214,8 +214,8 @@ npm run setup
 npm run tauri dev
 ```
 
-Development output is appended to `logs/tauri-dev.log`. To choose another
-destination, pass `--pipe-log <path>` after `dev`.
+In development mode, daily app logs are also written to `logs/` in the
+project directory. Terminal logging remains unchanged.
 
 `npm run setup` is only needed once, or again after the native-deps version changes.
 
