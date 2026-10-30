@@ -21,7 +21,7 @@ export default defineConfig(async () => ({
   clearScreen: false,
   // 2. tauri expects a fixed port, fail if that port is not available
   server: {
-    port: 1420,
+    port: 3000,
     strictPort: true,
     // An explicit IPv4 address, matching tauri.conf.json's devUrl: plain
     // "localhost" made Vite listen on IPv6 (::1) only, and the webview's
@@ -32,7 +32,7 @@ export default defineConfig(async () => ({
       ? {
           protocol: "ws",
           host,
-          port: 1421,
+          port: 3001,
         }
       : undefined,
     watch: {
