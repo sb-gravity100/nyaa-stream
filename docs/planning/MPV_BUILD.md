@@ -3,6 +3,13 @@
 Status: recipe for review, 2026-10-31. No custom DLL has been compiled.
 SB approved mpv v0.41.0 stable, native Windows LLVM, baseline x64 and the
 frozen scope in [ROADMAP.md](ROADMAP.md). Further changes require SB review.
+SB selected keeping separate FFmpeg builds and proceeding with local tool
+setup/source locking. Core dependency-version approval remains pending.
+
+Planned v0.7.0 setup implementation: `scripts/prepare-mpv.py` bootstraps
+isolated tools from `native/mpv/tools.lock.json`, records local tool identity,
+and leaves all downloads/build output under `target/mpv-build/`. The source
+lock is resolved separately after version approval, before compilation.
 
 ## Build layout and toolchain
 
@@ -101,8 +108,10 @@ Docker, MinGW binaries or a prebuilt full-featured DLL if it fails.
 4. Review the candidate's capabilities, imports, size and license/source bundle.
    Exercise it through the Settings DLL override before replacing the bundled DLL.
 
-The next approval request covers stage 1 and source downloads/locking in stage 2.
-It does not cover replacing the installed player, publishing, or app-wide CPU changes.
+Stages 1 and source downloads/locking in stage 2 are authorized by SB's
+selection to keep separate builds and prepare local tools/source lock.
+Core dependency versions remain subject to SB's pending answer. Full-build
+execution, installed-player replacement and publication remain later steps.
 
 ## Acceptance and evidence
 
