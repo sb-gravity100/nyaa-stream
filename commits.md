@@ -1,3 +1,8 @@
+### `0386fbf` · 2026-10-31 · docs: add independent ASS rendering controls
+- `docs/planning/MPV_BUILD.md`
+- `PHASES.md`
+- `FILE_INDEX.md`
+
 ### `ef3a5b5` · 2026-10-31 · docs: specify native subtitle smoothing work
 - `docs/planning/MPV_BUILD.md`
 
