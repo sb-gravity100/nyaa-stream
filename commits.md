@@ -1,3 +1,8 @@
+### `0a9f8c5` · 2026-10-31 · docs: record custom mpv build approval
+- `PHASES.md`
+- `docs/planning/MPV_BUILD.md`
+- `native/mpv/sources.lock.json`
+
 ### `7685f86` · 2026-10-31 · feat: add independent ASS overlay sampling
 - `FILE_INDEX.md`
 - `PHASES.md`
