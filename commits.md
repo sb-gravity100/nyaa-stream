@@ -1,3 +1,6 @@
+### `ef3a5b5` · 2026-10-31 · docs: specify native subtitle smoothing work
+- `docs/planning/MPV_BUILD.md`
+
 ### `f68d0c8` · 2026-10-31 · build: lock native libmpv dependency sources
 - `scripts/prepare-mpv.py`
 - `native/mpv/sources.lock.json`
