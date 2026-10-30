@@ -1,3 +1,13 @@
+### `ee1fabf` · 2026-10-30 · feat(thumbnails): capture frames with FFmpeg
+- `CLAUDE.md`
+- `FILE_INDEX.md`
+- `PHASES.md`
+- `crates/mpv-player/src/lib.rs`
+- `crates/torrent-engine/src/lib.rs`
+- `crates/torrent-engine/src/media.rs`
+- `docs/planning/V0_6_0.md`
+- `src-tauri/src/lib.rs`
+
 ### `550d912` · 2026-10-30 · docs: generalize player references
 - `PHASES.md`
 - `commits.md`
