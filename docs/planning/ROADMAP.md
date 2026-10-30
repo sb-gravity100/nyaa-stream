@@ -30,6 +30,12 @@ Custom-build scope approved by SB on 2026-10-31:
   scaling, pixel-format/color conversion, HDR/tone mapping, subtitle rendering,
   audio conversion and clip-export processing. Lua scripts cannot use omitted
   filters; the exact retained filter list must follow the dependency audit.
+- Remove direct ZIP/RAR/7z archive playback and unused network inputs such as
+  FTP, SMB, SSH, RTMP and RTSP; retain HTTP/HTTPS and local-file support with
+  their required protocol dependencies.
+- Trim encoders and output containers to the H.264/AAC MP4 clip-export and
+  screenshot paths after dependency checks. Input containers are a separate
+  decision; this approval does not limit them to the output-container list.
 - Use a native Windows LLVM build, approved by SB; exact dependency revisions,
   setup commands and remaining optional-component cuts await review.
 - Baseline x64 applies to this DLL. The existing Rust/HLS build still targets
