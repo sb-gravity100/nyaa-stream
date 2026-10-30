@@ -11,6 +11,22 @@ baseline and dependency audit, then prove a reproducible candidate build before
 optimizing subtitles, seeking or stream delivery. Memory work, batch
 transitions, preload timing and seek dragging follow.
 
+Custom-build scope approved by SB on 2026-10-31:
+- Deliver `libmpv-2.dll` for embedded playback and subtitle-burned clip export;
+  omit the standalone mpv executable.
+- Target baseline x64 CPUs; preserve broad Windows GPU compatibility,
+  hardware decoding with software fallback, HDR playback and tone mapping.
+- Retain H.264/AVC, HEVC (including 10-bit) and AV1 video decoding; AAC,
+  AC-3, E-AC-3, FLAC and Opus audio decoding. Subtitle/image support and
+  conversion components required by playback, screenshots and export remain
+  part of the dependency audit, separate from this media codec list.
+- Retain software H.264/AAC clip encoding plus NVIDIA, Intel and AMD hardware
+  H.264 encoders; preserve ASS/fonts, screenshots and HTTP torrent streaming.
+- Keep Lua scripting. Remove JavaScript scripting, native C plugin loading,
+  CD/DVD/Blu-ray disc playback, TV/capture-device inputs, VapourSynth and
+  gamepad input. Disc-rip video files remain supported through their containers.
+- Build-environment setup and exact dependency revisions/options await review.
+
 Native subtitle supersampling remains deferred to this milestone by SB.
 Render subtitle masks at bounded 1.5x resolution and downsample before
 composition; preserve authored layout/animation and video resolution. Verify

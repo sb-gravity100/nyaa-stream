@@ -78,6 +78,9 @@ build, then measure and integrate it. Native subtitle supersampling follows
 the build baseline; memory, batch transitions, preload timing and seek dragging
 follow libmpv acceptance. The checklist below groups related work and does not
 override this order.
+- [x] Agree custom-DLL scope with SB: baseline x64, Lua, selected video/audio
+      codecs, HDR/tone mapping, broad GPU support and software/hardware clip
+      encoding; remove unused integrations (ROADMAP.md records the exact scope)
 - [ ] Improve batch next-episode transitions by reusing torrent/file metadata and
       verified data; preserve season-aware file selection and source fallback
 - [ ] Measure next-episode click/autoplay to first frame on cached, partial,
