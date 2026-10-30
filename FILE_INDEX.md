@@ -13,7 +13,7 @@
 | `scripts/make-installer-art.ps1`, `src-tauri/installer/{banner,dialog}.bmp` | Renders the MSI (WiX) banner + welcome-dialog artwork from the app icon and brand colors (System.Drawing); wired in via `bundle.windows.wix` in `tauri.conf.json` | config, release, installer |
 | `scripts/make-nsis-art.ps1`, `src-tauri/installer/{installer.nsi,nsis-header.bmp,nsis-sidebar.bmp}` | Builds the branded NSIS template and image assets; custom install-choice page restores destination and shortcut choices on upgrades, and the file-copy progress page uses the app palette and branded headings | config, installer |
 | `CHANGELOG.md` | Release history (Keep a Changelog), mirrors `src/changelog.ts` + `Unreleased` | docs |
-| `docs/releases/v0.6.0.md` | Draft v0.6.0 release notes used by the local signed dry-run; publish only after readiness gates pass | docs, release |
+| `docs/releases/v0.6.0.md` | Published v0.6.0 release notes | docs, release |
 | `README.md` | Public overview: features, stack, build prerequisites, release steps | docs |
 | `PLAN.md` | Concise active roadmap, v0.6.0 order, constraints and index of detailed planning documents | docs |
 | `docs/planning/V0_6_0.md` | Consolidated v0.6.0 implementation order, feature specifications, proposed defaults and acceptance criteria | docs, planning |

@@ -29,12 +29,12 @@ Feature work follows this order; remaining checks and release waivers are record
       Start menu on, desktop shortcut off)
 - [~] 0: Prove installer/updater backend, clean-machine bootstrap, signed
       artifact, silent upgrade, old-install migration and restart lifecycle
-  - [x] Current code built into signed local NSIS and MSI installers with updater signatures; 2026-10-30 release dry-run staged both packages and `latest.json`; no artifacts uploaded
+  - [x] Current code built into signed local NSIS and MSI installers with updater signatures
   - [x] Win10Lite matrix passed 17/17 checks each for v0.5.8 NSIS→v0.6.0 NSIS, MSI→MSI, and MSI→NSIS; v0.6.0 launches and preserves the existing database and user-data marker
   - [x] Bundle app-local `VCRUNTIME140.dll` 14.44.35211.0; both v0.6.0 installer formats launch and uninstall while retaining user data
   - [x] Waive v0.5.8-based in-app-updater acceptance: v0.5.8 has no updater flow; its upgrade path is covered by the installer matrix above
-  - [~] Waive additional Windows lifecycle acceptance for this release at SB's direction; clean-machine bootstrap, UAC, repair and updater relaunch remain unverified because v0.5.8 lacks the new flow
-- [~] 1: Shared context menus and clipboard integration, including custom-source actions; manual Windows acceptance remains open
+  - [~] Waive additional Windows lifecycle acceptance by SB for v0.6.0; clean-machine bootstrap, UAC, repair and updater relaunch remain unverified, not passed
+- [~] 1: Shared context menus and clipboard integration, including custom-source actions; Windows manual acceptance waived by SB for v0.6.0, not passed
 - [~] 2: Magnet parsing/direct play, permanent attachments, pack mapping and migration
   - [x] Bounded btih parsing for magnet links (hex/base32), display name and tracker count
   - [x] Magnet/hash search detection bypasses AniList search; direct playback uses the existing player
@@ -51,10 +51,10 @@ Feature work follows this order; remaining checks and release waivers are record
       - [x] arm-server v2 fallback for missing map rows/map failures (AniDB, Kitsu, MAL, Simkl, IMDb); resolve an unambiguous IMDb-to-TMDB match when available, without guessing TV season or episode offsets
       - [~] Fribb mapping-data license remains unknown; SB deferred resolving it for this release
 - [~] 4: Persisted release results with explicit refresh and missing-thumbnail torrent capture; live-swarm acceptance remains open
-- [~] 5: Verified-data-only seekbar storyboard/hover previews; generation covers only the contiguous verified prefix, and Windows acceptance remains open
-- [~] 6: Branded NSIS install choices and styled file-copy progress/completion/error pages; isolated lifecycle checks remain open
-- [~] 7: Quiet update scheduler, flex-end header action and in-app progress/restart; signed apply/relaunch remains unverified
-- [~] 8: Integrated verification was waived by SB; docs/changelog/index are synced and v0.6.0 publication is authorized
+- [~] 5: Verified-data-only seekbar storyboard/hover previews; generation covers only the contiguous verified prefix; Windows acceptance waived by SB for v0.6.0, not passed
+- [~] 6: Branded NSIS install choices and styled file-copy progress/completion/error pages; isolated lifecycle checks waived by SB for v0.6.0, not passed
+- [~] 7: Quiet update scheduler, flex-end header action and in-app progress/restart; signed apply/relaunch waived by SB for v0.6.0, not verified
+- [x] 8: Integrated docs/changelog/index sync complete; v0.6.0 published 2026-10-30 with signed installers, signatures and updater manifest
 
 Native supersampling, batch next-episode/preload work and continuous seekbar
 dragging remain v0.7.0. Existing public-release

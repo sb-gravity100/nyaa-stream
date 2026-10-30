@@ -16,7 +16,7 @@ sbtl torrent streaming, embedded libmpv playback and an HLS fallback.
 | Version | Scope | State |
 |---|---|---|
 | v0.5.8 | Implemented pre-v0.6.0 work | Published |
-| v0.6.0 | Subtitle styling/smoothing plus context menus, custom magnets, artwork, thumbnails, seek previews, updates and bespoke installer | Feature code is integrated; Windows lifecycle, native runtime deployment, live acceptance, Fribb data licensing and final release checks remain open |
+| v0.6.0 | Subtitle styling/smoothing plus context menus, custom magnets, artwork, thumbnails, seek previews, updates and bespoke installer | Published 2026-10-30; SB waived remaining Windows acceptance and deferred Fribb licensing; live-swarm and manual magnet acceptance remain open |
 | v0.7.0 | Custom libmpv, native subtitle supersampling, memory profiling, batch transitions, preload timing and continuous seek dragging | Planned |
 | v0.8.0 | Navigation/Home rehaul and Discover | Planned |
 | v1.0.0 | Stabilization and 32-bit Windows | Planned |
@@ -26,7 +26,9 @@ sbtl torrent streaming, embedded libmpv playback and an HLS fallback.
 
 SB consolidated the unpublished v0.5.9/v0.5.10 subtitle work into v0.6.0.
 There are no separate releases for those versions; existing implementation
-and verification remain valid. Tag v0.6.0 only after the milestone is complete.
+and verification remain valid. SB authorized v0.6.0 publication with the
+remaining Windows acceptance and Fribb license checks waived/deferred on
+2026-10-30; those checks were not passed or resolved.
 
 1. Prove installer/updater packaging, silent upgrade, migration and relaunch.
 2. Build shared context menus and clipboard behavior.
