@@ -1,3 +1,7 @@
+### `501c05f` · 2026-10-31 · docs: plan isolated libmpv tool setup
+- `docs/planning/MPV_BUILD.md`
+- `PHASES.md`
+
 ### `a9afc8b` · 2026-10-31 · docs: draft native libmpv build recipe
 - `docs/planning/MPV_BUILD.md`
 - `docs/planning/ROADMAP.md`
