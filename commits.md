@@ -1,3 +1,8 @@
+### `6163ff6` · 2026-10-31 · docs: prioritize custom libmpv in v0.7.0
+- `PLAN.md`
+- `PHASES.md`
+- `docs/planning/ROADMAP.md`
+
 ### `e28cfc6` · 2026-10-30 · docs(release): record v0.6.0 publication
 - `FILE_INDEX.md`
 - `PHASES.md`
