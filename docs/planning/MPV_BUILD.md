@@ -136,9 +136,14 @@ Docker, MinGW binaries or a prebuilt full-featured DLL if it fails.
   Settings controls for ASS-only upscaling/downscaling filters, edge antialiasing
   and blur, and a window-resolution subtitle path with its own AA/blur values.
   These are user-adjustable controls in the existing Subtitles Settings section;
-  they apply to embedded mpv. Keep video `scale`/`dscale` behavior independent.
+  they apply to embedded mpv. The UI selects ASS rasterization at video or
+  window resolution, separate up/down filters, and independent AA/blur values
+  for both resolutions. Keep video `scale`/`dscale` behavior independent.
   These behaviors will use original mpv/libplacebo renderer patches; the
   `ass-*`/`wns-*` examples in mpv issue 2820 are not options in mpv v0.41.0.
+  Proposed option names follow the examples (`ass-scale`, `ass-dscale`,
+  `ass-aa`, `ass-blur`, `ass-autoscaling`, `wns-ass-aa`, `wns-ass-blur`); the
+  implementation will register these new options.
   HLS keeps its existing 1.5x JASSUB path and does not consume these controls.
 - Extend the same Settings controls to subtitle-burned clip export where the
   mpv encode path supports them. Keep saved-frame and screenshot subtitle
