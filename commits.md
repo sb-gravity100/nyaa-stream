@@ -1,3 +1,8 @@
+### `a37cb48` · 2026-10-30 · fix(dev): move Vite off Windows-reserved port
+- `FILE_INDEX.md`
+- `src-tauri/tauri.conf.json`
+- `vite.config.ts`
+
 ### `8824c1b` · 2026-10-30 · perf(thumbnails): prefer smallest viable source and bound captures
 - `CHANGELOG.md`
 - `FILE_INDEX.md`
