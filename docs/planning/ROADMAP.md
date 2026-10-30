@@ -25,6 +25,11 @@ Custom-build scope approved by SB on 2026-10-31:
 - Keep Lua scripting. Remove JavaScript scripting, native C plugin loading,
   CD/DVD/Blu-ray disc playback, TV/capture-device inputs, VapourSynth and
   gamepad input. Disc-rip video files remain supported through their containers.
+- Remove unused visualization, camera-correction, editing and audio-effect
+  filters after auditing dependencies. Preserve playback-speed pitch correction,
+  scaling, pixel-format/color conversion, HDR/tone mapping, subtitle rendering,
+  audio conversion and clip-export processing. Lua scripts cannot use omitted
+  filters; the exact retained filter list must follow the dependency audit.
 - Use a native Windows LLVM build, approved by SB; exact dependency revisions,
   setup commands and remaining optional-component cuts await review.
 - Baseline x64 applies to this DLL. The existing Rust/HLS build still targets
