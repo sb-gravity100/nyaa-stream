@@ -388,11 +388,11 @@ export function MediaPage({
     return episodes[latestIndex + 1] ?? episodes[latestIndex];
   }, [visibleSources, progress]);
 
-  // Backdrop and episode thumbnails come from Kitsu (real wide banner and
-  // better per-episode coverage than AniList - see src/kitsu.ts), falling
-  // back to AniList's poster.
+  // Keep the normal artwork chain for movie-row art. The page background
+  // uses fanart.tv's separate show-background slot when it is available.
   const backdrop = artwork?.backdrop ?? kitsu?.background ?? anime.bannerImage ?? anime.coverImage.extraLarge ?? anime.coverImage.large;
-  const enhancedBackdrop = useEnhancedImage(backdrop);
+  const mediaBackground = artwork?.fanartBackdrop ?? backdrop;
+  const enhancedBackdrop = useEnhancedImage(mediaBackground);
   const kitsuThumbnails = kitsu?.episodeThumbnails;
   const providerCredentials = useProviderCredentials();
   const [tmdbEpisodeStills, setTmdbEpisodeStills] = useState<Record<number, string>>({});
@@ -667,16 +667,9 @@ export function MediaPage({
 
   return (
     <div class="media-page">
-      {backdrop && (
-        <>
-          <div class="ambient" aria-hidden="true">
-            <img src={backdrop} alt="" />
-          </div>
-          <div class="media-background-layer" aria-hidden="true">
-            <img class="media-background-image" src={enhancedBackdrop} alt="" />
-          </div>
-        </>
-      )}
+      {mediaBackground && <div class="media-background-layer" aria-hidden="true">
+        <img class="media-background-image" src={enhancedBackdrop} alt="" />
+      </div>}
 
       <button class="back-button" onClick={onBack}>
         <BackIcon size={18} /> Home

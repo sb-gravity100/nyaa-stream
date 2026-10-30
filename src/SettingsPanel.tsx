@@ -10,6 +10,7 @@ import { exportBackup, importBackup } from "./backup";
 import { applyPreparedUpdate, checkForUpdate, getUpdateState, prepareUpdate, subscribeUpdateState, type UpdateState } from "./updater";
 import { HelpSection } from "./HelpSection";
 import { saveProviderCredentials, useProviderCredentials } from "./providerCredentials";
+import tmdbLogo from "./assets/tmdb-logo.svg";
 
 interface Props {
   onClose: () => void;
@@ -715,7 +716,7 @@ function ArtworkProviderSection() {
         <button class="button button-quiet" type="button" disabled={!credentials.tmdbReadAccessToken && !credentials.fanartApiKey} onClick={() => { const empty = { tmdbReadAccessToken: "", fanartApiKey: "" }; saveProviderCredentials(empty); setDraft(empty); setDirty(false); }}>Clear keys</button>
       </div>
       <div class="artwork-attribution">
-        <img src="https://www.themoviedb.org/assets/2/v4/logos/blue_short.svg" alt="TMDB" />
+        <img src={tmdbLogo} alt="TMDB" />
         <p>This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
         <p>Some artwork may come from <a href="https://fanart.tv" target="_blank" rel="noreferrer">fanart.tv</a>.</p>
       </div>

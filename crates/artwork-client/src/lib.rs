@@ -26,8 +26,12 @@ pub struct ProviderCredentials {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct Artwork {
     pub backdrop: Option<String>,
+    /// Fanart.tv's independent show background, used by the media-page layer.
+    #[serde(default)]
+    pub fanart_backdrop: Option<String>,
     pub logo: Option<String>,
     pub source: Option<String>,
     pub attribution: Option<String>,
@@ -97,6 +101,26 @@ struct Images { #[serde(default)] backdrops: Vec<TmdbImage>, #[serde(default)] l
 struct TmdbImage { file_path: String, #[serde(default)] width: u32, #[serde(default)] vote_average: f32, iso_639_1: Option<String> }
 
 #[derive(Serialize, Deserialize, Default)]
+struct TmdbConfiguration { #[serde(default)] images: TmdbImageConfiguration }
+#[derive(Serialize, Deserialize, Default)]
+struct TmdbImageConfiguration {
+    secure_base_url: String,
+    #[serde(default)] still_sizes: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, Default)]
+struct TmdbSeasonDetails {
+    #[serde(default)]
+    episodes: Vec<TmdbSeasonEpisode>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct TmdbSeasonEpisode {
+    episode_number: i32,
+    still_path: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Default)]
 struct FanartResponse {
     #[serde(default)] showbackground: Vec<FanartImage>,
     #[serde(default)] clearlogo: Vec<FanartImage>,
@@ -121,8 +145,8 @@ impl ArtworkClient {
         Ok(Self { client, cache_dir: cache_dir.into(), credentials })
     }
 
-    /// Get the first usable backdrop/logo. TMDB is preferred, then fanart.tv.
-    /// Kitsu/AniList/poster fallback remains the app's responsibility.
+    /// Get TMDB artwork and a separate fanart.tv show background for the media
+    /// page's subdued image layer. Kitsu/AniList/poster fallback remains the app's responsibility.
     pub async fn get_artwork(&self, anilist_id: i64) -> Result<Artwork> {
         tracing::debug!(anilist_id, "artwork lookup started");
         let ids = self.ids(anilist_id).await?;
@@ -142,35 +166,35 @@ impl ArtworkClient {
                 }
             }
         }
-        if artwork.backdrop.is_none() || artwork.logo.is_none() {
-            if let (Some(key), Some(tvdb_id)) = (self.credentials.fanart_api_key.as_deref().filter(|s| !s.trim().is_empty()), ids.tvdb_id) {
-                match self.fanart_images(tvdb_id, key).await {
-                    Ok(data) => {
-                        let mut used_images = Vec::new();
+        if let (Some(key), Some(tvdb_id)) = (self.credentials.fanart_api_key.as_deref().filter(|s| !s.trim().is_empty()), ids.tvdb_id) {
+            match self.fanart_images(tvdb_id, key).await {
+                Ok(data) => {
+                    let mut used_images = Vec::new();
+                    if let Some(image) = best_fanart(&data.showbackground) {
+                        artwork.fanart_backdrop = Some(image.url.clone());
                         if artwork.backdrop.is_none() {
-                            if let Some(image) = best_fanart(&data.showbackground) {
-                                artwork.backdrop = Some(image.url.clone());
-                                used_images.push(image);
-                            }
+                            artwork.backdrop = Some(image.url.clone());
                         }
-                        if artwork.logo.is_none() {
-                            if let Some(image) = best_fanart(&data.clearlogo) {
-                                artwork.logo = Some(image.url.clone());
-                                used_images.push(image);
-                            }
-                        }
-                        if !used_images.is_empty() {
-                            if artwork.source.as_deref() == Some("tmdb") {
-                                artwork.source = Some("tmdb+fanart.tv".into());
-                                artwork.attribution = Some(format!("{} · {}", TMDB_ATTRIBUTION, fanart_attribution(&used_images)));
-                            } else {
-                                artwork.source = Some("fanart.tv".into());
-                                artwork.attribution = Some(fanart_attribution(&used_images));
-                            }
+                        used_images.push(image);
+                    }
+                    if artwork.logo.is_none() {
+                        if let Some(image) = best_fanart(&data.clearlogo) {
+                            artwork.logo = Some(image.url.clone());
+                            used_images.push(image);
                         }
                     }
-                    Err(err) => tracing::warn!(anilist_id, provider = "fanart.tv", error = %err, "artwork provider failed"),
+                    if !used_images.is_empty() {
+                        if artwork.source.as_deref() == Some("tmdb") {
+                            artwork.source = Some("tmdb+fanart.tv".into());
+                            let tmdb_attribution = artwork.attribution.take().unwrap_or_else(|| TMDB_ATTRIBUTION.into());
+                            artwork.attribution = Some(format!("{tmdb_attribution} · {}", fanart_attribution(&used_images)));
+                        } else {
+                            artwork.source = Some("fanart.tv".into());
+                            artwork.attribution = Some(fanart_attribution(&used_images));
+                        }
+                    }
                 }
+                Err(err) => tracing::warn!(anilist_id, provider = "fanart.tv", error = %err, "artwork provider failed"),
             }
         }
         tracing::debug!(anilist_id, source = ?artwork.source, "artwork lookup finished");
@@ -185,11 +209,24 @@ impl ArtworkClient {
         let episode = i64::from(episode) + i64::from(ids.tmdb_episode_offset.unwrap_or(0));
         if episode < 1 || episode > i64::from(u32::MAX) { return Ok(None); }
         let Some(token) = self.credentials.tmdb_read_access_token.as_deref().filter(|s| !s.trim().is_empty()) else { return Ok(None) };
-        let key = format!("tmdb-episode-{anilist_id}-{season}-{episode}");
-        let images: Images = self.cached_json(&key, TMDB_TTL_SECS, || async {
-            self.tmdb_get(&format!("/tv/{tv_id}/season/{season}/episode/{episode}/images"), token).await
+        let configuration = self.tmdb_configuration(token).await?;
+        let season_key = format!("tmdb-season-{anilist_id}-{season}");
+        let season_details: TmdbSeasonDetails = self.cached_json(&season_key, TMDB_TTL_SECS, || async {
+            self.tmdb_get(&format!("/tv/{tv_id}/season/{season}"), token).await
         }).await?;
-        Ok(choose_backdrop(&images.stills).map(|url| EpisodeStill { url, source: "tmdb" }))
+        if let Some(path) = season_details.episodes.iter()
+            .find(|entry| i64::from(entry.episode_number) == episode)
+            .and_then(|entry| entry.still_path.as_deref())
+            .filter(|path| !path.is_empty())
+        {
+            return Ok(Some(EpisodeStill { url: tmdb_thumbnail_url(path, &configuration.images), source: "tmdb" }));
+        }
+
+        let key = format!("tmdb-episode-images-{anilist_id}-{season}-{episode}");
+        let images: Images = self.cached_json(&key, TMDB_TTL_SECS, || async {
+            self.tmdb_get_images(&format!("/tv/{tv_id}/season/{season}/episode/{episode}/images"), token).await
+        }).await?;
+        Ok(choose_still(&images.stills, &configuration.images).map(|url| EpisodeStill { url, source: "tmdb" }))
     }
 
     pub async fn ids(&self, anilist_id: i64) -> Result<AnimeIds> {
@@ -277,7 +314,11 @@ impl ArtworkClient {
 
     async fn tmdb_images(&self, kind: &str, id: u64, token: &str) -> Result<Images> {
         let key = format!("tmdb-images-{kind}-{id}");
-        self.cached_json(&key, TMDB_TTL_SECS, || async { self.tmdb_get(&format!("/{kind}/{id}/images"), token).await }).await
+        self.cached_json(&key, TMDB_TTL_SECS, || async { self.tmdb_get_images(&format!("/{kind}/{id}/images"), token).await }).await
+    }
+
+    async fn tmdb_configuration(&self, token: &str) -> Result<TmdbConfiguration> {
+        self.cached_json("tmdb-configuration", TMDB_TTL_SECS, || async { self.tmdb_get("/configuration", token).await }).await
     }
 
     async fn tmdb_find_ids(&self, imdb_id: &str, token: &str) -> Result<(Option<u64>, Option<u64>)> {
@@ -293,7 +334,12 @@ impl ArtworkClient {
 
     async fn tmdb_get<T: for<'de> Deserialize<'de>>(&self, path: &str, token: &str) -> Result<T> {
         tracing::debug!(path, "requesting TMDB metadata");
-        Ok(self.client.get(format!("{TMDB_API}{path}")).bearer_auth(token).query(&[("include_image_language", "en,null")]).send().await?.error_for_status()?.json().await?)
+        Ok(self.client.get(format!("{TMDB_API}{path}")).bearer_auth(token).send().await?.error_for_status()?.json().await?)
+    }
+
+    async fn tmdb_get_images<T: for<'de> Deserialize<'de>>(&self, path: &str, token: &str) -> Result<T> {
+        tracing::debug!(path, "requesting TMDB images");
+        Ok(self.client.get(format!("{TMDB_API}{path}")).bearer_auth(token).query(&[("include_image_language", "en-US,null")]).send().await?.error_for_status()?.json().await?)
     }
 
     async fn fanart_images(&self, tvdb_id: u64, key: &str) -> Result<FanartResponse> {
@@ -341,6 +387,18 @@ fn unambiguous_tmdb_ids(response: &TmdbFindResponse) -> (Option<u64>, Option<u64
 }
 fn choose_logo(images: &[TmdbImage]) -> Option<String> {
     images.iter().max_by(|a,b| a.vote_average.total_cmp(&b.vote_average)).map(|i| tmdb_image_url(&i.file_path, "w500"))
+}
+fn choose_still(images: &[TmdbImage], configuration: &TmdbImageConfiguration) -> Option<String> {
+    images.iter().filter(|image| !image.file_path.is_empty())
+        .max_by(|a, b| a.vote_average.total_cmp(&b.vote_average).then(a.width.cmp(&b.width)))
+        .map(|image| tmdb_thumbnail_url(&image.file_path, configuration))
+}
+fn tmdb_thumbnail_url(path: &str, configuration: &TmdbImageConfiguration) -> String {
+    let base = if configuration.secure_base_url.is_empty() { "https://image.tmdb.org/t/p/" } else { &configuration.secure_base_url };
+    let size = ["w500", "w780", "w300", "w185", "original"].into_iter()
+        .find(|size| configuration.still_sizes.iter().any(|candidate| candidate.as_str() == *size))
+        .unwrap_or("w500");
+    format!("{}/{size}{path}", base.trim_end_matches('/'))
 }
 fn tmdb_image_url(path: &str, size: &str) -> String { format!("https://image.tmdb.org/t/p/{size}{path}") }
 fn best_fanart(images: &[FanartImage]) -> Option<&FanartImage> {
@@ -398,5 +456,34 @@ mod tests {
             movie_results: vec![TmdbFindItem { id: 84 }],
         };
         assert_eq!(unambiguous_tmdb_ids(&ambiguous), (None, None));
+    }
+
+    #[test]
+    fn tmdb_episode_still_uses_a_thumbnail_size() {
+        let details: TmdbSeasonDetails = serde_json::from_str(r#"{"episodes":[{"episode_number":7,"still_path":"/episode-still.jpg"}]}"#).unwrap();
+        let path = details.episodes.iter().find(|entry| entry.episode_number == 7).and_then(|entry| entry.still_path.as_deref()).unwrap();
+        let configuration = TmdbImageConfiguration {
+            secure_base_url: "https://image.tmdb.org/t/p/".into(),
+            still_sizes: vec!["w92".into(), "w300".into(), "w500".into(), "w780".into(), "original".into()],
+        };
+        assert_eq!(tmdb_thumbnail_url(path, &configuration), "https://image.tmdb.org/t/p/w500/episode-still.jpg");
+    }
+
+    #[test]
+    fn tmdb_still_url_uses_a_supported_fallback_size() {
+        let configuration = TmdbImageConfiguration {
+            secure_base_url: "https://images.test/p/".into(),
+            still_sizes: vec!["w92".into(), "w300".into(), "original".into()],
+        };
+        assert_eq!(tmdb_thumbnail_url("/still.jpg", &configuration), "https://images.test/p/w300/still.jpg");
+    }
+
+    #[test]
+    fn fanart_backdrop_serializes_camel_case_and_old_cache_entries_still_load() {
+        let artwork: Artwork = serde_json::from_str(r#"{"backdrop":"tmdb.jpg","logo":null,"source":"tmdb","attribution":"TMDB"}"#).unwrap();
+        assert_eq!(artwork.fanart_backdrop, None);
+        let artwork = Artwork { fanart_backdrop: Some("fanart.jpg".into()), ..artwork };
+        let json = serde_json::to_value(artwork).unwrap();
+        assert_eq!(json["fanartBackdrop"], "fanart.jpg");
     }
 }

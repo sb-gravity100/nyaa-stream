@@ -4,6 +4,7 @@ import { getProviderCredentials, subscribeProviderCredentials } from "./provider
 
 export interface Artwork {
   backdrop: string | null;
+  fanartBackdrop: string | null;
   logo: string | null;
   source: string | null;
   attribution: string | null;
@@ -31,9 +32,9 @@ export function getArtwork(anilistId: number): Promise<Artwork> {
     ? invoke<Artwork>("get_artwork", { anilistId, credentials: getProviderCredentials() })
         .catch((error) => {
           console.warn("[artwork] artwork lookup failed", { anilistId, error: String(error) });
-          return { backdrop: null, logo: null, source: null, attribution: null };
+          return { backdrop: null, fanartBackdrop: null, logo: null, source: null, attribution: null };
         })
-    : Promise.resolve({ backdrop: null, logo: null, source: null, attribution: null });
+    : Promise.resolve({ backdrop: null, fanartBackdrop: null, logo: null, source: null, attribution: null });
   artworkCache.set(anilistId, promise);
   return promise;
 }

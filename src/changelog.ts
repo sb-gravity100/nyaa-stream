@@ -17,7 +17,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Right-click menus now provide accessible actions for anime, episodes, sources, text fields and the player, including custom sources.",
       "Paste a magnet or info hash to play it directly or search for an anime and attach it to an episode or pack; existing sources can be edited, moved or removed.",
       "Custom packs map to their numbered episode rows from inspected file metadata; extras are excluded and unknown packs stay on a Batch row.",
-      "TMDB and fanart.tv artwork can fill backdrops, logos and episode stills, with an IMDb-based TMDB lookup when an ID crosswalk is missing; anime pages keep saved release results with a Refresh action, and missing episode art uses the smallest adequately seeded source with up to ten quick midpoint captures at once.",
+      "Media pages use a dimmed fanart.tv background and correctly sized TMDB episode thumbnails; the TMDB attribution logo is bundled locally. Anime pages keep saved release results with Refresh, and thumbnail building runs up to ten midpoint captures at once.",
       "Seek-bar previews show frames decoded only from verified local torrent data.",
       "Quiet update checks, in-app download progress and deferred restart are available, with branded NSIS install choices and progress.",
       "Interactive upgrades retain the existing Start Menu and desktop shortcut choices.",
