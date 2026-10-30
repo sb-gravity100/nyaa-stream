@@ -1,3 +1,9 @@
+### `e57b031` · 2026-10-30 · feat(dev): pipe Tauri output to a log file
+- `FILE_INDEX.md`
+- `README.md`
+- `package.json`
+- `scripts/tauri.ps1`
+
 ### `ee1fabf` · 2026-10-30 · feat(thumbnails): capture frames with FFmpeg
 - `CLAUDE.md`
 - `FILE_INDEX.md`
