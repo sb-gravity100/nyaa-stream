@@ -9,11 +9,6 @@ step when cutting a release.
 
 ## [Unreleased]
 
-## [0.6.1] - Unreleased
-
-### Fixed
-- Fribb movie-ID arrays no longer invalidate the AniList mapping, restoring mapped TMDB episode thumbnails and fanart.tv backgrounds.
-
 ## [0.6.0] - Unreleased
 
 ### Added
@@ -36,6 +31,7 @@ step when cutting a release.
 - Embedded mpv uses `blend-subtitles=yes` and `scale=ewa_lanczos`, retaining scaler blur 1.5, Mitchell downscaling and subtitle blur 1.0.
 
 ### Fixed
+- Fribb movie-ID arrays no longer invalidate the AniList mapping, restoring mapped TMDB episode thumbnails and fanart.tv backgrounds.
 - Plain-text subtitles use light font hinting in mpv playback and clip export; styled ASS tracks retain unhinted positioning and animation.
 - HLS subtitle rendering uses 1.5x device-pixel supersampling up to a 2160px threshold, retaining native resolution on larger outputs.
 - Updating now saves the playback resume buffer and waits for torrent teardown before starting the installer.

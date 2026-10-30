@@ -10,12 +10,6 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "0.6.1",
-    date: "2026-10-30",
-    features: [],
-    fixes: ["Fribb movie-ID arrays no longer break provider ID mapping, restoring TMDB episode thumbnails and fanart.tv backgrounds."],
-  },
-  {
     version: "0.6.0",
     date: "2026-10-30",
     features: [
@@ -29,6 +23,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Interactive upgrades retain the existing Start Menu and desktop shortcut choices.",
     ],
     fixes: [
+      "Fribb movie-ID arrays no longer break provider ID mapping, restoring TMDB episode thumbnails and fanart.tv backgrounds.",
       "Removed experimental ML scoring and training tools; source matching continues to use trusted dataset ids and title rules.",
       "Embedded mpv blends subtitles onto upscaled video frames and uses EWA Lanczos video scaling.",
       "Plain-text subtitles use light font hinting for cleaner pixel alignment; styled ASS retains authored positioning and animation.",
