@@ -1,12 +1,13 @@
 # v0.7.0 custom libmpv native build recipe
 
-Status: recipe for review, 2026-10-31. No custom DLL has been compiled.
+Status: local tools prepared, source locking in progress, 2026-10-31.
+No custom DLL has been compiled.
 SB approved mpv v0.41.0 stable, native Windows LLVM, baseline x64 and the
 frozen scope in [ROADMAP.md](ROADMAP.md). Further changes require SB review.
 SB selected keeping separate FFmpeg builds and proceeding with local tool
-setup/source locking. Core dependency-version approval remains pending.
+setup/source locking. SB also approved the four core dependency versions below.
 
-Planned v0.7.0 setup implementation: `scripts/prepare-mpv.py` bootstraps
+The v0.7.0 setup implementation `scripts/prepare-mpv.py` bootstraps
 isolated tools from `native/mpv/tools.lock.json`, records local tool identity,
 and leaves all downloads/build output under `target/mpv-build/`. The source
 lock is resolved separately after version approval, before compilation.
@@ -19,9 +20,13 @@ candidate DLL. Track the recipe and eventual build scripts/source lock in the
 repository. Keep the installed DLL and existing HLS FFmpeg tree separate.
 
 The machine has LLVM 23.1.1, Visual Studio 2022 Community, CMake 4.3.2,
-Ninja 1.13.2, Python 3.11.9, GNU Make and Git for Windows. Meson, NASM and
-pkgconf are missing from the checked environment. Record executable paths,
-versions and Windows SDK identity in the build manifest.
+Ninja 1.13.2, Python 3.11.9, GNU Make and Git for Windows. Local Meson 1.12.1,
+NASM 2.16.03 and pkgconf 2.5.1 are prepared. pkgconf was compiled with native
+LLVM, static linkage and `/MD`. Executable paths, tool versions and Windows
+SDK/Visual Studio identities are recorded in `target/mpv-build/tools-manifest.json`.
+Rerun with `python scripts/prepare-mpv.py`; archives are SHA-256 checked against
+`native/mpv/tools.lock.json`. Detailed commands/build output are retained in
+`target/mpv-build/logs/tool-commands.log`.
 
 Use the Visual Studio amd64 developer environment, LLVM `clang`/`clang++`,
 `lld-link`, `llvm-lib` and `llvm-rc`. FFmpeg/x264 configure builds may use
@@ -35,12 +40,12 @@ Use baseline x64 compiler settings throughout, preserving runtime-dispatched
 SIMD assembly. Reject `-march=native`, unconditional AVX/AVX2 and inherited
 app `x86-64-v3` flags. The existing app's CPU requirement is unchanged.
 
-## Proposed source selections
+## Source selections
 
-Only the mpv baseline is already approved. These dependency versions are
-proposals, not a completed lock or a tested compatibility claim.
+SB approved mpv and the four core media dependency versions. This is not yet
+a complete transitive lock or a tested media-stack compatibility claim.
 
-| Component | Proposed selection | Purpose |
+| Component | Selection | Purpose |
 |---|---|---|
 | mpv | `v0.41.0` | Approved client API, playback and export core |
 | FFmpeg | `n8.0.3` | Maintenance release in the 8.0 family used by mpv's release build recipe |
@@ -48,7 +53,7 @@ proposals, not a completed lock or a tested compatibility claim.
 | libplacebo | `v7.387.0` | GPU rendering, HDR and tone mapping |
 | dav1d | `1.5.3` | Software AV1 decoder, alongside hardware decode |
 | Meson | `1.12.1` | Local Python virtual environment; observed PyPI version |
-| NASM | `2.16.03`, subject to download/configuration verification | Portable assembler for optimized codec paths |
+| NASM | `2.16.03` | Prepared portable assembler for optimized codec paths |
 | pkgconf | `pkgconf-2.5.1` | Native static-library dependency discovery |
 
 Resolve full commit IDs or verified archive hashes before building. Include
@@ -110,7 +115,7 @@ Docker, MinGW binaries or a prebuilt full-featured DLL if it fails.
 
 Stages 1 and source downloads/locking in stage 2 are authorized by SB's
 selection to keep separate builds and prepare local tools/source lock.
-Core dependency versions remain subject to SB's pending answer. Full-build
+Core dependency versions are approved. Full-build
 execution, installed-player replacement and publication remain later steps.
 
 ## Acceptance and evidence

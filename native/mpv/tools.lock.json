@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "meson": {
+    "version": "1.12.1",
+    "file": "meson-1.12.1-py3-none-any.whl",
+    "url": "https://files.pythonhosted.org/packages/57/99/36cd25f9598eef70db97577440a70a360af505f6f01c2338a18d1556079c/meson-1.12.1-py3-none-any.whl",
+    "sha256": "930bc7542cbd9f57009e182fd014eba48cf1a0180a7b9006d2d32d8f168d8b02",
+    "identity_source": "PyPI release metadata for meson 1.12.1"
+  },
+  "nasm": {
+    "version": "2.16.03",
+    "file": "nasm-2.16.03-win64.zip",
+    "url": "https://www.nasm.us/pub/nasm/releasebuilds/2.16.03/win64/nasm-2.16.03-win64.zip",
+    "sha256": "3ee4782247bcb874378d02f7eab4e294a84d3d15f3f6ee2de2f47a46aa7226e6",
+    "directory": "nasm-2.16.03",
+    "identity_source": "SHA-256 recorded from the upstream HTTPS archive; no separate published checksum was located"
+  },
+  "pkgconf": {
+    "version": "2.5.1",
+    "ref": "pkgconf-2.5.1",
+    "commit": "4fc570f91d9d8d843ab32d2198a5c064538d8ffd",
+    "file": "pkgconf-4fc570f91d9d8d843ab32d2198a5c064538d8ffd.zip",
+    "url": "https://codeload.github.com/pkgconf/pkgconf/zip/4fc570f91d9d8d843ab32d2198a5c064538d8ffd",
+    "sha256": "2f29f902a64b1aff330da5791ef473b74b25b7adfaaf481b32ecbb32c62aada6",
+    "directory": "pkgconf-4fc570f91d9d8d843ab32d2198a5c064538d8ffd",
+    "identity_source": "Upstream git tag resolved with git ls-remote; SHA-256 recorded from its HTTPS commit archive"
+  }
+}

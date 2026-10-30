@@ -84,9 +84,11 @@ override this order.
 - [x] SB approved mpv v0.41.0 stable and freezing the agreed trimming scope
 - [~] Prepare native LLVM build recipe (docs/planning/MPV_BUILD.md); core
       versions proposed, complete source lock and setup approval remain open
-- [~] Prepare isolated tools (`scripts/prepare-mpv.py`, `native/mpv/tools.lock.json`)
-      and resolve source/archive hashes; SB selected separate FFmpeg builds and
-      authorized setup/source locking; core dependency versions await approval
+- [x] Prepare isolated Meson/NASM/pkgconf with `scripts/prepare-mpv.py` and
+      `native/mpv/tools.lock.json`; native LLVM pkgconf build and tool versions verified
+- [x] SB approved FFmpeg 8.0.3, libass 0.17.5, libplacebo 7.387.0 and dav1d 1.5.3
+- [ ] Resolve the complete source/archive lock; SB selected separate FFmpeg
+      builds and authorized source locking
 - [ ] Improve batch next-episode transitions by reusing torrent/file metadata and
       verified data; preserve season-aware file selection and source fallback
 - [ ] Measure next-episode click/autoplay to first frame on cached, partial,
