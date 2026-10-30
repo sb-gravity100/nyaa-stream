@@ -1,3 +1,7 @@
+### `404aa64` · 2026-10-31 · docs: record approved custom libmpv scope
+- `docs/planning/ROADMAP.md`
+- `PHASES.md`
+
 ### `6163ff6` · 2026-10-31 · docs: prioritize custom libmpv in v0.7.0
 - `PLAN.md`
 - `PHASES.md`
