@@ -46,15 +46,18 @@ signed NSIS/MSI artifacts were generated, and the Win10Lite installer matrix
 passed NSIS→NSIS, MSI→MSI and MSI→NSIS upgrades (17/17 checks each). Both current
 installers launch with the bundled app-local `VCRUNTIME140.dll`; upgrades retain
 the release database and user-data marker, and uninstall retains user data.
-The test records are in `docs/acceptance/v0.6.0/`. The in-app updater's signed
-download/stage/relaunch path, UAC, interactive installer choices, clean-machine
-WebView2 bootstrap and repair/registration checks remain open. See
+The test records are in `docs/acceptance/v0.6.0/`. The v0.5.8-based updater
+acceptance is not applicable because v0.5.8 has no in-app updater; the installer
+upgrade matrix is the migration check. Signed apply/relaunch against a later
+build, UAC, interactive installer choices, clean-machine WebView2 bootstrap
+and repair/registration checks remain open. See
 `docs/prototypes/installer/FEASIBILITY.md`. The selected update schedule is
 30 seconds after readiness, then every six hours, with 15-minute to 6-hour
 failure backoff. First install defaults to `%LOCALAPPDATA%/Programs/nyaa-stream`,
 Start menu shortcut on and desktop shortcut off. Provider terms were
 rechecked: Simkl is excluded until the app provides Simkl login and sync.
-Fribb's mapping data has no stated license; do not publish until resolved.
+Fribb's mapping data has no stated license; a clarification request is open at
+https://github.com/Fribb/anime-lists/issues/33. Do not publish until resolved.
 Continuous drag behavior, batch transition work and native supersampling remain
 v0.7.0.
 
