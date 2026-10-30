@@ -1,3 +1,10 @@
+### `a9afc8b` · 2026-10-31 · docs: draft native libmpv build recipe
+- `docs/planning/MPV_BUILD.md`
+- `docs/planning/ROADMAP.md`
+- `PLAN.md`
+- `PHASES.md`
+- `FILE_INDEX.md`
+
 ### `82208db` · 2026-10-31 · docs: approve additional libmpv component cuts
 - `docs/planning/ROADMAP.md`
 
