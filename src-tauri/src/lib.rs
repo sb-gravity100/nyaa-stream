@@ -1981,7 +1981,8 @@ async fn export_clip(
 fn log_dir() -> std::path::PathBuf {
     #[cfg(debug_assertions)]
     {
-        return std::env::current_dir().unwrap_or_else(|_| std::env::temp_dir()).join("logs");
+        let project_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap_or_else(|| std::path::Path::new("."));
+        return project_root.join("logs");
     }
     #[cfg(not(debug_assertions))]
     dirs::data_local_dir()
