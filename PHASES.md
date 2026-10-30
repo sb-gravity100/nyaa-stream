@@ -44,13 +44,13 @@ Feature work follows this order; remaining acceptance checks stay open below.
   - [x] Metadata-only pack inspection and persisted video file list; no file reader is opened during inspection
   - [x] Store tests cover additive migration, move/edit, duplicate-hash merge, restart persistence, and removal
   - [ ] Manual app acceptance for sparse/multi-season selection, restart persistence, and malformed/hash input cases
-- [~] 3: Artwork providers are connected; IMDb-based TMDB fallback covers unambiguous IDs, while missing crosswalks and Fribb's license request awaits a response
+- [~] 3: Artwork providers are connected; IMDb-based TMDB fallback covers unambiguous IDs, while missing crosswalks and Fribb's data license remain unresolved
       - [x] Cached provider client and AniList ID mapping (TMDB + fanart.tv)
       - [x] User-supplied keys stored locally, omitted from backup, and never logged
       - [x] Tauri artwork/backdrop/still commands and About attribution settings
       - [x] Connect artwork fallbacks to media pages, hero, Continue watching and episode cards
       - [x] arm-server v2 fallback for missing map rows/map failures (AniDB, Kitsu, MAL, Simkl, IMDb); resolve an unambiguous IMDb-to-TMDB match when available, without guessing TV season or episode offsets
-      - [ ] Resolve Fribb mapping-data license before publication; request is open at https://github.com/Fribb/anime-lists/issues/33
+      - [ ] Resolve Fribb mapping-data license before publication
 - [~] 4: Persisted release results with explicit refresh and missing-thumbnail torrent capture; live-swarm acceptance remains open
 - [~] 5: Verified-data-only seekbar storyboard/hover previews; generation covers only the contiguous verified prefix, and Windows acceptance remains open
 - [~] 6: Branded NSIS install choices and styled file-copy progress/completion/error pages; isolated lifecycle checks remain open

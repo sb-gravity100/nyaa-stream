@@ -56,8 +56,7 @@ and repair/registration checks remain open. See
 failure backoff. First install defaults to `%LOCALAPPDATA%/Programs/nyaa-stream`,
 Start menu shortcut on and desktop shortcut off. Provider terms were
 rechecked: Simkl is excluded until the app provides Simkl login and sync.
-Fribb's mapping data has no stated license; a clarification request is open at
-https://github.com/Fribb/anime-lists/issues/33. Do not publish until resolved.
+Fribb's mapping data has no stated license; do not publish until resolved.
 Continuous drag behavior, batch transition work and native supersampling remain
 v0.7.0.
 
