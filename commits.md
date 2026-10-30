@@ -1,3 +1,9 @@
+### `06f23ff` · 2026-10-30 · chore: release v0.6.0
+- `CHANGELOG.md`
+- `PHASES.md`
+- `PLAN.md`
+- `docs/planning/V0_6_0.md`
+
 ### `f3e3b8e` · 2026-10-30 · docs: remove closed license inquiry reference
 - `PHASES.md`
 - `PLAN.md`
