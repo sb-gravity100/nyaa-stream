@@ -29,7 +29,7 @@ Feature work follows this order; remaining acceptance checks stay open below.
       Start menu on, desktop shortcut off)
 - [~] 0: Prove installer/updater backend, clean-machine bootstrap, signed
       artifact, silent upgrade, old-install migration and restart lifecycle
-  - [x] Current code built into signed local NSIS and MSI installers with updater signatures; no artifacts uploaded
+  - [x] Current code built into signed local NSIS and MSI installers with updater signatures; 2026-10-30 release dry-run staged both packages and `latest.json`; no artifacts uploaded
   - [x] Win10Lite matrix passed 17/17 checks each for v0.5.8 NSIS→v0.6.0 NSIS, MSI→MSI, and MSI→NSIS; v0.6.0 launches and preserves the existing database and user-data marker
   - [x] Bundle app-local `VCRUNTIME140.dll` 14.44.35211.0; both v0.6.0 installer formats launch and uninstall while retaining user data
   - [ ] Prove clean-machine WebView2 bootstrap, interactive choices, UAC/elevation, repair and uninstall registration
