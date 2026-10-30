@@ -377,7 +377,7 @@ nyaa_stream/
    the cursor) after the mouse sits idle, unless the pointer rests over
    the top or bottom control areas - re-checked on every pointer move
    against the bars and their invisible hover zones, see PlayerView.tsx's
-   CONTROLS_AREA_SELECTOR), plus PotPlayer/YouTube-style keybinds (space/K
+   CONTROLS_AREA_SELECTOR), plus player keyboard shortcuts (space/K
    play-pause, arrows/J/L seek, up/down volume, M mute, F fullscreen, Esc
    close) that work whether or not the bar is currently shown. Seeking is
    a plain `video.currentTime` set - hls.js fetches whichever segment
@@ -855,4 +855,3 @@ resume served from a resume buffer.
   of the target or occasionally not resolve in time, same tradeoff as
   torrent-engine's HLS segment restarts.
 See `PHASES.md` for the build order.
-

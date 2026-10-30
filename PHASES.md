@@ -127,7 +127,6 @@ policy remains unchanged.
 - [ ] Benchmark upstream mpv seek/read-ahead and retarget/cancel behavior;
       implement only independent changes with repeatable latency gains and
       no stale-seek or resume regressions
-- [ ] Verify no PotPlayer code or private implementation details are copied
 - [ ] Verify hardware decode and software fallback on supported Windows GPUs
 - [ ] Integrate the candidate DLL and check existing embedded-player ABI,
       torrent playback, screenshots, and HLS fallback
@@ -397,14 +396,14 @@ policy remains unchanged.
 - [x] Wire a video player to the media page: play button per episode row
       calls `play_magnet`, auto-picking the release with the most seeders
       out of that episode's group (`bestRelease` in `releases.ts`), and
-      plays it in a full-viewport `PlayerView.tsx` with a PotPlayer-style
-      hover-reveal bottom control bar (play/pause, seek, volume,
+      plays it in a full-viewport `PlayerView.tsx` with a bottom control bar
+      that appears on hover (play/pause, seek, volume,
       fullscreen, time, source picker)
 - [x] Solid-black control bar shown on mouse movement, faded out (with
       the cursor) after an idle timer unless the pointer rests over the
       top/bottom control areas (the bars or their always-present
       `.player-controls-hover-zone` strips, re-checked on every pointer
-      move), plus a mute button and PotPlayer/YouTube-style keybinds
+      move), plus a mute button and player keyboard shortcuts
       (space/K play-pause, arrows ±5s / J/L ±10s seek, up/down ±5 volume,
       M mute, F fullscreen, Esc close) that work whether or not the mouse
       is anywhere near the bar - a keybind press flashes the bar briefly

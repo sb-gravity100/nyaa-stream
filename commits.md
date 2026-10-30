@@ -3239,7 +3239,7 @@ Commit log, newest first. Prepend a new entry after every commit.
 ### `d2c70e5` · 2026-08-30 · fix(sources): drop cross-season contamination from grouped results
 - `FILE_INDEX.md`, `PLAN.md`, `src/App.tsx`, `src/episodeParser.ts`
 
-### `d7d45da` · 2026-08-30 · feat(player): hover-only solid control bar + PotPlayer/YouTube keybinds
+### `d7d45da` · 2026-08-30 · feat(player): hover-only solid control bar + player keyboard shortcuts
 - `FILE_INDEX.md`, `PHASES.md`, `PLAN.md`, `src/App.css`, `src/PlayerView.tsx`
 
 ### `7da48e9` · 2026-08-30 · fix(parser): stop "Final Season" colliding with real season 1

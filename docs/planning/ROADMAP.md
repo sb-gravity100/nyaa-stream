@@ -27,9 +27,8 @@ Windows cross-toolchain after a small build feasibility spike. Keep the
 existing vcpkg FFmpeg build for the HLS pipeline separate unless a later
 measured design proves safe to consolidate.
 
-Use PotPlayer only as a source of documented feature ideas, not as code or
-binary input. Implement improvements through upstream mpv/FFmpeg/libass/
-libplacebo features or independently authored patches: keep ASS antialiasing
+Implement improvements through upstream mpv/FFmpeg/libass/libplacebo features
+or independently authored patches: keep ASS antialiasing
 and subtitle processing isolated from video scaling so detail is retained;
 verify E-AC-3 decoding with known samples; optimize seek latency against the
 current DLL using nyaa-stream's seek traces and repeatable playback cases;
@@ -39,8 +38,7 @@ may tune upstream mpv buffering/read-ahead, retargeting and cancellation
 behavior, mpv's range/read pattern, or our stream-reader integration, but
 each change must show a measured improvement without stale-seek or resume
 regressions. Compare first-byte, first-frame, seek-complete, bytes-requested,
-and buffering times on the same torrents. Do not copy
-PotPlayer code or infer its private seek implementation. Add build identity
+and buffering times on the same torrents. Add build identity
 and selected decoder/hwdec context to logs without logging private paths or
 credentials. Ship required license notices and corresponding source or
 source-offer materials for the exact distributed build. Acceptance compares
@@ -98,10 +96,8 @@ host/window. The WebView2 runtime owns its child executable identity; do not
 rename or patch `msedgewebview2.exe` or its icon. Verify any Task Manager
 grouping available through supported Windows app identity settings.
 
-The PotPlayer installer review exposed no source-level evidence of its
-memory-management strategy. Use its visible behavior only as a comparison;
-memory changes must be independently implemented and justified by this
-dump's follow-up profiling.
+Memory changes require follow-up profiling and repeatable measurements on
+representative idle, library, playback and minimized workloads.
 
 ## 32-bit Windows support (planned, v1.0.0 - minor: new target)
 
@@ -286,4 +282,3 @@ Open questions (to decide before this becomes phases):
 Risks: inconsistent release groups mid-series (quality/audio jumps), torrents
 with no seeders stalling the queue (needs a timeout then fall back to the
 next-best release), look-ahead bandwidth/disk use.
-
