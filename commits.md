@@ -1,3 +1,6 @@
+### `82208db` · 2026-10-31 · docs: approve additional libmpv component cuts
+- `docs/planning/ROADMAP.md`
+
 ### `ad024b1` · 2026-10-31 · docs: approve trimming unused mpv effects
 - `docs/planning/ROADMAP.md`
 
