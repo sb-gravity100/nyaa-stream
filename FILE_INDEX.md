@@ -4,6 +4,7 @@
 |---|---|---|
 | `Cargo.toml` | Workspace root, shared dependency versions | workspace, config |
 | `package.json` | Frontend deps + Tauri CLI scripts (`dev:sbtl-local`: run against the sibling sbtl checkout) | frontend, config |
+| `scripts/tauri.ps1` | Tauri CLI wrapper: forwards commands and pipes `dev` output to `logs/tauri-dev.log` by default, or the path selected by `--pipe-log` | tooling, diagnostics |
 | `.github/workflows/release.yml` | Manual `workflow_dispatch` only (Actions unavailable - account billing-locked): windows runner fetches prebuilt native libs + libmpv, builds with `tauri-action` (signed with the `TAURI_SIGNING_PRIVATE_KEY` secret), publishes installer + `.sig` + `latest.json` as a GitHub release | ci, release |
 | `.vscode/settings.json` | `rust-analyzer.cargo.targetDir: true` - the editor's `cargo check` uses `target/rust-analyzer`, so it never blocks or invalidates `tauri dev`'s build | config, tooling |
 | `scripts/release.mjs` | `npm run release -- --notes "..." [--dry-run] [--skip-build]`: local release - preflight (clean tree, HEAD tagged `v<version>`, versions in lockstep, gh login, sbtl resolved from a git tag, native libs + libmpv), signed `tauri build` with the key contents from `~/.tauri/nyaa-stream.key`, stages NSIS/MSI + `.sig` + `latest.json` in `target/release/publish`, pushes main + that one tag, `gh release create` | release, tooling |

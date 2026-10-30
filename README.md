@@ -214,6 +214,9 @@ npm run setup
 npm run tauri dev
 ```
 
+Development output is appended to `logs/tauri-dev.log`. To choose another
+destination, pass `--pipe-log <path>` after `dev`.
+
 `npm run setup` is only needed once, or again after the native-deps version changes.
 
 ### Build an installer

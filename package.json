@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "tauri": "tauri",
+    "tauri": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/tauri.ps1",
     "dev:sbtl-local": "tauri dev -- --config \"patch.'https://github.com/sb-gravity100/sbtl'.sbtl.path='../../sb_torrent/bindings/rust/sbtl'\" --config \"env.SBTL_PREBUILT_DIR={value='../../sb_torrent/build/nyaa/bin', relative=true}\"",
     "bump": "node scripts/bump-version.mjs",
     "setup": "node scripts/fetch-native-deps.mjs",
