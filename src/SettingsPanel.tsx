@@ -939,7 +939,7 @@ yaa-stream screenshots.">
             )}
             <div class="setting-subsection">
               <h4>Embedded mpv ASS rendering</h4>
-              <p class="settings-hint">These controls independently scale and smooth ASS subtitle edges. The HLS fallback keeps its existing 1.5× subtitle rendering.</p>
+              <p class="settings-hint">These playback controls independently scale and smooth ASS subtitle edges. HLS keeps its existing 1.5× subtitle rendering; clip export retains its ASS style.</p>
               <Row label="Render resolution" hint="Video resolution scales subtitles with the picture. Window resolution renders subtitles at the window size.">
                 <select
                   value={rendering.resolution}

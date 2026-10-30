@@ -1325,10 +1325,9 @@ function MpvPlayerView({
       const burnSubs = request.includeSubs && activeSubtitle != null && videoEl != null;
       console.info("[player] exporting clip", { start: request.start, end: request.end, folder: request.folder || "(default)", subs: burnSubs });
       try {
-         const subtitleSettings = burnSubs ? {
-            ...await mpvSubtitleSettings(videoEl, settings.subtitleStyle, isStyledTrack(activeSubtitle)),
-            ...await mpvSubtitleRenderingSettings(videoEl, settings.subtitleRendering),
-         } : null;
+         // Clip export uses mpv's encode path, not a VO shader. Keep the ASS
+         // style and leave playback-only overlay filters out of the request.
+         const subtitleSettings = burnSubs ? await mpvSubtitleSettings(videoEl, settings.subtitleStyle, isStyledTrack(activeSubtitle)) : null;
          const out = await invoke<string>("export_clip", {
             torrentId,
             fileIdx: selectedFile.index,
