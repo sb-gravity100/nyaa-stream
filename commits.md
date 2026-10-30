@@ -1,3 +1,7 @@
+### `e691c68` · 2026-10-30 · docs(release): draft v0.6.0 notes
+- `FILE_INDEX.md`
+- `docs/releases/v0.6.0.md`
+
 ### `d881960` · 2026-10-30 · feat(artwork): select seasonal Fanart logos
 - `CHANGELOG.md`
 - `FILE_INDEX.md`
