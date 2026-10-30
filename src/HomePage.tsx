@@ -299,7 +299,7 @@ export function HomePage({
   const candidates = useMemo((): Featured[] => {
     const list: Featured[] = [];
     const seen = new Set<number>();
-    const artFor = (id: number, anime: AnimeMedia) => artworkByMedia[id]?.backdrop ?? kitsuByMedia[id]?.background ?? anime.bannerImage ?? anime.coverImage.extraLarge ?? anime.coverImage.large;
+    const artFor = (id: number, anime: AnimeMedia) => artworkByMedia[id]?.fanartBackdrop ?? artworkByMedia[id]?.backdrop ?? kitsuByMedia[id]?.background ?? anime.bannerImage ?? anime.coverImage.extraLarge ?? anime.coverImage.large;
     for (const resume of inProgress.slice(0, 2)) {
       const anime = asAnime(resume);
       seen.add(anime.id);
