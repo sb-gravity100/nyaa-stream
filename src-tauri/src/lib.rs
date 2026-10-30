@@ -22,7 +22,6 @@ use std::time::Duration;
 
 use anilist_client::{AiringEntry, AniListClient, AnimeMedia, AnimeTitle};
 use kitsu_client::{KitsuClient, KitsuMetadata};
-use mpv_player::MpvPlayer;
 use nyaa_client::{Category, NyaaClient, NyaaResult, TorrentDetails};
 use serde::{Deserialize, Serialize};
 use tauri::{Emitter, Manager, State};
@@ -51,8 +50,8 @@ struct AppState {
     franchise_cache: franchise_cache::FranchiseCache,
     /// Set after AniList turns us away - see `metadata_fallback`.
     anilist_cooldown: metadata_fallback::AniListCooldown,
-    /// One torrent capture at a time: each adds a scratch torrent and a
-    /// headless mpv decode, and a home page full of art-less cards used to
+    /// One torrent capture at a time: each adds a scratch torrent and an
+    /// FFmpeg frame extraction, and a home page full of art-less cards used to
     /// start them all at once.
     thumbnail_captures: tokio::sync::Semaphore,
     /// A batch build stops between file captures when the user cancels.
@@ -558,25 +557,14 @@ async fn build_view_page_thumbnail(
     Ok(None)
 }
 
-/// Fallback seek target when there's no duration estimate to compute a real
-/// midpoint from (see `capture_thumbnail_uncached`) - far enough to usually
-/// be past a cold-open/company-logo black frame, still early enough that
-/// reaching it by just letting playback run from 0 (no `--start`, avoiding
-/// mpv needing to seek at all) only pulls a small amount of data.
+/// Fallback seek target when there's no duration estimate for the FFmpeg
+/// midpoint seek; far enough to usually clear a cold-open/logo frame.
 const THUMBNAIL_SEEK_SECONDS: f64 = 8.0;
-/// Slack allowed when we *do* have a duration estimate and ask mpv to
-/// start already near the midpoint via `--start` (see mpv-player's
-/// `spawn_headless` doc comment): without a Matroska Cues index on a
-/// still-downloading torrent, that seek can land on the nearest keyframe
-/// *before* the exact target rather than exactly on it, so the wait loop
-/// below accepts anything within this much of the target instead of
-/// waiting for an exact match that might never come.
-const THUMBNAIL_SEEK_TOLERANCE_SECONDS: f64 = 5.0;
 /// A weak listing can be stale by the time the user builds thumbnails. Move
 /// on quickly when no peer connects rather than waiting through the old 20s
 /// gate for each candidate.
 const THUMBNAIL_PEER_TIMEOUT: Duration = Duration::from_secs(8);
-/// Upper bound on one mpv midpoint seek and screenshot. The separate peer
+/// Upper bound on one FFmpeg midpoint seek and frame extraction. The separate peer
 /// connection gate is shorter; a slow source should not stall the build queue.
 const THUMBNAIL_CAPTURE_TIMEOUT: Duration = Duration::from_secs(25);
 const THUMBNAIL_POLL_INTERVAL: Duration = Duration::from_millis(250);
@@ -832,23 +820,20 @@ async fn capture_thumbnail_file(
     duration_minutes: Option<f64>,
 ) -> anyhow::Result<()> {
     if let Some(parent) = cache_path.parent() { tokio::fs::create_dir_all(parent).await?; }
-    let stream_url = state.torrent_engine.stream_url(torrent_id, file_idx);
     let target_seconds = duration_minutes.filter(|minutes| *minutes > 0.0).map(|minutes| minutes * 60.0 / 2.0);
-    let capture = tokio::time::timeout(THUMBNAIL_CAPTURE_TIMEOUT, async {
-        let mut player = MpvPlayer::spawn_headless(&stream_url, target_seconds).await?;
-        let effective_target = target_seconds.unwrap_or(THUMBNAIL_SEEK_SECONDS);
-        let deadline = tokio::time::Instant::now() + THUMBNAIL_CAPTURE_TIMEOUT;
-        loop {
-            let position = player.get_time_position().await.unwrap_or(0.0);
-            let reached = target_seconds.map_or(position >= effective_target, |_| position >= effective_target - THUMBNAIL_SEEK_TOLERANCE_SECONDS);
-            if reached { break; }
-            if tokio::time::Instant::now() >= deadline { anyhow::bail!("timed out waiting for playback to reach {effective_target}s"); }
-            tokio::time::sleep(THUMBNAIL_POLL_INTERVAL).await;
+    let target_seconds = target_seconds.unwrap_or(THUMBNAIL_SEEK_SECONDS);
+    let temp_path = cache_path.with_extension("capture.jpg");
+    let capture = state.torrent_engine.capture_thumbnail_frame(torrent_id, file_idx, target_seconds, temp_path.clone(), THUMBNAIL_CAPTURE_TIMEOUT).await;
+    if capture.is_ok() {
+        match tokio::fs::remove_file(cache_path).await {
+            Ok(()) => {},
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {},
+            Err(error) => return Err(error.into()),
         }
-        let screenshot = player.screenshot_to_file(&cache_path.to_string_lossy()).await;
-        let _ = player.quit().await;
-        screenshot
-    }).await.map_err(|_| anyhow::anyhow!("thumbnail capture timed out after {THUMBNAIL_CAPTURE_TIMEOUT:?}"))?;
+        tokio::fs::rename(&temp_path, cache_path).await?;
+    } else if let Err(error) = tokio::fs::remove_file(&temp_path).await {
+        if error.kind() != std::io::ErrorKind::NotFound { tracing::debug!(%error, "failed to remove partial thumbnail frame"); }
+    }
     if capture.is_ok() {
         match state.torrent_engine.stats(torrent_id, file_idx).await {
             Ok(stats) => tracing::info!(

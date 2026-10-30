@@ -157,8 +157,8 @@ full architecture; summary:
   parser change against `src-tauri/tests/fixtures/nyaa_titles/corpus.txt`
 - `crates/anilist-client` — AniList GraphQL metadata client
 - `crates/mpv-player` — in-process libmpv (`libmpv-2.dll`, runtime-loaded,
-  bundled from `src-tauri/lib/`): `EmbeddedMpv` (playback) and headless
-  `MpvPlayer` (torrent-thumbnail capture)
+  bundled from `src-tauri/lib/`): `EmbeddedMpv` (playback); torrent thumbnail
+  frames are captured by in-process FFmpeg through direct sbtl reads
 - Real playback is libmpv embedded in the app window (`wid`,
   `src-tauri/src/player.rs`) under a transparent *webview* background —
   never `transparent: true` on the window, which broke click input — with
@@ -177,4 +177,3 @@ full architecture; summary:
   dependency, consult it for architecture ideas only
 - Run `cargo check --workspace` after touching any Rust crate before
   considering a change done
-

@@ -78,6 +78,24 @@ impl MediaJob {
             scheduler.abort();
         }
     }
+
+    /// Waits for a bounded one-off media job, cancelling blocked torrent
+    /// reads before returning on timeout.
+    fn wait_timeout(mut self, timeout: Duration) -> anyhow::Result<()> {
+        let deadline = std::time::Instant::now() + timeout;
+        loop {
+            let Some(scheduler) = self.scheduler.as_ref() else { anyhow::bail!("media job ended without a scheduler") };
+            if scheduler.is_ended() {
+                let scheduler = self.scheduler.take().expect("scheduler checked above");
+                return scheduler.wait().map_err(|err| anyhow::anyhow!("{}: {err}", self.label));
+            }
+            if std::time::Instant::now() >= deadline {
+                self.abort();
+                anyhow::bail!("{} timed out after {timeout:?}", self.label);
+            }
+            std::thread::sleep(Duration::from_millis(25));
+        }
+    }
 }
 
 impl Drop for MediaJob {
@@ -618,6 +636,28 @@ pub fn export_clip(clip: ClipExport<'_>) -> anyhow::Result<()> {
         .map_err(|err| anyhow::anyhow!("clip export: failed to start: {err}"))?
         .wait()
         .map_err(|err| anyhow::anyhow!("clip export: {err}"))
+}
+
+/// Seeks directly into an sbtl-backed reader and writes its first decoded
+/// frame as a centered 16:9 JPEG. The output limit makes FFmpeg stop as soon
+/// as one frame has been encoded.
+pub fn capture_thumbnail_frame(input: InputSource, out: &Path, start_seconds: f64, timeout: Duration) -> anyhow::Result<()> {
+    init();
+    anyhow::ensure!(start_seconds.is_finite() && start_seconds >= 0.0, "invalid thumbnail seek time");
+    let (input, cancel) = open_input(input, start_seconds);
+    let input = input.set_format_opt("probesize", "2000000").set_format_opt("analyzeduration", "2000000");
+    let output = Output::from(out.to_string_lossy().to_string())
+        .set_format("image2")
+        .add_stream_map("0:v:0")
+        .set_video_codec("mjpeg")
+        .set_video_filter("scale=640:360:force_original_aspect_ratio=increase,crop=640:360")
+        .set_max_video_frames(1);
+    let context = FfmpegContext::builder().input(input).output(output).build()
+        .map_err(|err| anyhow::anyhow!("thumbnail frame: {err}"))?;
+    tracing::info!(start_seconds, out = %out.display(), "capturing one torrent thumbnail frame with ffmpeg");
+    start(context, "thumbnail frame", cancel)?.wait_timeout(timeout)?;
+    anyhow::ensure!(out.is_file() && std::fs::metadata(out)?.len() > 0, "ffmpeg produced no thumbnail frame");
+    Ok(())
 }
 
 #[cfg(test)]

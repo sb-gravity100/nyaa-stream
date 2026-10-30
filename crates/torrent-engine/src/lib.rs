@@ -1572,6 +1572,15 @@ impl TorrentEngine {
             .map_err(|err| anyhow::anyhow!("clip export panicked: {err}"))?
     }
 
+    /// Captures one frame using FFmpeg's direct, seekable sbtl reader.
+    pub async fn capture_thumbnail_frame(&self, torrent_id: &TorrentId, file_idx: usize, start_seconds: f64, out: PathBuf, timeout: Duration) -> anyhow::Result<()> {
+        let input = media::InputSource::Torrent(self.hls_jobs.sources.reader(torrent_id, file_idx, true));
+        tracing::info!(torrent_id = %torrent_id, file_idx, start_seconds, out = %out.display(), "torrent thumbnail frame requested");
+        tokio::task::spawn_blocking(move || media::capture_thumbnail_frame(input, &out, start_seconds, timeout))
+            .await
+            .map_err(|err| anyhow::anyhow!("thumbnail frame capture panicked: {err}"))?
+    }
+
     /// Download progress/speed/peer-count snapshot for an in-progress
     /// torrent, polled by the frontend to show buffering feedback while
     /// mpv waits for enough data to start decoding.
