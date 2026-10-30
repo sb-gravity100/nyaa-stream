@@ -25,7 +25,10 @@ Custom-build scope approved by SB on 2026-10-31:
 - Keep Lua scripting. Remove JavaScript scripting, native C plugin loading,
   CD/DVD/Blu-ray disc playback, TV/capture-device inputs, VapourSynth and
   gamepad input. Disc-rip video files remain supported through their containers.
-- Build-environment setup and exact dependency revisions/options await review.
+- Use a native Windows LLVM build, approved by SB; exact dependency revisions,
+  setup commands and remaining optional-component cuts await review.
+- Baseline x64 applies to this DLL. The existing Rust/HLS build still targets
+  x86-64-v3; changing the whole app's CPU requirement is outside this build scope.
 
 Native subtitle supersampling remains deferred to this milestone by SB.
 Render subtitle masks at bounded 1.5x resolution and downsample before
