@@ -1,3 +1,8 @@
+### `f3e3b8e` · 2026-10-30 · docs: remove closed license inquiry reference
+- `PHASES.md`
+- `PLAN.md`
+- `docs/planning/V0_6_0.md`
+
 ### `63e402c` · 2026-10-30 · docs(release): waive legacy updater baseline check
 - `PHASES.md`
 - `PLAN.md`
