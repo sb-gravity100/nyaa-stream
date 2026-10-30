@@ -1,3 +1,6 @@
+### `c2a313c` · 2026-10-30 · docs: resolve updater lifecycle design audit
+- `docs/planning/V0_6_0.md`
+- `PHASES.md`
 ### `30e4aa6` · 2026-10-30 · style(installer): brand progress and setup action
 - `src-tauri/installer/installer.nsi`
 - `CHANGELOG.md`
