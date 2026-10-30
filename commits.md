@@ -1,3 +1,29 @@
+### `bae398d` · 2026-10-30 · perf(thumbnails): run ten refillable workers
+- `CHANGELOG.md`
+- `FILE_INDEX.md`
+- `PHASES.md`
+- `docs/planning/V0_6_0.md`
+- `src-tauri/src/lib.rs`
+- `src/MediaPage.tsx`
+- `src/changelog.ts`
+
+### `23b3ae5` · 2026-10-30 · feat(media): cache releases and streamline thumbnails
+- `CHANGELOG.md`
+- `FILE_INDEX.md`
+- `PHASES.md`
+- `PLAN.md`
+- `crates/nyaa-client/src/lib.rs`
+- `crates/nyaa-client/src/store.rs`
+- `docs/planning/ARCHITECTURE.md`
+- `docs/planning/V0_6_0.md`
+- `src-tauri/src/lib.rs`
+- `src-tauri/src/player.rs`
+- `src-tauri/src/thumbnail_build.rs`
+- `src/App.tsx`
+- `src/MediaPage.tsx`
+- `src/changelog.ts`
+- `src/releaseCache.ts`
+- `src/torrentThumbnail.ts`
 ### `b482144` · 2026-10-30 · fix(dev): anchor logs to project folder
 - `src-tauri/src/lib.rs`
 
@@ -3384,22 +3410,3 @@ Commit log, newest first. Prepend a new entry after every commit.
 - `PLAN.md`
 - `PHASES.md`
 - `CHANGELOG.md`
-### `23b3ae5` · 2026-10-30 · feat(media): cache releases and streamline thumbnails
-- `CHANGELOG.md`
-- `FILE_INDEX.md`
-- `PHASES.md`
-- `PLAN.md`
-- `crates/nyaa-client/src/lib.rs`
-- `crates/nyaa-client/src/store.rs`
-- `docs/planning/ARCHITECTURE.md`
-- `docs/planning/V0_6_0.md`
-- `src-tauri/src/lib.rs`
-- `src-tauri/src/player.rs`
-- `src-tauri/src/thumbnail_build.rs`
-- `src/App.tsx`
-- `src/MediaPage.tsx`
-- `src/changelog.ts`
-- `src/releaseCache.ts`
-- `src/torrentThumbnail.ts`
-
-### `b482144` · 2026-10-30 · fix(dev): anchor logs to project folder
