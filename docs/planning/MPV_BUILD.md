@@ -132,6 +132,17 @@ Docker, MinGW binaries or a prebuilt full-featured DLL if it fails.
 - Remove approved unused effect categories. Build an explicit filter list from
   actual dependencies; retain format/scale, resampling, subtitle burn-in and
   timing functions plus mpv's pitch-preserving speed control.
+- New subtitle-rendering feature approved by SB on 2026-10-31: add embedded-mpv
+  Settings controls for ASS-only upscaling/downscaling filters, edge antialiasing
+  and blur, and a window-resolution subtitle path with its own AA/blur values.
+  Keep video `scale`/`dscale` behavior independent. These names/values will be
+  designed in original mpv/libplacebo patches; the `ass-*`/`wns-*` examples in
+  mpv issue 2820 are not options in mpv v0.41.0. HLS keeps its existing 1.5x
+  JASSUB path and does not consume the embedded-mpv controls.
+- Extend the same Settings controls to subtitle-burned clip export where the
+  mpv encode path supports them. Keep saved-frame and screenshot subtitle
+  rendering consistent. Record any render path that cannot share the new mask
+  processing before claiming parity.
 - Input containers have not been approved for trimming. Preserve existing
   container coverage during this build; decoder selection still limits media.
 - Exclude standalone ffmpeg/ffplay/ffprobe programs, demos and development
@@ -174,6 +185,10 @@ configuration is exercised; record and review any changes to the source lock.
 - Exercise H.264 (including anime 10-bit sources), HEVC 10-bit, AV1, all retained
   audio codecs, ASS/font attachments, screenshots, HTTP Range reads, HDR/tone
   mapping, software/hardware decode and subtitle-burned MP4 export.
+- Verify ASS filter choices independently change subtitle pixels while the
+  source video remains unchanged; check video- and window-resolution subtitle
+  modes, AA/blur bounds, scaling ratios, borders, anime typesetting/animation,
+  high-DPI changes, fullscreen, embedded mpv and the HLS fallback.
 - Compare playback/start/seek results against the original DLL on identical
   sources. The 2026-10-30 log contains 1,295 successful seek summaries; the
   slowest is 11,520 ms with 11,503 ms of recorded torrent waits. That is a

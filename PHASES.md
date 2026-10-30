@@ -87,6 +87,8 @@ override this order.
       `native/mpv/tools.lock.json`; native LLVM pkgconf build and tool versions verified
 - [x] SB approved FFmpeg 8.0.3, libass 0.17.5, libplacebo 7.387.0 and dav1d 1.5.3
 - [x] SB approved LuaJIT scripting and x264 software H.264 export
+- [x] SB approved adjustable embedded-mpv ASS scaling/antialias/blur controls
+      for video- and window-resolution subtitle rendering
 - [x] Lock/fetch the five core source commits with archive SHA-256;
       `scripts/prepare-mpv.py --sources-only` verifies and extracts them
 - [x] Resolve/fetch selected source closure: 21 repository archives, 15 hashed
@@ -107,7 +109,9 @@ override this order.
       the final target on release; handle cancel, unknown duration and source changes
 - [ ] Verify mpv/HLS scrubbing in fullscreen, paused/backward/undownloaded seeks,
       keyboard seeking, and rejection of stale seek completions
-- [ ] Extend bounded 1.5x subtitle supersampling to embedded mpv (deferred by SB on 2026-10-29). Resolve native-build versus shared-overlay architecture; preserve video resolution and verify ASS layout/animation, screenshots/export, GPU compatibility and rendering cost.
+- [ ] Implement embedded-mpv ASS-only up/downscaling, AA/blur and window-resolution
+      controls, plus bounded 1.5x subtitle supersampling; preserve video scaling,
+      authored ASS behavior and check screenshot/export plus both mpv renderers.
 - [ ] Record current bundled libmpv identity/options and a baseline for ASS
       edge quality, E-AC-3 playback, seek latency, and hardware decoding
 - [x] Inspect `msedgewebview2.DMP` structure: about 2.56 GiB captured and
