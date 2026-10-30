@@ -135,10 +135,11 @@ Docker, MinGW binaries or a prebuilt full-featured DLL if it fails.
 - New subtitle-rendering feature approved by SB on 2026-10-31: add embedded-mpv
   Settings controls for ASS-only upscaling/downscaling filters, edge antialiasing
   and blur, and a window-resolution subtitle path with its own AA/blur values.
-  Keep video `scale`/`dscale` behavior independent. These names/values will be
-  designed in original mpv/libplacebo patches; the `ass-*`/`wns-*` examples in
-  mpv issue 2820 are not options in mpv v0.41.0. HLS keeps its existing 1.5x
-  JASSUB path and does not consume the embedded-mpv controls.
+  These are user-adjustable controls in the existing Subtitles Settings section;
+  they apply to embedded mpv. Keep video `scale`/`dscale` behavior independent.
+  These behaviors will use original mpv/libplacebo renderer patches; the
+  `ass-*`/`wns-*` examples in mpv issue 2820 are not options in mpv v0.41.0.
+  HLS keeps its existing 1.5x JASSUB path and does not consume these controls.
 - Extend the same Settings controls to subtitle-burned clip export where the
   mpv encode path supports them. Keep saved-frame and screenshot subtitle
   rendering consistent. Record any render path that cannot share the new mask
@@ -188,7 +189,8 @@ configuration is exercised; record and review any changes to the source lock.
 - Verify ASS filter choices independently change subtitle pixels while the
   source video remains unchanged; check video- and window-resolution subtitle
   modes, AA/blur bounds, scaling ratios, borders, anime typesetting/animation,
-  high-DPI changes, fullscreen, embedded mpv and the HLS fallback.
+  Settings persistence and updates, high-DPI changes, fullscreen, embedded mpv,
+  clip export and screenshots. Confirm HLS retains its current subtitle output.
 - Compare playback/start/seek results against the original DLL on identical
   sources. The 2026-10-30 log contains 1,295 successful seek summaries; the
   slowest is 11,520 ms with 11,503 ms of recorded torrent waits. That is a
