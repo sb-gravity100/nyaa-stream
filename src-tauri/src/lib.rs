@@ -12,7 +12,6 @@ mod player;
 pub(crate) mod resume;
 mod title_match;
 mod tosho_import;
-mod thumbnail_build;
 #[cfg(test)]
 mod title_match_fixture_tests;
 
@@ -50,11 +49,11 @@ struct AppState {
     franchise_cache: franchise_cache::FranchiseCache,
     /// Set after AniList turns us away - see `metadata_fallback`.
     anilist_cooldown: metadata_fallback::AniListCooldown,
-    /// One torrent capture at a time: each adds a scratch torrent and an
-    /// FFmpeg frame extraction, and a home page full of art-less cards used to
-    /// start them all at once.
+    /// Bound scratch torrent capture commands to five concurrent commands.
     thumbnail_captures: tokio::sync::Semaphore,
-    /// A batch build stops between file captures when the user cancels.
+    /// Bound actual FFmpeg frame extractions across all active batches.
+    thumbnail_frame_captures: tokio::sync::Semaphore,
+    /// A batch build stops after its active captures when the user cancels.
     thumbnail_batch_cancelled: std::sync::atomic::AtomicBool,
     /// Played torrents kept in `downloads/` - see `download_cache`.
     download_cache: download_cache::DownloadCache,
@@ -306,7 +305,7 @@ const KITSU_CACHE_FRESH_FOR: std::time::Duration = std::time::Duration::from_sec
 const THUMBNAIL_SCHEME: &str = "thumb";
 /// A failed torrent capture isn't retried for this long - each attempt
 /// costs a nyaa search, a scratch torrent and up to
-/// THUMBNAIL_CAPTURE_TIMEOUT of mpv decoding.
+/// THUMBNAIL_CAPTURE_TIMEOUT of FFmpeg decoding.
 const THUMBNAIL_FAILURE_RETRY_AFTER: Duration = Duration::from_secs(24 * 3600);
 
 /// `{anilistId}-{episode}` only: the key becomes a file name.
@@ -471,92 +470,6 @@ async fn cached_torrent_thumbnail(state: State<'_, Arc<AppState>>, cache_key: St
     Ok(CachedThumbnail { url, failed_recently })
 }
 
-fn valid_nyaa_view_url(raw: &str) -> bool {
-    tracing::debug!("validating nyaa view URL for thumbnail build");
-    let Ok(url) = reqwest::Url::parse(raw) else { return false };
-    url.scheme() == "https" && matches!(url.host_str(), Some("nyaa.si" | "www.nyaa.si")) && url.path().starts_with("/view/")
-}
-
-/// Fetches release-page description frames in the provided preference order,
-/// validates them on the backend and stores the selected 640px JPEG in the
-/// shared thumbnail cache. This command is intended for the manual build queue.
-#[tauri::command]
-async fn build_view_page_thumbnail(
-    state: State<'_, Arc<AppState>>,
-    cache_key: String,
-    view_urls: Vec<String>,
-    groups: Vec<String>,
-    force: bool,
-) -> Result<Option<String>, String> {
-    tracing::info!(cache_key, candidate_pages = view_urls.len(), force, "build_view_page_thumbnail invoked");
-    if !valid_thumbnail_key(&cache_key) {
-        tracing::warn!(cache_key, "build_view_page_thumbnail rejected cache key");
-        return Err("invalid cache key".to_string());
-    }
-    let cache_path = thumbnail_path(&state, &cache_key);
-    if let Some(url) = thumbnail_url(&cache_path, &cache_key).await {
-        tracing::debug!(cache_key, "build_view_page_thumbnail cache hit");
-        return Ok(Some(url));
-    }
-    if !force && thumbnail_failed_recently(&state, &cache_key).await {
-        tracing::debug!(cache_key, "build_view_page_thumbnail skipped after recent failure");
-        return Ok(None);
-    }
-    let _permit = state.thumbnail_captures.acquire().await.map_err(|error| error.to_string())?;
-    if let Some(url) = thumbnail_url(&cache_path, &cache_key).await {
-        tracing::debug!(cache_key, "thumbnail was filled while waiting for the build slot");
-        return Ok(Some(url));
-    }
-    for (index, view_url) in view_urls.into_iter().take(12).enumerate() {
-        let group = groups.get(index).map(String::as_str).unwrap_or_default().trim();
-        if !group.is_empty() && state.nyaa.screenshot_group_has_frames(group).await.ok().flatten() == Some(false) {
-            tracing::debug!(group, "skipping release group known to have no screenshots");
-            continue;
-        }
-        if !valid_nyaa_view_url(&view_url) {
-            tracing::warn!("thumbnail candidate URL rejected");
-            continue;
-        }
-        let image_urls = match state.nyaa.fetch_description_images(&view_url).await {
-            Ok(image_urls) => image_urls,
-            Err(error) => {
-                tracing::warn!(%error, "failed to read release-page image links");
-                continue;
-            }
-        };
-        if image_urls.is_empty() {
-            tracing::debug!("release page has no description images");
-            if !group.is_empty() { let _ = state.nyaa.remember_screenshot_group(group, false).await; }
-            continue;
-        }
-        match thumbnail_build::search_frames(&image_urls).await {
-            Ok(search) if search.jpeg.is_some() => {
-                let jpeg = search.jpeg.expect("guarded Some frame");
-                if !group.is_empty() { let _ = state.nyaa.remember_screenshot_group(group, true).await; }
-                if let Some(parent) = cache_path.parent() {
-                    tokio::fs::create_dir_all(parent).await.map_err(|error| error.to_string())?;
-                }
-                let temporary = cache_path.with_extension("tmp");
-                tokio::fs::write(&temporary, &jpeg).await.map_err(|error| error.to_string())?;
-                tokio::fs::rename(&temporary, &cache_path).await.map_err(|error| error.to_string())?;
-                let _ = tokio::fs::remove_file(thumbnail_failure_path(&state, &cache_key)).await;
-                tracing::info!(cache_key, bytes = jpeg.len(), "built thumbnail from release-page frame");
-                return thumbnail_url(&cache_path, &cache_key).await.ok_or_else(|| "saved thumbnail vanished".to_string()).map(Some);
-            }
-            Ok(search) => {
-                tracing::debug!("release page images contained no usable episode frame");
-                if search.conclusive && !group.is_empty() { let _ = state.nyaa.remember_screenshot_group(group, false).await; }
-            }
-            Err(error) => tracing::warn!(%error, "release page frame processing failed"),
-        }
-    }
-    if let Err(error) = tokio::fs::write(thumbnail_failure_path(&state, &cache_key), b"").await {
-        tracing::warn!(cache_key, %error, "failed to record release-page thumbnail miss");
-    }
-    tracing::info!(cache_key, "no release-page frame found");
-    Ok(None)
-}
-
 /// Fallback seek target when there's no duration estimate for the FFmpeg
 /// midpoint seek; far enough to usually clear a cold-open/logo frame.
 const THUMBNAIL_SEEK_SECONDS: f64 = 8.0;
@@ -567,14 +480,15 @@ const THUMBNAIL_PEER_TIMEOUT: Duration = Duration::from_secs(8);
 /// Upper bound on one FFmpeg midpoint seek and frame extraction. The separate peer
 /// connection gate is shorter; a slow source should not stall the build queue.
 const THUMBNAIL_CAPTURE_TIMEOUT: Duration = Duration::from_secs(25);
+const THUMBNAIL_CAPTURE_CONCURRENCY: usize = 5;
 const THUMBNAIL_POLL_INTERVAL: Duration = Duration::from_millis(250);
 
 /// Last-resort thumbnail source, used only when Kitsu and AniList both have
 /// no per-episode art for a show (verified live: happens for lower-profile
 /// currently-airing anime that simply haven't been backfilled into either
-/// database yet). Adds the given single-episode-release magnet, lets mpv
-/// play it headlessly just long enough to reach roughly the middle of the
-/// episode (a cold-open/black-frame/logo risk at the very start, unlike a
+/// database yet). Adds the given single-episode-release magnet, uses FFmpeg
+/// to seek and decode one frame near the middle of the episode (a
+/// cold-open/black-frame/logo risk at the very start, unlike a
 /// frame from partway through - `duration_minutes` is the frontend's
 /// AniList-derived estimate, same source as the HLS playlist duration;
 /// falls back to a fixed early point if it's unavailable, since waiting
@@ -667,7 +581,7 @@ async fn capture_thumbnail_uncached(
         }
     };
     let file_idx = requested_file_idx.filter(|index| files.get(*index).is_some_and(|file| file.is_video)).unwrap_or_else(|| largest_video_file(&files).unwrap_or(0));
-    // Let sbtl's range-backed stream and mpv seek directly to the estimated
+    // Let sbtl's range-backed reader and FFmpeg seek directly to the estimated
     // midpoint. Do not wait for or download the file from its beginning.
     let capture_result = tokio::time::timeout(THUMBNAIL_PEER_TIMEOUT + THUMBNAIL_CAPTURE_TIMEOUT, async {
         let swarm_deadline = tokio::time::Instant::now() + THUMBNAIL_PEER_TIMEOUT;
@@ -680,7 +594,7 @@ async fn capture_thumbnail_uncached(
             }
             tokio::time::sleep(THUMBNAIL_POLL_INTERVAL).await;
         }
-        capture_thumbnail_file(state, &added.id, file_idx, cache_path, duration_minutes).await
+        capture_thumbnail_file(state, &added.id, file_idx, cache_path, duration_minutes, None).await
     })
     .await;
 
@@ -762,41 +676,56 @@ async fn capture_torrent_thumbnail_batch(
         }
         Ok::<(), anyhow::Error>(())
     }.await;
-    let mut output = Vec::with_capacity(requests.len());
+    let mut output = cached.clone();
     if let Err(error) = swarm_wait {
-        for (request, cached_url) in requests.into_iter().zip(cached) {
+        for (index, (request, cached_url)) in requests.into_iter().zip(cached).enumerate() {
             if cached_url.is_none() && !state.thumbnail_batch_cancelled.load(std::sync::atomic::Ordering::Relaxed) {
                 let _ = tokio::fs::write(thumbnail_failure_path(&state, &request.cache_key), b"").await;
             }
-            output.push(cached_url);
+            output[index] = cached_url;
         }
         tracing::warn!(torrent_id = %added.id, %error, "thumbnail batch ended before captures started");
     } else {
+        let mut tasks = tokio::task::JoinSet::new();
         for (index, request) in requests.into_iter().enumerate() {
             if state.thumbnail_batch_cancelled.load(std::sync::atomic::Ordering::Relaxed) {
-                output.extend(cached[index..].iter().cloned());
                 break;
             }
-            let cache_path = thumbnail_path(&state, &request.cache_key);
             if let Some(url) = cached[index].clone() {
-                output.push(Some(url));
+                output[index] = Some(url);
                 continue;
             }
-            if skip_recent_failure[index] { output.push(None); continue; }
+            if skip_recent_failure[index] { continue; }
             if !files.get(request.file_idx).is_some_and(|file| file.is_video) {
-                output.push(None);
                 continue;
             }
-            match capture_thumbnail_file(&state, &added.id, request.file_idx, &cache_path, request.duration_minutes).await {
-                Ok(()) => {
-                    let _ = tokio::fs::remove_file(thumbnail_failure_path(&state, &request.cache_key)).await;
-                    output.push(thumbnail_url(&cache_path, &request.cache_key).await);
-                }
-                Err(error) => {
-                    tracing::warn!(cache_key = request.cache_key, %error, "batch thumbnail frame capture failed");
-                    let _ = tokio::fs::write(thumbnail_failure_path(&state, &request.cache_key), b"").await;
-                    output.push(None);
-                }
+            let app = state.inner().clone();
+            let torrent_id = added.id.clone();
+            let cache_key = request.cache_key;
+            let cache_path = thumbnail_path(&app, &cache_key);
+            tasks.spawn(async move {
+                let result = match capture_thumbnail_file(&app, &torrent_id, request.file_idx, &cache_path, request.duration_minutes, Some(&app.thumbnail_batch_cancelled)).await {
+                    Ok(()) => {
+                        let _ = tokio::fs::remove_file(thumbnail_failure_path(&app, &cache_key)).await;
+                        thumbnail_url(&cache_path, &cache_key).await
+                    }
+                    Err(error) if app.thumbnail_batch_cancelled.load(std::sync::atomic::Ordering::Relaxed) => {
+                        tracing::debug!(cache_key, %error, "thumbnail frame task cancelled before capture");
+                        None
+                    }
+                    Err(error) => {
+                        tracing::warn!(cache_key, %error, "batch thumbnail frame capture failed");
+                        let _ = tokio::fs::write(thumbnail_failure_path(&app, &cache_key), b"").await;
+                        None
+                    }
+                };
+                (index, result)
+            });
+        }
+        while let Some(joined) = tasks.join_next().await {
+            match joined {
+                Ok((index, url)) => output[index] = url,
+                Err(error) => tracing::error!(%error, "thumbnail frame task panicked"),
             }
         }
     }
@@ -818,7 +747,15 @@ async fn capture_thumbnail_file(
     file_idx: usize,
     cache_path: &std::path::Path,
     duration_minutes: Option<f64>,
+    cancelled: Option<&std::sync::atomic::AtomicBool>,
 ) -> anyhow::Result<()> {
+    if cancelled.is_some_and(|flag| flag.load(std::sync::atomic::Ordering::Relaxed)) {
+        anyhow::bail!("thumbnail frame cancelled before capture");
+    }
+    let _permit = state.thumbnail_frame_captures.acquire().await.map_err(|error| anyhow::anyhow!("thumbnail frame semaphore closed: {error}"))?;
+    if cancelled.is_some_and(|flag| flag.load(std::sync::atomic::Ordering::Relaxed)) {
+        anyhow::bail!("thumbnail frame cancelled while waiting for a capture slot");
+    }
     if let Some(parent) = cache_path.parent() { tokio::fs::create_dir_all(parent).await?; }
     let target_seconds = duration_minutes.filter(|minutes| *minutes > 0.0).map(|minutes| minutes * 60.0 / 2.0);
     let target_seconds = target_seconds.unwrap_or(THUMBNAIL_SEEK_SECONDS);
@@ -2108,7 +2045,8 @@ pub fn run() {
             anime_lists,
             franchise_cache: franchise_cache::FranchiseCache::new(dirs::cache_dir().unwrap_or_else(std::env::temp_dir).join("nyaa-stream").join("franchise")),
             anilist_cooldown: Default::default(),
-            thumbnail_captures: tokio::sync::Semaphore::new(1),
+            thumbnail_captures: tokio::sync::Semaphore::new(THUMBNAIL_CAPTURE_CONCURRENCY),
+            thumbnail_frame_captures: tokio::sync::Semaphore::new(THUMBNAIL_CAPTURE_CONCURRENCY),
             thumbnail_batch_cancelled: std::sync::atomic::AtomicBool::new(false),
             download_cache,
         })
@@ -2172,7 +2110,6 @@ pub fn run() {
             reset_thumbnail_build,
             cancel_thumbnail_build,
             cached_torrent_thumbnail,
-            build_view_page_thumbnail,
             artwork::get_artwork,
             artwork::get_episode_still,
             magnet::parse_custom_magnet,

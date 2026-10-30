@@ -98,8 +98,8 @@ export async function cachedTorrentThumbnail(anilistId: number, episode: number)
 
 // Last-resort thumbnail source — see the doc comment on the Rust
 // `capture_torrent_thumbnail` command (src-tauri/src/lib.rs) for the full
-// pipeline (add torrent, let mpv seek/play headlessly to roughly the
-// episode's midpoint, screenshot, remove torrent). Only runs in the real
+// pipeline (add torrent, let FFmpeg seek directly to roughly the
+// episode's midpoint, capture one frame, remove torrent). Only runs in the real
 // Tauri app: torrenting isn't available in the dev-only browser preview.
 export async function fetchTorrentThumbnail(
   anilistId: number,

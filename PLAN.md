@@ -32,7 +32,7 @@ and verification remain valid. Tag v0.6.0 only after the milestone is complete.
 2. Build shared context menus and clipboard behavior.
 3. Add direct magnet play and persistent episode/pack attachments.
 4. Add artwork providers, ID mapping, credentials, attribution and cache.
-5. Build missing-thumbnail lookup/capture queue and progress UI.
+5. Persist per-anime Nyaa release results with an explicit refresh action; build the missing-thumbnail torrent-capture queue and progress UI without fetching release-description images.
 6. Add verified-data-only seekbar frame previews.
 7. Build the bespoke installer on the proven backend.
 8. Add quiet checks, header Update action and custom in-app update progress.

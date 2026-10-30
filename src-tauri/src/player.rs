@@ -220,8 +220,8 @@ async fn reset_per_file_state(mpv: &EmbeddedMpv) {
     tracing::debug!("mpv per-file state reset");
 }
 
-/// Longest side of the last-frame thumbnail - matches the headless
-/// capture's width (mpv-player's `THUMBNAIL_WIDTH`), both feeding 16:9 cards.
+/// Longest side of the last-frame thumbnail - matches the FFmpeg capture
+/// width, both feeding 16:9 cards.
 const THUMBNAIL_WIDTH: u32 = 640;
 
 /// The current video frame (no subtitles) as a JPEG `width` pixels wide -

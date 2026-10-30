@@ -16,6 +16,7 @@ import {
   isTauriAvailable,
 } from "./browserFallback";
 import { addToLibrary, getLibrary, isInLibrary, removeFromLibrary } from "./library";
+import { loadSavedReleaseResults, saveReleaseResults } from "./releaseCache";
 import { addRecentSearch, clearRecentSearches, getRecentSearches, removeRecentSearch } from "./recentSearches";
 import { fetchKitsuMetadata, kitsuSnapshot } from "./kitsu";
 import { cachedTorrentThumbnail, fetchTorrentThumbnail } from "./torrentThumbnail";
@@ -123,15 +124,9 @@ function App() {
   // AniDB -> TVDB episode offset per entry (from the AnimeTosho dataset); stored only, not applied yet.
   const [, setEntryEpisodeOffsetByMedia] = useState<Record<number, number>>({});
   const [details, setDetails] = useState<Record<string, TorrentDetails>>({});
-  // Session-lifetime cache of both the nyaa.si search and the per-torrent
-  // view-page scrape (see loadDetails), keyed by AniList id - same
-  // never-invalidated-within-a-session pattern as kitsuByMedia/
-  // episodeOffsetByMedia below. Revisiting an anime (back-and-forth from
-  // the library/latest-episodes, or picking the same search result twice)
-  // used to re-run the full nyaa.si search (now up to three queries, see
-  // strip_season_suffix) and re-scrape every ambiguous title's view page
-  // from scratch every single time.
-  const [sourcesByMedia, setSourcesByMedia] = useState<Record<number, NyaaResult[]>>({});
+  // Persisted per-anime results let library pages reopen without a full
+  // Nyaa search. The anime page's Refresh action replaces this snapshot.
+  const [sourcesByMedia, setSourcesByMedia] = useState<Record<number, NyaaResult[]>>(loadSavedReleaseResults);
   const [customSourcesByMedia, setCustomSourcesByMedia] = useState<Record<number, CustomSource[]>>({});
   const [detailsByMedia, setDetailsByMedia] = useState<Record<number, Record<string, TorrentDetails>>>({});
   // Read synchronously: the route effect below looks anime up in it on the
@@ -338,7 +333,7 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeAnimeId]);
 
-  async function openAnime(anime: AnimeMedia, forceDebugSearch = false) {
+  async function openAnime(anime: AnimeMedia, forceDebugSearch = false, refreshResults = false) {
     const seq = ++openSeq.current;
     const releaseQuery = displayTitle(anime.title);
     skipNextSearch.current = true;
@@ -353,21 +348,24 @@ function App() {
     }
 
     const cachedSources = sourcesByMedia[anime.id];
-    if (cachedSources && !forceDebugSearch) {
+    if (cachedSources && !forceDebugSearch && !refreshResults) {
       console.debug("[search_torrents_for_anime] served from cache", { anime: releaseQuery, count: cachedSources.length });
       setSources(cachedSources);
       setDetails(detailsByMedia[anime.id] ?? {});
       setSourcesLoading(false);
+      if (!detailsByMedia[anime.id] && !isMovie(anime)) void loadDetails(anime.id, cachedSources);
     } else {
       console.debug("[search_torrents_for_anime] invoked", { anime: releaseQuery, title: anime.title });
-      setSources([]);
-      setDetails({});
+      if (!refreshResults) {
+        setSources([]);
+        setDetails({});
+      }
       setSourcesLoading(true);
       let shown = false;
       let fullLoaded = false;
       // Earlier phases only ever paint sooner than the full search; they never replace its result.
       const showEarly = (phase: string, early: NyaaResult[]) => {
-        if (fullLoaded || openSeq.current !== seq || early.length === 0) return;
+        if (refreshResults || fullLoaded || openSeq.current !== seq || early.length === 0) return;
         console.info(`[${phase}] shown before the full search`, { anime: releaseQuery, count: early.length });
         shown = true;
         setSources(early);
@@ -405,6 +403,7 @@ function App() {
         console.info("[search_torrents_for_anime] succeeded", { anime: releaseQuery, count: results.length });
         setSources(results);
         setSourcesByMedia((current) => ({ ...current, [anime.id]: results }));
+        if (!forceDebugSearch) saveReleaseResults(anime.id, results);
         setSourcesLoading(false);
         // A movie's releases all go in one group, so there's no batch
         // ambiguity worth a view-page scrape per title (which also ran
@@ -415,7 +414,7 @@ function App() {
         console.error("[search_torrents_for_anime] failed", { anime: releaseQuery, err });
         // Releases from the local database/fansubber search are still usable.
         if (!shown && openSeq.current === seq) {
-          setError(`Couldn't load releases from nyaa.si (${err instanceof Error ? err.message : String(err)}). Check your connection and reopen this page.`);
+          setError(`${refreshResults ? "Refresh failed; saved releases are still shown" : "Couldn't load releases from nyaa.si"} (${err instanceof Error ? err.message : String(err)}).`);
         }
         setSourcesLoading(false);
       }
@@ -1159,6 +1158,7 @@ function App() {
           entrySeason={entrySeasonByMedia[selectedAnime.id] ?? null}
           sourcesLoading={sourcesLoading}
           sourcesCount={sources.length}
+          onRefreshReleases={() => { void openAnime(selectedAnime, false, true); }}
           watch={route.watch}
           onWatch={(watch: WatchTarget, replace?: boolean) => navigate({ name: "anime", id: animeId, watch }, { replace })}
           onCloseWatch={() => goBack({ name: "anime", id: animeId, watch: null })}

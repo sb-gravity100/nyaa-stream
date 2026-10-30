@@ -44,8 +44,8 @@ solid-color skeleton blocks, not a spinner).
   driven by the HTML controls in `src/PlayerView.tsx` through
   `src/mpvVideo.ts` with mpv-IPC-shaped JSON commands/events. Fallback
   without libmpv: the HLS `<video>` + `hls.js` player
-  (`src/HlsPlayerView.tsx`). libmpv is also used headlessly for thumbnail
-  capture
+  (`src/HlsPlayerView.tsx`). Thumbnail frames use the in-process FFmpeg
+  pipeline over direct seekable sbtl readers
 - **Torrent engine:** sbtl (https://github.com/sb-gravity100/sbtl, a C
   library with Rust bindings, built for nyaa-stream) through
   `crates/sbtl-engine` (see "sbtl_engine"), which replaced the vendored
@@ -225,14 +225,12 @@ Building the workspace requires, beyond Rust/Node:
   required for public queries; Kitsu API (`crates/kitsu-client`) as a
   secondary source for wide backdrop banners and per-episode thumbnails,
   resolved from an AniList id via Kitsu's crowdsourced mapping table
-- **Thumbnails:** backdrop/episode art falls back Kitsu → AniList
-  `streamingEpisodes` → a torrent-captured frame (`capture_torrent_thumbnail`
-  starts a headless libmpv against the episode's stream, seeks it to roughly
-  the episode's midpoint using the same AniList duration estimate the HLS
-  playlist uses, grabs one frame, caches it to disk) when neither has
-  coverage - falls back to a fixed early point when no duration estimate
-  is available, since waiting for real-time playback to reach an actual
-  multi-minute midpoint isn't practical within the capture's timeout. Thumbnails are cached for good
+- **Thumbnails:** provider art uses Kitsu → AniList `streamingEpisodes` →
+  TMDB stills, then a torrent-captured frame when none has coverage.
+  `capture_torrent_thumbnail` seeks directly through sbtl with in-process
+  FFmpeg and stops after one frame; it uses AniList's episode duration for
+  the midpoint or an 8s fallback. Nyaa release-description images are not
+  fetched. Thumbnails are cached for good
   (they belong to one episode): captured frames on disk, checked first via
   `cached_torrent_thumbnail` before any nyaa search, and Kitsu metadata
   (`thumbnails/kitsu/<anilistId>.json`) reused for a day, stale on failure.
@@ -264,7 +262,7 @@ nyaa_stream/
     release-parse/           release title parser: MPL-2.0 port of anitopy + nyaa fixes
     anilist-client/          AniList GraphQL client
     kitsu-client/            Kitsu API client (backdrop + episode thumbnails)
-    mpv-player/                 in-process libmpv: embedded (playback) + headless (thumbnail capture)
+    mpv-player/                 in-process libmpv for embedded playback
   src/                       Preact + TypeScript frontend
   reference/stremio-core/    reference-only clone, gitignored
   reference/stremio-web/     reference-only clone, gitignored

@@ -50,7 +50,7 @@ Feature work follows this order; remaining acceptance checks stay open below.
       - [x] Connect artwork fallbacks to media pages, hero, Continue watching and episode cards
       - [x] arm-server v2 fallback for missing map rows/map failures (AniDB, Kitsu, MAL, Simkl, IMDb); resolve an unambiguous IMDb-to-TMDB match when available, without guessing TV season or episode offsets
       - [ ] Resolve Fribb mapping-data license before publication
-- [~] 4: Release-page screenshots and missing-thumbnail build queue; live-swarm acceptance remains open
+- [~] 4: Persisted release results with explicit refresh and missing-thumbnail torrent capture; live-swarm acceptance remains open
 - [~] 5: Verified-data-only seekbar storyboard/hover previews; generation covers only the contiguous verified prefix, and Windows acceptance remains open
 - [~] 6: Branded NSIS install choices and styled file-copy progress/completion/error pages; isolated lifecycle checks remain open
 - [~] 7: Quiet update scheduler, flex-end header action and in-app progress/restart; signed apply/relaunch remains unverified
@@ -543,10 +543,10 @@ policy remains unchanged.
 - [x] In-process FFmpeg: ez-ffmpeg pipelines + ffmpeg-next probe/fonts,
       FFmpeg 7.1.2 statically linked from vcpkg (LGPL; OpenH264 CPU
       fallback instead of x264). No ffmpeg/ffprobe on PATH needed
-- [ ] Read torrent bytes directly (ez-ffmpeg read/seek callbacks over the
-      enginefs file handle) instead of the loopback HTTP stream
-- [ ] Bundle mpv (thumbnail capture) as a sidecar, or capture thumbnails
-      in-process too and drop mpv entirely
+- [x] Read torrent bytes directly (FFmpeg read/seek callbacks over sbtl)
+      instead of the loopback HTTP stream for seekable media jobs
+- [x] Capture thumbnail frames in-process with FFmpeg; libmpv remains the
+      embedded player
 - [x] Subtitles: only dock-covered bottom lines lift while controls show;
       native-resolution libass rendering softened with a CSS blur
 - [x] Subtitles: append-only event log + delta polling (`processData`),
@@ -778,12 +778,9 @@ policy remains unchanged.
       - [x] FILE_INDEX.md/PLAN.md sync
 - [~] Build thumbnails button (v0.6.0, see PLAN.md "Build thumbnails
       button"): one commit each -
-      - [x] nyaa view-page scrape collects description image URLs
-      - [x] Frame thumbnail from a view-page image: frame filter, backend
-            fetch, letterbox crop, 640px JPEG into the thumb cache; auto
-            for rows without art
-      - [x] Screenshot groups: built-in yes/no lists (survey in PLAN.md),
-            unknown groups checked once and remembered
+      - [x] Persist per-anime release results so library entries reopen without a full search
+      - [x] Add an anime-page Refresh action that updates saved results
+      - [x] Remove Nyaa release-description image scraping and thumbnail downloads
       - [x] `capture_torrent_thumbnail`: optional `file_idx` and `force`
       - [x] Batch captures share one torrent across their episodes
       - [x] Capture source pick: smallest per-episode source among >= 3
@@ -791,7 +788,7 @@ policy remains unchanged.
             candidates; never 0 seeders
       - [x] Quick midpoint capture through sbtl's range stream: 8s peer gate,
             25s per-frame cap, and transfer-byte/peer diagnostics
-      - [x] Capture queue (list order, pause while playing, cancel)
+      - [x] Capture queue (pause while playing, cancel; concurrency capped at five)
       - [x] Episodes header button with count/progress/failed state,
             spinner on rows being captured
       - [ ] Verify live on a show with no Kitsu/AniList thumbnails
