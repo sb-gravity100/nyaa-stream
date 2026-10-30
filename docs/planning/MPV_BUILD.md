@@ -110,6 +110,15 @@ Docker, MinGW binaries or a prebuilt full-featured DLL if it fails.
   `libavdevice`, `vapoursynth`, `sdl2-gamepad` and `libarchive`.
 - Preserve WASAPI, D3D11, applicable Windows hardware decoding and GPU/OpenGL/
   Vulkan fallbacks; retain libass/font support, HDR/color handling and screenshots.
+- Preserve subtitle rendering policy: render subtitles separately from scaled
+  video, retain ASS/font/style overrides and outline blur, use light hinting for
+  plain text and no hinting for authored ASS. The first candidate should match
+  current rendering behavior against the recorded baseline.
+- After the custom DLL baseline is accepted, implement bounded 1.5x supersampling
+  for embedded subtitles in v0.7.0. Downsample subtitle masks while preserving
+  video resolution, authored ASS layout and animation; compare edges and cost
+  with the existing HLS supersampling path. Keep screenshot/export rendering
+  consistent and verify GPU compatibility.
 - FFmpeg: explicitly select approved H.264, HEVC and AV1 software/hardware
   decoders, and AAC, AC-3, E-AC-3, FLAC and Opus audio decoders. Retain subtitle
   and image support needed by the app; do not confuse these with extra requested
