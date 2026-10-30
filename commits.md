@@ -1,3 +1,12 @@
+### `2614332` · 2026-10-30 · fix(search): bound Nyaa exclusion queries
+- `CHANGELOG.md`
+- `FILE_INDEX.md`
+- `PHASES.md`
+- `PLAN.md`
+- `docs/planning/MATCHING.md`
+- `src-tauri/src/title_match.rs`
+- `src/changelog.ts`
+
 ### `d3a1155` · 2026-10-30 · chore: keep artwork fix in v0.6.0
 - `CHANGELOG.md`
 - `package.json`
