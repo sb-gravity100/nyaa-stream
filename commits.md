@@ -1,3 +1,6 @@
+### `8d30b59` · 2026-10-30 · docs(release): record v0.6.0 dry-run
+- `PHASES.md`
+
 ### `e691c68` · 2026-10-30 · docs(release): draft v0.6.0 notes
 - `FILE_INDEX.md`
 - `docs/releases/v0.6.0.md`
