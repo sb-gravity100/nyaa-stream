@@ -1,3 +1,15 @@
+### `1808857` · 2026-10-30 · fix(artwork): load fanart backgrounds and TMDB stills
+- `CHANGELOG.md`
+- `FILE_INDEX.md`
+- `crates/artwork-client/src/lib.rs`
+- `docs/planning/V0_6_0.md`
+- `src/App.css`
+- `src/MediaPage.tsx`
+- `src/SettingsPanel.tsx`
+- `src/artwork.ts`
+- `src/assets/tmdb-logo.svg`
+- `src/changelog.ts`
+
 ### `bae398d` · 2026-10-30 · perf(thumbnails): run ten refillable workers
 - `CHANGELOG.md`
 - `FILE_INDEX.md`
