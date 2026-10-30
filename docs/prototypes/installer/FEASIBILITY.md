@@ -28,8 +28,9 @@ Start Menu folder/shortcut choice and desktop shortcut choice. Existing
 shortcut choices are restored on interactive upgrades; unchecked choices
 remove only links that target the app. Passive updater installs retain the
 stored Start Menu folder. The real NSIS file-copy page reports progress/errors,
-and its completion page can launch the app. The generated header/sidebar
-artwork and the installer use the dusk-indigo/sakura palette. Rebuild artwork with
+with the app palette, branded headings and sakura progress bar; its completion
+page can launch the app. The generated header/sidebar artwork also uses the
+dusk-indigo/sakura palette. Rebuild artwork with
 `powershell -File scripts/make-nsis-art.ps1`.
 
 Tauri's signed updater payload and `passive` mode remain separate from the

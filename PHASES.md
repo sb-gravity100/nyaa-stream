@@ -49,7 +49,7 @@ Feature work follows this order; remaining acceptance checks stay open below.
       - [ ] Resolve Fribb mapping-data license before publication
 - [~] 4: Release-page screenshots and missing-thumbnail build queue; live-swarm acceptance remains open
 - [~] 5: Verified-data-only seekbar storyboard/hover previews; generation covers only the contiguous verified prefix, and Windows acceptance remains open
-- [~] 6: Branded NSIS template and install-choice page; NSIS handles progress/completion, and isolated lifecycle checks remain open
+- [~] 6: Branded NSIS install choices and styled file-copy progress/completion/error pages; isolated lifecycle checks remain open
 - [~] 7: Quiet update scheduler, flex-end header action and in-app progress/restart; signed apply/relaunch remains unverified
 - [ ] 8: Integrated Windows verification, docs/changelog/index sync, local v0.6.0 tag
 
@@ -855,6 +855,7 @@ policy remains unchanged.
             install and recovery screens
       - [x] Implement custom install-location, Start Menu and desktop shortcut choices
       - [x] Restore existing Start Menu shortcut selection alongside desktop choice on upgrades
+      - [x] Restyle file-copy progress status, headings and progress colors in the app palette
       - [ ] Cover install path/shortcuts, progress/completion/errors, fresh
             install, upgrade, repair/uninstall and silent updater compatibility
       - [ ] Verify Windows end-to-end update failures/retries, signature

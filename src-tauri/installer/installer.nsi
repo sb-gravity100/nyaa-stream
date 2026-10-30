@@ -442,6 +442,8 @@ Function PageInstallChoices
   ; This is the final interactive choice page; label the wizard's Next action clearly.
   GetDlgItem $R8 $HWNDPARENT 1
   SendMessage $R8 ${WM_SETTEXT} 0 "STR:Install"
+  CreateFont $R7 "Segoe UI Semibold" 11 700
+  SendMessage $R8 ${WM_SETFONT} $R7 1
   nsDialogs::Create 1018
   Pop $R9
   ${If} $R9 == error
@@ -616,7 +618,18 @@ FunctionEnd
 !define MUI_INSTFILESPAGE_FINISHHEADER_SUBTEXT "nyaa-stream is ready to finish setup."
 !define MUI_INSTFILESPAGE_ABORTHEADER_TEXT "Installation stopped"
 !define MUI_INSTFILESPAGE_ABORTHEADER_SUBTEXT "Close setup and try again."
+!define MUI_PAGE_CUSTOMFUNCTION_SHOW InstallerProgressShow
 !insertmacro MUI_PAGE_INSTFILES
+
+Function InstallerProgressShow
+  !insertmacro MUI_HEADER_TEXT "Installing nyaa-stream" "Setting up app files and shortcuts."
+  SetCtlColors $mui.InstFilesPage.Text "ECEAF6" "171A2B"
+  CreateFont $R7 "Segoe UI Semibold" 10 600
+  SendMessage $mui.InstFilesPage.Text ${WM_SETFONT} $R7 1
+  SetCtlColors $mui.InstFilesPage.Log "9EA1C0" "171A2B"
+  SendMessage $mui.InstFilesPage.ProgressBar 0x0409 0 0x00A67AF0
+  SendMessage $mui.InstFilesPage.ProgressBar 0x2001 0 0x0050302B
+FunctionEnd
 
 ; 8. Finish page
 ;

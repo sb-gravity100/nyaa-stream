@@ -19,7 +19,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Custom packs map to their numbered episode rows from inspected file metadata; extras are excluded and unknown packs stay on a Batch row.",
       "TMDB and fanart.tv artwork can fill backdrops, logos and episode stills, with an IMDb-based TMDB lookup when an ID crosswalk is missing; missing episode art can be built from release screenshots or a seeded torrent.",
       "Seek-bar previews show frames decoded only from verified local torrent data.",
-      "Quiet update checks, in-app download progress and deferred restart are available, with a branded NSIS install-choice page.",
+      "Quiet update checks, in-app download progress and deferred restart are available, with branded NSIS install choices and progress.",
       "Interactive upgrades retain the existing Start Menu and desktop shortcut choices.",
     ],
     fixes: [

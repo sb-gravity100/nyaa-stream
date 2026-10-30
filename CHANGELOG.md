@@ -17,7 +17,7 @@ step when cutting a release.
 - Custom packs now appear on their numbered episode rows using inspected file and season metadata; extras are excluded and unknown packs stay on a Batch row.
 - TMDB/fanart.tv artwork fallbacks (including IMDb-based TMDB lookup when an ID crosswalk is missing), provider-key settings, episode stills, release-page screenshots and a cancellable missing-thumbnail queue.
 - Seek-bar frame previews generated only from verified local torrent data.
-- Quiet update checks, in-app download/verification progress, deferred restart and a branded NSIS install-choice page.
+- Quiet update checks, in-app download/verification progress, deferred restart and branded NSIS install-choice and progress pages.
 - Interactive upgrades retain the user's existing Start Menu and desktop shortcut choices.
 
 ### Removed
