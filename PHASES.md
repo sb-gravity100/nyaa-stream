@@ -806,6 +806,8 @@ policy remains unchanged.
             without guessing TV season or episode offsets
       - [x] `crates/artwork-client`: TMDB backdrops + logos, fanart.tv
             `showbackground`/`clearlogo`, provider response cache
+      - [x] Prefer season-tagged Fanart.tv clearlogos, then the closest upload
+            to AniList season start (within 180 days), then default logos
       - [x] TMDB episode still client with TMDB episode-offset correction
       - [x] Providers skip cleanly when credentials or mapped IDs are absent;
             secrets are not logged; attribution is returned with artwork

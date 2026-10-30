@@ -8,8 +8,8 @@ fn cache_dir() -> PathBuf {
 }
 
 #[tauri::command]
-pub(super) async fn get_artwork(anilist_id: i64, credentials: ProviderCredentials) -> Result<Artwork, String> {
-    tracing::debug!(anilist_id, "get_artwork invoked");
+pub(super) async fn get_artwork(anilist_id: i64, season_start_date: Option<String>, credentials: ProviderCredentials) -> Result<Artwork, String> {
+    tracing::debug!(anilist_id, season_start_date = ?season_start_date, "get_artwork invoked");
     if anilist_id <= 0 {
         tracing::warn!(anilist_id, "get_artwork rejected invalid AniList id");
         return Err("invalid AniList id".into());
@@ -18,7 +18,7 @@ pub(super) async fn get_artwork(anilist_id: i64, credentials: ProviderCredential
         tracing::error!(anilist_id, %error, "artwork client initialization failed");
         error.to_string()
     })?;
-    client.get_artwork(anilist_id).await.map_err(|error| {
+    client.get_artwork(anilist_id, season_start_date.as_deref()).await.map_err(|error| {
         tracing::error!(anilist_id, %error, "get_artwork failed");
         error.to_string()
     })

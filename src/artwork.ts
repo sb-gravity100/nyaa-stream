@@ -15,7 +15,7 @@ export interface EpisodeStill {
   source: string;
 }
 
-const artworkCache = new Map<number, Promise<Artwork>>();
+const artworkCache = new Map<string, Promise<Artwork>>();
 const stillCache = new Map<string, Promise<EpisodeStill | null>>();
 
 subscribeProviderCredentials(() => {
@@ -24,18 +24,21 @@ subscribeProviderCredentials(() => {
   stillCache.clear();
 });
 
-export function getArtwork(anilistId: number): Promise<Artwork> {
-  console.debug("[artwork] get artwork", { anilistId, tauri: isTauriAvailable() });
-  const cached = artworkCache.get(anilistId);
+export function getArtwork(anilistId: number, season: string | null, seasonYear: number | null): Promise<Artwork> {
+  const startMonth = ({ WINTER: "01", SPRING: "04", SUMMER: "07", FALL: "10" } as Record<string, string>)[season?.toUpperCase() ?? ""];
+  const seasonStartDate = startMonth && seasonYear ? `${seasonYear}-${startMonth}-01` : null;
+  const cacheKey = `${anilistId}:${seasonStartDate ?? ""}`;
+  console.debug("[artwork] get artwork", { anilistId, seasonStartDate, tauri: isTauriAvailable() });
+  const cached = artworkCache.get(cacheKey);
   if (cached) return cached;
   const promise = isTauriAvailable()
-    ? invoke<Artwork>("get_artwork", { anilistId, credentials: getProviderCredentials() })
+    ? invoke<Artwork>("get_artwork", { anilistId, seasonStartDate, credentials: getProviderCredentials() })
         .catch((error) => {
           console.warn("[artwork] artwork lookup failed", { anilistId, error: String(error) });
           return { backdrop: null, fanartBackdrop: null, logo: null, source: null, attribution: null };
         })
     : Promise.resolve({ backdrop: null, fanartBackdrop: null, logo: null, source: null, attribution: null });
-  artworkCache.set(anilistId, promise);
+  artworkCache.set(cacheKey, promise);
   return promise;
 }
 

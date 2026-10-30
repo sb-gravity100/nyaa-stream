@@ -15,7 +15,7 @@ step when cutting a release.
 - Flat, keyboard-accessible context menus for inputs, anime, episode/source rows and the player, including custom-source actions.
 - Paste a magnet or info hash to play it directly or search for an anime and attach it to an episode or pack; existing sources can be edited, moved or removed.
 - Custom packs now appear on their numbered episode rows using inspected file and season metadata; extras are excluded and unknown packs stay on a Batch row.
-- TMDB/fanart.tv artwork fallbacks (including IMDb-based TMDB lookup when an ID crosswalk is missing), Fanart.tv-first home hero backgrounds, dimmed fanart.tv media backgrounds, correctly sized TMDB episode thumbnails and a bundled TMDB attribution logo; saved Nyaa release results with Refresh; and a cancellable thumbnail queue with up to ten concurrent captures.
+- TMDB/fanart.tv artwork fallbacks (including IMDb-based TMDB lookup when an ID crosswalk is missing), Fanart.tv-first home hero backgrounds, season-specific media logos with a 180-day upload-date fallback, dimmed fanart.tv media backgrounds, correctly sized TMDB episode thumbnails and a bundled TMDB attribution logo; saved Nyaa release results with Refresh; and a cancellable thumbnail queue with up to ten concurrent captures.
 - Seek-bar frame previews generated only from verified local torrent data.
 - Quiet update checks, in-app download/verification progress, deferred restart and branded NSIS install-choice and progress pages.
 - Interactive upgrades retain the user's existing Start Menu and desktop shortcut choices.

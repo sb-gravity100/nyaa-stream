@@ -13,6 +13,7 @@ const MAP_TTL_SECS: u64 = 7 * 24 * 60 * 60;
 const TMDB_TTL_SECS: u64 = 180 * 24 * 60 * 60;
 const FANART_TTL_SECS: u64 = 7 * 24 * 60 * 60;
 const ARM_TTL_SECS: u64 = 7 * 24 * 60 * 60;
+const SEASON_LOGO_UPLOAD_MAX_DISTANCE_DAYS: i64 = 180;
 pub const TMDB_API_SETTINGS_URL: &str = "https://www.themoviedb.org/settings/api";
 pub const FANART_API_KEY_URL: &str = "https://fanart.tv/get-an-api-key/";
 pub const TMDB_ATTRIBUTION: &str = "This product uses the TMDB API but is not endorsed or certified by TMDB.";
@@ -50,6 +51,7 @@ pub struct AnimeIds {
     pub tmdb_season: Option<i32>,
     pub tmdb_episode_offset: Option<i32>,
     pub tvdb_id: Option<u64>,
+    pub tvdb_season: Option<i32>,
     pub simkl_id: Option<u64>,
     pub anidb_id: Option<u64>,
     pub kitsu_id: Option<u64>,
@@ -101,7 +103,7 @@ struct TmdbFindResponse {
 #[derive(Serialize, Deserialize)]
 struct TmdbFindItem { id: u64 }
 #[derive(Serialize, Deserialize)]
-struct SeasonMap { tmdb: Option<i32> }
+struct SeasonMap { tmdb: Option<i32>, tvdb: Option<i32> }
 #[derive(Serialize, Deserialize)]
 struct EpisodeOffset { tmdb: Option<i32> }
 
@@ -139,8 +141,19 @@ struct FanartResponse {
 struct FanartImage {
     url: String,
     #[serde(default)] likes: String,
+    #[serde(default)] season: Option<FanartSeason>,
+    #[serde(default)] added: Option<String>,
     copyright: Option<String>,
     copyright_link: Option<String>,
+}
+#[derive(Serialize, Deserialize)]
+#[serde(untagged)]
+enum FanartSeason { Number(i32), Label(String) }
+impl FanartSeason {
+    fn matches(&self, season: i32) -> bool {
+        match self { Self::Number(number) => *number == season, Self::Label(label) => label.parse::<i32>().ok() == Some(season) }
+    }
+    fn is_general(&self) -> bool { matches!(self, Self::Label(label) if label.eq_ignore_ascii_case("all")) }
 }
 
 pub struct ArtworkClient {
@@ -157,7 +170,7 @@ impl ArtworkClient {
 
     /// Get TMDB artwork and a separate fanart.tv show background for the media
     /// page's subdued image layer. Kitsu/AniList/poster fallback remains the app's responsibility.
-    pub async fn get_artwork(&self, anilist_id: i64) -> Result<Artwork> {
+    pub async fn get_artwork(&self, anilist_id: i64, season_start_date: Option<&str>) -> Result<Artwork> {
         tracing::debug!(anilist_id, "artwork lookup started");
         let ids = self.ids(anilist_id).await?;
         let mut artwork = Artwork::default();
@@ -187,8 +200,12 @@ impl ArtworkClient {
                         }
                         used_images.push(image);
                     }
-                    if artwork.logo.is_none() {
-                        if let Some(image) = best_fanart(&data.clearlogo) {
+                    if let Some(image) = choose_fanart_logo(&data.clearlogo, ids.tvdb_season, season_start_date) {
+                        tracing::debug!(anilist_id, season = ?ids.tvdb_season, season_start_date = ?season_start_date, "using season-specific fanart.tv logo");
+                        artwork.logo = Some(image.url.clone());
+                        used_images.push(image);
+                    } else if artwork.logo.is_none() {
+                        if let Some(image) = best_general_fanart_logo(&data.clearlogo) {
                             artwork.logo = Some(image.url.clone());
                             used_images.push(image);
                         }
@@ -249,7 +266,7 @@ impl ArtworkClient {
         };
         let mut found: Vec<_> = rows.into_iter().filter(|row| row.anilist_id == Some(anilist_id)).collect();
         // Prefer entries with explicit seasonal coordinates for split-cour mapping.
-        found.sort_by_key(|row| row.season.as_ref().and_then(|s| s.tmdb).is_none());
+        found.sort_by_key(|row| row.season.as_ref().and_then(|s| s.tmdb.or(s.tvdb)).is_none());
         let row = found.into_iter().next();
         let row_tmdb = row.as_ref().and_then(|r| r.themoviedb_id.as_ref());
         let arm_needed = row_tmdb.and_then(|ids| ids.tv.or_else(|| ids.movie.as_ref().and_then(TmdbMovieIds::first))).is_none();
@@ -285,6 +302,7 @@ impl ArtworkClient {
             tmdb_season: row.as_ref().and_then(|r| r.season.as_ref()).and_then(|s| s.tmdb),
             tmdb_episode_offset: row.as_ref().and_then(|r| r.episode_offset.as_ref()).and_then(|o| o.tmdb),
             tvdb_id: row.as_ref().and_then(|r| r.tvdb_id),
+            tvdb_season: row.as_ref().and_then(|r| r.season.as_ref()).and_then(|s| s.tvdb),
             simkl_id: row.as_ref().and_then(|r| r.simkl_id).or(arm.simkl),
             anidb_id: arm.anidb,
             kitsu_id: arm.kitsu,
@@ -353,7 +371,7 @@ impl ArtworkClient {
     }
 
     async fn fanart_images(&self, tvdb_id: u64, key: &str) -> Result<FanartResponse> {
-        let cache_key = format!("fanart-tv-{tvdb_id}");
+        let cache_key = format!("fanart-tv-season-logos-{tvdb_id}");
         self.cached_json(&cache_key, FANART_TTL_SECS, || async {
             tracing::debug!(tvdb_id, "requesting fanart.tv metadata");
             Ok(self.client.get(format!("{FANART_API}/tv/{tvdb_id}")).header("api-key", key).send().await?.error_for_status()?.json().await?)
@@ -413,6 +431,47 @@ fn tmdb_thumbnail_url(path: &str, configuration: &TmdbImageConfiguration) -> Str
 fn tmdb_image_url(path: &str, size: &str) -> String { format!("https://image.tmdb.org/t/p/{size}{path}") }
 fn best_fanart(images: &[FanartImage]) -> Option<&FanartImage> {
     images.iter().max_by_key(|i| i.likes.parse::<u32>().unwrap_or(0))
+}
+fn best_season_fanart_logo(images: &[FanartImage], season: Option<i32>) -> Option<&FanartImage> {
+    let season = season?;
+    images.iter()
+        .filter(|image| image.season.as_ref().is_some_and(|value| value.matches(season)))
+        .max_by_key(|image| image.likes.parse::<u32>().unwrap_or(0))
+}
+fn choose_fanart_logo<'a>(images: &'a [FanartImage], season: Option<i32>, season_start_date: Option<&str>) -> Option<&'a FanartImage> {
+    best_season_fanart_logo(images, season).or_else(|| closest_fanart_logo(images, season_start_date))
+}
+fn best_general_fanart_logo(images: &[FanartImage]) -> Option<&FanartImage> {
+    images.iter()
+        .filter(|image| image.season.as_ref().is_none_or(FanartSeason::is_general))
+        .max_by_key(|image| image.likes.parse::<u32>().unwrap_or(0))
+}
+fn closest_fanart_logo<'a>(images: &'a [FanartImage], season_start_date: Option<&str>) -> Option<&'a FanartImage> {
+    let target_day = season_start_date.and_then(date_ordinal)?;
+    images.iter()
+        .filter_map(|image| {
+            if !image.season.as_ref().is_none_or(FanartSeason::is_general) { return None; }
+            let uploaded_day = image.added.as_deref().and_then(date_ordinal)?;
+            let distance = (uploaded_day - target_day).abs();
+            (distance <= SEASON_LOGO_UPLOAD_MAX_DISTANCE_DAYS).then_some((image, distance))
+        })
+        .min_by_key(|(_, distance)| *distance)
+        .map(|(image, _)| image)
+}
+fn date_ordinal(value: &str) -> Option<i64> {
+    let date = value.get(..10)?;
+    let mut parts = date.split('-');
+    let year = parts.next()?.parse::<i64>().ok()?;
+    let month = parts.next()?.parse::<i64>().ok()?;
+    let day = parts.next()?.parse::<i64>().ok()?;
+    if parts.next().is_some() || !(1..=12).contains(&month) || !(1..=31).contains(&day) { return None; }
+    let year = year - i64::from(month <= 2);
+    let era = if year >= 0 { year } else { year - 399 } / 400;
+    let year_of_era = year - era * 400;
+    let adjusted_month = month + if month > 2 { -3 } else { 9 };
+    let day_of_year = (153 * adjusted_month + 2) / 5 + day - 1;
+    let day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
+    Some(era * 146_097 + day_of_era)
 }
 fn fanart_attribution(images: &[&FanartImage]) -> String {
     let details: Vec<_> = images.iter().filter_map(|image| {
@@ -494,6 +553,38 @@ mod tests {
             still_sizes: vec!["w92".into(), "w300".into(), "original".into()],
         };
         assert_eq!(tmdb_thumbnail_url("/still.jpg", &configuration), "https://images.test/p/w300/still.jpg");
+    }
+
+    #[test]
+    fn fanart_logo_prefers_the_mapped_season_then_general_logo() {
+        let images: Vec<FanartImage> = serde_json::from_str(r#"[
+            {"url":"generic.png","likes":"100"},
+            {"url":"season-one.png","season":"1","likes":"500"},
+            {"url":"season-two.png","season":2,"likes":"1","added":"2020-01-01 00:00:00"},
+            {"url":"all-seasons.png","season":"all","likes":"50"}
+        ]"#).unwrap();
+        assert_eq!(choose_fanart_logo(&images, Some(2), Some("2020-01-01")).map(|image| image.url.as_str()), Some("season-two.png"));
+        assert!(best_season_fanart_logo(&images, None).is_none());
+        assert_eq!(best_general_fanart_logo(&images).map(|image| image.url.as_str()), Some("generic.png"));
+    }
+
+    #[test]
+    fn fribb_season_map_retains_both_provider_season_numbers() {
+        let season: SeasonMap = serde_json::from_str(r#"{"tmdb":3,"tvdb":2}"#).unwrap();
+        assert_eq!(season.tmdb, Some(3));
+        assert_eq!(season.tvdb, Some(2));
+    }
+
+    #[test]
+    fn fanart_logo_uploads_use_nearest_date_within_six_months() {
+        let images: Vec<FanartImage> = serde_json::from_str(r#"[
+            {"url":"near-before.png","added":"2026-03-20 00:00:00"},
+            {"url":"near-after.png","added":"2026-04-15 00:00:00"},
+            {"url":"other-season.png","season":"1","added":"2026-03-15 00:00:00"},
+            {"url":"too-old.png","added":"2025-09-01 00:00:00"}
+        ]"#).unwrap();
+        assert_eq!(closest_fanart_logo(&images, Some("2026-04-01")).map(|image| image.url.as_str()), Some("near-before.png"));
+        assert!(closest_fanart_logo(&images, Some("2020-04-01")).is_none());
     }
 
     #[test]

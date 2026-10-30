@@ -148,6 +148,7 @@ See [detailed specification](docs/planning/V0_6_0.md).
 ## HD banner sources (planned, v0.6.0 - minor: new feature)
 
 See [detailed specification](docs/planning/V0_6_0.md).
+Prefer season-tagged Fanart.tv logos; otherwise use an eligible logo uploaded within 180 days of the anime season start, then the default logo.
 
 ## Seek-bar thumbnail preview (planned, v0.6.0 - minor: new feature)
 

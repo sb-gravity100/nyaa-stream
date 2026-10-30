@@ -183,12 +183,14 @@ function App() {
   useEffect(() => {
     let cancelled = false;
     const ids = [...new Set([...library.map((anime) => anime.id), ...(selectedAnime ? [selectedAnime.id] : [])])];
+    const animeById = new Map([...library, ...(selectedAnime ? [selectedAnime] : [])].map((anime) => [anime.id, anime]));
     console.info("[artwork] refreshing app artwork", { shows: ids.length, hasTmdb: !!providerCredentials.tmdbReadAccessToken, hasFanart: !!providerCredentials.fanartApiKey });
     setArtworkByMedia({});
     const load = async () => {
       for (const id of ids) {
         if (cancelled) return;
-        const artwork = await getArtwork(id);
+        const anime = animeById.get(id);
+        const artwork = await getArtwork(id, anime?.season ?? null, anime?.seasonYear ?? null);
         if (!cancelled) setArtworkByMedia((current) => ({ ...current, [id]: artwork }));
       }
     };
