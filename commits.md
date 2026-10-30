@@ -1,3 +1,11 @@
+### `9ba6a96` · 2026-10-31 · feat: add mpv subtitle rendering controls
+- `src/App.css`
+- `src/PlayerView.tsx`
+- `src/SettingsPanel.tsx`
+- `src/settings.ts`
+- `src/subtitles.ts`
+- `FILE_INDEX.md`
+
 ### `0386fbf` · 2026-10-31 · docs: add independent ASS rendering controls
 - `docs/planning/MPV_BUILD.md`
 - `PHASES.md`
