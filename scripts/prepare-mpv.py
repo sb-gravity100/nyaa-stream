@@ -1,6 +1,7 @@
 """Prepare isolated native libmpv build tools; does not build or install libmpv."""
 
 import argparse
+import configparser
 import hashlib
 import json
 import logging
@@ -127,6 +128,51 @@ def compiler_environment():
     return environment
 
 
+def fetch_wrap_sources(wraps):
+    LOG.info("Preparing %s pinned Meson source definitions", len(wraps))
+    workspace = ROOT / "dependencies"
+    subprojects = workspace / "subprojects"
+    subprojects.mkdir(parents=True, exist_ok=True)
+    project = workspace / "meson.build"
+    project_text = "project('mpv-source-lock', 'c')\n"
+    if project.exists() and project.read_text(encoding="utf-8-sig").strip() != project_text.strip():
+        raise RuntimeError("Existing source metadata project differs; preserving it")
+    project.write_text(project_text, encoding="utf-8", newline="\n")
+    directories = {}
+    for name, entry in wraps.items():
+        LOG.info("Verifying locked source definition: %s", name)
+        payload = (REPO / entry["file"]).read_bytes().replace(b"\r\n", b"\n")
+        if hashlib.sha256(payload).hexdigest() != entry["sha256_lf"]:
+            raise RuntimeError(f"Source definition checksum mismatch: {name}")
+        destination = subprojects / (name + ".wrap")
+        if destination.exists() and destination.read_bytes().replace(b"\r\n", b"\n") != payload:
+            raise RuntimeError(f"Existing source definition differs; preserving {name}")
+        destination.write_bytes(payload)
+        directories[name] = str(subprojects / entry["directory"])
+    python = ROOT / "tools/python/Scripts/python.exe"
+    # Windows Meson directory locking failed with concurrent source extraction;
+    # use one worker for repeatable download/extraction, without changing hashes.
+    environment = os.environ.copy()
+    environment["MESON_PACKAGE_CACHE_DIR"] = str(subprojects / "packagecache")
+    run([python, "-m", "mesonbuild.mesonmain", "subprojects", "download",
+         "--sourcedir", workspace, "-j", "1", *wraps.keys()], env=environment)
+    for name, entry in wraps.items():
+        LOG.info("Verifying cached source/build-patch archives: %s", name)
+        definition = configparser.ConfigParser(interpolation=None)
+        definition.read(subprojects / (name + ".wrap"), encoding="utf-8")
+        section = definition["wrap-file"]
+        for kind in ("source", "patch"):
+            if kind + "_filename" not in section:
+                continue
+            archive = subprojects / "packagecache" / section[kind + "_filename"]
+            if not archive.is_file() or digest(archive) != section[kind + "_hash"]:
+                raise RuntimeError(f"Cached {kind} archive checksum mismatch: {name}")
+        if not Path(directories[name]).is_dir():
+            raise RuntimeError(f"Source directory was not prepared: {name}")
+    LOG.info("Pinned Meson sources prepared")
+    return directories
+
+
 def fetch_sources():
     LOG.info("Starting locked source preparation; compilation is disabled in this mode")
     lock_path = REPO / "native/mpv/sources.lock.json"
@@ -138,6 +184,14 @@ def fetch_sources():
         LOG.info("Preparing source %s at %s", name, entry["commit"])
         archive = fetch(entry)
         directories[name] = str(unpack(archive, ROOT / "sources", entry["directory"]))
+    if lock.get("wraps"):
+        LOG.info("Preparing transitive source archives through pinned Meson definitions")
+        directories.update(fetch_wrap_sources(lock["wraps"]))
+    for patch in lock.get("patches", []):
+        LOG.info("Verifying locked native build patch: %s", patch["file"])
+        payload = (REPO / patch["file"]).read_bytes().replace(b"\r\n", b"\n")
+        if hashlib.sha256(payload).hexdigest() != patch["sha256_lf"]:
+            raise RuntimeError("Native build patch checksum mismatch")
     manifest = {"source_lock_sha256": digest(lock_path), "directories": directories,
                 "transitive_lock_complete": lock["transitive_lock_complete"],
                 "pending": lock["pending"]}

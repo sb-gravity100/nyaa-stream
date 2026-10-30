@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "transitive_lock_complete": false,
+  "transitive_lock_complete": true,
   "identity_source": "Upstream release tags resolved with git ls-remote; archive SHA-256 recorded from HTTPS downloads of those exact commits",
   "packages": {
     "mpv": {
@@ -47,18 +47,360 @@
       "directory": "dav1d-b546257f770768b2c88258c533da38b91a06f737",
       "url": "https://codeload.github.com/videolan/dav1d/zip/b546257f770768b2c88258c533da38b91a06f737",
       "sha256": "9b5d9f397069856bf6384e2a964009c837291fb83b1c764b83be8193ea9574a4"
+    },
+    "x264": {
+      "ref": "upstream stable branch",
+      "commit": "b35605ace3ddf7c1a5d67a2eb553f034aef41d55",
+      "repository": "https://github.com/mirror/x264.git",
+      "file": "x264-b35605ace3ddf7c1a5d67a2eb553f034aef41d55.zip",
+      "directory": "x264-b35605ace3ddf7c1a5d67a2eb553f034aef41d55",
+      "url": "https://codeload.github.com/mirror/x264/zip/b35605ace3ddf7c1a5d67a2eb553f034aef41d55",
+      "sha256": "df01c20f11d409cee43eb0a3e1a316757dc129067104d013933c8135a1d84f7b"
+    },
+    "shaderc": {
+      "ref": "v2026.4",
+      "commit": "b64fd42c4a2a9d501c47aca5d3571f7673a5e9cc",
+      "repository": "https://github.com/google/shaderc.git",
+      "file": "shaderc-b64fd42c4a2a9d501c47aca5d3571f7673a5e9cc.zip",
+      "directory": "shaderc-b64fd42c4a2a9d501c47aca5d3571f7673a5e9cc",
+      "url": "https://codeload.github.com/google/shaderc/zip/b64fd42c4a2a9d501c47aca5d3571f7673a5e9cc",
+      "sha256": "8ebd034b27e4bf2f12f03db7f5be3350ac4bb2dfbc7e5ecdda9e025fa155f2cb"
+    },
+    "glslang": {
+      "ref": "shaderc v2026.4 DEPS",
+      "commit": "e1b562a8bed273a02f30b59b66a5d499793cede5",
+      "repository": "https://github.com/KhronosGroup/glslang.git",
+      "file": "glslang-e1b562a8bed273a02f30b59b66a5d499793cede5.zip",
+      "directory": "glslang-e1b562a8bed273a02f30b59b66a5d499793cede5",
+      "url": "https://codeload.github.com/KhronosGroup/glslang/zip/e1b562a8bed273a02f30b59b66a5d499793cede5",
+      "sha256": "99c8dc8bafeeec24bc4629e92cf39c667208d0a01c336603759c4e042fbcbe3d"
+    },
+    "spirv-headers": {
+      "ref": "shaderc v2026.4 DEPS",
+      "commit": "04fd3caa1e8267e4d95c806cad901181728e1006",
+      "repository": "https://github.com/KhronosGroup/SPIRV-Headers.git",
+      "file": "spirv-headers-04fd3caa1e8267e4d95c806cad901181728e1006.zip",
+      "directory": "SPIRV-Headers-04fd3caa1e8267e4d95c806cad901181728e1006",
+      "url": "https://codeload.github.com/KhronosGroup/SPIRV-Headers/zip/04fd3caa1e8267e4d95c806cad901181728e1006",
+      "sha256": "b0edf58b9e08138f9527bca37342d4c4f38676fbd6d4cac5831967b77a71c3d4"
+    },
+    "spirv-tools": {
+      "ref": "shaderc v2026.4 DEPS",
+      "commit": "ef96ed763b43b59b33b31b362f09a02b729fa1c9",
+      "repository": "https://github.com/KhronosGroup/SPIRV-Tools.git",
+      "file": "spirv-tools-ef96ed763b43b59b33b31b362f09a02b729fa1c9.zip",
+      "directory": "SPIRV-Tools-ef96ed763b43b59b33b31b362f09a02b729fa1c9",
+      "url": "https://codeload.github.com/KhronosGroup/SPIRV-Tools/zip/ef96ed763b43b59b33b31b362f09a02b729fa1c9",
+      "sha256": "2a7666cfaec2818516019fccb8101a6e57c589417bef83a3c61d19ed63de1c1f"
+    },
+    "spirv-cross": {
+      "ref": "vulkan-sdk-1.4.341.0",
+      "commit": "a0fba56c34a6700f1724bf9b751da5b488a3775c",
+      "repository": "https://github.com/KhronosGroup/SPIRV-Cross.git",
+      "file": "spirv-cross-a0fba56c34a6700f1724bf9b751da5b488a3775c.zip",
+      "directory": "SPIRV-Cross-a0fba56c34a6700f1724bf9b751da5b488a3775c",
+      "url": "https://codeload.github.com/KhronosGroup/SPIRV-Cross/zip/a0fba56c34a6700f1724bf9b751da5b488a3775c",
+      "sha256": "87d1e95e769649784f4039febb30812d07834ea025ea8e5dd6c35462b01ad618"
+    },
+    "vulkan-loader": {
+      "ref": "v1.4.345",
+      "commit": "363f465abadab0a8dcfc5c85d2c691e9b0b788d6",
+      "repository": "https://github.com/KhronosGroup/Vulkan-Loader.git",
+      "file": "vulkan-loader-363f465abadab0a8dcfc5c85d2c691e9b0b788d6.zip",
+      "directory": "Vulkan-Loader-363f465abadab0a8dcfc5c85d2c691e9b0b788d6",
+      "url": "https://codeload.github.com/KhronosGroup/Vulkan-Loader/zip/363f465abadab0a8dcfc5c85d2c691e9b0b788d6",
+      "sha256": "327bf7fac86575d5120e5383d048c56e5e5f0efe3ce6b6b8d9dc8aeeeea693e5"
+    },
+    "nv-codec-headers": {
+      "ref": "n11.1.5.3",
+      "commit": "43d91706e097565f57b311e567f0219838bcc2f6",
+      "repository": "https://github.com/FFmpeg/nv-codec-headers.git",
+      "file": "nv-codec-headers-43d91706e097565f57b311e567f0219838bcc2f6.zip",
+      "directory": "nv-codec-headers-43d91706e097565f57b311e567f0219838bcc2f6",
+      "url": "https://codeload.github.com/FFmpeg/nv-codec-headers/zip/43d91706e097565f57b311e567f0219838bcc2f6",
+      "sha256": "e063c2e46b4bd0d3ff47f40e731fca0ff2383dd28da1c115f8794b851a2d3803"
+    },
+    "amf": {
+      "ref": "v1.4.35",
+      "commit": "ba07d1b3c7c7ee0d846125cffc1d6d78a020c45a",
+      "repository": "https://github.com/GPUOpen-LibrariesAndSDKs/AMF.git",
+      "file": "amf-ba07d1b3c7c7ee0d846125cffc1d6d78a020c45a.zip",
+      "directory": "AMF-ba07d1b3c7c7ee0d846125cffc1d6d78a020c45a",
+      "url": "https://codeload.github.com/GPUOpen-LibrariesAndSDKs/AMF/zip/ba07d1b3c7c7ee0d846125cffc1d6d78a020c45a",
+      "sha256": "4c914d34bf450cede44f31ebe4e18f8cdf5249d0b8f9a353e4a2bdb37893ecb4"
+    },
+    "libvpl": {
+      "ref": "v2.15.0",
+      "commit": "c45b5d786bf7cdabbe49ff1bab78693ad78feb78",
+      "repository": "https://github.com/intel/libvpl.git",
+      "file": "libvpl-c45b5d786bf7cdabbe49ff1bab78693ad78feb78.zip",
+      "directory": "libvpl-c45b5d786bf7cdabbe49ff1bab78693ad78feb78",
+      "url": "https://codeload.github.com/intel/libvpl/zip/c45b5d786bf7cdabbe49ff1bab78693ad78feb78",
+      "sha256": "14bfbae293568e6895ff70346a8c9d56999b92522ec1f364ee842b8a204eb99f"
+    },
+    "placebo-vulkan-headers": {
+      "ref": "libplacebo v7.387.0 submodule",
+      "commit": "74d8a6cb930c68ef617b202c3ff3c59d919e086b",
+      "repository": "https://github.com/KhronosGroup/Vulkan-Headers.git",
+      "file": "placebo-vulkan-headers-74d8a6cb930c68ef617b202c3ff3c59d919e086b.zip",
+      "directory": "Vulkan-Headers-74d8a6cb930c68ef617b202c3ff3c59d919e086b",
+      "url": "https://codeload.github.com/KhronosGroup/Vulkan-Headers/zip/74d8a6cb930c68ef617b202c3ff3c59d919e086b",
+      "sha256": "b47d389b8bce7d07e63d3be81e623d0c20b897a4b30d37b3ccc36a4cab53311b"
+    },
+    "placebo-fast-float": {
+      "ref": "libplacebo v7.387.0 submodule",
+      "commit": "97b54ca9e75f5303507699d27c6b4f4efe4641a1",
+      "repository": "https://github.com/fastfloat/fast_float.git",
+      "file": "placebo-fast-float-97b54ca9e75f5303507699d27c6b4f4efe4641a1.zip",
+      "directory": "fast_float-97b54ca9e75f5303507699d27c6b4f4efe4641a1",
+      "url": "https://codeload.github.com/fastfloat/fast_float/zip/97b54ca9e75f5303507699d27c6b4f4efe4641a1",
+      "sha256": "05f3a1a4139a3179e18ddaae386d58de43e469273e22a219b5ed0ec909f3b46f"
+    },
+    "placebo-glad": {
+      "ref": "libplacebo v7.387.0 submodule",
+      "commit": "73db193f853e2ee079bf3ca8a64aa2eaf6459043",
+      "repository": "https://github.com/Dav1dde/glad.git",
+      "file": "placebo-glad-73db193f853e2ee079bf3ca8a64aa2eaf6459043.zip",
+      "directory": "glad-73db193f853e2ee079bf3ca8a64aa2eaf6459043",
+      "url": "https://codeload.github.com/Dav1dde/glad/zip/73db193f853e2ee079bf3ca8a64aa2eaf6459043",
+      "sha256": "c6fe11176ef2dca44f0da370fabcd986e1d06320831950adc622d317d8a60e0a"
+    },
+    "placebo-jinja": {
+      "ref": "libplacebo v7.387.0 submodule",
+      "commit": "15206881c006c79667fe5154fe80c01c65410679",
+      "repository": "https://github.com/pallets/jinja.git",
+      "file": "placebo-jinja-15206881c006c79667fe5154fe80c01c65410679.zip",
+      "directory": "jinja-15206881c006c79667fe5154fe80c01c65410679",
+      "url": "https://codeload.github.com/pallets/jinja/zip/15206881c006c79667fe5154fe80c01c65410679",
+      "sha256": "7b1d8136586e7d48042fec6fd85004e08434a8c943e9278f81622a76d9049e35"
+    },
+    "placebo-markupsafe": {
+      "ref": "libplacebo v7.387.0 submodule",
+      "commit": "297fc8e356e6836a62087949245d09a28e9f1b13",
+      "repository": "https://github.com/pallets/markupsafe.git",
+      "file": "placebo-markupsafe-297fc8e356e6836a62087949245d09a28e9f1b13.zip",
+      "directory": "markupsafe-297fc8e356e6836a62087949245d09a28e9f1b13",
+      "url": "https://codeload.github.com/pallets/markupsafe/zip/297fc8e356e6836a62087949245d09a28e9f1b13",
+      "sha256": "d9d092b72bd13c12d867be2e2a2d3d94a3b4d6b45462811190c21f171640b4f5"
+    },
+    "brotli": {
+      "ref": "v1.2.0",
+      "commit": "028fb5a23661f123017c060daa546b55cf4bde29",
+      "repository": "https://github.com/google/brotli.git",
+      "file": "brotli-028fb5a23661f123017c060daa546b55cf4bde29.zip",
+      "directory": "brotli-028fb5a23661f123017c060daa546b55cf4bde29",
+      "url": "https://codeload.github.com/google/brotli/zip/028fb5a23661f123017c060daa546b55cf4bde29",
+      "sha256": "55eb28fb9b36ea392c5252df8464d8a16d0d0b4f6860c86af72b87f7bde0d287"
     }
   },
-  "pending": [
-    "Approved LuaJIT: source and build-definition revisions",
-    "Approved x264: source and native build-definition revisions",
-    "Font shaping, rasterization, bidi and line breaking",
-    "Character encoding detection and conversion",
-    "Compression and screenshot/image libraries",
-    "LCMS2 and any hashing/math helper dependencies",
-    "Shader compiler, SPIR-V tools, headers and conversion",
-    "Vulkan headers/loader and vendored graphics sources",
-    "NVIDIA codec headers, AMD AMF and Intel QSV dispatcher",
-    "All submodule revisions, build definitions and patches"
-  ]
+  "pending": [],
+  "wraps": {
+    "bzip2": {
+      "version": "1.0.8-2",
+      "file": "native/mpv/wraps/bzip2.wrap",
+      "sha256_lf": "e5e568646065610e687e3e1b0d103649e291a5ee269208d93878d879dc971f35",
+      "directory": "bzip2-1.0.8",
+      "source_sha256": "ab5a03176ee106d3f0fa90e381da478ddae405918153cca248e682cd0c4a2269",
+      "patch_sha256": "60dbfc47880a78d9c8946f0dc689a771ddf503f6da904dabef1332904dcef561"
+    },
+    "freetype2": {
+      "version": "2.15.0-1",
+      "file": "native/mpv/wraps/freetype2.wrap",
+      "sha256_lf": "8b79da9a9374f1fcf6ada895325994c3a98aca6e9d58429f3d6111dbb2744ef4",
+      "directory": "freetype-2.15.0",
+      "source_sha256": "93cd47eb719c325107f2d3cf087d06299e944c3b48a40b55537302304dea1dd5"
+    },
+    "fribidi": {
+      "version": "1.0.17-1",
+      "file": "native/mpv/wraps/fribidi.wrap",
+      "sha256_lf": "dea268bce033a7d1c59c70fbe235cac395ba0683386fbebf6213be340143f615",
+      "directory": "fribidi-1.0.17",
+      "source_sha256": "6949dcde27d41cebad1fd741fcafc36d55a1020d2d872d4a6eb3914caabbada2"
+    },
+    "harfbuzz": {
+      "version": "13.0.1-1",
+      "file": "native/mpv/wraps/harfbuzz.wrap",
+      "sha256_lf": "147b05412cc67f2efa2be866e87e45a94d65d2da5a37d6bf9986ee2cc069f740",
+      "directory": "harfbuzz-13.0.1",
+      "source_sha256": "3553d943401c34ab9b8c75f35cdb8452ca660233b0e9d4a22395ce5245484bd7"
+    },
+    "lcms2": {
+      "version": "2.19.1-1",
+      "file": "native/mpv/wraps/lcms2.wrap",
+      "sha256_lf": "419d2c960b6ee0e388b6bb4e4c1a1826beb7ddd74e9cc22647fe39591c32cd49",
+      "directory": "lcms2-2.19.1",
+      "source_sha256": "bfc54f7bab59fbc921012014a8032e4cba4abd46db47d46b76416a8c0b2815c8"
+    },
+    "libjpeg-turbo": {
+      "version": "3.2.0-1",
+      "file": "native/mpv/wraps/libjpeg-turbo.wrap",
+      "sha256_lf": "08ce78d378612fe71ef3e4ced00c8aa31317661eabf1d55cb894476703a6fcae",
+      "directory": "libjpeg-turbo-3.2.0",
+      "source_sha256": "6f30092cef9fb839779646608f4ee14ae3cbac989c47fa05e841b0841f09878e",
+      "patch_sha256": "c746b7b102de8f7660b9df30b2d68fd75dfbab45ed658eda257c1976e3371d2e"
+    },
+    "libpng": {
+      "version": "1.6.59-1",
+      "file": "native/mpv/wraps/libpng.wrap",
+      "sha256_lf": "dc96aa30685134db3cf28532fb76b83cc9e36cd7502ce2e6e5c39a403ed1fe37",
+      "directory": "libpng-1.6.59",
+      "source_sha256": "2540302a1844ad2b2b501977abecfa850f265f97b78f065a712ab4074a89f5b5",
+      "patch_sha256": "d20d5e20516a550817026b0074c4051ff4342da43f0600827316ea85f89d1d38"
+    },
+    "libunibreak": {
+      "version": "6.1-1",
+      "file": "native/mpv/wraps/libunibreak.wrap",
+      "sha256_lf": "a1345d3628560fb0a83aa0326f1bae97386713f428145bdbfb55fd1171dde4b3",
+      "directory": "libunibreak-6.1",
+      "source_sha256": "cc4de0099cf7ff05005ceabff4afed4c582a736abc38033e70fdac86335ce93f",
+      "patch_sha256": "830688953398bcb5ca8d88e619b0babbb31de95b31f47234adb0245bce95cf14"
+    },
+    "luajit": {
+      "version": "2.1.1720049189-3",
+      "file": "native/mpv/wraps/luajit.wrap",
+      "sha256_lf": "b5ac9c2f34c2925cf001559c753919425c5f86500fe1a1c02383c9b0eace9985",
+      "directory": "LuaJIT-04dca7911ea255f37be799c18d74c305b921c1a6",
+      "source_sha256": "346b028d9ba85e04b7e23a43cc51ec076574d2efc0d271d4355141b0145cd6e0",
+      "patch_sha256": "f08a308599ff48ad73a8020ea592f1cd0f0b19bd9e9246a10503888d51889fe3"
+    },
+    "uchardet": {
+      "version": "0.0.8-1",
+      "file": "native/mpv/wraps/uchardet.wrap",
+      "sha256_lf": "c5f93850ff0fdfbaa1b28cf28928a83b64e842f113589d06fd0f87527ead3289",
+      "directory": "uchardet-0.0.8",
+      "source_sha256": "e97a60cfc00a1c147a674b097bb1422abd9fa78a2d9ce3f3fdcc2e78a34ac5f0",
+      "patch_sha256": "08077037aabc920d461794e8d81596efe80b9a7d7792e090fd89db9c1dc9fd76"
+    },
+    "vulkan-headers": {
+      "version": "1.4.346-1",
+      "file": "native/mpv/wraps/vulkan-headers.wrap",
+      "sha256_lf": "84317a736a31c2a1d83f5ae52ce99283a10b8404caab54717d3b56efd1eb5a2a",
+      "directory": "Vulkan-Headers-1.4.346",
+      "source_sha256": "5bb77f5d7b460e255a9e51affc00d64354986b55cf577d8eab28529cad01fc80",
+      "patch_sha256": "b85cbf6793193b28c5bd80858308b214816e66041b10ec00f0115b19f3a7a60e"
+    },
+    "win-iconv": {
+      "version": "0.0.9-1",
+      "file": "native/mpv/wraps/win-iconv.wrap",
+      "sha256_lf": "fc334f7b8a77a08bda5eaadfeccb8c746f3ff71083e964f7218fc11de2fb10be",
+      "directory": "win-iconv-0.0.9",
+      "source_sha256": "f97e11b44576830bcb7363146f65dfe748f55f800da0ac876350ffb3f765d5de",
+      "patch_sha256": "b732c2afe5c9bca0543093478ed6f21249f950f200667dc8dfae1ffb1f845694"
+    },
+    "xxhash": {
+      "version": "0.8.3-2",
+      "file": "native/mpv/wraps/xxhash.wrap",
+      "sha256_lf": "6fca8f9cdf6784e6caacae643ec833829be957f0cb93ecd1de90b3a720388ec3",
+      "directory": "xxHash-0.8.3",
+      "source_sha256": "aae608dfe8213dfd05d909a57718ef82f30722c392344583d3f39050c7f29a80",
+      "patch_sha256": "c7f78fc2d08ec21ff1bae928d7bdcddb42713a07d9d973a885c59ea7f8cf6bc8"
+    },
+    "zlib": {
+      "version": "1.3.2-1",
+      "file": "native/mpv/wraps/zlib.wrap",
+      "sha256_lf": "9a7916471716b8bdd107f82114477304b79759ea7f934254d4a0bc5af184d7c8",
+      "directory": "zlib-1.3.2",
+      "source_sha256": "d7a0654783a4da529d1bb793b7ad9c3318020af77667bcae35f95d0e42a792f3",
+      "patch_sha256": "5ae7a2e92f823df118cfb8c1b23d94e3117864392b3446581d669049b2fba6dd"
+    },
+    "graphite2": {
+      "version": "1.3.14-1",
+      "file": "native/mpv/wraps/graphite2.wrap",
+      "sha256_lf": "cac5de25e5b6e4b0625758b2efb82041b7b5d1bc75e83c32d76f7a4486a98ad8",
+      "directory": "graphite2-1.3.14",
+      "source_sha256": "f99d1c13aa5fa296898a181dff9b82fb25f6cc0933dbaa7a475d8109bd54209d",
+      "patch_sha256": "7d5d88ff677990cb0c7bc170f0454ec67315b142ab89cf8a679ca95fe7e47e6d"
+    }
+  },
+  "vendor_placements": [
+    {
+      "package": "placebo-vulkan-headers",
+      "parent": "libplacebo",
+      "path": "3rdparty/Vulkan-Headers"
+    },
+    {
+      "package": "placebo-fast-float",
+      "parent": "libplacebo",
+      "path": "3rdparty/fast_float"
+    },
+    {
+      "package": "placebo-glad",
+      "parent": "libplacebo",
+      "path": "3rdparty/glad"
+    },
+    {
+      "package": "placebo-jinja",
+      "parent": "libplacebo",
+      "path": "3rdparty/jinja"
+    },
+    {
+      "package": "placebo-markupsafe",
+      "parent": "libplacebo",
+      "path": "3rdparty/markupsafe"
+    },
+    {
+      "package": "glslang",
+      "parent": "shaderc",
+      "path": "third_party/glslang"
+    },
+    {
+      "package": "spirv-tools",
+      "parent": "shaderc",
+      "path": "third_party/spirv-tools"
+    },
+    {
+      "package": "spirv-headers",
+      "parent": "shaderc",
+      "path": "third_party/spirv-headers"
+    },
+    {
+      "package": "spirv-headers",
+      "parent": "spirv-tools",
+      "path": "external/spirv-headers"
+    }
+  ],
+  "configuration_constraints": {
+    "media_compilation_authorized": false,
+    "shaderc_tests": false,
+    "spirv_tools_tests": false,
+    "spirv_tools_executables": false,
+    "libplacebo_demos": false,
+    "vulkan_loader_update_deps": false,
+    "fontconfig": false,
+    "windows_font_provider": "DirectWrite",
+    "tls_provider": "schannel",
+    "nvidia_header_rationale": "FFmpeg 8.0.3 explicitly accepts SDK 11.1 headers; retain AV1 NVDEC declarations without requiring a new SDK 13 NVENC API",
+    "shaderc_skip_executables": true,
+    "shaderc_wgsl": false,
+    "spirv_tools_mimalloc": false,
+    "libjpeg_turbo_api": false,
+    "harfbuzz_glib": false,
+    "harfbuzz_gobject": false,
+    "harfbuzz_cairo": false,
+    "harfbuzz_icu": false,
+    "harfbuzz_graphite": true,
+    "freetype_harfbuzz": false,
+    "freetype_brotli": true,
+    "freetype_bzip2": true,
+    "libplacebo_libdovi": false,
+    "libplacebo_dovi": true
+  },
+  "excluded_source_dependencies": {
+    "libplacebo:demos/3rdparty/nuklear": "Demos disabled",
+    "shaderc:abseil_cpp,effcee,googletest,re2": "Test dependencies; tests and examples disabled",
+    "shaderc:tint": "WGSL output disabled",
+    "spirv-tools:mimalloc,protobuf": "Optional allocator/fuzzer functionality disabled",
+    "libjpeg-turbo:spng": "TurboJPEG API disabled; mpv uses classic libjpeg API",
+    "libplacebo:libdovi": "Optional raw RPU parser disabled; native Dolby Vision metadata reshaping retained",
+    "harfbuzz:glib,gobject,cairo,icu": "Unused adapters/alternative Unicode providers; native Unicode/OpenType and Graphite shaping retained"
+  },
+  "patches": [
+    {
+      "package": "x264",
+      "file": "native/mpv/patches/x264-clang-cl.patch",
+      "sha256_lf": "f592f35ac5e1b23d948615ea1909af6203a98f9becb07b58588885d8bf4282ab",
+      "reason": "Recognize clang-cl as the existing MSVC-style compiler path"
+    }
+  ],
+  "source_audit_status": "Selected source closure pinned and downloaded; configure/build compatibility not yet proven"
 }

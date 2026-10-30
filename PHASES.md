@@ -82,16 +82,17 @@ override this order.
       codecs, HDR/tone mapping, broad GPU support and software/hardware clip
       encoding; remove unused integrations (ROADMAP.md records the exact scope)
 - [x] SB approved mpv v0.41.0 stable and freezing the agreed trimming scope
-- [~] Prepare native LLVM build recipe (docs/planning/MPV_BUILD.md); core
-      versions proposed, complete source lock and setup approval remain open
+- [x] Record native LLVM build recipe and approved scope (docs/planning/MPV_BUILD.md)
 - [x] Prepare isolated Meson/NASM/pkgconf with `scripts/prepare-mpv.py` and
       `native/mpv/tools.lock.json`; native LLVM pkgconf build and tool versions verified
 - [x] SB approved FFmpeg 8.0.3, libass 0.17.5, libplacebo 7.387.0 and dav1d 1.5.3
 - [x] SB approved LuaJIT scripting and x264 software H.264 export
 - [x] Lock/fetch the five core source commits with archive SHA-256;
       `scripts/prepare-mpv.py --sources-only` verifies and extracts them
-- [ ] Resolve the complete source/archive lock; SB selected separate FFmpeg
-      builds and authorized source locking
+- [x] Resolve/fetch selected source closure: 21 repository archives, 15 hashed
+      source/build definitions and one checked native patch; archive hashes verified
+- [ ] Review and authorize the first full dependency/DLL configure/build;
+      source preparation does not prove compilation or runtime acceptance
 - [ ] Improve batch next-episode transitions by reusing torrent/file metadata and
       verified data; preserve season-aware file selection and source fallback
 - [ ] Measure next-episode click/autoplay to first frame on cached, partial,

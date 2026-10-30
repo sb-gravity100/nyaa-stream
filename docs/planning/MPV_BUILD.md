@@ -1,6 +1,6 @@
 # v0.7.0 custom libmpv native build recipe
 
-Status: local tools prepared, source locking in progress, 2026-10-31.
+Status: local tools and selected source closure prepared, 2026-10-31.
 No custom DLL has been compiled.
 SB approved mpv v0.41.0 stable, native Windows LLVM, baseline x64 and the
 frozen scope in [ROADMAP.md](ROADMAP.md). Further changes require SB review.
@@ -11,11 +11,22 @@ The v0.7.0 setup implementation `scripts/prepare-mpv.py` bootstraps
 isolated tools from `native/mpv/tools.lock.json`, records local tool identity,
 and leaves all downloads/build output under `target/mpv-build/`. The source
 lock is recorded separately in `native/mpv/sources.lock.json`, before compilation.
-The first pass locks/fetches the five approved core projects; it remains marked
-incomplete until every transitive dependency, vendored source and patch is pinned.
+The source lock covers 21 repository archives, 15 Meson source/build definitions
+and one native compiler patch. Their archives/patches have been fetched and
+SHA-256 checked. This proves source preparation, not successful configuration,
+media compilation or runtime compatibility.
 `scripts/prepare-mpv.py --sources-only` fetches locked source archives without
 compiling them. SB approved LuaJIT and x264; their exact source/build-definition
-revisions remain part of the transitive lock work.
+revisions are recorded in the source lock.
+Pinned Meson WrapDB definitions under `native/mpv/wraps/` will retain source
+and build-patch hashes for portable dependencies. Source-only preparation may
+use Meson's download operation to verify those archives without configuring
+or compiling media libraries. Vendored graphics/shader sources are pinned
+separately from their parent project's release archive.
+The source audit identified one native compiler-name adjustment for x264:
+`native/mpv/patches/x264-clang-cl.patch` makes its existing MSVC-style flag
+path recognize `clang-cl`. The patch is pinned and checked against the locked
+source; configuration/compilation still needs to prove the complete path.
 
 ## Build layout and toolchain
 
@@ -66,6 +77,21 @@ LuaJIT, x264, FreeType, HarfBuzz, FriBidi, character encoding detection/conversi
 zlib, image libraries, LCMS2, shader compiler/conversion dependencies and GPU
 headers/loaders in the same lock. Pin every transitive checkout, wrap and patch;
 do not retain floating `master`/`main` or an unrecorded WrapDB update.
+
+The resolved selection is in `native/mpv/sources.lock.json` and
+`native/mpv/wraps/`. It includes Graphite shaping, compressed-font support,
+DirectWrite font discovery, Windows character conversion, image libraries,
+shader compilation/conversion and the three hardware-encoder interfaces.
+Shaderc's own DEPS commits pin glslang and SPIR-V dependencies; libplacebo's
+vendored sources use its exact gitlink revisions. Test/demo-only dependencies
+are excluded under explicit options in the lock. mpv uses the classic libjpeg
+API, so the separate TurboJPEG API and its PNG dependency are not required.
+
+The NVIDIA header selection is `n11.1.5.3`, a version explicitly accepted by
+FFmpeg 8.0.3 and containing AV1 NVDEC declarations, instead of raising the
+NVENC API requirement to SDK 13. Driver/runtime behavior still needs testing.
+libplacebo retains native Dolby Vision metadata reshaping; its optional raw
+RPU parser is separate from the metadata supplied through mpv/FFmpeg.
 
 The v0.41.0 upstream native script is a reference, not the final recipe: it
 enables integrations and dependencies outside SB's approved scope and builds
@@ -122,6 +148,13 @@ Stages 1 and source downloads/locking in stage 2 are authorized by SB's
 selection to keep separate builds and prepare local tools/source lock.
 Core dependency versions are approved. Full-build
 execution, installed-player replacement and publication remain later steps.
+
+Stage 1 passed: tool bootstrap completed and pkgconf compiled with LLVM.
+Stage 2 source locking/fetching passed: the source-only command verified all
+locked archives/build patches and native patch identity. The x264 patch also
+passed `git apply --check`. Full media-stack configuration/compilation is the
+next approval gate. Required build definitions may need adjustment when that
+configuration is exercised; record and review any changes to the source lock.
 
 ## Acceptance and evidence
 
