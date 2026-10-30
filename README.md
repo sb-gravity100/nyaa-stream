@@ -111,7 +111,7 @@ an embedded [mpv](https://mpv.io/) player.
 **Requirements**
 - Windows 10 or 11, x64
 - A CPU with AVX2 (x86-64-v3: Intel Haswell / AMD Excavator or newer, roughly 2013+). The build targets it, so older CPUs won't run it
-- WebView2 (preinstalled on Windows 11 and current Windows 10)
+- WebView2 (preinstalled on Windows 11 and current Windows 10; the installer bootstraps it if missing, requiring internet on a clean machine)
 - For the fallback player only: a GPU with NVENC, QSV or AMF helps a lot with transcoding. Without one it uses OpenH264 on the CPU
 
 ---
