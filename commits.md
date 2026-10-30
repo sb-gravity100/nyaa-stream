@@ -1,3 +1,6 @@
+### `5e2cb9d` · 2026-10-31 · docs: select native LLVM for custom libmpv
+- `docs/planning/ROADMAP.md`
+
 ### `404aa64` · 2026-10-31 · docs: record approved custom libmpv scope
 - `docs/planning/ROADMAP.md`
 - `PHASES.md`
