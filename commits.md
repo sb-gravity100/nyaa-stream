@@ -1,3 +1,5 @@
+### `0876ad9` · 2026-10-30 · docs: clarify WebView2 runtime bootstrap
+- `README.md`
 ### `c2a313c` · 2026-10-30 · docs: resolve updater lifecycle design audit
 - `docs/planning/V0_6_0.md`
 - `PHASES.md`
