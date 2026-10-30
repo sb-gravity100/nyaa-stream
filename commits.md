@@ -1,3 +1,10 @@
+### `d3a1155` · 2026-10-30 · chore: keep artwork fix in v0.6.0
+- `CHANGELOG.md`
+- `package.json`
+- `src-tauri/Cargo.toml`
+- `src-tauri/tauri.conf.json`
+- `src/changelog.ts`
+
 ### `b13a2b8` · 2026-10-30 · chore: release v0.6.1
 - `package.json`
 - `src-tauri/Cargo.toml`
