@@ -1,3 +1,13 @@
+### `7685f86` · 2026-10-31 · feat: add independent ASS overlay sampling
+- `FILE_INDEX.md`
+- `PHASES.md`
+- `docs/planning/MPV_BUILD.md`
+- `native/mpv/sources.lock.json`
+- `native/mpv/patches/libplacebo-ass-overlay-sampling.patch`
+- `native/mpv/patches/mpv-ass-overlay-sampling.patch`
+- `scripts/prepare-mpv.py`
+- `src/subtitles.ts`
+
 ### `113bd01` · 2026-10-31 · fix: gate ASS sampling controls to gpu-next
 - `src/SettingsPanel.tsx`
 - `src/subtitles.ts`
