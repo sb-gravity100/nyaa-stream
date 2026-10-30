@@ -487,6 +487,13 @@ export function MediaPage({
       const power = unit.startsWith("T") ? 4 : unit.startsWith("G") ? 3 : unit.startsWith("M") ? 2 : unit.startsWith("K") ? 1 : 0;
       return Number(match[1]) * 1024 ** power;
     };
+    const bytesPerEpisode = (release: NyaaResult, label: EpisodeLabel) => {
+      const bytes = sizeBytes(release.size);
+      if (bytes === Number.MAX_SAFE_INTEGER) return bytes;
+      const episodes = label.kind === "batch" ? (label.episodeRange ? label.episodeRange[1] - label.episodeRange[0] + 1 : anime.episodes || 1) : 1;
+      return bytes / episodes;
+    };
+    const minThumbnailSeeders = 3;
     type Candidate = { release: NyaaResult; fileIdx: number };
     type EpisodePlan = { episode: number; hadSeededSource: boolean; candidates: Candidate[] };
     const preliminary = new Map<number, NyaaResult[]>();
@@ -506,13 +513,11 @@ export function MediaPage({
       const ordered = [...candidates].sort((a, b) => {
         const labelA = labelOf(a.label, a.title);
         const labelB = labelOf(b.label, b.title);
-        const subA = groupName(a) === "subsplease" && /480p/i.test(a.title);
-        const subB = groupName(b) === "subsplease" && /480p/i.test(b.title);
-        return Number(subB) - Number(subA)
-          || Number(b.seeders >= 3) - Number(a.seeders >= 3)
-          || Number(labelA.kind === "batch") - Number(labelB.kind === "batch")
-          || (sizeBytes(a.size) / (labelA.kind === "batch" ? (labelA.episodeRange ? labelA.episodeRange[1] - labelA.episodeRange[0] + 1 : anime.episodes || 1) : 1))
-            - (sizeBytes(b.size) / (labelB.kind === "batch" ? (labelB.episodeRange ? labelB.episodeRange[1] - labelB.episodeRange[0] + 1 : anime.episodes || 1) : 1));
+        // Favor a viable swarm, then the least data for this episode. Do not
+        // let an uploader or standalone-release preference outrank size.
+        return Number(b.seeders >= minThumbnailSeeders) - Number(a.seeders >= minThumbnailSeeders)
+          || bytesPerEpisode(a, labelA) - bytesPerEpisode(b, labelB)
+          || b.seeders - a.seeders;
       }).slice(0, 3);
       preliminary.set(episode, ordered);
       for (const release of ordered) viewUrls.add(release.view_url);

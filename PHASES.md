@@ -792,11 +792,11 @@ policy remains unchanged.
             unknown groups checked once and remembered
       - [x] `capture_torrent_thumbnail`: optional `file_idx` and `force`
       - [x] Batch captures share one torrent across their episodes
-      - [x] Capture source pick: SubsPlease 480p (>= 1 seeder) first, else
-            smallest file with >= 3, then >= 1
-            seeders (batch = size / episodes, single episodes first); never
-            0 seeders - row skipped as "no seeded source"
-      - [x] Live swarm check: no peer within 20s → next candidate (max 3)
+      - [x] Capture source pick: smallest per-episode source among >= 3
+            seeders, then >= 1; no uploader/standalone preference; max 3
+            candidates; never 0 seeders
+      - [x] Quick midpoint capture through sbtl's range stream: 8s peer gate,
+            25s per-frame cap, and transfer-byte/peer diagnostics
       - [x] Capture queue (list order, pause while playing, cancel)
       - [x] Episodes header button with count/progress/failed state,
             spinner on rows being captured

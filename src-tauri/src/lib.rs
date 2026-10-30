@@ -572,12 +572,14 @@ const THUMBNAIL_SEEK_SECONDS: f64 = 8.0;
 /// below accepts anything within this much of the target instead of
 /// waiting for an exact match that might never come.
 const THUMBNAIL_SEEK_TOLERANCE_SECONDS: f64 = 5.0;
-/// Upper bound on the whole capture attempt (spawn mpv, wait for the swarm
-/// to deliver enough data to reach THUMBNAIL_SEEK_SECONDS, screenshot).
-/// Deliberately short: this is a best-effort background enhancement for a
-/// home-page thumbnail, not something worth blocking on if peers are slow.
-const THUMBNAIL_CAPTURE_TIMEOUT: Duration = Duration::from_secs(60);
-const THUMBNAIL_POLL_INTERVAL: Duration = Duration::from_millis(500);
+/// A weak listing can be stale by the time the user builds thumbnails. Move
+/// on quickly when no peer connects rather than waiting through the old 20s
+/// gate for each candidate.
+const THUMBNAIL_PEER_TIMEOUT: Duration = Duration::from_secs(8);
+/// Upper bound on one mpv midpoint seek and screenshot. The separate peer
+/// connection gate is shorter; a slow source should not stall the build queue.
+const THUMBNAIL_CAPTURE_TIMEOUT: Duration = Duration::from_secs(25);
+const THUMBNAIL_POLL_INTERVAL: Duration = Duration::from_millis(250);
 
 /// Last-resort thumbnail source, used only when Kitsu and AniList both have
 /// no per-episode art for a show (verified live: happens for lower-profile
@@ -677,48 +679,20 @@ async fn capture_thumbnail_uncached(
         }
     };
     let file_idx = requested_file_idx.filter(|index| files.get(*index).is_some_and(|file| file.is_video)).unwrap_or_else(|| largest_video_file(&files).unwrap_or(0));
-    let stream_url = state.torrent_engine.stream_url(&added.id, file_idx);
-
-    // Some(_) means "seek there via mpv's --start", None means "no
-    // estimate, just play from 0" - see spawn_headless/the wait loop below
-    // for why these two cases are handled differently rather than always
-    // going through --start with THUMBNAIL_SEEK_SECONDS as its target.
-    let target_seconds = duration_minutes.filter(|m| *m > 0.0).map(|minutes| minutes * 60.0 / 2.0);
-
-    let capture_result = tokio::time::timeout(THUMBNAIL_CAPTURE_TIMEOUT, async {
-        let swarm_deadline = tokio::time::Instant::now() + Duration::from_secs(20);
+    // Let sbtl's range-backed stream and mpv seek directly to the estimated
+    // midpoint. Do not wait for or download the file from its beginning.
+    let capture_result = tokio::time::timeout(THUMBNAIL_PEER_TIMEOUT + THUMBNAIL_CAPTURE_TIMEOUT, async {
+        let swarm_deadline = tokio::time::Instant::now() + THUMBNAIL_PEER_TIMEOUT;
         loop {
             if state.torrent_engine.stats(&added.id, file_idx).await.map(|stats| stats.connected_peers > 0).unwrap_or(false) {
                 break;
             }
             if tokio::time::Instant::now() >= swarm_deadline {
-                anyhow::bail!("no peer connected within 20 seconds");
-            }
-            tokio::time::sleep(Duration::from_millis(500)).await;
-        }
-        let mut player = MpvPlayer::spawn_headless(&stream_url, target_seconds).await?;
-
-        let effective_target = target_seconds.unwrap_or(THUMBNAIL_SEEK_SECONDS);
-        let deadline = tokio::time::Instant::now() + THUMBNAIL_CAPTURE_TIMEOUT;
-        loop {
-            let position = player.get_time_position().await.unwrap_or(0.0);
-            let reached = match target_seconds {
-                Some(_) => position >= effective_target - THUMBNAIL_SEEK_TOLERANCE_SECONDS,
-                None => position >= effective_target,
-            };
-            if reached {
-                break;
-            }
-            if tokio::time::Instant::now() >= deadline {
-                anyhow::bail!("timed out waiting for playback to reach {effective_target}s");
+                anyhow::bail!("no peer connected within {} seconds", THUMBNAIL_PEER_TIMEOUT.as_secs());
             }
             tokio::time::sleep(THUMBNAIL_POLL_INTERVAL).await;
         }
-
-        let cache_path_str = cache_path.to_string_lossy().to_string();
-        let screenshot_result = player.screenshot_to_file(&cache_path_str).await;
-        let _ = player.quit().await;
-        screenshot_result
+        capture_thumbnail_file(state, &added.id, file_idx, cache_path, duration_minutes).await
     })
     .await;
 
@@ -736,7 +710,7 @@ async fn capture_thumbnail_uncached(
     match capture_result {
         Ok(Ok(())) => Ok(()),
         Ok(Err(err)) => Err(err),
-        Err(_) => anyhow::bail!("thumbnail capture timed out after {THUMBNAIL_CAPTURE_TIMEOUT:?}"),
+        Err(_) => anyhow::bail!("thumbnail attempt timed out after {:?}", THUMBNAIL_PEER_TIMEOUT + THUMBNAIL_CAPTURE_TIMEOUT),
     }
 }
 
@@ -791,12 +765,12 @@ async fn capture_torrent_thumbnail_batch(
     }).map(|((request, _), _)| request).collect();
     let first_file = active.first().map(|request| request.file_idx).unwrap_or_else(|| largest_video_file(&files).unwrap_or(0));
     let swarm_wait = async {
-        let deadline = tokio::time::Instant::now() + Duration::from_secs(20);
+        let deadline = tokio::time::Instant::now() + THUMBNAIL_PEER_TIMEOUT;
         loop {
             if state.thumbnail_batch_cancelled.load(std::sync::atomic::Ordering::Relaxed) { anyhow::bail!("thumbnail batch cancelled"); }
             if state.torrent_engine.stats(&added.id, first_file).await.map(|stats| stats.connected_peers > 0).unwrap_or(false) { break; }
-            if tokio::time::Instant::now() >= deadline { anyhow::bail!("no peer connected within 20 seconds"); }
-            tokio::time::sleep(Duration::from_millis(500)).await;
+            if tokio::time::Instant::now() >= deadline { anyhow::bail!("no peer connected within {} seconds", THUMBNAIL_PEER_TIMEOUT.as_secs()); }
+            tokio::time::sleep(THUMBNAIL_POLL_INTERVAL).await;
         }
         Ok::<(), anyhow::Error>(())
     }.await;
@@ -860,7 +834,7 @@ async fn capture_thumbnail_file(
     if let Some(parent) = cache_path.parent() { tokio::fs::create_dir_all(parent).await?; }
     let stream_url = state.torrent_engine.stream_url(torrent_id, file_idx);
     let target_seconds = duration_minutes.filter(|minutes| *minutes > 0.0).map(|minutes| minutes * 60.0 / 2.0);
-    tokio::time::timeout(THUMBNAIL_CAPTURE_TIMEOUT, async {
+    let capture = tokio::time::timeout(THUMBNAIL_CAPTURE_TIMEOUT, async {
         let mut player = MpvPlayer::spawn_headless(&stream_url, target_seconds).await?;
         let effective_target = target_seconds.unwrap_or(THUMBNAIL_SEEK_SECONDS);
         let deadline = tokio::time::Instant::now() + THUMBNAIL_CAPTURE_TIMEOUT;
@@ -874,7 +848,22 @@ async fn capture_thumbnail_file(
         let screenshot = player.screenshot_to_file(&cache_path.to_string_lossy()).await;
         let _ = player.quit().await;
         screenshot
-    }).await.map_err(|_| anyhow::anyhow!("thumbnail capture timed out after {THUMBNAIL_CAPTURE_TIMEOUT:?}"))?
+    }).await.map_err(|_| anyhow::anyhow!("thumbnail capture timed out after {THUMBNAIL_CAPTURE_TIMEOUT:?}"))?;
+    if capture.is_ok() {
+        match state.torrent_engine.stats(torrent_id, file_idx).await {
+            Ok(stats) => tracing::info!(
+                torrent_id = %torrent_id,
+                file_idx,
+                target_seconds = ?target_seconds,
+                downloaded_bytes = stats.downloaded_bytes,
+                total_bytes = stats.total_bytes,
+                connected_peers = stats.connected_peers,
+                "thumbnail sbtl range capture finished"
+            ),
+            Err(error) => tracing::debug!(torrent_id = %torrent_id, file_idx, %error, "thumbnail capture byte stats unavailable"),
+        }
+    }
+    capture
 }
 
 #[tauri::command]
