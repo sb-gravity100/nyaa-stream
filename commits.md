@@ -1,3 +1,10 @@
+### `8c82438` · 2026-10-30 · fix(home): prefer Fanart hero backgrounds
+- `CHANGELOG.md`
+- `FILE_INDEX.md`
+- `docs/planning/V0_6_0.md`
+- `src/HomePage.tsx`
+- `src/changelog.ts`
+
 ### `2614332` · 2026-10-30 · fix(search): bound Nyaa exclusion queries
 - `CHANGELOG.md`
 - `FILE_INDEX.md`
