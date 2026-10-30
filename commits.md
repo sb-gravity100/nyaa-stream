@@ -1,3 +1,14 @@
+### `1dfaf69` · 2026-10-30 · docs: record Win10Lite installer acceptance
+- `FILE_INDEX.md`
+- `PHASES.md`
+- `PLAN.md`
+- `docs/acceptance/v0.6.0/README.md`
+- `docs/acceptance/v0.6.0/report-Msi.json`
+- `docs/acceptance/v0.6.0/report-MsiToNsis.json`
+- `docs/acceptance/v0.6.0/report-Nsis.json`
+- `docs/planning/V0_6_0.md`
+- `docs/prototypes/installer/FEASIBILITY.md`
+
 ### `6173aed` · 2026-10-30 · fix(installer): bundle MSVC runtime for clean Windows launch
 - `CHANGELOG.md`
 - `FILE_INDEX.md`
