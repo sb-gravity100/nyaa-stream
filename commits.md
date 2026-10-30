@@ -1,3 +1,8 @@
+### `b13a2b8` · 2026-10-30 · chore: release v0.6.1
+- `package.json`
+- `src-tauri/Cargo.toml`
+- `src-tauri/tauri.conf.json`
+
 ### `cd29bc1` · 2026-10-30 · fix(artwork): decode Fribb movie ID arrays
 - `CHANGELOG.md`
 - `FILE_INDEX.md`
