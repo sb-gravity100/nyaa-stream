@@ -1,3 +1,6 @@
+### `ad024b1` · 2026-10-31 · docs: approve trimming unused mpv effects
+- `docs/planning/ROADMAP.md`
+
 ### `5e2cb9d` · 2026-10-31 · docs: select native LLVM for custom libmpv
 - `docs/planning/ROADMAP.md`
 
