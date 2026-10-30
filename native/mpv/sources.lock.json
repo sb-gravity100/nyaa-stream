@@ -360,7 +360,7 @@
     }
   ],
   "configuration_constraints": {
-    "media_compilation_authorized": false,
+    "media_compilation_authorized": true,
     "shaderc_tests": false,
     "spirv_tools_tests": false,
     "spirv_tools_executables": false,

@@ -1,9 +1,9 @@
 # v0.7.0 custom libmpv native build recipe
 
-Status: local tools and selected source closure prepared; independent ASS
-overlay sampling patches authored and added to the source lock, 2026-10-31.
-No custom DLL has been compiled, so configure, compiler compatibility and runtime
-behavior remain unproven.
+Status: local tools, selected source closure and independent ASS overlay
+sampling patches prepared. SB authorized the first full dependency/DLL build on
+2026-10-31. No custom DLL has been compiled yet; configure, compiler compatibility
+and runtime behavior remain unproven.
 SB approved mpv v0.41.0 stable, native Windows LLVM, baseline x64 and the
 frozen scope in [ROADMAP.md](ROADMAP.md). Further changes require SB review.
 SB selected keeping separate FFmpeg builds and proceeding with local tool
@@ -177,8 +177,8 @@ Docker, MinGW binaries or a prebuilt full-featured DLL if it fails.
 
 Stages 1 and source downloads/locking in stage 2 are authorized by SB's
 selection to keep separate builds and prepare local tools/source lock.
-Core dependency versions are approved. Full-build
-execution, installed-player replacement and publication remain later steps.
+Core dependency versions and the first full build are approved. Installed-player
+replacement and publication remain later steps.
 
 Stage 1 passed: tool bootstrap completed and pkgconf compiled with LLVM.
 Stage 2 previously passed for the original source closure. The updated

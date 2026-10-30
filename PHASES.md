@@ -97,7 +97,7 @@ order.
 - [x] Resolve/fetch selected source closure: 21 repository archives, 15 hashed
       source/build definitions and three locked native patches; verify archive
       and patch hashes with `scripts/prepare-mpv.py --sources-only` (no compilation)
-- [ ] Review and authorize the first full dependency/DLL configure/build;
+- [x] SB authorized the first full dependency/DLL configure/build on 2026-10-31;
       source preparation does not prove compilation or runtime acceptance
 - [ ] Improve batch next-episode transitions by reusing torrent/file metadata and
       verified data; preserve season-aware file selection and source fallback
