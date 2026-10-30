@@ -1,0 +1,91 @@
+{
+    "scenario":  "Msi",
+    "completedAt":  "2026-10-30T13:01:23.9270223-07:00",
+    "checks":  [
+                   {
+                       "name":  "install v0.5.8 MSI",
+                       "passed":  true,
+                       "details":  "exit=0"
+                   },
+                   {
+                       "name":  "old install executable exists",
+                       "passed":  true,
+                       "details":  "C:\\Users\\Win10Lite\\AppData\\Local\\nyaa-stream\\nyaa-stream.exe"
+                   },
+                   {
+                       "name":  "old package version",
+                       "passed":  true,
+                       "details":  "0.5.8"
+                   },
+                   {
+                       "name":  "legacy launch runtime test shim staged",
+                       "passed":  true,
+                       "details":  ""
+                   },
+                   {
+                       "name":  "old app launches",
+                       "passed":  true,
+                       "details":  ""
+                   },
+                   {
+                       "name":  "legacy release database exists before upgrade",
+                       "passed":  true,
+                       "details":  "4096"
+                   },
+                   {
+                       "name":  "upgrade to v0.6.0 MSI",
+                       "passed":  true,
+                       "details":  "exit=0"
+                   },
+                   {
+                       "name":  "v0.6.0 executable exists",
+                       "passed":  true,
+                       "details":  "C:\\Users\\Win10Lite\\AppData\\Local\\nyaa-stream\\nyaa-stream.exe"
+                   },
+                   {
+                       "name":  "updated package version",
+                       "passed":  true,
+                       "details":  "0.6.0"
+                   },
+                   {
+                       "name":  "app-local VCRUNTIME140 exists",
+                       "passed":  true,
+                       "details":  "14.44.35211.0"
+                   },
+                   {
+                       "name":  "app data marker survived upgrade",
+                       "passed":  true,
+                       "details":  ""
+                   },
+                   {
+                       "name":  "release database survived upgrade",
+                       "passed":  true,
+                       "details":  ""
+                   },
+                   {
+                       "name":  "WebView2 runtime is installed",
+                       "passed":  true,
+                       "details":  "156.0.4314.56"
+                   },
+                   {
+                       "name":  "updated app launches",
+                       "passed":  true,
+                       "details":  ""
+                   },
+                   {
+                       "name":  "uninstall v0.6.0 MSI",
+                       "passed":  true,
+                       "details":  "exit=0"
+                   },
+                   {
+                       "name":  "app files removed by MSI uninstall",
+                       "passed":  true,
+                       "details":  ""
+                   },
+                   {
+                       "name":  "app data retained by uninstall",
+                       "passed":  true,
+                       "details":  ""
+                   }
+               ]
+}

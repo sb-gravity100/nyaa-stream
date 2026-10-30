@@ -42,12 +42,13 @@ Installer direction confirmed by SB: **compact dark layout matching the app**.
 The custom NSIS template and branded install-choice page are integrated; NSIS
 still owns progress and completion. The in-app quiet checker, staged download,
 resume-buffer save and teardown wait are implemented. A local signed NSIS
-artifact was generated, but its install/update lifecycle remains unverified;
-keep passive updater mode until isolated Windows checks establish elevation,
-existing MSI/NSIS migration, WebView2 bootstrap, native runtime availability
-and relaunch behavior. A VM launch exposed `sbtl.dll`'s `VCRUNTIME140.dll`
-dependency; bundle the licensed app-local runtime beside the executable and
-retest launch in both installer paths. See
+signed NSIS/MSI artifacts were generated, and the Win10Lite installer matrix
+passed NSIS→NSIS, MSI→MSI and MSI→NSIS upgrades (17/17 checks each). Both current
+installers launch with the bundled app-local `VCRUNTIME140.dll`; upgrades retain
+the release database and user-data marker, and uninstall retains user data.
+The test records are in `docs/acceptance/v0.6.0/`. The in-app updater's signed
+download/stage/relaunch path, UAC, interactive installer choices, clean-machine
+WebView2 bootstrap and repair/registration checks remain open. See
 `docs/prototypes/installer/FEASIBILITY.md`. The selected update schedule is
 30 seconds after readiness, then every six hours, with 15-minute to 6-hour
 failure backoff. First install defaults to `%LOCALAPPDATA%/Programs/nyaa-stream`,

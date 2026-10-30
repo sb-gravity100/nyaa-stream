@@ -44,19 +44,21 @@ The current v0.6.0 code built both
 `target/release/bundle/msi/nyaa-stream_0.6.0_x64_en-US.msi`, with updater
 signatures generated from the local release key. The NSIS script compiled
 successfully with the configured `nyaa-stream` Start Menu folder and custom
-install choices. These artifacts were not uploaded. The interactive page,
-install, error recovery, uninstaller and updater flow have not been exercised
-on an isolated Windows profile.
+install choices. These artifacts were not uploaded. Win10Lite acceptance
+passed the v0.5.8 NSIS→v0.6.0 NSIS, MSI→MSI and MSI→NSIS direct-installer paths,
+17 checks per route, including current-app launch, local runtime presence,
+database/marker retention and uninstall. Raw reports are in
+[`docs/acceptance/v0.6.0/`](../../acceptance/v0.6.0/).
 
 ## Still requires an isolated Windows environment
 
 No installer was run against SB's active profile. These checks remain open:
 
-- Install fresh with Start menu/desktop choices, then verify launch, shortcuts,
-  uninstall registration and WebView2 bootstrap on a clean Windows machine.
-- Upgrade both existing NSIS and MSI installs; verify their install paths,
-  shortcuts, registration, app data, release database, settings and resume
-  progress survive. Verify repair, uninstall and reinstall.
+- Verify clean-machine WebView2 bootstrap, interactive shortcut/install-path
+  choices, UAC/elevation, repair and Add/Remove Programs registration.
+- Preserve settings and playback/resume state through existing-install
+  upgrades and controlled restarts, beyond the database/marker checks already
+  covered by the installer matrix.
 - Apply a signed update from each supported install type, including interrupted
   download, invalid signature, failed preparation, deferred restart and
   successful relaunch/version detection.

@@ -17,7 +17,8 @@
 | `PLAN.md` | Concise active roadmap, v0.6.0 order, constraints and index of detailed planning documents | docs |
 | `docs/planning/V0_6_0.md` | Consolidated v0.6.0 implementation order, feature specifications, proposed defaults and acceptance criteria | docs, planning |
 | `docs/prototypes/installer/index.html` | Standalone compact dark installer UI prototype with install choices, progress, completion and recovery states | docs, prototype, installer |
-| `docs/prototypes/installer/FEASIBILITY.md` | Tauri custom NSIS/updater feasibility result, selected direction and isolated Windows acceptance still required | docs, prototype, installer, updater |
+| `docs/prototypes/installer/FEASIBILITY.md` | Tauri custom NSIS/updater feasibility, selected direction, Win10Lite package acceptance and remaining updater/elevation/bootstrap gates | docs, prototype, installer, updater |
+| `docs/acceptance/v0.6.0/` | Win10Lite installer acceptance summary and raw NSIS, MSI and MSI-to-NSIS reports | docs, acceptance, installer |
 | `docs/planning/ARCHITECTURE.md` | Stack/build prerequisites, workspace/data flow, sbtl engines, development and legacy gap inventory | docs, architecture |
 | `docs/planning/PLAYBACK.md` | Playback/cache/resume/subtitle/desktop specifications and historical measurements | docs, player |
 | `docs/planning/MATCHING.md` | Release matching, AnimeTosho dataset, rule-based search debugger | docs, search |

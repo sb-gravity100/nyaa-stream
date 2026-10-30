@@ -27,12 +27,13 @@ Feature work follows this order; remaining acceptance checks stay open below.
 - [x] Adopt the documented update schedule (30s first check, 6h cadence,
       15m–6h failure backoff) and first-install defaults (per-user path,
       Start menu on, desktop shortcut off)
-- [ ] 0: Prove installer/updater backend, clean-machine bootstrap, signed
+- [~] 0: Prove installer/updater backend, clean-machine bootstrap, signed
       artifact, silent upgrade, old-install migration and restart lifecycle
   - [x] Current code built into signed local NSIS and MSI installers with updater signatures; no artifacts uploaded
-  - [x] Win10Lite NSIS run proved v0.5.8 install, v0.6.0 passive upgrade/version, marker retention, WebView2 detection, uninstall and user-data retention
-  - [ ] Fix the discovered `sbtl.dll` → `VCRUNTIME140.dll` launch failure with an app-local redistributable, then repeat launch acceptance
-  - [ ] Isolated fresh install, upgrade, migration, WebView2, uninstall and signed updater/relaunch checks
+  - [x] Win10Lite matrix passed 17/17 checks each for v0.5.8 NSIS→v0.6.0 NSIS, MSI→MSI, and MSI→NSIS; v0.6.0 launches and preserves the existing database and user-data marker
+  - [x] Bundle app-local `VCRUNTIME140.dll` 14.44.35211.0; both v0.6.0 installer formats launch and uninstall while retaining user data
+  - [ ] Prove clean-machine WebView2 bootstrap, interactive choices, UAC/elevation, repair and uninstall registration
+  - [ ] Exercise the in-app signed updater's download, verification, staging, deferred apply and successful relaunch
 - [~] 1: Shared context menus and clipboard integration, including custom-source actions; manual Windows acceptance remains open
 - [~] 2: Magnet parsing/direct play, permanent attachments, pack mapping and migration
   - [x] Bounded btih parsing for magnet links (hex/base32), display name and tracker count
@@ -849,8 +850,9 @@ policy remains unchanged.
             on preparation failure; keep background checks non-installing
       - [x] Static lifecycle audit: verified updater bytes hand off to Tauri's
             unattended passive installer (`/P /UPDATE`) with relaunch enabled
-      - [ ] Isolated runtime proof for staging, UAC/elevation, install migration,
-            and successful relaunch into the updated version
+      - [x] Win10Lite direct installer matrix: NSIS→NSIS, MSI→MSI and MSI→NSIS; all 17 checks pass per route, including app launch, database/marker preservation and uninstall
+      - [ ] Runtime proof for the in-app signed updater's download, staging,
+            UAC/elevation behavior and successful relaunch into the new version
       - [x] Save resume buffer before controlled restart; wait for playback
             teardown and keep restart disabled during playback
       - [~] Add a bespoke branded NSIS template and install-choice page; NSIS
