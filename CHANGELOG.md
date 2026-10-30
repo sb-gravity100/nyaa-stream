@@ -32,6 +32,7 @@ step when cutting a release.
 
 ### Fixed
 - Fribb movie-ID arrays no longer invalidate the AniList mapping, restoring mapped TMDB episode thumbnails and fanart.tv backgrounds.
+- First-season Nyaa searches trim oversized sibling exclusions so valid title queries avoid HTTP 400 responses.
 - Plain-text subtitles use light font hinting in mpv playback and clip export; styled ASS tracks retain unhinted positioning and animation.
 - HLS subtitle rendering uses 1.5x device-pixel supersampling up to a 2160px threshold, retaining native resolution on larger outputs.
 - Updating now saves the playback resume buffer and waits for torrent teardown before starting the installer.

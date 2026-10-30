@@ -268,6 +268,8 @@ policy remains unchanged.
         routed to their own entries
   - [x] `build_candidates`: strip synonyms (roman numerals too), base-name
         query for season ≥2
+  - [x] Bound remote query length by trimming optional sibling exclusions;
+        local season matching stays authoritative
   - [x] No-episode matched release → season batch of the matched entry
   - [x] Mushoku S3 report (PLAN.md "Mushoku S3 report"): roman-numeral season
         in the label, `season_ambiguous` flag + `groupedSources` drop of unconfirmed

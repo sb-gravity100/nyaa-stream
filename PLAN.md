@@ -193,6 +193,8 @@ See [detailed specification](docs/planning/ARCHITECTURE.md).
 
 See [detailed specification](docs/planning/MATCHING.md).
 
+Remote Nyaa queries stay within 600 characters; long first-season sibling-exclusion lists are trimmed because local season matching remains authoritative.
+
 ## AnimeTosho dataset (v0.5.0, was v0.4.4 - minor feature)
 
 See [detailed specification](docs/planning/MATCHING.md).

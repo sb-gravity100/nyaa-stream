@@ -204,22 +204,40 @@ impl NyaaSearchQuery {
     }
 }
 
-/// Keep nyaa.si expressions short enough for its search endpoint while
-/// preserving every exact phrase and the same exclusion rules per chunk.
+/// Keep nyaa.si expressions short enough for its search endpoint. Exclusions
+/// are only a remote-search optimization; ShowMatcher remains authoritative.
 fn split_search_query(query: NyaaSearchQuery) -> Vec<NyaaSearchQuery> {
+    // A first-season franchise can produce a long exclusion list. Bound it
+    // against the longest positive phrase so even a one-phrase chunk fits.
+    // Omitted exclusions can add noise to search results, but local matching
+    // removes other-season releases after the requests complete.
+    let longest = query.includes.iter().max_by_key(|phrase| phrase.chars().count()).cloned();
+    let mut excludes = Vec::new();
+    if let Some(longest) = longest {
+        for exclusion in query.excludes {
+            let mut candidate = excludes.clone();
+            candidate.push(exclusion.clone());
+            let rendered = NyaaSearchQuery { includes: vec![longest.clone()], excludes: candidate.clone() }.render();
+            if rendered.chars().count() > MAX_QUERY_CHARS {
+                break;
+            }
+            excludes = candidate;
+        }
+    }
+
     let mut chunks = Vec::new();
     let mut includes = Vec::new();
     for phrase in query.includes {
         let mut candidate = includes.clone();
         candidate.push(phrase.clone());
-        let rendered = NyaaSearchQuery { includes: candidate, excludes: query.excludes.clone() }.render();
+        let rendered = NyaaSearchQuery { includes: candidate, excludes: excludes.clone() }.render();
         if !includes.is_empty() && (includes.len() >= MAX_QUERY_ALTERNATIVES || rendered.chars().count() > MAX_QUERY_CHARS) {
-            chunks.push(NyaaSearchQuery { includes: std::mem::take(&mut includes), excludes: query.excludes.clone() });
+            chunks.push(NyaaSearchQuery { includes: std::mem::take(&mut includes), excludes: excludes.clone() });
         }
         includes.push(phrase);
     }
     if !includes.is_empty() {
-        chunks.push(NyaaSearchQuery { includes, excludes: query.excludes });
+        chunks.push(NyaaSearchQuery { includes, excludes });
     }
     chunks
 }
@@ -1334,6 +1352,18 @@ mod tests {
         assert!(rendered.iter().any(|q| q.contains(" -\"Mushoku Tensei: Jobless Reincarnation Season 2\"")));
         assert!(rendered.iter().any(|q| q.contains("\"Mushoku Tensei S02\"")));
         assert!(rendered.iter().any(|q| q.contains("\"Mushoku Tensei: Jobless Reincarnation Season 2\"")));
+    }
+
+    #[test]
+    fn long_first_season_exclusions_are_bounded_to_nyaa_query_limit() {
+        let query = NyaaSearchQuery {
+            includes: vec!["Show Name".into(), "Show Name Alternative".into()],
+            excludes: (0..21).map(|i| format!("Show Name sibling alias {i} season 2")).collect(),
+        };
+        let chunks = split_search_query(query);
+        assert!(chunks.iter().all(|query| query.render().chars().count() <= MAX_QUERY_CHARS));
+        assert!(chunks.iter().all(|query| query.excludes.len() < 21));
+        assert!(chunks.iter().all(|query| !query.includes.is_empty()));
     }
 
     #[test]

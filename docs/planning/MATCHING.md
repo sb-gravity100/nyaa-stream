@@ -137,6 +137,9 @@ Title formats this must handle are surveyed in `TITLE_ANALYSIS.md`
   synonyms. For season ≥2 entries, add the short base name ("Mushoku
   Tensei") as a candidate. Its words are a subset of the full names', so
   `build_candidates` drops those, and the query count doesn't grow.
+  Remote query expressions are split at 600 characters. First-season sibling
+  exclusions are only a server-side optimization and are trimmed to fit; the
+  local `ShowMatcher` remains authoritative for rejecting other seasons.
 - *Batches*: a matched release with no episode number is a season batch
   of the entry it matched (a season-specific name pins the season, e.g.
   "The Second Plate").
@@ -528,4 +531,3 @@ diagnostics must come from the same search/matcher decisions used by normal
 playback, and frontend mapping evidence must be produced by the same grouping
 logic used by the media page. This is a local development tool and makes no
 production UI changes.
-

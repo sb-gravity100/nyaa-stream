@@ -24,6 +24,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
     fixes: [
       "Fribb movie-ID arrays no longer break provider ID mapping, restoring TMDB episode thumbnails and fanart.tv backgrounds.",
+      "First-season Nyaa searches trim oversized sibling exclusions to avoid rejected search requests.",
       "Removed experimental ML scoring and training tools; source matching continues to use trusted dataset ids and title rules.",
       "Embedded mpv blends subtitles onto upscaled video frames and uses EWA Lanczos video scaling.",
       "Plain-text subtitles use light font hinting for cleaner pixel alignment; styled ASS retains authored positioning and animation.",
