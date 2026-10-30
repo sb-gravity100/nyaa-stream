@@ -10,6 +10,12 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.6.1",
+    date: "2026-10-30",
+    features: [],
+    fixes: ["Fribb movie-ID arrays no longer break provider ID mapping, restoring TMDB episode thumbnails and fanart.tv backgrounds."],
+  },
+  {
     version: "0.6.0",
     date: "2026-10-30",
     features: [

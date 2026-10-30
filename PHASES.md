@@ -797,6 +797,8 @@ policy remains unchanged.
       commit each -
       - [x] Fribb anime-lists ID map: runtime download, weekly refresh, offline
             lookup (upstream data license remains to be resolved before publish)
+      - [x] Accept the map's single-value and array forms for TMDB movie IDs;
+            rejecting the map prevented all mapped artwork and episode stills
       - [x] arm-server v2 fallback for missing map rows/map failures (AniDB,
             Kitsu, MAL, Simkl, IMDb); resolve unambiguous IMDb-to-TMDB matches
             without guessing TV season or episode offsets

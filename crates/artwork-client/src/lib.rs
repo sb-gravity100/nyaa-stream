@@ -82,7 +82,17 @@ struct ArmIds {
     imdb: Option<String>,
 }
 #[derive(Serialize, Deserialize)]
-struct TmdbIds { tv: Option<u64>, movie: Option<u64> }
+struct TmdbIds { tv: Option<u64>, movie: Option<TmdbMovieIds> }
+/// Fribb stores movie IDs as an array because a single AniList entry can map
+/// to several TMDB films. Accept a scalar too for older/partial map versions.
+#[derive(Serialize, Deserialize)]
+#[serde(untagged)]
+enum TmdbMovieIds { One(u64), Many(Vec<u64>) }
+impl TmdbMovieIds {
+    fn first(&self) -> Option<u64> {
+        match self { Self::One(id) => Some(*id), Self::Many(ids) => ids.first().copied() }
+    }
+}
 #[derive(Serialize, Deserialize, Default)]
 struct TmdbFindResponse {
     #[serde(default)] tv_results: Vec<TmdbFindItem>,
@@ -242,7 +252,7 @@ impl ArtworkClient {
         found.sort_by_key(|row| row.season.as_ref().and_then(|s| s.tmdb).is_none());
         let row = found.into_iter().next();
         let row_tmdb = row.as_ref().and_then(|r| r.themoviedb_id.as_ref());
-        let arm_needed = row_tmdb.and_then(|ids| ids.tv.or(ids.movie)).is_none();
+        let arm_needed = row_tmdb.and_then(|ids| ids.tv.or_else(|| ids.movie.as_ref().and_then(TmdbMovieIds::first))).is_none();
         let arm = if arm_needed {
             match self.arm_ids(anilist_id).await {
                 Ok(ids) => ids,
@@ -254,7 +264,7 @@ impl ArtworkClient {
         } else { ArmIds::default() };
         let tmdb = row.as_ref().and_then(|r| r.themoviedb_id.as_ref());
         let mut tmdb_tv_id = tmdb.and_then(|id| id.tv);
-        let mut tmdb_movie_id = tmdb.and_then(|id| id.movie);
+        let mut tmdb_movie_id = tmdb.and_then(|id| id.movie.as_ref()).and_then(TmdbMovieIds::first);
         if tmdb_tv_id.is_none() && tmdb_movie_id.is_none() {
             if let (Some(imdb_id), Some(token)) = (
                 arm.imdb.as_deref().filter(|id| valid_imdb_id(id)),
@@ -456,6 +466,14 @@ mod tests {
             movie_results: vec![TmdbFindItem { id: 84 }],
         };
         assert_eq!(unambiguous_tmdb_ids(&ambiguous), (None, None));
+    }
+
+    #[test]
+    fn fribb_tmdb_movie_ids_accept_single_and_multiple_ids() {
+        let multiple: TmdbIds = serde_json::from_str(r#"{"tv":123,"movie":[456,789]}"#).unwrap();
+        assert_eq!(multiple.movie.as_ref().and_then(TmdbMovieIds::first), Some(456));
+        let single: TmdbIds = serde_json::from_str(r#"{"movie":456}"#).unwrap();
+        assert_eq!(single.movie.as_ref().and_then(TmdbMovieIds::first), Some(456));
     }
 
     #[test]

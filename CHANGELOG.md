@@ -9,6 +9,11 @@ step when cutting a release.
 
 ## [Unreleased]
 
+## [0.6.1] - Unreleased
+
+### Fixed
+- Fribb movie-ID arrays no longer invalidate the AniList mapping, restoring mapped TMDB episode thumbnails and fanart.tv backgrounds.
+
 ## [0.6.0] - Unreleased
 
 ### Added
