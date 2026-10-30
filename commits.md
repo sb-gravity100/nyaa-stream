@@ -1,3 +1,15 @@
+### `6173aed` · 2026-10-30 · fix(installer): bundle MSVC runtime for clean Windows launch
+- `CHANGELOG.md`
+- `FILE_INDEX.md`
+- `PHASES.md`
+- `PLAN.md`
+- `README.md`
+- `docs/planning/V0_6_0.md`
+- `src-tauri/runtime/README.md`
+- `src-tauri/runtime/vcruntime140.dll`
+- `src-tauri/tauri.conf.json`
+- `src/changelog.ts`
+
 ### `0876ad9` · 2026-10-30 · docs: clarify WebView2 runtime bootstrap
 - `README.md`
 ### `c2a313c` · 2026-10-30 · docs: resolve updater lifecycle design audit
