@@ -1,3 +1,10 @@
+### `2ece7c2` · 2026-10-31 · build: lock custom libmpv core sources
+- `scripts/prepare-mpv.py`
+- `native/mpv/sources.lock.json`
+- `FILE_INDEX.md`
+- `PHASES.md`
+- `docs/planning/MPV_BUILD.md`
+
 ### `dfb5c54` · 2026-10-31 · build: prepare isolated native libmpv tools
 - `scripts/prepare-mpv.py`
 - `native/mpv/tools.lock.json`
