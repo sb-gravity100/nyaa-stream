@@ -112,8 +112,11 @@ order.
       all reached the expected state with the app's embedded-player options.
 - [x] Track `scripts/build-mpv.py` and its native build stages; run the full
       locked dependency/FFmpeg/mpv pipeline successfully
-- [ ] Stage the candidate and its required runtime dependencies, then verify
-      playback and clip export through the full nyaa-stream app UI
+- [x] Stage the candidate with its app-local MSVC/Vulkan dependencies; preserve
+      the prior DLL and confirm Rust embedded playback and clip export load from
+      the staged `src-tauri/lib/` path.
+- [ ] Verify staged candidate playback and clip export through the full
+      nyaa-stream app UI
 - [ ] Improve batch next-episode transitions by reusing torrent/file metadata and
       verified data; preserve season-aware file selection and source fallback
 - [ ] Measure next-episode click/autoplay to first frame on cached, partial,

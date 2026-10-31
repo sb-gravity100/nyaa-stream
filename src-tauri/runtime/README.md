@@ -13,5 +13,10 @@ toolchain. Microsoft permits app-local deployment of individual redistributable
 DLLs under the Visual Studio license terms, but recommends central deployment
 for easier servicing:
 
+The custom `libmpv-2.dll` also imports `MSVCP140.dll` and `VCRUNTIME140_1.dll`.
+Matching x64 copies (14.44.35211.0) are bundled beside libmpv under
+`src-tauri/lib/`; `vcruntime140.dll` is bundled both beside the app executable
+for `sbtl.dll` and beside libmpv for its app-local dependency lookup.
+
 - <https://learn.microsoft.com/en-us/cpp/windows/redistributing-visual-cpp-files>
 - <https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist>
