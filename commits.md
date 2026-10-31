@@ -1,3 +1,11 @@
+### `bc991da` · 2026-11-01 · feat: sample mpv range requests in load traces
+- `FILE_INDEX.md`
+- `PHASES.md`
+- `crates/torrent-engine/src/lib.rs`
+- `crates/torrent-engine/src/read_stats.rs`
+- `docs/planning/MPV_BUILD.md`
+- `src-tauri/src/load_trace.rs`
+
 ### `e7f83b7` · 2026-11-01 · docs: sync mpv build index
 - `FILE_INDEX.md`
 
