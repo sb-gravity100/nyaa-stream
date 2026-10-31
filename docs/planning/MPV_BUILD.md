@@ -1,12 +1,12 @@
 # v0.7.0 custom libmpv native build recipe
 
-Status: the first x64 candidate DLL has been compiled with the locked renderer
-patches. Runtime checks confirmed API initialization, custom subtitle-option
-registration, H.264/AAC and AV1 playback, and x264/AAC MP4 export with a visibly
-burned subtitle. These checks do not cover visual comparisons of the new
-playback-only subtitle filters or hardware codec paths. The tracked build entry
-point and all dependency stages have now completed successfully; app installation
-and visual/hardware acceptance remain pending.
+Status: the x64 candidate DLL has been compiled with the locked renderer patches,
+and the tracked full build pipeline completed successfully. Runtime checks
+confirmed API initialization, custom subtitle-option registration, H.264/AAC and
+AV1 playback, and x264/AAC MP4 export with a visibly burned subtitle. A controlled
+1920×1080 `gpu-next` window test showed the embedded subtitle and confirmed that
+ASS blur 0 versus 1.6 changes the captured frame. App installation, other subtitle
+controls/display modes, and hardware codec paths remain unverified.
 SB approved mpv v0.41.0 stable, native Windows LLVM, baseline x64 and the
 frozen scope in [ROADMAP.md](ROADMAP.md). Further changes require SB review.
 SB selected keeping separate FFmpeg builds and proceeding with local tool

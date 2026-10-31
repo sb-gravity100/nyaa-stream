@@ -15,6 +15,7 @@ HELPERS = ROOT / "scripts" / "mpv-build"
 STAGES = [
     ("prepare-tools", [PYTHON, str(ROOT / "scripts" / "prepare-mpv.py")]),
     ("prepare-sources", [PYTHON, str(ROOT / "scripts" / "prepare-mpv.py"), "--sources-only"]),
+    ("build-zlib", [PYTHON, str(HELPERS / "build-zlib.py")]),
     ("build-x264", [PYTHON, str(HELPERS / "build-x264.py")]),
     ("build-dav1d", [PYTHON, str(HELPERS / "build-dav1d.py")]),
     ("build-shaderc", [PYTHON, str(HELPERS / "build-shaderc.py")]),

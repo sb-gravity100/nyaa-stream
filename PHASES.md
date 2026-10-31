@@ -74,10 +74,9 @@ policy remains unchanged.
 ## v0.7.0 — custom Windows libmpv build (planned 2026-10-29)
 Execution priority set by SB on 2026-10-31: custom libmpv first. Start with
 the current DLL baseline and API/dependency audit, prove a reproducible x64
-build, then measure and integrate it. The first local candidate now builds and
-passes API/options, H.264/AAC, AV1, and subtitle-burned export checks. A tracked
-build entry point now exists but still needs a full run; playback-only ASS sampling
-patches still need visual comparison. Hardware paths remain unverified;
+build, then measure and integrate it. The local candidate builds and passes
+API/options, H.264/AAC, AV1, subtitle-burned export, and a controlled 1920×1080
+gpu-next subtitle/blur visual check. Hardware paths remain unverified;
 memory, batch transitions, preload timing and seek dragging follow libmpv
 acceptance. The checklist below groups related work and does not override this
 order.
@@ -126,9 +125,12 @@ order.
 - [x] Implement independent ASS overlay filters and AA/blur options in the
       locked mpv gpu-next/libplacebo source patches; source application and hashes
       verified without compiling.
-- [ ] Verify both subtitle-resolution modes, filter/AA/blur changes, high-DPI,
-      fullscreen and screenshots against a compiled custom DLL; clip export
-      keeps its current ASS encode path.
+- [x] Verify compiled-DLL gpu-next playback at 1920×1080 with an embedded
+      subtitle; changing ASS blur from 0 to 1.6 changes the captured frame while
+      the subtitle remains visible.
+- [ ] Verify both subtitle-resolution modes, all scale/dscale and AA controls,
+      high-DPI, fullscreen and app screenshots; clip export keeps its current
+      ASS encode path.
 - [ ] Record current bundled libmpv identity/options and a baseline for ASS
       edge quality, E-AC-3 playback, seek latency, and hardware decoding
 - [x] Inspect `msedgewebview2.DMP` structure: about 2.56 GiB captured and

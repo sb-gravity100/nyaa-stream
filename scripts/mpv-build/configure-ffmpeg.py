@@ -35,7 +35,7 @@ if not build.exists():
 flags=[
  '--prefix='+posix(b/'install/ffmpeg'),'--arch=x86_64','--target-os=win64','--toolchain=msvc',
  '--cc=clang-cl','--cxx=clang-cl','--ar=llvm-lib','--ranlib=llvm-ranlib','--as=nasm','--pkg-config='+env['PKG_CONFIG'],
- '--enable-static','--disable-shared','--enable-pic','--extra-cflags=/MD','--disable-programs','--disable-doc','--disable-debug','--disable-autodetect','--disable-everything','--disable-avdevice','--enable-gpl','--enable-network','--enable-w32threads',
+ '--enable-static','--disable-shared','--enable-pic','--extra-cflags=/MD','--disable-programs','--disable-doc','--disable-debug','--disable-autodetect','--disable-everything','--disable-avdevice','--enable-gpl','--enable-network','--enable-w32threads','--enable-zlib','--enable-schannel',
  '--enable-avcodec','--enable-avformat','--enable-avfilter','--enable-avutil','--enable-swresample','--enable-swscale',
  '--enable-demuxers','--enable-parsers','--enable-bsfs',
  '--enable-protocol=file,http,https,tcp,tls,crypto,httpproxy,udp',

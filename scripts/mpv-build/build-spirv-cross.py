@@ -21,7 +21,7 @@ args = [
     '-DCMAKE_INSTALL_PREFIX=' + str(prefix), '-DCMAKE_INSTALL_LIBDIR=lib',
     '-DSPIRV_CROSS_STATIC=ON', '-DSPIRV_CROSS_SHARED=OFF',
     '-DSPIRV_CROSS_CLI=OFF', '-DSPIRV_CROSS_ENABLE_TESTS=OFF',
-    '-DSPIRV_CROSS_ENABLE_GLSL=ON', '-DSPIRV_CROSS_ENABLE_HLSL=OFF',
+    '-DSPIRV_CROSS_ENABLE_GLSL=ON', '-DSPIRV_CROSS_ENABLE_HLSL=ON',
     '-DSPIRV_CROSS_ENABLE_MSL=OFF', '-DSPIRV_CROSS_ENABLE_CPP=OFF',
     '-DSPIRV_CROSS_ENABLE_REFLECT=OFF', '-DSPIRV_CROSS_ENABLE_UTIL=OFF',
 ]
@@ -41,4 +41,21 @@ with log.open('w', encoding='utf-8') as out:
 print(f'SPIRV-Cross build exit: {result.returncode}; log: {log}')
 if result.returncode:
     print('\n'.join(log.read_text(encoding='utf-8', errors='replace').splitlines()[-45:]))
-sys.exit(result.returncode)
+    sys.exit(result.returncode)
+
+# The C API exposes HLSL methods when HLSL is enabled but upstream's generated
+# shared C API pkg-config file omits the static HLSL backend from its link interface.
+pc = prefix / 'lib/pkgconfig/spirv-cross-c-shared.pc'
+content = pc.read_text(encoding='utf-8')
+expected = 'Libs: -L${libdir} -lspirv-cross-c -lspirv-cross-glsl -lspirv-cross-core'
+if expected in content:
+    content = content.replace(
+        expected,
+        'Libs: -L${libdir} -lspirv-cross-c -lspirv-cross-hlsl -lspirv-cross-glsl -lspirv-cross-core',
+    )
+elif '-lspirv-cross-hlsl' not in content:
+    raise SystemExit(f'Unexpected SPIRV-Cross C API link line in {pc}')
+pc.write_text(content, encoding='utf-8', newline='\n')
+if not (prefix / 'lib/spirv-cross-hlsl.lib').is_file():
+    raise SystemExit('SPIRV-Cross HLSL backend library is missing')
+print('SPIRV-Cross C API metadata includes its HLSL backend library')
