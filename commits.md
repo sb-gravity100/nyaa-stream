@@ -1,3 +1,8 @@
+### `8494c58` · 2026-11-01 · feat: enable selected D3D11VA decode in custom mpv
+- `scripts/mpv-build/configure-ffmpeg.py`
+- `native/mpv/patches/libplacebo-ass-overlay-sampling.patch`
+- `native/mpv/sources.lock.json`
+
 ### `90fafa9` · 2026-11-01 · docs: record cached mpv range A/B
 - `PHASES.md`
 - `docs/planning/MPV_BUILD.md`
