@@ -240,6 +240,11 @@ acceptance and broader codec/media coverage remain pending.
   2026-10-30 log contains 1,295 successful seek summaries; the
   slowest is 11,520 ms with 11,503 ms of recorded torrent waits. That is a
   stream-delivery case, not proof of a slow decoder.
+- Use the recorded slow-seek case as the A/B anchor: My Dress-Up Darling S2
+  Episode 2, AVC 1080p Blu-ray Remux, torrent `465275751c7d8d5cd435a6fdd3fe3123f7fe4a50`,
+  file index 3, seek target 408.032 s. The original event read 14,626,057 torrent
+  bytes with 32 peers at 6.90 Mbps. Record current peer/rate conditions on each
+  run because the old swarm state cannot be recreated exactly.
 - Reproduce E-AC-3 errors after seeks, Matroska parsing/queue warnings and four
   audio underruns from that log. Establish downloaded-input versus live-torrent
   behavior before attributing failures or improvements to the new DLL.
