@@ -1,3 +1,23 @@
+### `d3a2a71` · 2026-11-01 · build: add repeatable custom mpv pipeline
+- `FILE_INDEX.md`
+- `PHASES.md`
+- `docs/planning/MPV_BUILD.md`
+- `native/mpv/patches/ffmpeg-llvm-lib-response.patch`
+- `native/mpv/patches/ffmpeg-make-response-list.patch`
+- `native/mpv/patches/ffmpeg-msvc-depfile-escape.patch`
+- `native/mpv/patches/mpv-clang-rc-codepage.patch`
+- `native/mpv/sources.lock.json`
+- `scripts/build-mpv.py`
+- `scripts/mpv-build/build-dav1d.py`
+- `scripts/mpv-build/build-ffmpeg.py`
+- `scripts/mpv-build/build-shaderc.py`
+- `scripts/mpv-build/build-spirv-cross.py`
+- `scripts/mpv-build/build-vulkan.py`
+- `scripts/mpv-build/build-x264.py`
+- `scripts/mpv-build/compile-candidate.py`
+- `scripts/mpv-build/configure-candidate.py`
+- `scripts/mpv-build/configure-ffmpeg.py`
+
 ### `0a9f8c5` · 2026-10-31 · docs: record custom mpv build approval
 - `PHASES.md`
 - `docs/planning/MPV_BUILD.md`
