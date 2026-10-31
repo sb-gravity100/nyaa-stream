@@ -1,3 +1,6 @@
+### `f997eea` · 2026-11-01 · docs: refine mpv stream replay sequence
+- `docs/planning/MPV_BUILD.md`
+
 ### `60edeb7` · 2026-11-01 · docs: pin mpv stream comparison case
 - `docs/planning/MPV_BUILD.md`
 
