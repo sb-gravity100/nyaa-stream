@@ -1,3 +1,12 @@
+### `d93aee0` · 2026-11-01 · docs: stage custom mpv runtime bundle
+- `FILE_INDEX.md`
+- `PHASES.md`
+- `docs/planning/MPV_BUILD.md`
+- `native/mpv/sources.lock.json`
+- `src-tauri/lib/README.md`
+- `src-tauri/lib/vulkan-loader-LICENSE.txt`
+- `src-tauri/runtime/README.md`
+
 ### `55cd2af` · 2026-11-01 · docs: record custom mpv Rust export verification
 - `PHASES.md`
 - `docs/planning/MPV_BUILD.md`
