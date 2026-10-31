@@ -243,8 +243,10 @@ acceptance and broader codec/media coverage remain pending.
 - Use the recorded slow-seek case as the A/B anchor: My Dress-Up Darling S2
   Episode 2, AVC 1080p Blu-ray Remux, torrent `465275751c7d8d5cd435a6fdd3fe3123f7fe4a50`,
   file index 3, seek target 408.032 s. The original event read 14,626,057 torrent
-  bytes with 32 peers at 6.90 Mbps. Record current peer/rate conditions on each
-  run because the old swarm state cannot be recreated exactly.
+  bytes with 32 peers at 6.90 Mbps. It followed a successful seek to 314.849 s;
+  the 408.032 s seek began about 6.4 s after playback restarted. Reproduce that
+  sequence and record current peer/rate conditions because the old swarm state
+  cannot be recreated exactly.
 - Reproduce E-AC-3 errors after seeks, Matroska parsing/queue warnings and four
   audio underruns from that log. Establish downloaded-input versus live-torrent
   behavior before attributing failures or improvements to the new DLL.
