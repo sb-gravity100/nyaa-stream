@@ -83,8 +83,10 @@ the original DLL and 843 ms on the custom DLL over three runs each. This cached
 case cannot prove live-torrent performance. Next compare both DLLs under live
 or partial torrent conditions, measure Range shape/wait, first byte/frame,
 rebuffering and seek completion, then tune the app reader and mpv cache/read-
-ahead/seek behavior. Only after that baseline should the next candidate add
-the approved D3D11VA/D3D11VA2 decoders for H.264, HEVC and AV1.
+ahead/seek behavior. The approved D3D11VA/D3D11VA2 decoders are now compiled
+for H.264, HEVC and AV1; headless runtime checks selected hardware decode for
+H.264/HEVC and software fallback for AV1 on this GPU. Full app UI and live
+missing-piece acceptance remain open.
 The checklist below groups related work and does not override this order.
 - [x] Agree custom-DLL scope with SB: baseline x64, Lua, selected video/audio
       codecs, HDR/tone mapping, broad GPU support and software/hardware clip
@@ -123,9 +125,10 @@ The checklist below groups related work and does not override this order.
       the staged `src-tauri/lib/` path.
 - [ ] Verify staged candidate playback and clip export through the full
       nyaa-stream app UI
-- [ ] Enable D3D11VA/D3D11VA2 decoding for H.264, HEVC and AV1 only, rebuild the
-      separate FFmpeg and libmpv candidate, then verify `hwdec-current` selects
-      D3D11VA where supported and software fallback still works
+- [x] Enable only D3D11VA/D3D11VA2 decoding for H.264, HEVC and AV1; rebuild
+      separate FFmpeg and libmpv. On this GPU `hwdec-current` selects
+      `d3d11va-copy` for H.264/HEVC; AV1 loads through software fallback.
+      Full Tauri UI and broader GPU coverage remain pending.
 - [ ] Improve batch next-episode transitions by reusing torrent/file metadata and
       verified data; preserve season-aware file selection and source fallback
 - [ ] Measure next-episode click/autoplay to first frame on cached, partial,

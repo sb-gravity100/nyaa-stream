@@ -13,6 +13,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: "0.7.0",
     date: "2026-11-01",
     features: [
+      "The tailored libmpv build includes D3D11VA/D3D11VA2 hardware decoders for H.264, HEVC and AV1, with software fallback when the device cannot decode a stream.",
       "Embedded mpv defaults to rendering ASS subtitles at 2× window resolution and downsampling to video resolution before blending, with independent scaling, antialiasing and blur controls.",
     ],
     fixes: [],

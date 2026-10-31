@@ -1,9 +1,10 @@
 # v0.7.0 custom libmpv native build recipe
 
 Status: the locked full build pipeline completed successfully, and the x64
-candidate is staged in `src-tauri/lib/` with its MSVC/Vulkan runtime DLLs. The
-upstream DLL remains backed up at `target/mpv-build/app-bundle-original/`; the
-previous custom candidate is at `target/mpv-build/app-bundle-pre-supersampling/`.
+candidate with selected D3D11VA/D3D11VA2 decoders is staged in `src-tauri/lib/`
+with its MSVC/Vulkan runtime DLLs. The upstream DLL remains backed up at
+`target/mpv-build/app-bundle-original/`; the previous custom candidate is at
+`target/mpv-build/app-bundle-pre-d3d11va/`.
 Runtime checks passed for API/options, H.264/AAC and AV1 playback, and the
 subtitle-burned x264/AAC export. A controlled 1080p `gpu-next` window check
 confirmed visible subtitles and a visible ASS blur change. Through the Rust
@@ -14,13 +15,12 @@ image comparisons both kept subtitles visible; the supersampling mode changed
 `encode_clip` path produced a 1920×1080 H.264/AAC MP4 with the subtitle visibly
 burned in. A package-layout probe confirmed that Vulkan/MSVCP/VCRUNTIME140_1
 load from `src-tauri/lib/` and VCRUNTIME140 loads beside the executable. Full
-Tauri UI playback/export, clean-Windows dependency behavior, other subtitle
-controls/display modes, and hardware codec paths remain unverified. The current
-FFmpeg config currently enables the D3D11VA device API but disables its
-codec-specific decoders. SB approved the next candidate to enable both D3D11VA
-and D3D11VA2 hwaccels for H.264, HEVC and AV1 only, retaining software fallback
-and leaving other decode APIs out. Hardware decode still needs a rebuilt DLL
-and runtime verification on this machine. The custom build's primary playback
+Headless runtime checks with `hwdec=auto-safe` selected `d3d11va-copy` for the
+H.264 and HEVC samples; the AV1 sample loaded with software fallback. The FFmpeg
+config confirms only D3D11VA/D3D11VA2 components for H.264, HEVC and AV1 are
+enabled. Full Tauri UI playback/export, clean-Windows dependency behavior, other
+subtitle controls/display modes, and wider GPU/AV1 hardware coverage remain
+unverified. The custom build's primary playback
 goal remains improving torrent data delivery into mpv. A first headless A/B on
 the cached x265 proxy produced identical Range spans and zero torrent waits;
 mean seek completion was 737 ms on the original DLL and 843 ms on the custom
@@ -218,9 +218,9 @@ Stage 2 passed: the tracked runner verified the full source closure and all
 seven native patches. Stage 3 passed: the runner built the static dependencies,
 separate FFmpeg and shared candidate DLL with every stage exit code 0. Runtime
 checks passed for libmpv initialization/options, H.264/AAC and AV1 playback, and
-x264/AAC MP4 export with a visibly burned subtitle. Installing the DLL in the
-app, visual comparison of playback-only subtitle filters, hardware-path
-acceptance and broader codec/media coverage remain pending.
+x264/AAC MP4 export with a visibly burned subtitle. The DLL is staged in the
+app bundle. Full app UI playback/export, wider hardware-path acceptance and
+broader codec/media coverage remain pending.
 
 ## Acceptance and evidence
 
@@ -263,6 +263,11 @@ acceptance and broader codec/media coverage remain pending.
   `8FA1864D888E0E8FDDF1338CA7B6E141F6A51CF117727ABB3954C44F0AB251B5`. This
   verifies only cached-file Range behavior; live missing-piece performance
   remains unverified.
+- Hardware decode probe used the staged DLL with `hwdec=auto-safe`, `vo=null`,
+  and `ao=null`. Original and custom DLLs selected `d3d11va-copy` for the H.264
+  and HEVC samples; both reported `hwdec-current=no` for the 1 s AV1 sample.
+  This verifies D3D11VA integration for two codecs and software fallback for
+  AV1 on this machine, not AV1 hardware support.
 - Reproduce E-AC-3 errors after seeks, Matroska parsing/queue warnings and four
   audio underruns from that log. Establish downloaded-input versus live-torrent
   behavior before attributing failures or improvements to the new DLL.

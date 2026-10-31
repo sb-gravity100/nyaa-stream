@@ -17,7 +17,7 @@ sbtl torrent streaming, embedded libmpv playback and an HLS fallback.
 |---|---|---|
 | v0.5.8 | Implemented pre-v0.6.0 work | Published |
 | v0.6.0 | Subtitle styling/smoothing plus context menus, custom magnets, artwork, thumbnails, seek previews, updates and bespoke installer | Published 2026-10-30; SB waived remaining Windows acceptance and deferred Fribb licensing; live-swarm and manual magnet acceptance remain open |
-| v0.7.0 | Custom libmpv first, then native subtitle supersampling, memory profiling, batch transitions, preload timing and continuous seek dragging | Tools and selected source lock prepared; full native DLL build awaits review |
+| v0.7.0 | Custom libmpv first, then native subtitle supersampling, memory profiling, batch transitions, preload timing and continuous seek dragging | Custom DLL built and staged with 2× ASS supersampling and selected D3D11VA decode; full app UI and live torrent acceptance pending |
 | v0.8.0 | Navigation/Home rehaul and Discover | Planned |
 | v1.0.0 | Stabilization and 32-bit Windows | Planned |
 | v1.1.0 | Binge Mode | Idea; not implementation-ready |
@@ -72,8 +72,8 @@ v0.7.0.
 - Preserve permanent release data, source attachments and playback/resume state.
 - Keep HLS FFmpeg separate from future custom-libmpv dependencies unless a
   measured design supports consolidation.
-- Preserve authored ASS layout/animation; HLS supersampling is implemented,
-  embedded mpv supersampling is deferred to v0.7.0.
+- Preserve authored ASS layout/animation; HLS supersampling and the v0.7.0
+  embedded mpv 2× rendering path are implemented.
 
 ## Release and documentation rules
 
