@@ -44,6 +44,7 @@ flags=[
  '--enable-muxer=mp4,mov,image2',
  '--enable-filter=scale,format,fps,setpts,asetpts,aresample,aformat,null,anull',
  '--enable-libx264','--enable-libdav1d','--enable-ffnvcodec','--enable-libmfx','--enable-amf','--enable-nvenc','--enable-d3d11va','--enable-dxva2',
+ '--enable-hwaccel=av1_d3d11va,av1_d3d11va2,h264_d3d11va,h264_d3d11va2,hevc_d3d11va,hevc_d3d11va2',
 ]
 args=['./configure',*flags]
 cmd="cd '"+posix(build)+"' && "+subprocess.list2cmdline(args)

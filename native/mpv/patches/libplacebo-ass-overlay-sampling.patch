@@ -103,7 +103,7 @@
                      ? PL_TEX_SAMPLE_LINEAR
                      : PL_TEX_SAMPLE_NEAREST,
              },
-@@ -1047,7 +1102,7 @@
+@@ -1047,6 +1102,6 @@
          if (encode_xyz)
              pl_shader_delinearize(sh, &fbo_color);
          if (ol.mode == PL_OVERLAY_MONOCHROME) {
