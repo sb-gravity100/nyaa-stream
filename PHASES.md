@@ -77,11 +77,14 @@ the current DLL baseline and API/dependency audit, prove a reproducible x64
 build, then measure and integrate it. The local candidate builds and passes
 API/options, H.264/AAC, AV1, subtitle-burned export, and gpu-next subtitle
 checks at 720p-in-1080p and native 1080p. The key remaining goal is to improve
-the torrent-to-mpv data path: compare the original and custom DLL under the
-same torrent conditions, measure Range request latency/shape, torrent wait,
-first byte/frame, rebuffering and seek completion, then tune the app reader and
-mpv cache/read-ahead/seek behavior. Only after this baseline should the next
-candidate add the approved D3D11VA/D3D11VA2 decoders for H.264, HEVC and AV1.
+the torrent-to-mpv data path. A headless A/B on the cached x265 proxy produced
+the same Range span and zero torrent waits; mean seek completion was 737 ms on
+the original DLL and 843 ms on the custom DLL over three runs each. This cached
+case cannot prove live-torrent performance. Next compare both DLLs under live
+or partial torrent conditions, measure Range shape/wait, first byte/frame,
+rebuffering and seek completion, then tune the app reader and mpv cache/read-
+ahead/seek behavior. Only after that baseline should the next candidate add
+the approved D3D11VA/D3D11VA2 decoders for H.264, HEVC and AV1.
 The checklist below groups related work and does not override this order.
 - [x] Agree custom-DLL scope with SB: baseline x64, Lua, selected video/audio
       codecs, HDR/tone mapping, broad GPU support and software/hardware clip
@@ -182,9 +185,10 @@ The checklist below groups related work and does not override this order.
       reproducible x64 `libmpv-2.dll` build with license/source materials
 - [ ] Preserve the existing HLS FFmpeg build separately unless measurements
       support a safe consolidation
+- [x] Add capped load-trace samples of Range offsets/lengths (first and last
+      16 requests per trace)
 - [ ] Measure streamer-to-mpv Range reads, first byte, first frame, buffering,
-      and seek completion on repeatable torrent cases; add capped load-trace
-      samples of Range offsets/lengths (first and last 16 requests per trace)
+      and seek completion on repeatable live or partial torrent cases
 - [ ] Tune the app's stream reader and mpv cache/read-ahead/seek behavior from
       those measurements; report binary-size and playback-time results apart
 - [ ] Implement subtitle AA/scaling through upstream features or original

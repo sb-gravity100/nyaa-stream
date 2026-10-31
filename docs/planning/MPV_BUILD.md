@@ -21,9 +21,11 @@ codec-specific decoders. SB approved the next candidate to enable both D3D11VA
 and D3D11VA2 hwaccels for H.264, HEVC and AV1 only, retaining software fallback
 and leaving other decode APIs out. Hardware decode still needs a rebuilt DLL
 and runtime verification on this machine. The custom build's primary playback
-goal remains improving torrent data delivery into mpv: no controlled
-candidate-versus-upstream Range/read-ahead/seek benchmark has yet proven a
-reduction in torrent wait, startup time, rebuffering or seek latency.
+goal remains improving torrent data delivery into mpv. A first headless A/B on
+the cached x265 proxy produced identical Range spans and zero torrent waits;
+mean seek completion was 737 ms on the original DLL and 843 ms on the custom
+DLL over three runs each. This does not measure missing-piece stalls or prove a
+live-torrent gain; that comparison remains pending.
 SB approved mpv v0.41.0 stable, native Windows LLVM, baseline x64 and the
 frozen scope in [ROADMAP.md](ROADMAP.md). Further changes require SB review.
 SB selected keeping separate FFmpeg builds and proceeding with local tool
@@ -247,6 +249,20 @@ acceptance and broader codec/media coverage remain pending.
   the 408.032 s seek began about 6.4 s after playback restarted. Reproduce that
   sequence and record current peer/rate conditions because the old swarm state
   cannot be recreated exactly.
+- Cached proxy A/B run 2026-11-01: My Dress-Up Darling S2 Episode 2, YURASUKA
+  1080p x265 (`b56c8fe02fd6f13c027c33f9fcbe84b025dc28e6`), file index 1,
+  1,561,793,893 bytes. The 95 pieces covering this file were verified; two
+  missing pieces were outside it. No torrent waits or connected peers were
+  observed. A headless `vo=null`/`ao=null` probe
+  forced software decode and replayed seek 314.849 s, waited 6.4 s, then sought
+  to 408.032 s. Both DLLs made one identical Range request (`531013873` offset,
+  `1030780020` length) on each of three runs. Original seek times were
+  745/720/747 ms; custom times were 828/849/852 ms. Mean bytes read were
+  185,488,725 versus 184,112,469. DLL SHA-256: original
+  `5FC4171EFEE040FCC4245BA34F7FAF1EF816B87EE3647F6334733BA0DE6D1064`, custom
+  `8FA1864D888E0E8FDDF1338CA7B6E141F6A51CF117727ABB3954C44F0AB251B5`. This
+  verifies only cached-file Range behavior; live missing-piece performance
+  remains unverified.
 - Reproduce E-AC-3 errors after seeks, Matroska parsing/queue warnings and four
   audio underruns from that log. Establish downloaded-input versus live-torrent
   behavior before attributing failures or improvements to the new DLL.
