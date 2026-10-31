@@ -1,3 +1,7 @@
+### `90fafa9` · 2026-11-01 · docs: record cached mpv range A/B
+- `PHASES.md`
+- `docs/planning/MPV_BUILD.md`
+
 ### `f997eea` · 2026-11-01 · docs: refine mpv stream replay sequence
 - `docs/planning/MPV_BUILD.md`
 
