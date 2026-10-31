@@ -1,3 +1,8 @@
+### `4445457` · 2026-11-01 · docs: record embedded mpv wrapper verification
+- `PHASES.md`
+- `docs/planning/MPV_BUILD.md`
+- `native/mpv/sources.lock.json`
+
 ### `515aa85` · 2026-11-01 · build: complete custom mpv candidate pipeline
 - `FILE_INDEX.md`
 - `PHASES.md`
