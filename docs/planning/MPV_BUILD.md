@@ -9,7 +9,9 @@ ASS blur 0 versus 1.6 changes the captured frame. App installation, other subtit
 controls/display modes, and hardware codec paths remain unverified. A separate
 Rust `EmbeddedMpv` probe also loaded the candidate through the app's Rust wrapper,
 rendered into a native 1080p window, selected the embedded subtitle, and advanced
-playback to 1 second; the full Tauri UI and clip-export flow remain pending.
+playback to 1 second. The app's Rust `encode_clip` function also produced a
+1920×1080 H.264/AAC MP4 from the candidate; an extracted output frame visibly
+contains the burned subtitle. Full Tauri UI playback/export remains pending.
 SB approved mpv v0.41.0 stable, native Windows LLVM, baseline x64 and the
 frozen scope in [ROADMAP.md](ROADMAP.md). Further changes require SB review.
 SB selected keeping separate FFmpeg builds and proceeding with local tool

@@ -104,6 +104,9 @@ order.
       FFmpeg 8.0.3 build
 - [x] Runtime-check required libmpv startup/options, H.264/AAC playback, AV1
       playback and x264/AAC MP4 export with a visibly burned subtitle
+- [x] Exercise the app's Rust `encode_clip` path with the candidate on a
+      1920×1080 H.264/AAC/SRT sample; the H.264/AAC MP4 was produced and an
+      extracted frame visibly retained the subtitle.
 - [x] Run the candidate through `mpv_player::EmbeddedMpv` into a native 1080p
       window; `gpu-next`, selected subtitle, subtitle text, and playback position
       all reached the expected state with the app's embedded-player options.
