@@ -1,3 +1,13 @@
+### `515aa85` · 2026-11-01 · build: complete custom mpv candidate pipeline
+- `FILE_INDEX.md`
+- `PHASES.md`
+- `docs/planning/MPV_BUILD.md`
+- `native/mpv/sources.lock.json`
+- `scripts/build-mpv.py`
+- `scripts/mpv-build/build-spirv-cross.py`
+- `scripts/mpv-build/build-zlib.py`
+- `scripts/mpv-build/configure-ffmpeg.py`
+
 ### `d3a2a71` · 2026-11-01 · build: add repeatable custom mpv pipeline
 - `FILE_INDEX.md`
 - `PHASES.md`
