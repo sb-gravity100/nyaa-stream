@@ -1,3 +1,11 @@
+### `e839a76` · 2026-11-01 · docs: record D3D11VA candidate under v0.7.0
+- `CHANGELOG.md`
+- `PHASES.md`
+- `PLAN.md`
+- `docs/planning/MPV_BUILD.md`
+- `src-tauri/lib/README.md`
+- `src/changelog.ts`
+
 ### `8494c58` · 2026-11-01 · feat: enable selected D3D11VA decode in custom mpv
 - `scripts/mpv-build/configure-ffmpeg.py`
 - `native/mpv/patches/libplacebo-ass-overlay-sampling.patch`
