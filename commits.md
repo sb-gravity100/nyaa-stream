@@ -1,3 +1,19 @@
+### `0f06458` · 2026-11-01 · feat: add 2x ASS subtitle supersampling
+- `CHANGELOG.md`
+- `FILE_INDEX.md`
+- `PHASES.md`
+- `docs/planning/MPV_BUILD.md`
+- `native/mpv/patches/libplacebo-ass-overlay-sampling.patch`
+- `native/mpv/patches/mpv-ass-overlay-sampling.patch`
+- `native/mpv/sources.lock.json`
+- `scripts/mpv-build/configure-candidate.py`
+- `src-tauri/lib/README.md`
+- `src/PlayerView.tsx`
+- `src/SettingsPanel.tsx`
+- `src/changelog.ts`
+- `src/settings.ts`
+- `src/subtitles.ts`
+
 ### `d93aee0` · 2026-11-01 · docs: stage custom mpv runtime bundle
 - `FILE_INDEX.md`
 - `PHASES.md`
