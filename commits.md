@@ -1,3 +1,14 @@
+### `e7f83b7` · 2026-11-01 · docs: sync mpv build index
+- `FILE_INDEX.md`
+
+### `ae9823f` · 2026-11-01 · chore: release v0.7.0
+- `package.json`
+- `src-tauri/Cargo.toml`
+- `src-tauri/tauri.conf.json`
+
+### `6f2f9f4` · 2026-11-01 · docs: update commits.md
+- `commits.md`
+
 ### `0f06458` · 2026-11-01 · feat: add 2x ASS subtitle supersampling
 - `CHANGELOG.md`
 - `FILE_INDEX.md`
