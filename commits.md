@@ -1,3 +1,8 @@
+### `55cd2af` · 2026-11-01 · docs: record custom mpv Rust export verification
+- `PHASES.md`
+- `docs/planning/MPV_BUILD.md`
+- `native/mpv/sources.lock.json`
+
 ### `4445457` · 2026-11-01 · docs: record embedded mpv wrapper verification
 - `PHASES.md`
 - `docs/planning/MPV_BUILD.md`
