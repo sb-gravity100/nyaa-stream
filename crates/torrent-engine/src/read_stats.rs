@@ -4,17 +4,39 @@
 //! torrent. A trace reads what happened since it began.
 
 use std::collections::{HashMap, VecDeque};
+use std::ops::Bound;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
+
+use axum_extra::headers::Range;
 
 use crate::TorrentId;
 
 /// Events kept per torrent - plenty for one load's window.
 const MAX_EVENTS: usize = 1024;
+/// A trace retains its first and last request samples, rather than every
+/// request from a long playback session.
+pub const MAX_RANGE_SAMPLES_PER_TRACE: usize = 32;
+const RANGE_SAMPLE_HEAD: usize = MAX_RANGE_SAMPLES_PER_TRACE / 2;
+const MAX_RANGES_PER_REQUEST: usize = 4;
+
+#[derive(Debug, Clone, Copy)]
+pub struct RequestedRange {
+    pub offset: u64,
+    pub length: u64,
+}
+
+#[derive(Debug, Clone)]
+pub struct RangeRequestSample {
+    pub at: Instant,
+    pub ranged: bool,
+    pub ranges: Vec<RequestedRange>,
+    pub truncated: bool,
+}
 
 enum Event {
-    Request(Instant),
+    Request(RangeRequestSample),
     Wait { end: Instant, duration: Duration },
 }
 
@@ -34,8 +56,41 @@ impl TorrentReads {
         events.push_back(event);
     }
 
-    pub(crate) fn request(&self) {
-        self.push(Event::Request(Instant::now()));
+    pub(crate) fn request(&self, range: Option<&Range>, file_size: u64) {
+        let mut ranges = Vec::new();
+        let mut truncated = false;
+        if let Some(range) = range {
+            if file_size > 0 {
+                let mut requested = range.satisfiable_ranges(file_size);
+                for (start, end) in requested.by_ref().take(MAX_RANGES_PER_REQUEST) {
+                    let start = match start {
+                        Bound::Included(value) => value,
+                        Bound::Excluded(value) => value.saturating_add(1),
+                        Bound::Unbounded => continue,
+                    };
+                    let end = match end {
+                        Bound::Included(value) => value.min(file_size - 1),
+                        Bound::Excluded(value) => value.saturating_sub(1).min(file_size - 1),
+                        Bound::Unbounded => file_size - 1,
+                    };
+                    if end >= start {
+                        ranges.push(RequestedRange {
+                            offset: start,
+                            length: end - start + 1,
+                        });
+                    }
+                }
+                truncated = requested.next().is_some();
+            }
+        } else if file_size > 0 {
+            ranges.push(RequestedRange { offset: 0, length: file_size });
+        }
+        self.push(Event::Request(RangeRequestSample {
+            at: Instant::now(),
+            ranged: range.is_some(),
+            ranges,
+            truncated,
+        }));
     }
 
     /// A read that went Pending on the engine and has now completed.
@@ -70,6 +125,8 @@ pub struct ReadSummary {
     pub longest_wait: Duration,
     pub bytes: u64,
     pub buffer_bytes: u64,
+    /// First and last request samples, capped at `MAX_RANGE_SAMPLES_PER_TRACE`.
+    pub range_samples: Vec<RangeRequestSample>,
 }
 
 #[derive(Clone, Default)]
@@ -96,14 +153,20 @@ impl ReadStats {
             ..ReadSummary::default()
         };
         for event in reads.events.lock().unwrap_or_else(|e| e.into_inner()).iter() {
-            match *event {
-                Event::Request(at) if at >= since => {
+            match event {
+                Event::Request(sample) if sample.at >= since => {
                     summary.requests += 1;
-                    summary.first_request.get_or_insert(at);
+                    summary.first_request.get_or_insert(sample.at);
+                    if summary.range_samples.len() < MAX_RANGE_SAMPLES_PER_TRACE {
+                        summary.range_samples.push(sample.clone());
+                    } else {
+                        summary.range_samples.remove(RANGE_SAMPLE_HEAD);
+                        summary.range_samples.push(sample.clone());
+                    }
                 }
                 // Waits that ended inside the window (clipped to it).
-                Event::Wait { end, duration } if end >= since => {
-                    let duration = duration.min(end - since);
+                Event::Wait { end, duration } if *end >= since => {
+                    let duration = (*duration).min(*end - since);
                     summary.waits += 1;
                     summary.wait_total += duration;
                     summary.longest_wait = summary.longest_wait.max(duration);
@@ -128,11 +191,11 @@ mod tests {
         let stats = ReadStats::default();
         let id: TorrentId = "AB".into();
         let reads = stats.for_torrent(&id);
-        reads.request();
+        reads.request(None, 1000);
         reads.read(100);
         let since = Instant::now();
         let base = stats.snapshot(&id);
-        reads.request();
+        reads.request(None, 1000);
         reads.waited(Duration::from_millis(5));
         reads.read(50);
         reads.from_buffer(20);

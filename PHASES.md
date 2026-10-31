@@ -76,10 +76,13 @@ Execution priority set by SB on 2026-10-31: custom libmpv first. Start with
 the current DLL baseline and API/dependency audit, prove a reproducible x64
 build, then measure and integrate it. The local candidate builds and passes
 API/options, H.264/AAC, AV1, subtitle-burned export, and gpu-next subtitle
-checks at 720p-in-1080p and native 1080p. Hardware paths remain unverified;
-memory, batch transitions, preload timing and seek dragging follow libmpv
-acceptance. The checklist below groups related work and does not override this
-order.
+checks at 720p-in-1080p and native 1080p. The key remaining goal is to improve
+the torrent-to-mpv data path: compare the original and custom DLL under the
+same torrent conditions, measure Range request latency/shape, torrent wait,
+first byte/frame, rebuffering and seek completion, then tune the app reader and
+mpv cache/read-ahead/seek behavior. Only after this baseline should the next
+candidate add the approved D3D11VA/D3D11VA2 decoders for H.264, HEVC and AV1.
+The checklist below groups related work and does not override this order.
 - [x] Agree custom-DLL scope with SB: baseline x64, Lua, selected video/audio
       codecs, HDR/tone mapping, broad GPU support and software/hardware clip
       encoding; remove unused integrations (ROADMAP.md records the exact scope)
@@ -117,6 +120,9 @@ order.
       the staged `src-tauri/lib/` path.
 - [ ] Verify staged candidate playback and clip export through the full
       nyaa-stream app UI
+- [ ] Enable D3D11VA/D3D11VA2 decoding for H.264, HEVC and AV1 only, rebuild the
+      separate FFmpeg and libmpv candidate, then verify `hwdec-current` selects
+      D3D11VA where supported and software fallback still works
 - [ ] Improve batch next-episode transitions by reusing torrent/file metadata and
       verified data; preserve season-aware file selection and source fallback
 - [ ] Measure next-episode click/autoplay to first frame on cached, partial,
@@ -177,7 +183,8 @@ order.
 - [ ] Preserve the existing HLS FFmpeg build separately unless measurements
       support a safe consolidation
 - [ ] Measure streamer-to-mpv Range reads, first byte, first frame, buffering,
-      and seek completion on repeatable torrent cases
+      and seek completion on repeatable torrent cases; add capped load-trace
+      samples of Range offsets/lengths (first and last 16 requests per trace)
 - [ ] Tune the app's stream reader and mpv cache/read-ahead/seek behavior from
       those measurements; report binary-size and playback-time results apart
 - [ ] Implement subtitle AA/scaling through upstream features or original

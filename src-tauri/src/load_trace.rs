@@ -151,6 +151,31 @@ pub async fn trace_end(traces: State<'_, LoadTraces>, app_state: State<'_, std::
         traces.field(id, "longest_wait_ms", reads.longest_wait.as_millis());
         traces.field(id, "torrent_bytes", reads.bytes.saturating_sub(reads.buffer_bytes));
         traces.field(id, "buffer_bytes", reads.buffer_bytes);
+        let range_samples = reads
+            .range_samples
+            .iter()
+            .map(|sample| {
+                let at_ms = sample.at.saturating_duration_since(began).as_millis();
+                let kind = if sample.ranged { 'R' } else { 'F' };
+                let spans = sample
+                    .ranges
+                    .iter()
+                    .map(|range| format!("{}+{}", range.offset, range.length))
+                    .collect::<Vec<_>>()
+                    .join(",");
+                format!(
+                    "{at_ms}:{kind}:{spans}{}",
+                    if sample.truncated { "+more" } else { "" }
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("|");
+        traces.field(id, "range_samples", range_samples);
+        traces.field(
+            id,
+            "range_samples_omitted",
+            reads.requests.saturating_sub(reads.range_samples.len()),
+        );
         if let Ok(stats) = engine.stats(&torrent_id, 0).await {
             traces.field(id, "peers", stats.connected_peers);
             traces.field(id, "rate_mbps", format!("{:.2}", stats.download_speed_mbps));

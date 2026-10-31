@@ -1680,10 +1680,10 @@ async fn stream_handler(
     }
 
     let range = range.map(|TypedHeader(range)| range);
-    let content_type = torrent
-        .files()
-        .into_iter()
-        .nth(file_idx)
+    let file = torrent.files().into_iter().nth(file_idx);
+    let file_size = file.as_ref().map(|file| file.length).unwrap_or_default();
+    let content_type = file
+        .as_ref()
         .map(|file| mime_for_filename(&file.name))
         .unwrap_or("application/octet-stream");
     let headers = [(axum::http::header::CONTENT_TYPE, content_type)];
@@ -1692,7 +1692,7 @@ async fn stream_handler(
     let log = (!background).then(|| state.open_reads.log_for(&torrent_id, file_idx));
     let reads = (!background).then(|| state.read_stats.for_torrent(&torrent_id));
     if let Some(reads) = &reads {
-        reads.request();
+        reads.request(range.as_ref(), file_size);
     }
     let kind = if background { ReadKind::Background } else { ReadKind::Foreground };
 

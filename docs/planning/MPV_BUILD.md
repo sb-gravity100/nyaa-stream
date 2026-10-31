@@ -16,9 +16,14 @@ burned in. A package-layout probe confirmed that Vulkan/MSVCP/VCRUNTIME140_1
 load from `src-tauri/lib/` and VCRUNTIME140 loads beside the executable. Full
 Tauri UI playback/export, clean-Windows dependency behavior, other subtitle
 controls/display modes, and hardware codec paths remain unverified. The current
-FFmpeg config enables the D3D11VA device API but disables codec-specific D3D11VA
-decoders (including H.264, HEVC and AV1), so the candidate currently falls back
-to software decoding; hardware decoding is a separate pending acceptance item.
+FFmpeg config currently enables the D3D11VA device API but disables its
+codec-specific decoders. SB approved the next candidate to enable both D3D11VA
+and D3D11VA2 hwaccels for H.264, HEVC and AV1 only, retaining software fallback
+and leaving other decode APIs out. Hardware decode still needs a rebuilt DLL
+and runtime verification on this machine. The custom build's primary playback
+goal remains improving torrent data delivery into mpv: no controlled
+candidate-versus-upstream Range/read-ahead/seek benchmark has yet proven a
+reduction in torrent wait, startup time, rebuffering or seek latency.
 SB approved mpv v0.41.0 stable, native Windows LLVM, baseline x64 and the
 frozen scope in [ROADMAP.md](ROADMAP.md). Further changes require SB review.
 SB selected keeping separate FFmpeg builds and proceeding with local tool
@@ -149,8 +154,10 @@ Docker, MinGW binaries or a prebuilt full-featured DLL if it fails.
   build recipe syncs the separately locked libplacebo source into mpv's Meson
   subproject before configuration, so compilation uses the patched source.
   HLS keeps its existing 1.5× JASSUB path; clip export keeps its ASS encode path.
-- FFmpeg: explicitly select approved H.264, HEVC and AV1 software/hardware
-  decoders, and AAC, AC-3, E-AC-3, FLAC and Opus audio decoders. Retain subtitle
+- FFmpeg: explicitly select approved H.264, HEVC and AV1 software decoders plus
+  D3D11VA/D3D11VA2 hwaccels for those three codecs only; software fallback stays
+  available. Leave other hardware decode APIs out. Retain AAC, AC-3, E-AC-3,
+  FLAC and Opus audio decoders and subtitle
   and image support needed by the app; do not confuse these with extra requested
   media codecs. Prefer dav1d rather than building redundant AV1 software libraries.
 - Export: retain native AAC, software H.264 through approved x264 and H.264 NVENC,
@@ -228,7 +235,9 @@ acceptance and broader codec/media coverage remain pending.
   Settings persistence and updates, high-DPI changes, fullscreen, embedded mpv,
   clip export and screenshots. Confirm HLS retains its current subtitle output.
 - Compare playback/start/seek results against the original DLL on identical
-  sources. The 2026-10-30 log contains 1,295 successful seek summaries; the
+  sources. Load traces must include a bounded sample of Range offsets and
+  lengths (first and last 16 requests) with engine waits and byte totals. The
+  2026-10-30 log contains 1,295 successful seek summaries; the
   slowest is 11,520 ms with 11,503 ms of recorded torrent waits. That is a
   stream-delivery case, not proof of a slow decoder.
 - Reproduce E-AC-3 errors after seeks, Matroska parsing/queue warnings and four
