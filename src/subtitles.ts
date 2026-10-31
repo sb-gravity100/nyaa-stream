@@ -224,6 +224,7 @@ export async function mpvSubtitleRenderingSettings(
     return {};
   }
   return {
+    "blend-subtitles": "video",
     "sub-ass-scale-with-window": rendering.resolution === "window",
     "ass-scale": rendering.upscale,
     "ass-dscale": rendering.downscale,

@@ -19,7 +19,7 @@ import { labelOf } from "./episodeParser";
 import { Buffering } from "./Buffering";
 import { StatisticsMenu } from "./StatisticsMenu";
 import { getSettings as getSettingsSnapshot, useSettings } from "./settings";
-import { applyMpvSubtitleStyle, mpvSubtitleRenderingSettings, mpvSubtitleSettings, defaultSubtitleIndex, isStyledTrack, subtitleTrackLabel } from "./subtitles";
+import { applyMpvSubtitleStyle, mpvSubtitleSettings, defaultSubtitleIndex, isStyledTrack, subtitleTrackLabel } from "./subtitles";
 import { COMPLETED_FRACTION, MIN_RESUME_SECONDS, getProgress, resumePosition, saveProgress } from "./watchProgress";
 import { PlayerPlaylist, type PlaylistItem } from "./PlayerPlaylist";
 import { copyToClipboard, openContextMenu, openNyaaPage } from "./contextMenuStore";

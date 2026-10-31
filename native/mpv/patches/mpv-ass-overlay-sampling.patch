@@ -67,7 +67,7 @@
      struct gl_next_opts *next_opts;
      struct cache shader_cache, icc_cache;
      struct mp_csp_equalizer_state *video_eq;
-@@ -313,6 +317,10 @@
+@@ -313,8 +317,38 @@
                              struct mp_image *src)
  {
      struct priv *p = vo->priv;
@@ -75,10 +75,58 @@
 +    m_config_cache_update(p->sub_opts_cache);
 +    const struct mp_vo_opts *vo_opts = p->vo_opts_cache->opts;
 +    const struct mp_subtitle_opts *sub_opts = p->sub_opts_cache->opts;
++    struct mp_osd_res render_res = res;
++    const bool window_scale = sub_opts->ass_scale_with_window;
++    const bool supersample = window_scale &&
++        coords == PL_OVERLAY_COORDS_SRC_CROP && p->osd_res.w > 0 &&
++        p->osd_res.h > 0 && res.w > 0 && res.h > 0;
++    float sample_scale_x = 1.0f, sample_scale_y = 1.0f;
++    if (supersample) {
++        render_res = p->osd_res;
++        render_res.w *= 2;
++        render_res.h *= 2;
++        render_res.ml *= 2;
++        render_res.mr *= 2;
++        render_res.mt *= 2;
++        render_res.mb *= 2;
++        const float render_w = render_res.w - render_res.ml - render_res.mr;
++        const float render_h = render_res.h - render_res.mt - render_res.mb;
++        const float target_w = res.w - res.ml - res.mr;
++        const float target_h = res.h - res.mt - res.mb;
++        if (render_w > 0 && render_h > 0 && target_w > 0 && target_h > 0) {
++            sample_scale_x = target_w / render_w;
++            sample_scale_y = target_h / render_h;
++        } else {
++            sample_scale_x = (float) res.w / render_res.w;
++            sample_scale_y = (float) res.h / render_res.h;
++        }
++    }
      double pts = src ? src->pts : 0;
-     struct sub_bitmap_list *subs = osd_render(vo->osd, res, pts, flags, mp_draw_sub_formats);
+-    struct sub_bitmap_list *subs = osd_render(vo->osd, res, pts, flags, mp_draw_sub_formats);
++    struct sub_bitmap_list *subs = osd_render(vo->osd, render_res, pts, flags, mp_draw_sub_formats);
  
-@@ -379,6 +387,33 @@
+     frame->overlays = state->overlays;
+     frame->num_overlays = 0;
+@@ -355,9 +389,17 @@
+             if (b->dw == 0 || b->dh == 0)
+                 continue;
+             uint32_t c = b->libass.color;
++            float x0 = b->x, y0 = b->y;
++            float x1 = b->x + b->dw, y1 = b->y + b->dh;
++            if (supersample) {
++                x0 = res.ml + (b->x - render_res.ml) * sample_scale_x;
++                x1 = res.ml + (b->x + b->dw - render_res.ml) * sample_scale_x;
++                y0 = res.mt + (b->y - render_res.mt) * sample_scale_y;
++                y1 = res.mt + (b->y + b->dh - render_res.mt) * sample_scale_y;
++            }
+             struct pl_overlay_part part = {
+                 .src = { b->src_x, b->src_y, b->src_x + b->w, b->src_y + b->h },
+-                .dst = { b->x, b->y, b->x + b->dw, b->y + b->dh },
++                .dst = { x0, y0, x1, y1 },
+                 .color = {
+                     (c >> 24) / 255.0f,
+                     ((c >> 16) & 0xFF) / 255.0f,
+@@ -379,6 +421,39 @@
              },
              .coords = coords,
          };
@@ -86,7 +134,9 @@
 +        if (item->format == SUBBITMAP_LIBASS && res.w > 0 && res.h > 0 &&
 +            vo->dwidth > 0 && vo->dheight > 0) {
 +            const bool window_scale = sub_opts->ass_scale_with_window;
-+            const bool upscale = vo->dwidth >= res.w && vo->dheight >= res.h;
++            const bool upscale = supersample
++                ? sample_scale_x >= 1.0f && sample_scale_y >= 1.0f
++                : vo->dwidth >= res.w && vo->dheight >= res.h;
 +            const int selected = upscale ? vo_opts->ass_scale : vo_opts->ass_dscale;
 +            const struct pl_filter_config *filter = NULL;
 +            if (upscale) {
@@ -105,14 +155,18 @@
 +            p->subtitle_filter = *filter;
 +            p->subtitle_filter.blur = window_scale ? vo_opts->wns_ass_blur : vo_opts->ass_blur;
 +            ol->sample_filter = &p->subtitle_filter;
-+            ol->sample_w = MPMAX(1, lrintf(item->packed_w * (float) vo->dwidth / res.w));
-+            ol->sample_h = MPMAX(1, lrintf(item->packed_h * (float) vo->dheight / res.h));
++            ol->sample_source_w = item->packed_w;
++            ol->sample_source_h = item->packed_h;
++            ol->sample_w = MPMAX(1, lrintf(item->packed_w *
++                (supersample ? sample_scale_x : (float) vo->dwidth / res.w)));
++            ol->sample_h = MPMAX(1, lrintf(item->packed_h *
++                (supersample ? sample_scale_y : (float) vo->dheight / res.h)));
 +            ol->sample_antialias = window_scale ? vo_opts->wns_ass_aa : vo_opts->ass_aa;
 +        }
  
          switch (item->format) {
          case SUBBITMAP_BGRA:
-@@ -2132,6 +2167,8 @@
+@@ -2132,6 +2207,8 @@
      struct priv *p = vo->priv;
      p->opts_cache = m_config_cache_alloc(p, vo->global, &gl_video_conf);
      p->next_opts_cache = m_config_cache_alloc(p, vo->global, &gl_next_conf);

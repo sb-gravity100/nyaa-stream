@@ -405,15 +405,15 @@
     {
       "package": "mpv",
       "file": "native/mpv/patches/mpv-ass-overlay-sampling.patch",
-      "sha256_lf": "e7cd9493b305bdbf3a21cc430df76183270369e48c91cb3a40bbab9f5907c816",
-      "reason": "Register ASS overlay sampling controls and pass their filters from gpu-next",
+      "sha256_lf": "b8a2f00e1a188fd2164fef8c9f50f0acf9d4960b0ecdfbb4047e3a2df6aee657",
+      "reason": "Register independent ASS filters and render window-mode ASS at 2x before downsampling to the video frame",
       "apply_to": "mpv"
     },
     {
       "package": "libplacebo",
       "file": "native/mpv/patches/libplacebo-ass-overlay-sampling.patch",
-      "sha256_lf": "9ae2be585e346f6efb61581ea80f18a3827ad4e8662dfda0c60b6688b14609aa",
-      "reason": "Apply independent filtered sampling to subtitle overlays",
+      "sha256_lf": "25ba6cf2b298970273675ba517fa2eee3ef0a36d74fb4b60fc8a78362f3611d7",
+      "reason": "Downsample high-resolution ASS masks into reusable libplacebo overlay textures with the configured filter",
       "apply_to": "libplacebo"
     },
     {
@@ -445,5 +445,5 @@
       "apply_to": "ffmpeg"
     }
   ],
-  "source_audit_status": "Pinned source closure and seven native patches are verified; full separate-FFmpeg and x64 libmpv pipeline completed; candidate staged in src-tauri/lib with MSVC/Vulkan runtime DLLs and old DLL backed up; package-layout probe confirmed app-local dependency resolution; API/options, H.264/AAC playback, AV1 playback, subtitle-burned x264/AAC export, controlled 1920x1080 gpu-next subtitle visibility/ASS blur comparison, Rust EmbeddedMpv wrapper playback, and app Rust encode_clip export passed; full Tauri UI flow, clean-machine dependency check, other subtitle controls/display modes, and hardware-path acceptance remain pending"
+  "source_audit_status": "Pinned source closure and seven native patches are verified; the full separate-FFmpeg and x64 libmpv pipeline completed with locked libplacebo synced into mpv's Meson subproject; candidate staged in src-tauri/lib with MSVC/Vulkan runtime DLLs and previous DLL backups; package-layout probe confirmed app-local dependency resolution; API/options, H.264/AAC playback, AV1 playback, subtitle-burned x264/AAC export, 2x-window ASS supersampling at 720p-in-1080p and native 1080p, runtime video-stage option changes, Rust EmbeddedMpv wrapper playback, and app Rust encode_clip export passed; full Tauri UI flow, clean-machine dependency check, other subtitle controls/display modes, and hardware-path acceptance remain pending"
 }

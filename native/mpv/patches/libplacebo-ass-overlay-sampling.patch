@@ -1,6 +1,6 @@
 --- a/src/include/libplacebo/renderer.h
 +++ b/src/include/libplacebo/renderer.h
-@@ -528,6 +528,12 @@
+@@ -528,6 +528,13 @@
      // The number of parts for this overlay.
      const struct pl_overlay_part *parts;
      int num_parts;
@@ -8,6 +8,7 @@
 +    // Optional sampling policy for rasterized subtitle overlays. If unset,
 +    // overlays use the renderer's normal linear/nearest texture sampling.
 +    const struct pl_filter_config *sample_filter;
++    int sample_source_w, sample_source_h;
 +    int sample_w, sample_h;
 +    bool sample_antialias;
  };
@@ -15,80 +16,98 @@
  // High-level description of a complete frame, including metadata and planes
 --- a/src/renderer.c
 +++ b/src/renderer.c
-@@ -71,6 +71,7 @@
+@@ -71,6 +71,8 @@
      pl_shader_obj grain_state[4];
      pl_shader_obj lut_state[3];
      pl_shader_obj icc_state[2];
 +    pl_shader_obj overlay_sample_state;
++    pl_tex overlay_sample_tex;
      PL_ARRAY(pl_tex) fbos[PL_RENDER_STAGE_COUNT];
      struct sampler sampler_main;
      struct sampler sampler_contrast;
-@@ -164,6 +165,7 @@
+@@ -164,6 +166,8 @@
          pl_shader_obj_destroy(&rr->grain_state[i]);
      for (int i = 0; i < PL_ARRAY_SIZE(rr->icc_state); i++)
          pl_shader_obj_destroy(&rr->icc_state[i]);
 +    pl_shader_obj_destroy(&rr->overlay_sample_state);
++    pl_tex_destroy(rr->gpu, &rr->overlay_sample_tex);
  
      // Free all samplers
      sampler_destroy(rr, &rr->sampler_main);
-@@ -999,16 +1001,35 @@
-         sh_describe(sh, "overlay");
-         GLSL("// overlay \n");
+@@ -981,6 +985,57 @@
+             PL_ARRAY_APPEND(rr, rr->osd_indices, idx_base + 3);
+         }
  
--        switch (ol.mode) {
--        case PL_OVERLAY_NORMAL:
--            GLSL("vec4 color = textureLod("$", coord, 0.0); \n", tex);
--            break;
--        case PL_OVERLAY_MONOCHROME:
--            GLSL("vec4 color = osd_color; \n");
--            break;
--        case PL_OVERLAY_MODE_COUNT:
--            pl_unreachable();
--        };
-+        const bool custom_sample = ol.sample_filter && ol.sample_w > 0 && ol.sample_h > 0;
++        // Downsample a high-resolution subtitle mask in its own dispatch.
++        pl_tex draw_tex = ol.tex;
++        const bool custom_sample = ol.sample_filter && ol.sample_source_w > 0 &&
++            ol.sample_source_h > 0 && ol.sample_w > 0 && ol.sample_h > 0;
 +        if (custom_sample) {
-+            struct pl_filter_config filter = *ol.sample_filter;
-+            filter.polar = true;
-+            struct pl_sample_filter_params fparams = {
-+                .filter = filter,
-+                .no_widening = !ol.sample_antialias,
-+                .lut = &rr->overlay_sample_state,
-+            };
-+            pl_shader_sample_polar(sh, pl_sample_src(
-+                .tex = ol.tex,
-+                .rect = {0, 0, ol.tex->params.w, ol.tex->params.h},
-+                .new_w = ol.sample_w,
-+                .new_h = ol.sample_h,
-+            ), &fparams);
-+            if (ol.mode == PL_OVERLAY_MONOCHROME)
-+                GLSL("vec4 overlay_mask = color; color = osd_color; \n");
-+        } else {
-+            switch (ol.mode) {
-+            case PL_OVERLAY_NORMAL:
-+                GLSL("vec4 color = textureLod("$", coord, 0.0); \n", tex);
-+                break;
-+            case PL_OVERLAY_MONOCHROME:
-+                GLSL("vec4 color = osd_color; \n");
-+                break;
-+            case PL_OVERLAY_MODE_COUNT:
-+                pl_unreachable();
-+            };
++            pl_fmt input_fmt = ol.tex->params.format;
++            pl_fmt sample_fmt = pl_find_fmt(rr->gpu, input_fmt->type,
++                input_fmt->num_components, input_fmt->component_depth[0], 0,
++                PL_FMT_CAP_RENDERABLE | PL_FMT_CAP_SAMPLEABLE);
++            if (sample_fmt && pl_tex_recreate(rr->gpu, &rr->overlay_sample_tex,
++                pl_tex_params(
++                    .w = ol.sample_w,
++                    .h = ol.sample_h,
++                    .format = sample_fmt,
++                    .sampleable = true,
++                    .renderable = true,
++                    .storable = sample_fmt->caps & PL_FMT_CAP_STORABLE,
++                )))
++            {
++                struct pl_filter_config filter = *ol.sample_filter;
++                filter.polar = true;
++                struct pl_sample_filter_params fparams = {
++                    .filter = filter,
++                    .no_widening = !ol.sample_antialias,
++                    .no_compute = !rr->overlay_sample_tex->params.storable,
++                    .lut = &rr->overlay_sample_state,
++                };
++                pl_shader filter_sh = pl_dispatch_begin(rr->dp);
++                bool ok = pl_shader_sample_polar(filter_sh, pl_sample_src(
++                    .tex = ol.tex,
++                    .rect = {0, 0, ol.sample_source_w, ol.sample_source_h},
++                    .new_w = ol.sample_w,
++                    .new_h = ol.sample_h,
++                ), &fparams);
++                if (!ok) {
++                    pl_dispatch_abort(rr->dp, &filter_sh);
++                } else if (pl_dispatch_finish(rr->dp, pl_dispatch_params(
++                    .shader = &filter_sh,
++                    .target = rr->overlay_sample_tex,
++                ))) {
++                    draw_tex = rr->overlay_sample_tex;
++                    float sx = (float) ol.tex->params.w / ol.sample_source_w;
++                    float sy = (float) ol.tex->params.h / ol.sample_source_h;
++                    for (int i = 0; i < rr->osd_vertices.num; i++) {
++                        rr->osd_vertices.elem[i].coord[0] *= sx;
++                        rr->osd_vertices.elem[i].coord[1] *= sy;
++                    }
++                }
++            }
 +        }
- 
-         static const struct pl_color_map_params osd_params = {
-             PL_COLOR_MAP_DEFAULTS
-@@ -1047,8 +1068,12 @@
++
+         // Draw parts
+         pl_shader sh = pl_dispatch_begin(rr->dp);
+         ident_t tex = sh_desc(sh, (struct pl_shader_desc) {
+@@ -989,8 +1044,8 @@
+                 .type = PL_DESC_SAMPLED_TEX,
+             },
+             .binding = {
+-                .object = ol.tex,
+-                .sample_mode = (ol.tex->params.format->caps & PL_FMT_CAP_LINEAR)
++                .object = draw_tex,
++                .sample_mode = (draw_tex->params.format->caps & PL_FMT_CAP_LINEAR)
+                     ? PL_TEX_SAMPLE_LINEAR
+                     : PL_TEX_SAMPLE_NEAREST,
+             },
+@@ -1047,7 +1102,7 @@
          if (encode_xyz)
              pl_shader_delinearize(sh, &fbo_color);
          if (ol.mode == PL_OVERLAY_MONOCHROME) {
 -            GLSL("color.%s *= textureLod("$", coord, 0.0).r; \n",
--                 premul ? "rgba" : "a", tex);
-+            if (custom_sample) {
-+                GLSL("color.%s *= overlay_mask.r; \n", premul ? "rgba" : "a");
-+            } else {
-+                GLSL("color.%s *= textureLod("$", coord, 0.0).r; \n",
-+                     premul ? "rgba" : "a", tex);
-+            }
++            GLSL("color.%s *= textureLod("$", coord, 0.0).r; \n",
+                  premul ? "rgba" : "a", tex);
          }
- 
-         swizzle_color(sh, comps, comp_map, true, &repr, fbo->params.format);

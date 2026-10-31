@@ -42,7 +42,7 @@ export type SubtitleDownscaler = "mitchell" | "bicubic";
 
 /** Embedded mpv's ASS-only overlay sampling. HLS keeps its JASSUB renderer. */
 export interface MpvSubtitleRendering {
-  /** Scale the ASS raster with the video or render it at window resolution. */
+  /** Render at video resolution or at 2× window resolution, then downsample. */
   resolution: "video" | "window";
   upscale: SubtitleUpscaler;
   downscale: SubtitleDownscaler;

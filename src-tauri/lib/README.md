@@ -14,8 +14,10 @@ it so Windows can load the DLL on machines without the matching runtimes:
 The MSVC runtime files are licensed app-local redistributables; see
 `src-tauri/runtime/README.md` for the source and Microsoft terms.
 
-The original bundled DLL is preserved at
-`target/mpv-build/app-bundle-original/libmpv-2.dll` for rollback. `mpv-player`
+The upstream DLL is preserved at
+`target/mpv-build/app-bundle-original/libmpv-2.dll`; earlier custom builds are
+preserved under `target/mpv-build/app-bundle-pre-supersampling/` and
+`target/mpv-build/app-bundle-pre-final-pipeline/`. `mpv-player`
 loads the Settings override first, then `<exe dir>`, `<exe dir>/lib`, and PATH;
 on Windows it searches dependencies beside the selected DLL. Without a usable
 libmpv or its dependencies the app falls back to the HLS player.

@@ -9,6 +9,11 @@ step when cutting a release.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-01
+
+### Changed
+- Embedded mpv defaults to rendering ASS subtitles at 2× window resolution and downsampling to video resolution before blending; independent subtitle scaling, antialiasing and blur controls are applied by the custom renderer.
+
 ## [0.6.0] - 2026-10-30
 
 ### Added

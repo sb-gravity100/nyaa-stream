@@ -1,21 +1,24 @@
 # v0.7.0 custom libmpv native build recipe
 
-Status: the x64 candidate DLL has been compiled with the locked renderer patches,
-staged in `src-tauri/lib/` with its MSVC and Vulkan runtime DLLs, and the prior
-bundled DLL backed up under `target/mpv-build/app-bundle-original/`. The tracked
-full build pipeline completed successfully. Runtime checks
-confirmed API initialization, custom subtitle-option registration, H.264/AAC and
-AV1 playback, and x264/AAC MP4 export with a visibly burned subtitle. A controlled
-1920×1080 `gpu-next` window test showed the embedded subtitle and confirmed that
-ASS blur 0 versus 1.6 changes the captured frame. Full Tauri UI playback/export,
-other subtitle controls/display modes, hardware codec paths, and clean-Windows
-dependency behavior remain unverified. A separate Rust `EmbeddedMpv` probe loaded the candidate through the app's Rust wrapper,
-rendered into a native 1080p window, selected the embedded subtitle, and advanced
-playback to 1 second. The app's Rust `encode_clip` function also produced a
-1920×1080 H.264/AAC MP4 from the candidate; an extracted output frame visibly
-contains the burned subtitle. A package-layout probe confirmed that the staged
-Vulkan/MSVCP/VCRUNTIME140_1 sidecars resolve from `src-tauri/lib/`, while the
-app-local VCRUNTIME140 resolves from the executable directory.
+Status: the locked full build pipeline completed successfully, and the x64
+candidate is staged in `src-tauri/lib/` with its MSVC/Vulkan runtime DLLs. The
+upstream DLL remains backed up at `target/mpv-build/app-bundle-original/`; the
+previous custom candidate is at `target/mpv-build/app-bundle-pre-supersampling/`.
+Runtime checks passed for API/options, H.264/AAC and AV1 playback, and the
+subtitle-burned x264/AAC export. A controlled 1080p `gpu-next` window check
+confirmed visible subtitles and a visible ASS blur change. Through the Rust
+`EmbeddedMpv` wrapper, 720p playback at 1 second passed with video-stage
+blending and 2× window supersampling enabled. The 720p-in-1080p and native 1080p
+image comparisons both kept subtitles visible; the supersampling mode changed
+24,130 and 18,382 pixels in the subtitle regions, respectively. The Rust
+`encode_clip` path produced a 1920×1080 H.264/AAC MP4 with the subtitle visibly
+burned in. A package-layout probe confirmed that Vulkan/MSVCP/VCRUNTIME140_1
+load from `src-tauri/lib/` and VCRUNTIME140 loads beside the executable. Full
+Tauri UI playback/export, clean-Windows dependency behavior, other subtitle
+controls/display modes, and hardware codec paths remain unverified. The current
+FFmpeg config enables the D3D11VA device API but disables codec-specific D3D11VA
+decoders (including H.264, HEVC and AV1), so the candidate currently falls back
+to software decoding; hardware decoding is a separate pending acceptance item.
 SB approved mpv v0.41.0 stable, native Windows LLVM, baseline x64 and the
 frozen scope in [ROADMAP.md](ROADMAP.md). Further changes require SB review.
 SB selected keeping separate FFmpeg builds and proceeding with local tool
@@ -137,14 +140,15 @@ Docker, MinGW binaries or a prebuilt full-featured DLL if it fails.
   video, retain ASS/font/style overrides and outline blur, use light hinting for
   plain text and no hinting for authored ASS. The first candidate should match
   current rendering behavior against the recorded baseline.
-- Independent ASS overlay sampling is implemented in the locked native patches
-  `mpv-ass-overlay-sampling.patch` and `libplacebo-ass-overlay-sampling.patch`.
-  mpv registers `ass-scale`, `ass-dscale`, `ass-aa`, `ass-blur`, `wns-ass-aa`,
-  and `wns-ass-blur`; the built-in `sub-ass-scale-with-window` selects the
-  window-resolution path. gpu-next passes ASS masks through libplacebo's filter
-  sampler, with the video scaler untouched. HLS retains its existing 1.5x
-  JASSUB path; clip export remains on its ASS style/encode path. These patches
-  have not been compiled or visually verified yet.
+- Independent ASS filtering and true 2× window supersampling are implemented in
+  the locked native patches `mpv-ass-overlay-sampling.patch` and
+  `libplacebo-ass-overlay-sampling.patch`. When the custom options are available,
+  `src/subtitles.ts` selects `blend-subtitles=video`. gpu-next rasterizes ASS at
+  2× the window OSD size, downsamples the mask into a video-resolution texture
+  with the selected filter, then maps it onto the source-sized overlay. The
+  build recipe syncs the separately locked libplacebo source into mpv's Meson
+  subproject before configuration, so compilation uses the patched source.
+  HLS keeps its existing 1.5× JASSUB path; clip export keeps its ASS encode path.
 - FFmpeg: explicitly select approved H.264, HEVC and AV1 software/hardware
   decoders, and AAC, AC-3, E-AC-3, FLAC and Opus audio decoders. Retain subtitle
   and image support needed by the app; do not confuse these with extra requested

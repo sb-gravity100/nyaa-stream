@@ -1,6 +1,7 @@
 import importlib.util
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 
@@ -20,7 +21,17 @@ env['PKG_CONFIG'] = str(pkgconf)
 env['PKG_CONFIG_PATH'] = os.pathsep.join([str(mpv_build / 'install/ffmpeg/lib/pkgconfig'), str(mpv_build / 'install/probe/lib/pkgconfig')])
 env['MESON_PACKAGE_CACHE_DIR'] = str(mpv_build / 'dependencies/subprojects/packagecache')
 source = mpv_build / 'sources/mpv-41f6a645068483470267271e1d09966ca3b9f413'
+libplacebo_source = mpv_build / 'sources/libplacebo-275f7dea27924cdd34ab2e6c20e448b6bc4fab65'
+libplacebo_subproject = source / 'subprojects/libplacebo'
 build = mpv_build / 'build/candidate'
+if not (libplacebo_source / 'meson.build').is_file():
+    raise SystemExit(f'locked patched libplacebo source is missing: {libplacebo_source}')
+if not libplacebo_subproject.is_dir():
+    raise SystemExit(f'mpv libplacebo subproject directory is missing: {libplacebo_subproject}')
+# mpv's Meson subproject is a separate extraction; use the independently
+# locked and patched source package that prepare-mpv.py verified.
+shutil.copytree(libplacebo_source, libplacebo_subproject, dirs_exist_ok=True)
+print(f'Synced locked patched libplacebo into the mpv subproject: {libplacebo_subproject}')
 args = [
     str(mpv_build / 'tools/python/Scripts/python.exe'), '-m', 'mesonbuild.mesonmain',
     'setup', '--wipe', str(build), str(source), '--prefix=' + (mpv_build / 'install/candidate').as_posix(),

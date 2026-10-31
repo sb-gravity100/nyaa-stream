@@ -75,8 +75,8 @@ policy remains unchanged.
 Execution priority set by SB on 2026-10-31: custom libmpv first. Start with
 the current DLL baseline and API/dependency audit, prove a reproducible x64
 build, then measure and integrate it. The local candidate builds and passes
-API/options, H.264/AAC, AV1, subtitle-burned export, and a controlled 1920×1080
-gpu-next subtitle/blur visual check. Hardware paths remain unverified;
+API/options, H.264/AAC, AV1, subtitle-burned export, and gpu-next subtitle
+checks at 720p-in-1080p and native 1080p. Hardware paths remain unverified;
 memory, batch transitions, preload timing and seek dragging follow libmpv
 acceptance. The checklist below groups related work and does not override this
 order.
@@ -133,10 +133,18 @@ order.
       keyboard seeking, and rejection of stale seek completions
 - [x] Implement independent ASS overlay filters and AA/blur options in the
       locked mpv gpu-next/libplacebo source patches; source application and hashes
-      verified without compiling.
+      verified and compiled in the candidate DLL.
 - [x] Verify compiled-DLL gpu-next playback at 1920×1080 with an embedded
       subtitle; changing ASS blur from 0 to 1.6 changes the captured frame while
       the subtitle remains visible.
+- [x] Implement true window-resolution ASS supersampling for the app's
+      `blend-subtitles=video` path: rasterize the subtitle overlay at 2× window
+      resolution, downsample its mask to video resolution with the selected
+      downscaler, then blend it with the video frame. This is the default for
+      new installs; saved user selections are preserved.
+- [x] Verify the supersampling path with 720p video in a 1080p window and with
+      native 1080p video; both modes kept subtitles visible and produced distinct
+      subtitle-region pixels. Retain comparison captures under `target/`.
 - [ ] Verify both subtitle-resolution modes, all scale/dscale and AA controls,
       high-DPI, fullscreen and app screenshots; clip export keeps its current
       ASS encode path.

@@ -940,13 +940,13 @@ yaa-stream screenshots.">
             <div class="setting-subsection">
               <h4>Embedded mpv ASS rendering</h4>
               <p class="settings-hint">These controls independently scale and smooth ASS edges when mpv uses gpu-next. HLS and the gpu fallback keep their standard subtitle output; clip export retains its ASS style.</p>
-              <Row label="Render resolution" hint="Video resolution scales subtitles with the picture. Window resolution renders subtitles at the window size.">
+              <Row label="Render resolution" hint="Video resolution renders subtitles at video size. 2× window renders ASS at twice the window resolution, then downsamples to video resolution before blending.">
                 <select
                   value={rendering.resolution}
                   onChange={(event) => updateSettings({ subtitleRendering: { ...rendering, resolution: (event.currentTarget as HTMLSelectElement).value as typeof rendering.resolution } })}
                 >
                   <option value="video">Scale with video</option>
-                  <option value="window">Window resolution</option>
+                  <option value="window">2× window, downsample to video</option>
                 </select>
               </Row>
               <Row label="ASS upscaler">

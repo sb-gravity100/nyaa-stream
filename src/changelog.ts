@@ -10,6 +10,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.7.0",
+    date: "2026-11-01",
+    features: [
+      "Embedded mpv defaults to rendering ASS subtitles at 2× window resolution and downsampling to video resolution before blending, with independent scaling, antialiasing and blur controls.",
+    ],
+    fixes: [],
+  },
+  {
     version: "0.6.0",
     date: "2026-10-30",
     features: [
