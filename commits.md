@@ -1,3 +1,6 @@
+### `60edeb7` · 2026-11-01 · docs: pin mpv stream comparison case
+- `docs/planning/MPV_BUILD.md`
+
 ### `bc991da` · 2026-11-01 · feat: sample mpv range requests in load traces
 - `FILE_INDEX.md`
 - `PHASES.md`
