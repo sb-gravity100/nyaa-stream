@@ -445,5 +445,5 @@
       "apply_to": "ffmpeg"
     }
   ],
-  "source_audit_status": "Pinned source closure and seven native patches are verified; full separate-FFmpeg and x64 libmpv pipeline completed; API/options, H.264/AAC playback, AV1 playback, subtitle-burned x264/AAC export, and controlled 1920x1080 gpu-next subtitle visibility/ASS blur comparison passed; app integration, other subtitle controls/display modes, and hardware-path acceptance remain pending"
+  "source_audit_status": "Pinned source closure and seven native patches are verified; full separate-FFmpeg and x64 libmpv pipeline completed; API/options, H.264/AAC playback, AV1 playback, subtitle-burned x264/AAC export, controlled 1920x1080 gpu-next subtitle visibility/ASS blur comparison, and Rust EmbeddedMpv wrapper playback passed; full Tauri UI/export flow, other subtitle controls/display modes, and hardware-path acceptance remain pending"
 }

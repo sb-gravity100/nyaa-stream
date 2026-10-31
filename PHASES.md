@@ -104,10 +104,13 @@ order.
       FFmpeg 8.0.3 build
 - [x] Runtime-check required libmpv startup/options, H.264/AAC playback, AV1
       playback and x264/AAC MP4 export with a visibly burned subtitle
+- [x] Run the candidate through `mpv_player::EmbeddedMpv` into a native 1080p
+      window; `gpu-next`, selected subtitle, subtitle text, and playback position
+      all reached the expected state with the app's embedded-player options.
 - [x] Track `scripts/build-mpv.py` and its native build stages; run the full
       locked dependency/FFmpeg/mpv pipeline successfully
-- [ ] Install the candidate with its required runtime dependencies and verify
-      embedded app playback and export
+- [ ] Stage the candidate and its required runtime dependencies, then verify
+      playback and clip export through the full nyaa-stream app UI
 - [ ] Improve batch next-episode transitions by reusing torrent/file metadata and
       verified data; preserve season-aware file selection and source fallback
 - [ ] Measure next-episode click/autoplay to first frame on cached, partial,
