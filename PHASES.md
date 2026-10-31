@@ -74,8 +74,10 @@ policy remains unchanged.
 ## v0.7.0 — custom Windows libmpv build (planned 2026-10-29)
 Execution priority set by SB on 2026-10-31: custom libmpv first. Start with
 the current DLL baseline and API/dependency audit, prove a reproducible x64
-build, then measure and integrate it. Independent ASS sampling patches are now
-part of the locked source recipe and still need build/runtime verification;
+build, then measure and integrate it. The first local candidate now builds and
+passes API/options, H.264/AAC, AV1, and subtitle-burned export checks. A tracked
+build entry point now exists but still needs a full run; playback-only ASS sampling
+patches still need visual comparison. Hardware paths remain unverified;
 memory, batch transitions, preload timing and seek dragging follow libmpv
 acceptance. The checklist below groups related work and does not override this
 order.
@@ -99,6 +101,14 @@ order.
       and patch hashes with `scripts/prepare-mpv.py --sources-only` (no compilation)
 - [x] SB authorized the first full dependency/DLL configure/build on 2026-10-31;
       source preparation does not prove compilation or runtime acceptance
+- [x] Compile the first candidate DLL from the locked source tree and separate
+      FFmpeg 8.0.3 build
+- [x] Runtime-check required libmpv startup/options, H.264/AAC playback, AV1
+      playback and x264/AAC MP4 export with a visibly burned subtitle
+- [x] Track `scripts/build-mpv.py` and its native build stages; run the full
+      locked dependency/FFmpeg/mpv pipeline successfully
+- [ ] Install the candidate with its required runtime dependencies and verify
+      embedded app playback and export
 - [ ] Improve batch next-episode transitions by reusing torrent/file metadata and
       verified data; preserve season-aware file selection and source fallback
 - [ ] Measure next-episode click/autoplay to first frame on cached, partial,

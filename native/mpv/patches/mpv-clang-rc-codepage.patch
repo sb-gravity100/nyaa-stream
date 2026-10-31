@@ -1,0 +1,11 @@
+--- a/meson.build
++++ b/meson.build
+@@ -1762,7 +1762,7 @@
+ # build targets
+ if win32
+     windows = import('windows')
+-    res_flags = ['--codepage=65001']
++    res_flags = ['/C', '65001']
+ 
+     # Unintuitively, this compile operates out of the osdep subdirectory.
+     # Hence, these includes are needed.

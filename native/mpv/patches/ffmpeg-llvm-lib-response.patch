@@ -1,0 +1,22 @@
+--- a/configure
++++ b/configure
+@@ -5292,7 +5292,7 @@
+     DEPCCFLAGS=$_flags
+ fi
+ 
+-if VSLANG=1033 $ar 2>&1 | grep -q ^Microsoft; then
++if VSLANG=1033 $ar 2>&1 | grep -q ^Microsoft || [ "$(basename "$ar")" = llvm-lib ] || [ "$(basename "$ar")" = llvm-lib.exe ]; then
+     arflags="-nologo"
+     ar_o='-out:$@'
+ elif $ar 2>&1 | grep -q "\[D\] "; then
+@@ -7877,7 +7877,9 @@
+     ;;
+ esac
+ 
+-if [ "$response_files" != "no" ]; then
++if [ "$(basename "$ar")" = llvm-lib ] || [ "$(basename "$ar")" = llvm-lib.exe ]; then
++    response_files="yes"
++elif [ "$response_files" != "no" ]; then
+     ar_out=${FFTMPDIR}/test$LIBSUF
+     respfile="@/dev/null"
+     out_arg="$(echo $ar_o | sed "s;\$@;$ar_out;g")"

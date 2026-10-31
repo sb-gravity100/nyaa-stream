@@ -1,0 +1,20 @@
+--- a/ffbuild/library.mak
++++ b/ffbuild/library.mak
+@@ -36,7 +36,7 @@
+ $(SUBDIR)$(LIBNAME): $(OBJS) $(STLIBOBJS)
+ 	$(RM) $@
+ ifeq ($(RESPONSE_FILES),yes)
+-	$(Q)echo $^ > $@.objs
++	$(file >$@.objs,$^)
+ 	$(AR) $(ARFLAGS) $(AR_O) @$@.objs
+ else
+ 	$(AR) $(ARFLAGS) $(AR_O) $^
+@@ -73,7 +73,7 @@
+ $(SUBDIR)$(SLIBNAME_WITH_MAJOR): $(OBJS) $(SHLIBOBJS) $(SUBDIR)lib$(NAME).ver
+ 	$(SLIB_CREATE_DEF_CMD)
+ ifeq ($(RESPONSE_FILES),yes)
+-	$(Q)echo $$(filter %.o,$$^) > $$@.objs
++	$$(file >$$@.objs,$$(filter %.o,$$^))
+ 	$$(LD) $(SHFLAGS) $(LDFLAGS) $(LDSOFLAGS) $$(LD_O) @$$@.objs $(FFEXTRALIBS)
+ else
+ 	$$(LD) $(SHFLAGS) $(LDFLAGS) $(LDSOFLAGS) $$(LD_O) $$(filter %.o,$$^) $(FFEXTRALIBS)

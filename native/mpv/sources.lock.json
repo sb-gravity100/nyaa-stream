@@ -103,13 +103,13 @@
       "sha256": "87d1e95e769649784f4039febb30812d07834ea025ea8e5dd6c35462b01ad618"
     },
     "vulkan-loader": {
-      "ref": "v1.4.345",
-      "commit": "363f465abadab0a8dcfc5c85d2c691e9b0b788d6",
+      "ref": "v1.4.346",
+      "commit": "6923f2b7e869dd94a09dcdd6fa2152269edc7fef",
       "repository": "https://github.com/KhronosGroup/Vulkan-Loader.git",
-      "file": "vulkan-loader-363f465abadab0a8dcfc5c85d2c691e9b0b788d6.zip",
-      "directory": "Vulkan-Loader-363f465abadab0a8dcfc5c85d2c691e9b0b788d6",
-      "url": "https://codeload.github.com/KhronosGroup/Vulkan-Loader/zip/363f465abadab0a8dcfc5c85d2c691e9b0b788d6",
-      "sha256": "327bf7fac86575d5120e5383d048c56e5e5f0efe3ce6b6b8d9dc8aeeeea693e5"
+      "file": "Vulkan-Loader-6923f2b7e869dd94a09dcdd6fa2152269edc7fef.zip",
+      "directory": "Vulkan-Loader-6923f2b7e869dd94a09dcdd6fa2152269edc7fef",
+      "url": "https://codeload.github.com/KhronosGroup/Vulkan-Loader/zip/6923f2b7e869dd94a09dcdd6fa2152269edc7fef",
+      "sha256": "b075982052746016122062411e435ab1d7a766a9a281e73110fe757fad45e7c1"
     },
     "nv-codec-headers": {
       "ref": "n11.1.5.3",
@@ -399,7 +399,8 @@
       "package": "x264",
       "file": "native/mpv/patches/x264-clang-cl.patch",
       "sha256_lf": "f592f35ac5e1b23d948615ea1909af6203a98f9becb07b58588885d8bf4282ab",
-      "reason": "Recognize clang-cl as the existing MSVC-style compiler path"
+      "reason": "Recognize clang-cl as the existing MSVC-style compiler path",
+      "apply_to": "x264"
     },
     {
       "package": "mpv",
@@ -414,7 +415,35 @@
       "sha256_lf": "9ae2be585e346f6efb61581ea80f18a3827ad4e8662dfda0c60b6688b14609aa",
       "reason": "Apply independent filtered sampling to subtitle overlays",
       "apply_to": "libplacebo"
+    },
+    {
+      "package": "mpv",
+      "file": "native/mpv/patches/mpv-clang-rc-codepage.patch",
+      "sha256_lf": "2387439a2eb4a8e8b6fb686b011e7a6cccf8e62113f9b0f33d5b9e51e3716290",
+      "reason": "Use Microsoft resource compiler codepage syntax for native Windows LLVM builds",
+      "apply_to": "mpv"
+    },
+    {
+      "package": "ffmpeg",
+      "file": "native/mpv/patches/ffmpeg-msvc-depfile-escape.patch",
+      "sha256_lf": "486aeb171b03bfe34955bd24c17fb3f5ca6c608214c6bec8dd08ee3b65459fcd",
+      "reason": "Preserve the backslash pattern in FFmpeg MSVC dependency parsing under Windows Make",
+      "apply_to": "ffmpeg"
+    },
+    {
+      "package": "ffmpeg",
+      "file": "native/mpv/patches/ffmpeg-llvm-lib-response.patch",
+      "sha256_lf": "c0bcac129de90bbdf2a8d652ef7d8dacd8a7d1dc60ae88b8c1a435a209c700da",
+      "reason": "Select llvm-lib archive syntax and response files for the x64 static MSVC-compatible FFmpeg build",
+      "apply_to": "ffmpeg"
+    },
+    {
+      "package": "ffmpeg",
+      "file": "native/mpv/patches/ffmpeg-make-response-list.patch",
+      "sha256_lf": "a0ebc055ef57073375ac36702909dd701e0ddc3190c4b6285505be9075831ce9",
+      "reason": "Write large static-library object lists with GNU Make response files without command-line truncation",
+      "apply_to": "ffmpeg"
     }
   ],
-  "source_audit_status": "Selected source closure pinned; independent ASS mpv/libplacebo patches locked and applied by source preparation; configure/build compatibility not yet proven"
+  "source_audit_status": "Pinned source closure and seven native patches are verified; separate FFmpeg and x64 libmpv candidate compiled; API/options, H.264/AAC playback, AV1 playback, and subtitle-burned x264/AAC export passed runtime checks; playback-filter visual comparison and hardware-path acceptance remain pending"
 }

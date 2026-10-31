@@ -1,9 +1,12 @@
 # v0.7.0 custom libmpv native build recipe
 
-Status: local tools, selected source closure and independent ASS overlay
-sampling patches prepared. SB authorized the first full dependency/DLL build on
-2026-10-31. No custom DLL has been compiled yet; configure, compiler compatibility
-and runtime behavior remain unproven.
+Status: the first x64 candidate DLL has been compiled with the locked renderer
+patches. Runtime checks confirmed API initialization, custom subtitle-option
+registration, H.264/AAC and AV1 playback, and x264/AAC MP4 export with a visibly
+burned subtitle. These checks do not cover visual comparisons of the new
+playback-only subtitle filters or hardware codec paths. The tracked build entry
+point and all dependency stages have now completed successfully; app installation
+and visual/hardware acceptance remain pending.
 SB approved mpv v0.41.0 stable, native Windows LLVM, baseline x64 and the
 frozen scope in [ROADMAP.md](ROADMAP.md). Further changes require SB review.
 SB selected keeping separate FFmpeg builds and proceeding with local tool
@@ -14,7 +17,7 @@ isolated tools from `native/mpv/tools.lock.json`, records local tool identity,
 and leaves all downloads/build output under `target/mpv-build/`. The source
 lock is recorded separately in `native/mpv/sources.lock.json`, before compilation.
 The source lock covers 21 repository archives, 15 Meson source/build definitions
-and three native patches. Their archives/patches are SHA-256 checked; the two
+and seven native patches. Their archives/patches are SHA-256 checked; the two
 ASS source patches are applied to the extracted mpv and libplacebo trees. This
 proves source preparation, not successful configuration, media compilation or
 runtime compatibility.
@@ -35,8 +38,14 @@ needs to prove the complete path.
 
 Develop on `release/0.7.0`. Use a dedicated `target/mpv-build/` tree for tools,
 source archives/checkouts, static dependency installation, build logs and the
-candidate DLL. Track the recipe and eventual build scripts/source lock in the
-repository. Keep the installed DLL and existing HLS FFmpeg tree separate.
+candidate DLL. Keep the tracked recipe/source lock, installed DLL and existing
+HLS FFmpeg tree separate.
+
+Run `python scripts/build-mpv.py` from the repository root to prepare the locked
+tools and sources, build the approved static dependencies and separate FFmpeg,
+then configure and compile the shared candidate DLL. The command writes detailed
+logs and the candidate to `target/mpv-build/`; it does not install or replace
+the app's bundled DLL. `scripts/mpv-build/` contains the individual build stages.
 
 The machine has LLVM 23.1.1, Visual Studio 2022 Community, CMake 4.3.2,
 Ninja 1.13.2, Python 3.11.9, GNU Make and Git for Windows. Local Meson 1.12.1,
@@ -61,8 +70,9 @@ app `x86-64-v3` flags. The existing app's CPU requirement is unchanged.
 
 ## Source selections
 
-SB approved mpv and the four core media dependency versions. This is not yet
-a complete transitive lock or a tested media-stack compatibility claim.
+SB approved mpv and the four core media dependency versions. The complete
+transitive source lock is now verified; compatibility evidence is recorded
+separately below and does not cover every codec or GPU path.
 
 | Component | Selection | Purpose |
 |---|---|---|
@@ -92,7 +102,8 @@ API, so the separate TurboJPEG API and its PNG dependency are not required.
 
 The NVIDIA header selection is `n11.1.5.3`, a version explicitly accepted by
 FFmpeg 8.0.3 and containing AV1 NVDEC declarations, instead of raising the
-NVENC API requirement to SDK 13. Driver/runtime behavior still needs testing.
+NVENC API requirement to SDK 13. The candidate configuration resolves this
+locked header version; driver/runtime behavior still needs testing.
 libplacebo retains native Dolby Vision metadata reshaping; its optional raw
 RPU parser is separate from the metadata supplied through mpv/FFmpeg.
 
@@ -181,12 +192,13 @@ Core dependency versions and the first full build are approved. Installed-player
 replacement and publication remain later steps.
 
 Stage 1 passed: tool bootstrap completed and pkgconf compiled with LLVM.
-Stage 2 previously passed for the original source closure. The updated
-source-only command must verify archive and patch hashes and apply the ASS
-patches before that stage can be marked complete again. Full media-stack
-configuration/compilation remains the next approval gate. Required build
-definitions may need adjustment when configuration is exercised; record and
-review any changes to the source lock.
+Stage 2 passed: the tracked runner verified the full source closure and all
+seven native patches. Stage 3 passed: the runner built the static dependencies,
+separate FFmpeg and shared candidate DLL with every stage exit code 0. Runtime
+checks passed for libmpv initialization/options, H.264/AAC and AV1 playback, and
+x264/AAC MP4 export with a visibly burned subtitle. Installing the DLL in the
+app, visual comparison of playback-only subtitle filters, hardware-path
+acceptance and broader codec/media coverage remain pending.
 
 ## Acceptance and evidence
 
