@@ -147,16 +147,19 @@ The checklist below groups related work and does not override this order.
 - [~] Log next-episode click/autoplay/playlist selection to first frame in mpv
       and HLS. Run cached, partial and poorly seeded batches in the app to
       measure the result against the 2026-10-30 traces.
-- [x] Use the local sbtl 0.2.0 DLL/API: `wake`, safe stream invalidation on
-      removal, `stalled_ms`, verified reads and direct wait/seek APIs are present.
-      Keep the app's Cargo dependency pinned to the published tag until v0.2.0
-      is available remotely; local builds use `npm run dev:sbtl-local`.
+- [x] Use sbtl 0.2.0's published DLL/API: `wake`, safe stream invalidation on
+      removal, `stalled_ms`, verified reads and direct wait/seek APIs are present;
+      refresh `Cargo.lock` to the current published `v0.2.0` tag commit.
 - [x] Implement P0 using stock libmpv's `mpv_stream_cb_add_ro("sbtl")`:
       direct `sbtl://<infohash>/<file-index>` URLs, cancellable verified-byte
       reader, torrent-lifetime guard, open-read/resume accounting, and first-byte
       logging. Older libmpv builds retain the HTTP URL fallback.
-- [ ] Measure P0 against HTTP Range in the app on identical cached, live and
-      partial torrents before changing mpv cache defaults or adding core patches.
+- [~] Compare P0 against HTTP Range in the app on the cleared-cache 2026-11-01
+      One Punch Man case. Direct sbtl reached first frame sooner across its
+      cancelled attempt plus retry, with comparable bytes and lower total wait;
+      this is promising, not conclusive, and cached/live/partial cases remain.
+- [x] Configure the direct sbtl stream to switch to a 45-second playback-time
+      read-ahead window once its container index reports a measured bitrate.
 - [ ] If measurements warrant it, add the later sbtl buffer property/cache-pause,
       demux seek-time prefetch and bitrate/pause hints; preserve the app as the
       sole sbtl event consumer.

@@ -299,6 +299,7 @@ impl Torrent {
             stream,
             position: Mutex::new(0),
             cancelled: AtomicBool::new(false),
+            adaptive_window_set: AtomicBool::new(false),
             len: file.size,
             _open: OpenReader(self.readers.clone()),
         })
@@ -374,11 +375,38 @@ pub struct MpvStream {
     stream: Arc<sbtl::Stream>,
     position: Mutex<u64>,
     cancelled: AtomicBool,
+    adaptive_window_set: AtomicBool,
     len: u64,
     _open: OpenReader,
 }
 
 impl MpvStream {
+    /// Once sbtl's container index has a measured bitrate, size its
+    /// sequential read-ahead window in playback time instead of bytes.
+    /// Retrying while the index is probing is cheap and lets the stream
+    /// adapt as soon as the index becomes available.
+    fn update_adaptive_window(&self) {
+        const WINDOW: Duration = Duration::from_secs(45);
+        if self.adaptive_window_set.load(Ordering::Relaxed) {
+            return;
+        }
+        let media = self.stream.media_info();
+        if media.state != sbtl::MediaState::Ready || media.avg_bitrate == 0 {
+            return;
+        }
+        match self.stream.set_window_time(WINDOW) {
+            Ok(()) => {
+                self.adaptive_window_set.store(true, Ordering::Relaxed);
+                tracing::info!(
+                    avg_bitrate = media.avg_bitrate,
+                    window_seconds = WINDOW.as_secs(),
+                    "sbtl: configured bitrate-adaptive mpv read-ahead window"
+                );
+            }
+            Err(error) => tracing::debug!(%error, "sbtl: couldn't configure adaptive read-ahead window"),
+        }
+    }
+
     pub fn len(&self) -> u64 {
         self.len
     }
@@ -393,6 +421,7 @@ impl MpvStream {
         if buffer.is_empty() {
             return Ok(0);
         }
+        self.update_adaptive_window();
         let mut position = self.position.lock().unwrap_or_else(|e| e.into_inner());
         loop {
             if self.cancelled.load(Ordering::SeqCst) {
