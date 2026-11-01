@@ -146,15 +146,23 @@ The checklist below groups related work and does not override this order.
 - [~] Log next-episode click/autoplay/playlist selection to first frame in mpv
       and HLS. Run cached, partial and poorly seeded batches in the app to
       measure the result against the 2026-10-30 traces.
-- [ ] Implement the direct sbtl-to-mpv path in phases: P0 `mpv_stream_cb_add_ro`
-      baseline and metrics; P1 `sbtl://` registered ops vtable and cancellable
-      reader; P2 shared buffer property/cache-pause; P3 seek prefetch; P4
-      bitrate and pause hints. Keep the HTTP Range path as a fallback.
+- [ ] Implement the direct sbtl-to-mpv path in phases: P0 stock-libmpv
+      `mpv_stream_cb_add_ro("sbtl")` baseline and metrics; P1 `sbtl://`
+      registered ops vtable and cancellable reader (`wait` in 50 ms slices,
+      `wake` on cancel); P2 shared `sbtl-buffer` property/cache-pause; P3 seek
+      prefetch; P4 bitrate-adaptive window and pause/seek hints. Keep the HTTP
+      Range path as a fallback and leave event consumption with the app.
 - [ ] Compare direct sbtl and HTTP Range on cached, live and partial torrents:
       first byte/frame, random and sequential seeks, stalls, bytes requested,
       RSS and disk use. Accept only with zero wrong-byte reads and no resume or
       stale-seek regressions; zero-copy remains optional and requires a verified
       piece peek API.
+- [ ] Target one durable data copy: retain verified sbtl storage as the back
+      cache, cap mpv packet buffers, disable mpv disk cache, and adapt sbtl's
+      ahead window to bitrate/playback speed. Measure packet eviction before
+      considering keyframe-aligned eviction changes.
+- [ ] Treat sliding-window torrent storage as optional P6 work; quantify disk
+      savings against re-downloads on back-seek and reduced seeding.
 - [ ] Add preload timing choice: existing spare-bandwidth behavior (default)
       or only after the current episode file reaches 100% verified download
 - [ ] Verify file-level threshold (not whole torrent/playhead), already-cached

@@ -90,8 +90,13 @@ session and registers a read/wait/wake/seek/buffer vtable with libmpv; mpv
 does not link sbtl. Add shared buffer state and cache-pause reporting, seek
 prefetch hooks, and bitrate/pause hints, while preserving the HTTP reader as
 fallback until comparative live and partial-torrent measurements accept the
-new path. Keep HLS FFmpeg independent. Optional zero-copy depends on a verified
-piece peek API. The current custom DLL does not include this integration yet;
+new path. Target one storage copy by bounding mpv packet buffers, disabling
+mpv disk caching and using sbtl as the durable back cache; adapt sbtl's window
+to bitrate and playback speed. Measure keyframe-aligned eviction before
+patching it. Optional zero-copy depends on a verified-piece peek API, and
+optional sliding-window storage trades back-seek redownloads and seeding for
+lower disk use. Keep HLS FFmpeg independent. The current custom DLL does not
+include this integration yet;
 phases and metrics are detailed in
 [MPV_SBTL_FIX_0.7.0.md](MPV_SBTL_FIX_0.7.0.md).
 
