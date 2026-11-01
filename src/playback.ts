@@ -2,6 +2,26 @@ import { invoke } from "@tauri-apps/api/core";
 import { isTauriAvailable } from "./browserFallback";
 import type { PlaySession, StreamStats, SubtitleInfo } from "./types";
 
+type EpisodeTransition = { animeId: number; targetKey: string; startedAt: number; trigger: "manual" | "autoplay" | "playlist" };
+let pendingEpisodeTransition: EpisodeTransition | null = null;
+
+export function markEpisodeTransition(animeId: number, targetKey: string, trigger: EpisodeTransition["trigger"]): void {
+  pendingEpisodeTransition = { animeId, targetKey, startedAt: performance.now(), trigger };
+  console.info("[player] next-episode navigation started", { animeId, targetKey, trigger });
+}
+
+export function takeEpisodeTransition(animeId: number, targetKey: string): EpisodeTransition | null {
+  const pending = pendingEpisodeTransition;
+  if (!pending || pending.animeId !== animeId || pending.targetKey !== targetKey) return null;
+  pendingEpisodeTransition = null;
+  if (performance.now() - pending.startedAt > 60_000) {
+    console.debug("[player] expired next-episode timing marker", { animeId, targetKey });
+    return null;
+  }
+  console.debug("[player] matched next-episode timing marker", { animeId, targetKey, trigger: pending.trigger });
+  return pending;
+}
+
 // Torrenting isn't available in the dev-only browser preview (see
 // browserFallback.ts) - there's no meaningful fallback for actual playback,
 // so these just reject/no-op there rather than pretending to stream.

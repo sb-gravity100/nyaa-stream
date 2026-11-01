@@ -103,7 +103,8 @@ embedded-player ABI and HLS fallback still work.
   deferred stops with the playback generation so a late stop from the old
   player cannot remove the new session; an intentional episode transition
   has ten seconds of grace for its next route to open. Full app timing remains
-  to be measured.
+  to be measured; frontend logs now include navigation-to-first-frame time for
+  manual, autoplay and playlist transitions.
 - Add a next-episode preload timing option: retain the existing spare-bandwidth
   behavior as the default and offer "Only after the current episode is fully
   downloaded". Gate the latter on 100% verified bytes of the current episode's

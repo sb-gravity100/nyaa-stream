@@ -138,8 +138,9 @@ The checklist below groups related work and does not override this order.
       rejected, alternate sources are tried in ranked order, and stale player
       stops cannot remove a successor. Measure the handoff in the full app,
       separately from waits for missing torrent pieces.
-- [ ] Measure next-episode click/autoplay to first frame on cached, partial,
-      and poorly seeded batches
+- [~] Log next-episode click/autoplay/playlist selection to first frame in mpv
+      and HLS. Run cached, partial and poorly seeded batches in the app to
+      measure the result against the 2026-10-30 traces.
 - [ ] Add preload timing choice: existing spare-bandwidth behavior (default)
       or only after the current episode file reaches 100% verified download
 - [ ] Verify file-level threshold (not whole torrent/playhead), already-cached

@@ -9,7 +9,7 @@ import { isTypingTarget } from "./keyboard";
 import { ExportDialog, type ExportRequest } from "./ExportDialog";
 import type { AnimeMedia, NyaaResult, PlayFile, StreamStats, SubtitleTrack } from "./types";
 import { displayTitle, isMovie } from "./types";
-import { getStreamStats, playMagnet, stopPlayback, streamFileLoaded, type ResumeRequest } from "./playback";
+import { getStreamStats, markEpisodeTransition, playMagnet, stopPlayback, streamFileLoaded, takeEpisodeTransition, type ResumeRequest } from "./playback";
 import { traceBegin, traceEnd, traceMark, type LoadTrace } from "./loadTrace";
 import { saveFrameThumbnail } from "./torrentThumbnail";
 import { loadingProgress } from "./loadingProgress";
@@ -278,6 +278,8 @@ function MpvPlayerView({
    onAttachCustomSource,
 }: Props) {
    const settings = useSettings();
+   const [episodeTransition] = useState(() => takeEpisodeTransition(anime.id, episodeKey));
+   const transitionLoggedRef = useRef(false);
    const videoRef = useRef<MpvVideo | null>(null);
    // Load profiler traces (PLAN.md "Load profiler"): the current start
    // (player open / source -> first frame) and seek (-> playback restart).
@@ -350,15 +352,17 @@ function MpvPlayerView({
       (key: string) => {
          console.info("[player] episode picked from list", { key });
          nextTransitionRef.current = key !== episodeKey;
+         if (key !== episodeKey) markEpisodeTransition(anime.id, key, "playlist");
          setPlaylistOpen(false);
          onSelectEpisode(key);
       },
-      [onSelectEpisode, episodeKey],
+      [onSelectEpisode, episodeKey, anime.id],
    );
-   function advanceToNext() {
+   function advanceToNext(trigger: "manual" | "autoplay" = "manual") {
       if (!onNext) return;
       nextTransitionRef.current = true;
-      console.info("[player] advancing to next episode");
+      if (nextLabel) markEpisodeTransition(anime.id, nextLabel, trigger);
+      console.info("[player] advancing to next episode", { trigger });
       onNext();
    }
    const closePlaylist = useCallback(() => setPlaylistOpen(false), []);
@@ -650,6 +654,10 @@ function MpvPlayerView({
       on("volumechange", () => setMuted(video.muted));
       on("canplay", () => {
          // mpv's playback-restart: the first frame.
+         if (episodeTransition && !transitionLoggedRef.current) {
+            transitionLoggedRef.current = true;
+            console.info("[player] next-episode first frame", { animeId: anime.id, episodeKey, trigger: episodeTransition.trigger, elapsedMs: Math.round(performance.now() - episodeTransition.startedAt), renderer: "mpv" });
+         }
          if (seekTraceRef.current && !seekTraceRef.current.ended)
             traceMark(seekTraceRef.current, "playback_restart", `position=${video.currentTime.toFixed(3)}`);
          traceEnd(startTraceRef.current, "ok");
@@ -862,7 +870,7 @@ function MpvPlayerView({
    useEffect(() => {
       if (nextCountdown == null) return;
       if (nextCountdown <= 0) {
-         advanceToNext();
+         advanceToNext("autoplay");
          return;
       }
       const timer = window.setTimeout(
@@ -1901,7 +1909,7 @@ function MpvPlayerView({
                <div class="player-next-label">Up next</div>
                <div class="player-next-title">{nextLabel}</div>
                <div class="player-next-actions">
-                  <button class="button button-primary" onClick={advanceToNext}>
+                  <button class="button button-primary" onClick={() => advanceToNext()}>
                      Play now ({nextCountdown})
                   </button>
                   <button
@@ -2201,7 +2209,7 @@ function MpvPlayerView({
                {onNext && (
                   <button
                      class="player-icon-button"
-                     onClick={advanceToNext}
+                     onClick={() => advanceToNext()}
                      aria-label="Next episode"
                      title={`${nextLabel ?? "Next episode"} (N)`}
                   >

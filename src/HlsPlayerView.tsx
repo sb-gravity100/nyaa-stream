@@ -6,7 +6,7 @@ import { isFullscreen, setFullscreen, toggleFullscreen, useFullscreen } from "./
 import { isPip, setPip, togglePip, usePip } from "./pip";
 import type { AnimeMedia, NyaaResult, PlayFile, StreamStats, SubtitleTrack } from "./types";
 import { displayTitle, isMovie } from "./types";
-import { getStreamStats, getSubtitleTracks, playMagnet, reportDecoderSupport, stopPlayback } from "./playback";
+import { getStreamStats, getSubtitleTracks, markEpisodeTransition, playMagnet, reportDecoderSupport, stopPlayback, takeEpisodeTransition } from "./playback";
 import { saveFrameThumbnail } from "./torrentThumbnail";
 import { loadingProgress } from "./loadingProgress";
 import { bestRelease, codecPlayable, getPreferredGroup, releaseCodec, releaseGroup, releaseResolution, setPreferredGroup, sortReleases } from "./releases";
@@ -242,6 +242,8 @@ export function HlsPlayerView({
    onAttachCustomSource,
 }: Props) {
    const settings = useSettings();
+   const [episodeTransition] = useState(() => takeEpisodeTransition(anime.id, episodeKey));
+   const transitionLoggedRef = useRef(false);
    const videoRef = useRef<HTMLVideoElement | null>(null);
    const playbackGenerationRef = useRef<number | null>(null);
    const nextTransitionRef = useRef(false);
@@ -346,15 +348,17 @@ export function HlsPlayerView({
       (key: string) => {
          console.info("[player] episode picked from list", { key });
          nextTransitionRef.current = key !== episodeKey;
+         if (key !== episodeKey) markEpisodeTransition(anime.id, key, "playlist");
          setPlaylistOpen(false);
          onSelectEpisode(key);
       },
-      [onSelectEpisode, episodeKey],
+      [onSelectEpisode, episodeKey, anime.id],
    );
-   function advanceToNext() {
+   function advanceToNext(trigger: "manual" | "autoplay" = "manual") {
       if (!onNext) return;
       nextTransitionRef.current = true;
-      console.info("[hls-player] advancing to next episode");
+      if (nextLabel) markEpisodeTransition(anime.id, nextLabel, trigger);
+      console.info("[hls-player] advancing to next episode", { trigger });
       onNext();
    }
    const closePlaylist = useCallback(() => setPlaylistOpen(false), []);
@@ -795,7 +799,7 @@ export function HlsPlayerView({
    useEffect(() => {
       if (nextCountdown == null) return;
       if (nextCountdown <= 0) {
-         advanceToNext();
+         advanceToNext("autoplay");
          return;
       }
       const timer = window.setTimeout(
@@ -1522,6 +1526,10 @@ export function HlsPlayerView({
                onCanPlay={() => setReady(true)}
                onWaiting={() => setReady(false)}
                onPlaying={() => {
+                  if (episodeTransition && !transitionLoggedRef.current) {
+                     transitionLoggedRef.current = true;
+                     console.info("[player] next-episode first frame", { animeId: anime.id, episodeKey, trigger: episodeTransition.trigger, elapsedMs: Math.round(performance.now() - episodeTransition.startedAt), renderer: "hls" });
+                  }
                   setReady(true);
                   setHasPlayed(true);
                   rememberGroupOnPlay();
@@ -1629,7 +1637,7 @@ export function HlsPlayerView({
                <div class="player-next-label">Up next</div>
                <div class="player-next-title">{nextLabel}</div>
                <div class="player-next-actions">
-                  <button class="button button-primary" onClick={advanceToNext}>
+                  <button class="button button-primary" onClick={() => advanceToNext()}>
                      Play now ({nextCountdown})
                   </button>
                   <button
@@ -1856,7 +1864,7 @@ export function HlsPlayerView({
                {onNext && (
                   <button
                      class="player-icon-button"
-                     onClick={advanceToNext}
+                     onClick={() => advanceToNext()}
                      aria-label="Next episode"
                      title={`${nextLabel ?? "Next episode"} (N)`}
                   >
