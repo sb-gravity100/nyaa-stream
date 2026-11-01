@@ -1,3 +1,11 @@
+### `e48f2f2` · 2026-11-01 · feat: trace next episode startup time
+- `FILE_INDEX.md`
+- `PHASES.md`
+- `docs/planning/ROADMAP.md`
+- `src/HlsPlayerView.tsx`
+- `src/PlayerView.tsx`
+- `src/playback.ts`
+
 ### `56a3e7e` · 2026-11-01 · feat: preserve batch episode handoff
 - `CHANGELOG.md`
 - `FILE_INDEX.md`
