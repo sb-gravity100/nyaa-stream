@@ -68,11 +68,21 @@ const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
  * standard anime OP length. */
 const INTRO_SKIP_SECONDS = 90;
 const INTRO_CHAPTER = /^(op|opening|intro)\b|\bopening\b/i;
-const ENDING_CHAPTER = /^(ed|ending|outro)\b|\bending\b/i;
+const ENDING_CHAPTER = /^(ed|ending|outro|credits?)\b|\b(ending|outro|credits?)\b/i;
 const GENERIC_OPENING_CHAPTER = /^chapter\s*[12]$/i;
 const PROGRESS_SAVE_MS = 5000;
 const VOLUME_STORAGE_KEY = "nyaa-stream:volume";
 const REMAINING_STORAGE_KEY = "nyaa-stream:show-remaining";
+
+type OpEdRegion = "opening" | "ending";
+
+function chapterOpEdRegion(title: string, index: number, duration: number): OpEdRegion | null {
+   const normalizedTitle = title.trim();
+   if (INTRO_CHAPTER.test(normalizedTitle)) return "opening";
+   if (ENDING_CHAPTER.test(normalizedTitle)) return "ending";
+   if (index < 2 && GENERIC_OPENING_CHAPTER.test(normalizedTitle) && duration >= 85 && duration <= 95) return "opening";
+   return null;
+}
 
 /** Thumbnail width for the last-frame capture (16:9 cards). */
 const LAST_FRAME_WIDTH = 640;
@@ -1398,24 +1408,14 @@ function MpvPlayerView({
       showToast(`Speed ${next}×`);
    }
 
-   /** The opening chapter playing at `time`, if the file marks one. */
-   function openingAt(time: number): { end: number } | null {
-      for (let i = 0; i < chapters.length; i++) {
-         if (!INTRO_CHAPTER.test(chapters[i].title.trim())) continue;
-         const end = chapters[i + 1] ? chapters[i + 1].time : episodeDuration;
-         if (time >= chapters[i].time && time < end - 0.5) return { end };
-      }
-      return null;
-   }
-
    /** The opening (intro chapter) playing at `time` or still to come, as
     * its end - so Shift in a prologue before the opening skips past the
     * whole opening, not just to where it starts. Null when the file marks
     * no opening ahead. */
    function openingFrom(time: number): { end: number } | null {
       for (let i = 0; i < chapters.length; i++) {
-         if (!INTRO_CHAPTER.test(chapters[i].title.trim())) continue;
          const end = chapters[i + 1] ? chapters[i + 1].time : episodeDuration;
+         if (chapterOpEdRegion(chapters[i].title, i, end - chapters[i].time) !== "opening") continue;
          if (end - time > 0.5) return { end };
       }
       return null;
@@ -1428,13 +1428,7 @@ function MpvPlayerView({
          const title = chapter.title.trim();
          const end = chapters[i + 1]?.time ?? episodeDuration;
          const length = end - chapter.time;
-         const reason = INTRO_CHAPTER.test(title)
-            ? "opening"
-            : ENDING_CHAPTER.test(title)
-              ? "ending"
-              : i < 2 && GENERIC_OPENING_CHAPTER.test(title) && length >= 85 && length <= 95
-                ? "opening"
-                : null;
+         const reason = chapterOpEdRegion(title, i, length);
          if (!reason || time < chapter.time || time >= end - 0.5) continue;
          const key = `${selectedFile?.index ?? -1}:${i}:${chapter.time}`;
          if (autoSkippedChaptersRef.current.has(key)) return;
@@ -1451,6 +1445,13 @@ function MpvPlayerView({
    useEffect(() => {
       autoSkippedChaptersRef.current.clear();
    }, [selectedFile?.streamUrl]);
+
+   const opEdRegions = chapters.flatMap((chapter, index) => {
+      const start = chapter.time;
+      const end = chapters[index + 1]?.time ?? episodeDuration;
+      const type = chapterOpEdRegion(chapter.title, index, end - start);
+      return type && end > start ? [{ start, end, type }] : [];
+   });
 
    /** Shift: jumps to the end of the opening chapter (see `openingFrom`);
     * only in a file with no opening marked, a fixed 90s. */
@@ -1948,12 +1949,6 @@ function MpvPlayerView({
             />
          )}
 
-         {hasPlayed && !error && openingAt(position) && (
-            <button class="player-skip-intro" onClick={skipIntro}>
-               Skip opening <kbd>Shift</kbd>
-            </button>
-         )}
-
          {renderedMenu && (
             <div class={`player-menu${menu ? " open" : ""}`} ref={menuRef}>
                {renderedMenu === "subtitles" && (
@@ -2200,6 +2195,14 @@ function MpvPlayerView({
                   />
                )}
                <div class="player-seek-played" ref={playedFillRef} />
+               {episodeDuration > 0 && opEdRegions.map(({ start, end, type }) => (
+                  <div
+                     key={`op-ed-${start}-${end}`}
+                     class={`player-seek-op-ed player-seek-op-ed-${type}`}
+                     style={{ left: `${(start / episodeDuration) * 100}%`, width: `${((end - start) / episodeDuration) * 100}%` }}
+                     aria-hidden="true"
+                  />
+               ))}
                {episodeDuration > 0 &&
                   chapters
                      .filter((c) => c.time > 0.5 && c.time < episodeDuration - 0.5)
