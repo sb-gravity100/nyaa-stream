@@ -1,3 +1,11 @@
+### `6b89ee3` · 2026-11-01 · chore: sbtl v0.2.0
+- `crates/sbtl-engine/Cargo.toml`
+- `docs/planning/ARCHITECTURE.md`
+- `native/sbtl/README.md`
+- `native/sbtl/VERSION`
+- `native/sbtl/sbtl.dll`
+- `native/sbtl/sbtl_import.lib`
+
 ### `e48f2f2` · 2026-11-01 · feat: trace next episode startup time
 - `FILE_INDEX.md`
 - `PHASES.md`
