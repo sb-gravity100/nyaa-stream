@@ -17,7 +17,7 @@ sbtl torrent streaming, embedded libmpv playback and an HLS fallback.
 |---|---|---|
 | v0.5.8 | Implemented pre-v0.6.0 work | Published |
 | v0.6.0 | Subtitle styling/smoothing plus context menus, custom magnets, artwork, thumbnails, seek previews, updates and bespoke installer | Published 2026-10-30; SB waived remaining Windows acceptance and deferred Fribb licensing; live-swarm and manual magnet acceptance remain open |
-| v0.7.0 | Custom libmpv and direct sbtl streaming first, then subtitle rendering, memory profiling, batch transitions, preload timing, seek dragging and player/settings accessibility | P0 direct `sbtl://` stream callback is implemented and pinned to published sbtl 0.2.0; a cleared-cache A/B is promising but not conclusive; indexed-bitrate read-ahead, speed-scaled window and app-side seek prefetch are implemented; mpv buffer-property/cache-pause hooks and broader runtime measurements remain pending; batch torrent/file reuse and season-aware handoff implemented |
+| v0.7.0 | Custom libmpv and direct sbtl streaming first, then subtitle rendering, memory profiling, batch transitions, preload timing, seek dragging and player/settings accessibility | P0 direct `sbtl://` stream callback is implemented and pinned to published sbtl 0.2.0; a cleared-cache A/B is promising but not conclusive; indexed-bitrate read-ahead, speed-scaled window and app-side seek prefetch are implemented; playback/mpv logging coverage is being improved; mpv buffer-property/cache-pause hooks and broader runtime measurements remain pending; batch torrent/file reuse and season-aware handoff implemented |
 | v0.8.0 | Navigation/Home rehaul and Discover | Planned |
 | v1.0.0 | Stabilization and 32-bit Windows | Planned |
 | v1.1.0 | Binge Mode | Idea; not implementation-ready |
@@ -172,6 +172,19 @@ See [detailed specification](docs/planning/PLAYBACK.md).
 ## Load profiler (planned, v0.4.0 - patch: diagnostics)
 
 See [detailed specification](docs/planning/PLAYBACK.md).
+
+## Playback and mpv logging coverage (planned, v0.7.0 - patch: diagnostics)
+
+Problem: playback traces span the frontend, Tauri commands, torrent readers and
+libmpv, while mpv currently forwards only warning-level messages. This makes
+start, seek, cancellation, fallback and decode failures hard to connect.
+
+Fix: log player command categories, state transitions, stream lifecycle and
+read/seek outcomes, libmpv messages/events, and frontend event/error branches
+with shared playback correlation fields. Redact sensitive command values and
+credentials; rate-limit repetitive high-frequency records while retaining a
+suppression count. This is a diagnostics patch within v0.7.0, with no feature
+version change.
 
 ## 32-bit Windows support (planned, v1.0.0 - minor: new target)
 
