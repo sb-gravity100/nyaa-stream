@@ -1,3 +1,8 @@
+### `e3b5c13` · 2026-11-01 · perf: adapt sbtl window to indexed bitrate
+- `crates/sbtl-engine/src/torrent.rs`
+- `PLAN.md`
+- `PHASES.md`
+- `docs/planning/ROADMAP.md`
 ### `6b89ee3` · 2026-11-01 · chore: sbtl v0.2.0
 - `crates/sbtl-engine/Cargo.toml`
 - `docs/planning/ARCHITECTURE.md`
