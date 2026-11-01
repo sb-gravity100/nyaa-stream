@@ -3781,3 +3781,21 @@ Commit log, newest first. Prepend a new entry after every commit.
 ### `e8907a7` · 2026-11-01 · docs: separate sbtl and mpv milestone ownership
 - `PHASES.md`
 - `docs/planning/ROADMAP.md`
+### `9ac7e8e` · 2026-11-01 · feat: stream torrents directly into mpv
+- `FILE_INDEX.md`
+- `PHASES.md`
+- `PLAN.md`
+- `crates/mpv-player/src/embedded.rs`
+- `crates/mpv-player/src/lib.rs`
+- `crates/mpv-player/src/libmpv.rs`
+- `crates/mpv-player/src/stream.rs`
+- `crates/sbtl-engine/src/lib.rs`
+- `crates/sbtl-engine/src/torrent.rs`
+- `crates/torrent-engine/src/lib.rs`
+- `crates/torrent-engine/src/resume_buffer.rs`
+- `docs/planning/ARCHITECTURE.md`
+- `docs/planning/ROADMAP.md`
+- `src-tauri/src/lib.rs`
+- `src-tauri/src/player.rs`
+- `src/PlayerView.tsx`
+- `src/types.ts`
