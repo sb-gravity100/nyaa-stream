@@ -39,6 +39,8 @@ struct AppState {
     /// The player process itself (embedded mpv) is tracked separately, in
     /// `player::PlayerState`.
     current_torrent: Mutex<Option<TorrentId>>,
+    /// Resolved metadata for the active torrent, reused on batch episode changes.
+    current_files: Mutex<Option<(TorrentId, Vec<TorrentFile>)>>,
     /// Bumped by every `stop_playback`/`play_magnet`: a deferred removal only
     /// goes ahead if nothing bumped it since (see `stop_playback`).
     stop_generation: std::sync::atomic::AtomicU64,
@@ -1441,12 +1443,22 @@ async fn play_magnet(
     // The HLS URL is only for the fallback player: raw container bytes
     // aren't reliably playable in a browser <video> element (see
     // torrent-engine's hls_playlist_handler), while mpv reads them fine.
-    let started = std::time::Instant::now();
-    let files = state.torrent_engine.files(&added.id).await.map_err(|err| {
-        tracing::error!(%title, torrent_id = %added.id, %err, "play_magnet failed to get file list");
-        err.to_string()
-    })?;
-    mark("metadata", Some(started.elapsed()), None);
+    let cached_files = state.current_files.lock().await.clone();
+    let files = if let Some((cached_id, files)) = cached_files.filter(|(id, _)| id == &added.id) {
+        tracing::debug!(torrent_id = %cached_id, file_count = files.len(), "play_magnet reusing resolved file list");
+        mark("file_list_reused", None, Some(format!("{} files", files.len())));
+        files
+    } else {
+        let started = std::time::Instant::now();
+        let files = state.torrent_engine.files(&added.id).await.map_err(|err| {
+            tracing::error!(%title, torrent_id = %added.id, %err, "play_magnet failed to get file list");
+            err.to_string()
+        })?;
+        mark("metadata", Some(started.elapsed()), None);
+        *state.current_files.lock().await = Some((added.id.clone(), files.clone()));
+        tracing::debug!(torrent_id = %added.id, file_count = files.len(), "play_magnet cached resolved file list");
+        files
+    };
     let default_file_idx = largest_video_file(&files).unwrap_or(0);
     state.download_cache.touch(&added.id, &title, &files, episode.as_deref());
     let buffered = resume::attach(&state.torrent_engine, &added.id, &files).await;
@@ -1561,6 +1573,12 @@ const FILE_RELEASE_DELAY: Duration = Duration::from_secs(2);
 /// its cap.
 async fn cleanup_playback(state: &Arc<AppState>, keep_storyboard: bool) {
     if let Some(torrent_id) = state.current_torrent.lock().await.take() {
+        let mut cached_files = state.current_files.lock().await;
+        if cached_files.as_ref().is_some_and(|(id, _)| id == &torrent_id) {
+            cached_files.take();
+            tracing::debug!(%torrent_id, "cleanup_playback cleared resolved file list");
+        }
+        drop(cached_files);
         if let Err(err) = state.torrent_engine.remove(torrent_id.clone()).await {
             tracing::warn!(torrent_id = %torrent_id, %err, "cleanup_playback: failed to remove torrent");
         }
@@ -2040,6 +2058,7 @@ pub fn run() {
             ),
             torrent_engine,
             current_torrent: Mutex::new(None),
+            current_files: Mutex::new(None),
             stop_generation: Default::default(),
             thumbnail_cache_dir,
             anime_lists,
