@@ -85,6 +85,9 @@ embedded-player ABI and HLS fallback still work.
 
 **v0.7.0 batch transitions, next-episode preload, and seek dragging
 (requested 2026-10-29).**
+- The next episode now starts a two-second idle cursor timer when the mpv or
+  HLS player mounts, including transitions started with `N`; verify the cursor
+  hides in the running app after the timeout.
 - Improve next-episode loading from batch sources: reuse the active torrent,
   resolved file list, and verified downloaded data rather than removing and
   re-adding the batch. Resolve the next episode by its season/episode mapping,

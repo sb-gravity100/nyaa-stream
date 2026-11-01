@@ -17,6 +17,9 @@ step when cutting a release.
 ### Changed
 - Embedded mpv defaults to rendering ASS subtitles at 2× window resolution and downsampling to video resolution before blending; independent subtitle scaling, antialiasing and blur controls are applied by the custom renderer.
 
+### Fixed
+- The mouse cursor hides after its idle timeout when `N` opens the next episode.
+
 ## [0.6.0] - 2026-10-30
 
 ### Added

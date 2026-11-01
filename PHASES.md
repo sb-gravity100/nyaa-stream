@@ -125,6 +125,9 @@ The checklist below groups related work and does not override this order.
       the staged `src-tauri/lib/` path.
 - [ ] Verify staged candidate playback and clip export through the full
       nyaa-stream app UI
+- [~] Start the mouse cursor idle timer when the next episode mounts in mpv or
+      HLS, including the `N` transition; verify in the app that it hides after
+      two seconds.
 - [x] Enable only D3D11VA/D3D11VA2 decoding for H.264, HEVC and AV1; rebuild
       separate FFmpeg and libmpv. On this GPU `hwdec-current` selects
       `d3d11va-copy` for H.264/HEVC; AV1 loads through software fallback.

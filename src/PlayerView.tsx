@@ -991,6 +991,11 @@ function MpvPlayerView({
       }, CONTROLS_IDLE_MS);
    }
 
+   useEffect(() => {
+      console.debug("[player] starting cursor idle timer for episode");
+      showCursorAndRestartTimer();
+   }, []);
+
    function hideControlsImmediately() {
       hoveringControlsRef.current = false;
       window.clearTimeout(idleTimerRef.current);

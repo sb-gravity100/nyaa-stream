@@ -902,6 +902,11 @@ export function HlsPlayerView({
       setCursorHidden(true);
    }
 
+   useEffect(() => {
+      console.debug("[player] starting cursor idle timer for HLS episode");
+      idleTimerRef.current = window.setTimeout(hideControlsIfIdle, CONTROLS_IDLE_MS);
+   }, []);
+
    function togglePlaylist() {
       setMenu(null);
       setPlaylistOpen((current) => {
