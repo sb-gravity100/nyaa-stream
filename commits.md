@@ -1,3 +1,8 @@
+### `5918e10` · 2026-11-01 · feat: reuse resolved batch metadata
+- `src-tauri/src/lib.rs`
+- `PHASES.md`
+- `docs/planning/ROADMAP.md`
+
 ### `30c8c9f` · 2026-11-01 · feat: smooth mpv overlay subtitles
 - `CHANGELOG.md`
 - `PHASES.md`
