@@ -42,6 +42,8 @@ export type SubtitleDownscaler = "mitchell" | "bicubic";
 
 /** Embedded mpv's ASS-only overlay sampling. HLS keeps its JASSUB renderer. */
 export interface MpvSubtitleRendering {
+  /** Blend with the video or draw as a separate window overlay. */
+  composition: "video" | "overlay";
   /** Render at video resolution or at 2× window resolution, then downsample. */
   resolution: "video" | "window";
   upscale: SubtitleUpscaler;
@@ -53,13 +55,14 @@ export interface MpvSubtitleRendering {
 }
 
 export const DEFAULT_MPV_SUBTITLE_RENDERING: MpvSubtitleRendering = {
-  resolution: "window",
-  upscale: "ewa_lanczos",
-  downscale: "mitchell",
-  videoAntialias: true,
-  videoBlur: 1.6,
-  windowAntialias: true,
-  windowBlur: 1.12,
+  composition: "video",
+  resolution: "video",
+  upscale: "bicubic",
+  downscale: "bicubic",
+  videoAntialias: false,
+  videoBlur: 0,
+  windowAntialias: false,
+  windowBlur: 0,
 };
 
 export type PreferredResolution = "any" | "2160" | "1080" | "720" | "480";

@@ -405,7 +405,7 @@
     {
       "package": "mpv",
       "file": "native/mpv/patches/mpv-ass-overlay-sampling.patch",
-      "sha256_lf": "b8a2f00e1a188fd2164fef8c9f50f0acf9d4960b0ecdfbb4047e3a2df6aee657",
+      "sha256_lf": "bac212d4906131f71d027165ff33a14600611f7cc21021283b47d3294eabb6bb",
       "reason": "Register independent ASS filters and render window-mode ASS at 2x before downsampling to the video frame",
       "apply_to": "mpv"
     },
@@ -445,5 +445,5 @@
       "apply_to": "ffmpeg"
     }
   ],
-  "source_audit_status": "Pinned source closure and seven native patches verified; full separate-FFmpeg/x64 libmpv pipeline built and D3D11VA/D3D11VA2 enabled only for H.264, HEVC and AV1; candidate staged with MSVC/Vulkan sidecars and previous DLL preserved. API/options, H.264/AAC and AV1 software playback, subtitle-burned x264/AAC export, 2x ASS supersampling at 720p-in-1080p and 1080p, Rust EmbeddedMpv and encode_clip passed. Headless auto-safe probes selected d3d11va-copy for H.264/HEVC; AV1 used software fallback on this GPU. Full Tauri UI, clean-Windows dependencies, live missing-piece A/B, other subtitle controls and wider GPU/AV1 hardware coverage remain pending."
+  "source_audit_status": "Pinned source closure and seven native patches verified; separate-FFmpeg/x64 libmpv pipeline rebuilt and D3D11VA/D3D11VA2 retained only for H.264, HEVC and AV1. With video uses custom ASS filters; Overlay uses mpv's native window overlay. Both modes rendered visible ASS in a 1920x1080 gpu-next probe. Candidate SHA-256 A36ABF7B80FC010A3EE7A7D55CABF782A8BC055073032DF64C64DEDEA038810F is staged with MSVC/Vulkan sidecars; prior DLL is backed up. Earlier API/options, codec playback, subtitle-burned export, supersampling, Rust EmbeddedMpv/encode_clip, and H.264/HEVC D3D11VA probes passed. Full Tauri UI, clean-Windows dependencies, live missing-piece A/B, other subtitle controls and wider GPU/AV1 coverage remain pending."
 }

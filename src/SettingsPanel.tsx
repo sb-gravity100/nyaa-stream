@@ -940,6 +940,19 @@ yaa-stream screenshots.">
             <div class="setting-subsection">
               <h4>Embedded mpv ASS rendering</h4>
               <p class="settings-hint">These controls independently scale and smooth ASS edges when mpv uses gpu-next. HLS and the gpu fallback keep their standard subtitle output; clip export retains its ASS style.</p>
+              <Row label="Subtitle composition" hint="With video blends subtitles with the video. Overlay draws them separately at window resolution after video scaling.">
+                <select
+                  value={rendering.composition}
+                  onChange={(event) => updateSettings({ subtitleRendering: { ...rendering, composition: (event.currentTarget as HTMLSelectElement).value as typeof rendering.composition } })}
+                >
+                  <option value="video">With video</option>
+                  <option value="overlay">Overlay</option>
+                </select>
+              </Row>
+              {rendering.composition === "overlay" ? (
+                <p class="settings-hint">Overlay uses mpv's native window-resolution subtitle renderer. The video-stage ASS controls stay saved for switching back.</p>
+              ) : (
+                <>
               <Row label="Render resolution" hint="Video resolution renders subtitles at video size. 2× window renders ASS at twice the window resolution, then downsamples to video resolution before blending.">
                 <select
                   value={rendering.resolution}
@@ -983,6 +996,8 @@ yaa-stream screenshots.">
               <Row label={`Window-resolution ASS blur (${rendering.windowBlur.toFixed(1)})`}>
                 <input type="range" min={0} max={2} step={0.1} value={rendering.windowBlur} onInput={(event) => updateSettings({ subtitleRendering: { ...rendering, windowBlur: Number((event.currentTarget as HTMLInputElement).value) } })} />
               </Row>
+                </>
+              )}
               <div class="settings-inline-actions">
                 <button class="link-button" onClick={() => updateSettings({ subtitleRendering: DEFAULT_MPV_SUBTITLE_RENDERING })}>
                   Reset ASS rendering

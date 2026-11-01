@@ -21,12 +21,12 @@
          .ontop_level = -1,
          .timing_offset = 0.050,
          .swapchain_depth = 2,
-+        .ass_scale = 0,
-+        .ass_dscale = 0,
-+        .ass_aa = true,
-+        .ass_blur = 1.6,
-+        .wns_ass_aa = true,
-+        .wns_ass_blur = 1.12,
++        .ass_scale = 2,
++        .ass_dscale = 1,
++        .ass_aa = false,
++        .ass_blur = 0.0,
++        .wns_ass_aa = false,
++        .wns_ass_blur = 0.0,
          .focus_on = 1,
      },
  };
@@ -126,12 +126,13 @@
                  .color = {
                      (c >> 24) / 255.0f,
                      ((c >> 16) & 0xFF) / 255.0f,
-@@ -379,6 +421,39 @@
+@@ -379,6 +421,40 @@
              },
              .coords = coords,
          };
 +
-+        if (item->format == SUBBITMAP_LIBASS && res.w > 0 && res.h > 0 &&
++        if (item->format == SUBBITMAP_LIBASS &&
++            coords == PL_OVERLAY_COORDS_SRC_CROP && res.w > 0 && res.h > 0 &&
 +            vo->dwidth > 0 && vo->dheight > 0) {
 +            const bool window_scale = sub_opts->ass_scale_with_window;
 +            const bool upscale = supersample
@@ -166,7 +167,7 @@
  
          switch (item->format) {
          case SUBBITMAP_BGRA:
-@@ -2132,6 +2207,8 @@
+@@ -2132,6 +2208,8 @@
      struct priv *p = vo->priv;
      p->opts_cache = m_config_cache_alloc(p, vo->global, &gl_video_conf);
      p->next_opts_cache = m_config_cache_alloc(p, vo->global, &gl_next_conf);

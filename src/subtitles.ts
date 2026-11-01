@@ -206,22 +206,31 @@ export async function mpvSubtitleSettings(
   return settings;
 }
 
-/** Translates Settings preferences to the custom embedded mpv VO options. */
+/** Selects mpv's subtitle composition path and custom video-stage ASS options. */
 export async function mpvSubtitleRenderingSettings(
   mpv: MpvSubtitleTarget,
   rendering: MpvSubtitleRendering,
 ): Promise<Record<string, string | number | boolean>> {
-  console.debug("[subtitles] preparing mpv ASS rendering options", { resolution: rendering.resolution });
+  console.debug("[subtitles] preparing mpv ASS rendering options", { composition: rendering.composition, resolution: rendering.resolution });
   try {
     const currentVo = String(await mpv.getProperty("current-vo") ?? "");
     if (currentVo !== "gpu-next") {
-      console.debug("[subtitles] independent ASS sampling requires gpu-next", { currentVo });
+      console.debug("[subtitles] subtitle composition requires gpu-next", { currentVo });
       return {};
     }
+  } catch (error) {
+    console.debug("[subtitles] cannot inspect the current mpv renderer", { error: String(error) });
+    return {};
+  }
+  if (rendering.composition === "overlay") {
+    console.debug("[subtitles] selecting window overlay composition");
+    return { "blend-subtitles": "no", "sub-ass-scale-with-window": true };
+  }
+  try {
     await mpv.getProperty("ass-scale");
   } catch (error) {
-    console.debug("[subtitles] independent ASS renderer options are unavailable in this libmpv", { error: String(error) });
-    return {};
+    console.debug("[subtitles] custom ASS filters unavailable; using mpv video composition", { error: String(error) });
+    return { "blend-subtitles": "video" };
   }
   return {
     "blend-subtitles": "video",

@@ -1,10 +1,11 @@
 # v0.7.0 custom libmpv native build recipe
 
 Status: the locked full build pipeline completed successfully, and the x64
-candidate with selected D3D11VA/D3D11VA2 decoders is staged in `src-tauri/lib/`
+candidate with selected D3D11VA/D3D11VA2 decoders and selectable subtitle
+composition is staged in `src-tauri/lib/`
 with its MSVC/Vulkan runtime DLLs. The upstream DLL remains backed up at
 `target/mpv-build/app-bundle-original/`; the previous custom candidate is at
-`target/mpv-build/app-bundle-pre-d3d11va/`.
+`target/mpv-build/app-bundle-pre-composition/`.
 Runtime checks passed for API/options, H.264/AAC and AV1 playback, and the
 subtitle-burned x264/AAC export. A controlled 1080p `gpu-next` window check
 confirmed visible subtitles and a visible ASS blur change. Through the Rust
@@ -14,11 +15,15 @@ image comparisons both kept subtitles visible; the supersampling mode changed
 24,130 and 18,382 pixels in the subtitle regions, respectively. The Rust
 `encode_clip` path produced a 1920×1080 H.264/AAC MP4 with the subtitle visibly
 burned in. A package-layout probe confirmed that Vulkan/MSVCP/VCRUNTIME140_1
-load from `src-tauri/lib/` and VCRUNTIME140 loads beside the executable. Full
+load from `src-tauri/lib/` and VCRUNTIME140 loads beside the executable.
 Headless runtime checks with `hwdec=auto-safe` selected `d3d11va-copy` for the
 H.264 and HEVC samples; the AV1 sample loaded with software fallback. The FFmpeg
 config confirms only D3D11VA/D3D11VA2 components for H.264, HEVC and AV1 are
-enabled. Full Tauri UI playback/export, clean-Windows dependency behavior, other
+enabled. A 1920×1080 gpu-next runtime probe with an ASS subtitle accepted both
+`blend-subtitles=video` and `blend-subtitles=no`, rendered visible text in both
+captures, and produced different output. Candidate/staged DLL SHA-256:
+`A36ABF7B80FC010A3EE7A7D55CABF782A8BC055073032DF64C64DEDEA038810F`.
+Full Tauri UI playback/export, clean-Windows dependency behavior, other
 subtitle controls/display modes, and wider GPU/AV1 hardware coverage remain
 unverified. The custom build's primary playback
 goal remains improving torrent data delivery into mpv. A first headless A/B on
@@ -149,8 +154,8 @@ Docker, MinGW binaries or a prebuilt full-featured DLL if it fails.
   current rendering behavior against the recorded baseline.
 - Independent ASS filtering and true 2× window supersampling are implemented in
   the locked native patches `mpv-ass-overlay-sampling.patch` and
-  `libplacebo-ass-overlay-sampling.patch`. When the custom options are available,
-  `src/subtitles.ts` selects `blend-subtitles=video`. gpu-next rasterizes ASS at
+  `libplacebo-ass-overlay-sampling.patch`. The With video composition selects
+  `blend-subtitles=video`. gpu-next rasterizes ASS at
   2× the window OSD size, downsamples the mask into a video-resolution texture
   with the selected filter, then maps it onto the source-sized overlay. The
   build recipe syncs the separately locked libplacebo source into mpv's Meson
@@ -184,6 +189,15 @@ Docker, MinGW binaries or a prebuilt full-featured DLL if it fails.
   `ass-*`/`wns-*` examples in mpv issue 2820 were not options in mpv v0.41.0;
   the locked native patches register and implement the selected controls.
   HLS keeps its existing 1.5x JASSUB path and does not consume these controls.
+  SB selected the 0.7.0 default profile on 2026-11-01: render ASS at video
+  resolution, use Bicubic for upscaling and downscaling, disable both edge
+  antialias switches, and set both blur values to 0.0. Keep existing saved
+  rendering choices; the 2× window mode remains selectable.
+  Add a Subtitle composition choice: With video remains the default and uses
+  the custom video-stage ASS filters; Overlay selects `blend-subtitles=no` and
+  mpv's native window-resolution subtitle overlay after video scaling. The
+  custom ASS filters are bypassed in Overlay mode. Both choices retain authored
+  ASS layout and the existing HLS/clip-export paths.
 - Keep saved-frame screenshots aligned with the embedded playback renderer.
   Subtitle-burned clip export retains the selected ASS track/style, without
   claiming the playback-only overlay filters apply in encode mode.
@@ -268,6 +282,11 @@ broader codec/media coverage remain pending.
   and HEVC samples; both reported `hwdec-current=no` for the 1 s AV1 sample.
   This verifies D3D11VA integration for two codecs and software fallback for
   AV1 on this machine, not AV1 hardware support.
+- Composition probe used the rebuilt candidate with a 1920×1080 ASS sample in
+  gpu-next. Both video-stage and window-overlay modes selected the subtitle
+  track and rendered its text; captures are in `target/mpv-build/test-media/`.
+  The previous custom DLL (`95951D6A5C9548612C6F28730F1EDF9DB944A12EA1BC3617D6BBCDA64FE01385`)
+  is backed up under `target/mpv-build/app-bundle-pre-composition/`.
 - Reproduce E-AC-3 errors after seeks, Matroska parsing/queue warnings and four
   audio underruns from that log. Establish downloaded-input versus live-torrent
   behavior before attributing failures or improvements to the new DLL.

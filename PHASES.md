@@ -155,14 +155,18 @@ The checklist below groups related work and does not override this order.
 - [x] Implement true window-resolution ASS supersampling for the app's
       `blend-subtitles=video` path: rasterize the subtitle overlay at 2× window
       resolution, downsample its mask to video resolution with the selected
-      downscaler, then blend it with the video frame. This is the default for
-      new installs; saved user selections are preserved.
+      downscaler, then blend it with the video frame. SB later selected video
+      resolution and Bicubic as the default; 2× remains selectable and saved
+      user selections are preserved.
 - [x] Verify the supersampling path with 720p video in a 1080p window and with
       native 1080p video; both modes kept subtitles visible and produced distinct
       subtitle-region pixels. Retain comparison captures under `target/`.
 - [ ] Verify both subtitle-resolution modes, all scale/dscale and AA controls,
       high-DPI, fullscreen and app screenshots; clip export keeps its current
       ASS encode path.
+- [~] Add With video / Overlay subtitle composition to embedded mpv Settings;
+      the revised 0.7.0 defaults are applied, the locked DLL rebuilt, and both
+      modes rendered ASS in a gpu-next probe. Full app UI verification remains.
 - [ ] Record current bundled libmpv identity/options and a baseline for ASS
       edge quality, E-AC-3 playback, seek latency, and hardware decoding
 - [x] Inspect `msedgewebview2.DMP` structure: about 2.56 GiB captured and
