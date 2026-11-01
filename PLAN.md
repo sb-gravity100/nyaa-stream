@@ -187,6 +187,19 @@ Each app run starts a new UTC timestamped log file, with the seven most recent
 run files retained. This is a diagnostics patch within v0.7.0, with no feature
 version change. `cargo check --workspace` and `npm run build` pass.
 
+## Direct sbtl buffer control in mpv (planned, v0.7.0 patch: playback)
+
+Problem: mpv currently sees direct sbtl reads only as a blocking custom stream,
+so its cache-pause decisions and the player UI cannot use sbtl's verified
+playback-time buffer as their source of truth. Pausing also leaves sbtl's
+read-ahead policy unchanged.
+
+Fix: add a locked custom-libmpv stream interface that exposes sbtl buffer
+snapshots without linking mpv to sbtl or consuming sbtl's event queue. Drive
+`sbtl-buffer` and cache pause from the same readiness thresholds; forward
+playback pause changes to the active sbtl stream while keeping the app as the
+single event consumer. Retain the public callback/HTTP paths as fallbacks.
+
 ## 32-bit Windows support (planned, v1.0.0 - minor: new target)
 
 See [detailed specification](docs/planning/ROADMAP.md).
