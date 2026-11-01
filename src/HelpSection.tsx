@@ -139,7 +139,7 @@ export function HelpSection() {
   const [modal, setModal] = useState<"contact" | "logs" | null>(null);
   const close = () => setModal(null);
   return (
-    <section class="settings-section">
+    <section class="settings-section" id="settings-help" data-settings-section="help">
       <h3>Help</h3>
       <div class="setting-row">
         <span class="setting-text">

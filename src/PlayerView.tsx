@@ -23,6 +23,7 @@ import { getSettings as getSettingsSnapshot, useSettings } from "./settings";
 import { applyMpvSubtitleStyle, mpvSubtitleSettings, defaultSubtitleIndex, isStyledTrack, subtitleTrackLabel } from "./subtitles";
 import { COMPLETED_FRACTION, MIN_RESUME_SECONDS, getProgress, resumePosition, saveProgress } from "./watchProgress";
 import { PlayerPlaylist, type PlaylistItem } from "./PlayerPlaylist";
+import { PlayerShortcutsDialog } from "./PlayerShortcuts";
 import { copyToClipboard, openContextMenu, openNyaaPage } from "./contextMenuStore";
 import {
   BackIcon,
@@ -67,9 +68,9 @@ const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
  * standard anime OP length. */
 const INTRO_SKIP_SECONDS = 90;
 const INTRO_CHAPTER = /^(op|opening|intro)\b|\bopening\b/i;
+const ENDING_CHAPTER = /^(ed|ending|outro)\b|\bending\b/i;
+const GENERIC_OPENING_CHAPTER = /^chapter\s*[12]$/i;
 const PROGRESS_SAVE_MS = 5000;
-// Countdown shown before auto-starting the next episode.
-const AUTOPLAY_NEXT_SECONDS = 8;
 const VOLUME_STORAGE_KEY = "nyaa-stream:volume";
 const REMAINING_STORAGE_KEY = "nyaa-stream:show-remaining";
 
@@ -340,12 +341,19 @@ function MpvPlayerView({
    // mousemove through React state re-rendered the whole player per event,
    // so the tooltip trailed behind the cursor.
    const seekTooltipRef = useRef<HTMLDivElement>(null);
+   const autoSkipChapterRef = useRef<((time: number) => void) | null>(null);
+   const autoSkippedChaptersRef = useRef(new Set<string>());
    const storyboardHoverTimerRef = useRef<number | null>(null);
    const storyboardHoverTokenRef = useRef(0);
    const [volume, setVolumeState] = useState(loadVolume);
    const [muted, setMuted] = useState(false);
    const [menu, setMenu] = useState<Menu>(null);
    const [playlistOpen, setPlaylistOpen] = useState(false);
+   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+   const shortcutsReturnFocusRef = useRef<HTMLElement | null>(null);
+   const popupOpenRef = useRef(false);
+   const popupWasOpenRef = useRef(false);
+   popupOpenRef.current = menu != null || playlistOpen || shortcutsOpen;
    // Stable so the memoized PlayerPlaylist skips the ~4Hz re-renders
    // that timeupdate drives through this component.
    const selectFromPlaylist = useCallback(
@@ -402,7 +410,6 @@ function MpvPlayerView({
    const [exportSaved, setExportSaved] = useState<string | null>(null);
    const [exportError, setExportError] = useState<string | null>(null);
    const [toast, setToast] = useState<string | null>(null);
-   const [nextCountdown, setNextCountdown] = useState<number | null>(null);
    const idleTimerRef = useRef<number | undefined>(undefined);
    const cursorIdleTimerRef = useRef<number | undefined>(undefined);
    const toastTimerRef = useRef<number | undefined>(undefined);
@@ -411,8 +418,6 @@ function MpvPlayerView({
    const hoveringControlsRef = useRef(false);
    const menuRef = useRef<HTMLDivElement>(null);
    // For the idle timer, which outlives the render that scheduled it.
-   const menuOpenRef = useRef(false);
-   menuOpenRef.current = menu != null;
    // Resume target in source time, captured once per episode.
    const resumeAtRef = useRef<number | null>(
       settings.resumePlayback ? resumePosition(anime.id, progressKey) : null,
@@ -490,6 +495,7 @@ function MpvPlayerView({
 
    function showPlayerContextMenu(event: MouseEvent) {
       const video = videoRef.current;
+      shortcutsReturnFocusRef.current = rootRef.current;
       console.debug("[player] open surface context menu", { hasVideo: video !== null, ready: video?.readyState ?? 0, hasStats: stats !== null });
       openContextMenu(event, [
          { label: paused ? "Play" : "Pause", action: () => {
@@ -502,6 +508,7 @@ function MpvPlayerView({
          { label: "Copy frame", disabled: !video || video.readyState < 2, action: () => copyFrame() },
          { label: "Save screenshot", disabled: !video || video.readyState < 2, action: () => saveFrame() },
          { label: "Statistics", disabled: !stats, action: () => { setPlaylistOpen(false); setMenu("stats"); } },
+         { label: "Keyboard shortcuts", action: () => { setMenu(null); setPlaylistOpen(false); setShortcutsOpen(true); } },
          { separator: true },
          { label: pip ? "Exit picture-in-picture" : "Picture-in-picture", action: () => togglePip() },
          { label: fullscreen ? "Exit fullscreen" : "Fullscreen", action: () => toggleFullscreen() },
@@ -606,7 +613,6 @@ function MpvPlayerView({
       setChapters([]);
       setLoopA(null);
       setLoopB(null);
-      setNextCountdown(null);
    }, [selectedFile?.streamUrl]);
 
    // Latest values for the unmount capture below.
@@ -628,7 +634,10 @@ function MpvPlayerView({
       const on = (type: string, handler: () => void) => video.addEventListener(type, handler);
       on("durationchange", () => setDuration(video.duration));
       on("loadedmetadata", () => setDuration(video.duration));
-      on("timeupdate", () => setPosition(video.currentTime));
+      on("timeupdate", () => {
+         setPosition(video.currentTime);
+         autoSkipChapterRef.current?.(video.currentTime);
+      });
       on("progress", updateBuffered);
       on("seeked", () => {
          updateBuffered();
@@ -866,24 +875,12 @@ function MpvPlayerView({
          setPreferredGroup(anime.id, group);
    }
 
-   // Next-episode countdown.
-   useEffect(() => {
-      if (nextCountdown == null) return;
-      if (nextCountdown <= 0) {
-         advanceToNext("autoplay");
-         return;
-      }
-      const timer = window.setTimeout(
-         () => setNextCountdown((n) => (n == null ? null : n - 1)),
-         1000,
-      );
-      return () => window.clearTimeout(timer);
-   }, [nextCountdown]);
-
    function handleEnded() {
       persistProgress();
-      if (onNext && settings.autoplayNext)
-         setNextCountdown(AUTOPLAY_NEXT_SECONDS);
+      if (onNext && settings.autoplayNext) {
+         console.info("[player] episode ended; starting next episode immediately");
+         advanceToNext("autoplay");
+      }
    }
    // For the mpv listener registered once at mount.
    const handleEndedRef = useRef(handleEnded);
@@ -909,6 +906,10 @@ function MpvPlayerView({
             console.debug("[player] pointer over controls area", { over });
          hoveringControlsRef.current = over;
          if (over) showControls();
+         else if (popupOpenRef.current) {
+            showCursorAndRestartTimer();
+            setControlsVisible(true);
+         }
          else {
             showCursorAndRestartTimer();
             hideControlsImmediately();
@@ -917,6 +918,7 @@ function MpvPlayerView({
 
       function handlePointerLeave() {
          console.debug("[player] pointer left window");
+         if (popupOpenRef.current) return;
          hideControlsImmediately();
       }
 
@@ -977,6 +979,10 @@ function MpvPlayerView({
       setCursorHidden(false);
       window.clearTimeout(cursorIdleTimerRef.current);
       cursorIdleTimerRef.current = window.setTimeout(() => {
+         if (popupOpenRef.current) {
+            showCursorAndRestartTimer();
+            return;
+         }
          console.debug("[player] pointer idle, hiding cursor");
          setCursorHidden(true);
       }, CONTROLS_IDLE_MS);
@@ -998,10 +1004,22 @@ function MpvPlayerView({
    function hideControlsIfIdle() {
       // Resting over the top/bottom bars, or with a menu open, keeps the
       // controls up; the next pointer move restarts this countdown.
-      if (hoveringControlsRef.current || menuOpenRef.current) return;
+      if (hoveringControlsRef.current || popupOpenRef.current) return;
       console.debug("[player] mouse idle, hiding controls");
       setControlsVisible(false);
    }
+
+   useEffect(() => {
+      if (popupOpenRef.current) {
+         popupWasOpenRef.current = true;
+         window.clearTimeout(idleTimerRef.current);
+         setControlsVisible(true);
+      } else if (popupWasOpenRef.current) {
+         popupWasOpenRef.current = false;
+         window.clearTimeout(idleTimerRef.current);
+         idleTimerRef.current = window.setTimeout(hideControlsIfIdle, CONTROLS_IDLE_MS);
+      }
+   }, [menu, playlistOpen, shortcutsOpen]);
 
    function togglePlaylist() {
       setMenu(null);
@@ -1011,11 +1029,15 @@ function MpvPlayerView({
       });
    }
 
+   function closeShortcuts() {
+      setShortcutsOpen(false);
+      requestAnimationFrame(() => (shortcutsReturnFocusRef.current ?? rootRef.current)?.focus());
+   }
+
    function skip(deltaSeconds: number) {
       const video = videoRef.current;
       if (!video || !episodeDuration) return;
       cancelPendingKeyboardSeek();
-      setNextCountdown(null);
       seekToEpisodeTime(
          Math.min(
             Math.max(
@@ -1121,7 +1143,6 @@ function MpvPlayerView({
       const value = seekValueAt(e);
       dragPreviewRef.current = null;
       console.debug("[player] seek bar commit", { value, from: videoRef.current?.currentTime });
-      setNextCountdown(null);
       setPosition(value);
       seekToEpisodeTime(value);
    }
@@ -1398,6 +1419,37 @@ function MpvPlayerView({
       }
       return null;
    }
+
+   function autoSkipChapterAt(time: number): void {
+      if (!settings.autoSkipOpEd || !episodeDuration || chapters.length === 0) return;
+      for (let i = 0; i < chapters.length; i++) {
+         const chapter = chapters[i];
+         const title = chapter.title.trim();
+         const end = chapters[i + 1]?.time ?? episodeDuration;
+         const length = end - chapter.time;
+         const reason = INTRO_CHAPTER.test(title)
+            ? "opening"
+            : ENDING_CHAPTER.test(title)
+              ? "ending"
+              : i < 2 && GENERIC_OPENING_CHAPTER.test(title) && length >= 85 && length <= 95
+                ? "opening"
+                : null;
+         if (!reason || time < chapter.time || time >= end - 0.5) continue;
+         const key = `${selectedFile?.index ?? -1}:${i}:${chapter.time}`;
+         if (autoSkippedChaptersRef.current.has(key)) return;
+         autoSkippedChaptersRef.current.add(key);
+         console.info("[player] auto-skip chapter", { reason, title, from: time, to: end, length });
+         showToast(reason === "opening" ? "Auto-skipped opening" : "Auto-skipped ending");
+         cancelPendingKeyboardSeek();
+         seekToEpisodeTime(end);
+         return;
+      }
+   }
+   autoSkipChapterRef.current = autoSkipChapterAt;
+
+   useEffect(() => {
+      autoSkippedChaptersRef.current.clear();
+   }, [selectedFile?.streamUrl]);
 
    /** Shift: jumps to the end of the opening chapter (see `openingFrom`);
     * only in a file with no opening marked, a fixed 90s. */
@@ -1779,7 +1831,8 @@ function MpvPlayerView({
    return (
       <div
          ref={rootRef}
-         class={`player-view${controlsVisible || menu ? " controls-shown" : ""}${playlistOpen ? " playlist-open" : ""}`}
+         class={`player-view${controlsVisible || menu || playlistOpen || shortcutsOpen ? " controls-shown" : ""}${playlistOpen ? " playlist-open" : ""}`}
+         tabIndex={-1}
          style={{ cursor: cursorHidden ? "none" : "auto" }}
          onContextMenu={showPlayerContextMenu}
       >
@@ -1894,32 +1947,10 @@ function MpvPlayerView({
             />
          )}
 
-         {hasPlayed && !error && nextCountdown == null && openingAt(position) && (
+         {hasPlayed && !error && openingAt(position) && (
             <button class="player-skip-intro" onClick={skipIntro}>
                Skip opening <kbd>Shift</kbd>
             </button>
-         )}
-
-         {nextCountdown != null && onNext && (
-            <div class="player-next-card">
-               <div
-                  class="player-next-progress"
-                  style={{ animationDuration: `${AUTOPLAY_NEXT_SECONDS}s` }}
-               />
-               <div class="player-next-label">Up next</div>
-               <div class="player-next-title">{nextLabel}</div>
-               <div class="player-next-actions">
-                  <button class="button button-primary" onClick={() => advanceToNext()}>
-                     Play now ({nextCountdown})
-                  </button>
-                  <button
-                     class="button button-quiet"
-                     onClick={() => setNextCountdown(null)}
-                  >
-                     Cancel
-                  </button>
-               </div>
-            </div>
          )}
 
          {renderedMenu && (
@@ -2110,6 +2141,8 @@ function MpvPlayerView({
             </div>
          )}
 
+         {shortcutsOpen && <PlayerShortcutsDialog onClose={closeShortcuts} />}
+
          {/* Always-present, invisible strips with the control bars'
           footprint: they're what the pointer hits while the bars are hidden
           (pointer-events:none), so resting there keeps the controls up -
@@ -2118,7 +2151,7 @@ function MpvPlayerView({
          <div class="player-controls-hover-zone player-top-hover-zone" />
 
          <div
-            class={`player-controls${controlsVisible || menu ? " visible" : ""}`}
+            class={`player-controls${controlsVisible || menu || playlistOpen || shortcutsOpen ? " visible" : ""}`}
          >
             <div
                class={`player-seek-wrap${episodeDuration ? " seekable" : ""}`}

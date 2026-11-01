@@ -81,6 +81,8 @@ export interface Settings {
   hardwareDecoding: boolean;
   /** Offer/auto-start the next episode when one ends. */
   autoplayNext: boolean;
+  /** Automatically skip chapter-marked openings and endings in embedded mpv. */
+  autoSkipOpEd: boolean;
   /** Remember the fansub group last played per anime and prefer it. */
   rememberFansubGroup: boolean;
   /** Fansub group/release tags to prefer, e.g. "ToonsHub CR": a release
@@ -137,6 +139,7 @@ export const DEFAULT_SETTINGS: Settings = {
   resumePlayback: true,
   hardwareDecoding: true,
   autoplayNext: true,
+  autoSkipOpEd: false,
   rememberFansubGroup: true,
   preferredFansubber: "",
   exportFolder: "",

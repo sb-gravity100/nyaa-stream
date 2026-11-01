@@ -16,6 +16,9 @@ export const CHANGELOG: ChangelogEntry[] = [
       "The tailored libmpv build includes D3D11VA/D3D11VA2 hardware decoders for H.264, HEVC and AV1, with software fallback when the device cannot decode a stream.",
       "Embedded mpv defaults to video-resolution ASS with Bicubic scaling, antialiasing off and blur 0.0. Subtitle composition can blend with video or draw a separate overlay; both paths support ASS filters and blur controls.",
       "Next-episode batch playback reuses resolved torrent files, chooses the matching season and episode, and falls back to another source when needed.",
+      "Settings are organized into keyboard-navigable sections, and the player context menu opens a shortcut reference.",
+      "Autoplay starts the next episode immediately. Player controls stay visible while a player popup is open.",
+      "Auto-Skip OP/ED can skip labeled mpv chapters; generic Chapter 1/2 chapters lasting 85–95 seconds are treated as openings. It is off by default.",
     ],
     fixes: [
       "The mouse cursor hides after its idle timeout when N opens the next episode.",

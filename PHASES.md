@@ -151,6 +151,18 @@ The checklist below groups related work and does not override this order.
       the final target on release; handle cancel, unknown duration and source changes
 - [ ] Verify mpv/HLS scrubbing in fullscreen, paused/backward/undownloaded seeks,
       keyboard seeking, and rejection of stale seek completions
+- [x] Reorganize Settings into accessible sections with a section sidebar,
+      keyboard focus handling and deep links; manual keyboard and small-window
+      verification remains pending.
+- [x] Add the shared, focus-trapped player shortcuts dialog to both mpv and HLS
+      player context menus; manual app verification remains pending.
+- [x] Start the next episode immediately on end when autoplay is enabled;
+      retain the setting to disable autoplay; verify in the app.
+- [x] Add Auto-Skip OP/ED (off by default): skip mpv chapters labeled OP/ED or
+      Opening/Ending/Intro/Outro; recognize generic Chapter 1/2 chapters lasting
+      85–95 seconds as likely OPs. HLS chapter extraction is not implemented.
+- [x] Keep player controls visible while the Statistics, Sources, Subtitles or
+      Episodes popup is open in both mpv and HLS; verify in the app.
 - [x] Implement independent ASS overlay filters and AA/blur options in the
       locked mpv gpu-next/libplacebo source patches; source application and hashes
       verified and compiled in the candidate DLL.

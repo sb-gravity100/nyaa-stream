@@ -9,6 +9,7 @@ import { CloseIcon } from "./icons";
 import { exportBackup, importBackup } from "./backup";
 import { applyPreparedUpdate, checkForUpdate, getUpdateState, prepareUpdate, subscribeUpdateState, type UpdateState } from "./updater";
 import { HelpSection } from "./HelpSection";
+import { PlayerShortcutsList } from "./PlayerShortcuts";
 import { saveProviderCredentials, useProviderCredentials } from "./providerCredentials";
 import tmdbLogo from "./assets/tmdb-logo.svg";
 
@@ -17,6 +18,17 @@ interface Props {
   playbackActive?: boolean;
   showUpdates?: boolean;
 }
+
+const SETTINGS_SECTIONS = [
+  { id: "playback", label: "Playback" },
+  { id: "subtitles", label: "Subtitles" },
+  { id: "artwork", label: "Artwork" },
+  { id: "shortcuts", label: "Shortcuts" },
+  { id: "storage", label: "Storage" },
+  { id: "backup", label: "Backup & data" },
+  { id: "updates", label: "Updates" },
+  { id: "help", label: "Help" },
+] as const;
 
 // Fonts libass can resolve: the bundled default, plus common system fonts
 // found through the Local Font Access API (see assRenderer.ts's
@@ -126,7 +138,7 @@ function StorageSection() {
 
   if (!sizes) return null;
   return (
-    <section class="settings-section">
+    <section class="settings-section" id="settings-storage" data-settings-section="storage">
       <h3>Storage</h3>
       {downloads && (
         <div class="setting-row">
@@ -186,7 +198,7 @@ function UpdateSection({ playbackActive }: { playbackActive: boolean }) {
             : update ? `v${update.version} is available` : "Checks GitHub Releases";
 
   return (
-    <section class="settings-section" data-settings-updates="true">
+    <section class="settings-section" id="settings-updates" data-settings-section="updates" data-settings-updates="true">
       <h3>Updates</h3>
       <div class="setting-row">
         <span class="setting-text">
@@ -263,7 +275,7 @@ function BackupSection() {
   }
 
   return (
-    <section class="settings-section">
+    <section class="settings-section" id="settings-backup" data-settings-section="backup">
       <h3>Backup</h3>
       <div class="setting-row">
         <span class="setting-text">
@@ -686,7 +698,7 @@ function ArtworkProviderSection() {
   }
 
   return (
-    <section class="settings-section">
+    <section class="settings-section" id="settings-artwork" data-settings-section="artwork">
       <h3>Artwork providers</h3>
       <p class="setting-hint">Optional keys enable larger backdrops, logos and episode stills. Keys stay in this app profile and are excluded from backups.</p>
       <Row label="TMDB API Read Access Token" hint="Used for TMDB backdrops, logos and episode stills.">
@@ -729,6 +741,8 @@ export function SettingsPanel({ onClose, playbackActive = false, showUpdates = f
   const style = settings.subtitleStyle;
   const rendering = settings.subtitleRendering;
   const panelRef = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const [activeSection, setActiveSection] = useState<string>("playback");
   const [popularFansubbers, setPopularFansubbers] = useState<string[]>([]);
   const [defaultScreenshotFolder, setDefaultScreenshotFolder] = useState("");
 
@@ -748,20 +762,56 @@ export function SettingsPanel({ onClose, playbackActive = false, showUpdates = f
 
   useEffect(() => {
     panelRef.current?.focus();
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
   useEffect(() => {
-    if (showUpdates) panelRef.current?.querySelector("[data-settings-updates='true']")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    if (showUpdates) bodyRef.current?.querySelector("[data-settings-updates='true']")?.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [showUpdates]);
+
+  function handlePanelKeyDown(event: JSX.TargetedKeyboardEvent<HTMLDivElement>) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      onClose();
+      return;
+    }
+    if (event.key !== "Tab") return;
+    const focusable = Array.from(panelRef.current?.querySelectorAll<HTMLElement>(
+      "button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])",
+    ) ?? []).filter((element) => element.getClientRects().length > 0);
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last?.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first?.focus();
+    }
+  }
+
+  useEffect(() => {
+    const body = bodyRef.current;
+    if (!body) return;
+    const updateActiveSection = () => {
+      const sections = SETTINGS_SECTIONS.map(({ id }) => body.querySelector<HTMLElement>(`#settings-${id}`)).filter((section): section is HTMLElement => section != null);
+      const threshold = body.getBoundingClientRect().top + 24;
+      const current = [...sections].reverse().find((section) => section.getBoundingClientRect().top <= threshold) ?? sections[0];
+      if (current) setActiveSection(current.id.replace("settings-", ""));
+    };
+    body.addEventListener("scroll", updateActiveSection, { passive: true });
+    updateActiveSection();
+    return () => body.removeEventListener("scroll", updateActiveSection);
+  }, []);
+
+  function goToSection(id: string) {
+    console.info("[settings] navigating to section", { id });
+    setActiveSection(id);
+    bodyRef.current?.querySelector<HTMLElement>(`#settings-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 
   return (
     <div class="settings-backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div class="settings-panel" role="dialog" aria-modal="true" aria-labelledby="settings-title" tabIndex={-1} ref={panelRef}>
+      <div class="settings-panel" role="dialog" aria-modal="true" aria-labelledby="settings-title" tabIndex={-1} ref={panelRef} onKeyDown={handlePanelKeyDown}>
         <header class="settings-header">
           <h2 id="settings-title">Settings</h2>
           <button class="icon-button" onClick={onClose} aria-label="Close settings">
@@ -769,8 +819,23 @@ export function SettingsPanel({ onClose, playbackActive = false, showUpdates = f
           </button>
         </header>
 
-        <div class="settings-body">
-          <section class="settings-section">
+        <div class="settings-layout">
+          <nav class="settings-sidebar" aria-label="Settings sections">
+            {SETTINGS_SECTIONS.map(({ id, label }) => (
+              <button
+                type="button"
+                class={`settings-sidebar-link${activeSection === id ? " active" : ""}`}
+                aria-controls={`settings-${id}`}
+                aria-current={activeSection === id ? "location" : undefined}
+                onClick={() => goToSection(id)}
+                key={id}
+              >
+                {label}
+              </button>
+            ))}
+          </nav>
+          <div class="settings-body" ref={bodyRef}>
+          <section class="settings-section" id="settings-playback" data-settings-section="playback">
             <h3>Playback</h3>
             <Toggle label="Resume where you left off" checked={settings.resumePlayback} onChange={(v) => updateSettings({ resumePlayback: v })} />
             <Toggle
@@ -781,9 +846,15 @@ export function SettingsPanel({ onClose, playbackActive = false, showUpdates = f
             />
             <Toggle
               label="Play the next episode automatically"
-              hint="Counts down when an episode ends"
+              hint="Starts the next episode as soon as the current one ends"
               checked={settings.autoplayNext}
               onChange={(v) => updateSettings({ autoplayNext: v })}
+            />
+            <Toggle
+              label="Auto-Skip OP/ED"
+              hint="Skips marked OP/ED chapters and generic Chapter 1/2 sections lasting 85–95 seconds. Embedded mpv only."
+              checked={settings.autoSkipOpEd}
+              onChange={(v) => updateSettings({ autoSkipOpEd: v })}
             />
             <Toggle
               label="Stick with the same fansub group"
@@ -855,9 +926,7 @@ yaa-stream screenshots.">
             </Row>
           </section>
 
-          <ArtworkProviderSection />
-
-          <section class="settings-section">
+          <section class="settings-section" id="settings-subtitles" data-settings-section="subtitles">
             <h3>Subtitles</h3>
             <Toggle label="Turn subtitles on by default" checked={settings.subtitlesEnabled} onChange={(v) => updateSettings({ subtitlesEnabled: v })} />
             <Row label="Language">
@@ -1015,35 +1084,17 @@ yaa-stream screenshots.">
             </div>
           </section>
 
-          <UpdateSection playbackActive={playbackActive} />
+          <ArtworkProviderSection />
 
-          <BackupSection />
-
-          <StorageSection />
-          <HelpSection />
-
-          <section class="settings-section">
+          <section class="settings-section" id="settings-shortcuts" data-settings-section="shortcuts">
             <h3>Player shortcuts</h3>
-            <dl class="shortcut-list">
-              <div><dt>Space / K</dt><dd>Play or pause</dd></div>
-              <div><dt>← → / J L</dt><dd>Seek 5s / 10s</dd></div>
-              <div><dt>↑ ↓</dt><dd>Volume</dd></div>
-              <div><dt>C</dt><dd>Subtitles on / off</dd></div>
-              <div><dt>Hold C + scroll</dt><dd>Step through subtitle tracks</dd></div>
-              <div><dt>, / .</dt><dd>Step one frame back / forward</dd></div>
-              <div><dt>- / =</dt><dd>Subtitle delay −/+ 0.1s</dd></div>
-              <div><dt>X</dt><dd>Save the current frame as a PNG</dd></div>
-              <div><dt>N</dt><dd>Next episode</dd></div>
-              <div><dt>Shift</dt><dd>Skip the opening (90s if the file marks none)</dd></div>
-              <div><dt>{"[ / ] / \\"}</dt><dd>Playback speed slower / faster / reset</dd></div>
-              <div><dt>A</dt><dd>A-B loop: set A, set B, clear</dd></div>
-              <div><dt>E</dt><dd>Export the looped section as MP4</dd></div>
-              <div><dt>M</dt><dd>Mute</dd></div>
-              <div><dt>F</dt><dd>Fullscreen (anywhere in the app)</dd></div>
-              <div><dt>P</dt><dd>Picture-in-picture (mini always-on-top window)</dd></div>
-              <div><dt>Ctrl + C</dt><dd>Copy the current frame</dd></div>
-            </dl>
+            <PlayerShortcutsList />
           </section>
+          <StorageSection />
+          <BackupSection />
+          <UpdateSection playbackActive={playbackActive} />
+          <HelpSection />
+          </div>
         </div>
 
         <footer class="settings-footer">

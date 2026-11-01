@@ -13,8 +13,11 @@ step when cutting a release.
 
 ### Added
 - The tailored libmpv build includes D3D11VA/D3D11VA2 hardware decoders for H.264, HEVC and AV1, with software fallback when the device cannot decode a stream.
+- Settings are organized into keyboard-navigable sections, and the player context menu opens a shortcut reference.
+- Auto-Skip OP/ED can skip labeled mpv chapters; generic Chapter 1/2 chapters lasting 85–95 seconds are treated as openings. It is off by default.
 
 ### Changed
+- Autoplay starts the next episode immediately, and player controls stay visible while a player popup is open.
 - Embedded mpv defaults to video-resolution ASS with Bicubic upscaling and downscaling, antialiasing off and blur 0.0. Settings can blend subtitles with video or draw them as a separate overlay; both paths support the ASS filters and blur controls, and 2× window rendering remains available with video blending.
 - Next-episode batch playback reuses the active torrent's resolved file list, selects a matching season and episode file, and tries other ranked sources when the batch lacks the target.
 

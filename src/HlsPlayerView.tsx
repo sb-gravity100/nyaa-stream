@@ -20,6 +20,7 @@ import { defaultSubtitleIndex, isStyledTrack, subtitleTrackLabel } from "./subti
 import { useAssRenderer } from "./assRenderer";
 import { resumePosition, saveProgress } from "./watchProgress";
 import { PlayerPlaylist, type PlaylistItem } from "./PlayerPlaylist";
+import { PlayerShortcutsDialog } from "./PlayerShortcuts";
 import {
   BackIcon,
   EpisodesIcon,
@@ -64,8 +65,6 @@ const SUBTITLE_PROBE_RETRY_MS = 3000;
 const SUBTITLE_PROBE_MAX_ATTEMPTS = 40;
 const SUBTITLE_DELAY_STEP = 0.1;
 const PROGRESS_SAVE_MS = 5000;
-// Countdown shown before auto-starting the next episode.
-const AUTOPLAY_NEXT_SECONDS = 8;
 const VOLUME_STORAGE_KEY = "nyaa-stream:volume";
 const REMAINING_STORAGE_KEY = "nyaa-stream:show-remaining";
 
@@ -295,6 +294,7 @@ export function HlsPlayerView({
    }
    function showPlayerContextMenu(event: MouseEvent) {
       const video = videoRef.current;
+      shortcutsReturnFocusRef.current = rootRef.current;
       console.debug("[hls-player] open surface context menu", { hasVideo: video !== null, ready: video?.readyState ?? 0, hasStats: stats !== null });
       openContextMenu(event, [
          { label: paused ? "Play" : "Pause", action: () => {
@@ -307,6 +307,7 @@ export function HlsPlayerView({
          { label: "Copy frame", disabled: !video || video.videoWidth === 0, action: () => copyFrame() },
          { label: "Save screenshot", disabled: !video || video.videoWidth === 0, action: () => saveFrame() },
          { label: "Statistics", disabled: !stats, action: () => { setPlaylistOpen(false); setMenu("stats"); } },
+         { label: "Keyboard shortcuts", action: () => { setMenu(null); setPlaylistOpen(false); setShortcutsOpen(true); } },
          { separator: true },
          { label: pip ? "Exit picture-in-picture" : "Picture-in-picture", action: () => togglePip() },
          { label: fullscreen ? "Exit fullscreen" : "Fullscreen", action: () => toggleFullscreen() },
@@ -342,6 +343,11 @@ export function HlsPlayerView({
    const [muted, setMuted] = useState(false);
    const [menu, setMenu] = useState<Menu>(null);
    const [playlistOpen, setPlaylistOpen] = useState(false);
+   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+   const shortcutsReturnFocusRef = useRef<HTMLElement | null>(null);
+   const popupOpenRef = useRef(false);
+   const popupWasOpenRef = useRef(false);
+   popupOpenRef.current = menu != null || playlistOpen || shortcutsOpen;
    // Stable so the memoized PlayerPlaylist skips the ~4Hz re-renders
    // that timeupdate drives through this component.
    const selectFromPlaylist = useCallback(
@@ -388,7 +394,6 @@ export function HlsPlayerView({
    const [timeOffset, setTimeOffset] = useState(0);
    const [subtitleDelay, setSubtitleDelay] = useState(0);
    const [toast, setToast] = useState<string | null>(null);
-   const [nextCountdown, setNextCountdown] = useState<number | null>(null);
    const idleTimerRef = useRef<number | undefined>(undefined);
    const toastTimerRef = useRef<number | undefined>(undefined);
    const keyboardSeekTargetRef = useRef<number | null>(null);
@@ -396,8 +401,6 @@ export function HlsPlayerView({
    const hoveringControlsRef = useRef(false);
    const menuRef = useRef<HTMLDivElement>(null);
    // For the idle timer, which outlives the render that scheduled it.
-   const menuOpenRef = useRef(false);
-   menuOpenRef.current = menu != null;
    const timeOffsetRef = useRef(0);
    timeOffsetRef.current = timeOffset;
    // Resume target in source time, captured once per episode.
@@ -492,7 +495,6 @@ export function HlsPlayerView({
       setSubtitleFonts([]);
       setActiveSubtitleIndex(null);
       setSubtitleDelay(0);
-      setNextCountdown(null);
    }, [selectedFile?.hlsUrl]);
 
    // Latest values for the unmount capture below.
@@ -795,24 +797,12 @@ export function HlsPlayerView({
          setPreferredGroup(anime.id, group);
    }
 
-   // Next-episode countdown.
-   useEffect(() => {
-      if (nextCountdown == null) return;
-      if (nextCountdown <= 0) {
-         advanceToNext("autoplay");
-         return;
-      }
-      const timer = window.setTimeout(
-         () => setNextCountdown((n) => (n == null ? null : n - 1)),
-         1000,
-      );
-      return () => window.clearTimeout(timer);
-   }, [nextCountdown]);
-
    function handleEnded() {
       persistProgress();
-      if (onNext && settings.autoplayNext)
-         setNextCountdown(AUTOPLAY_NEXT_SECONDS);
+      if (onNext && settings.autoplayNext) {
+         console.info("[hls-player] episode ended; starting next episode immediately");
+         advanceToNext("autoplay");
+      }
    }
 
    useEffect(() => {
@@ -835,11 +825,15 @@ export function HlsPlayerView({
             console.debug("[player] pointer over controls area", { over });
          hoveringControlsRef.current = over;
          if (over) showControls();
-         else hideControlsImmediately();
+         else if (popupOpenRef.current) {
+            setControlsVisible(true);
+            setCursorHidden(false);
+         } else hideControlsImmediately();
       }
 
       function handlePointerLeave() {
          console.debug("[player] pointer left window");
+         if (popupOpenRef.current) return;
          hideControlsImmediately();
       }
 
@@ -905,11 +899,24 @@ export function HlsPlayerView({
    function hideControlsIfIdle() {
       // Resting over the top/bottom bars, or with a menu open, keeps them
       // up; the next pointer move restarts the countdown.
-      if (hoveringControlsRef.current || menuOpenRef.current) return;
+      if (hoveringControlsRef.current || popupOpenRef.current) return;
       console.debug("[player] mouse idle, hiding controls");
       setControlsVisible(false);
       setCursorHidden(true);
    }
+
+   useEffect(() => {
+      if (popupOpenRef.current) {
+         popupWasOpenRef.current = true;
+         window.clearTimeout(idleTimerRef.current);
+         setControlsVisible(true);
+         setCursorHidden(false);
+      } else if (popupWasOpenRef.current) {
+         popupWasOpenRef.current = false;
+         window.clearTimeout(idleTimerRef.current);
+         idleTimerRef.current = window.setTimeout(hideControlsIfIdle, CONTROLS_IDLE_MS);
+      }
+   }, [menu, playlistOpen, shortcutsOpen]);
 
    useEffect(() => {
       console.debug("[player] starting cursor idle timer for HLS episode");
@@ -924,11 +931,15 @@ export function HlsPlayerView({
       });
    }
 
+   function closeShortcuts() {
+      setShortcutsOpen(false);
+      requestAnimationFrame(() => (shortcutsReturnFocusRef.current ?? rootRef.current)?.focus());
+   }
+
    function skip(deltaSeconds: number) {
       const video = videoRef.current;
       if (!video || !episodeDuration) return;
       cancelPendingKeyboardSeek();
-      setNextCountdown(null);
       seekToEpisodeTime(
          Math.min(
             Math.max(
@@ -1012,7 +1023,6 @@ export function HlsPlayerView({
       cancelPendingKeyboardSeek();
       const value = Number((e.target as HTMLInputElement).value);
       setSeekPreview(null);
-      setNextCountdown(null);
       seekToEpisodeTime(value);
    }
 
@@ -1490,7 +1500,8 @@ export function HlsPlayerView({
    return (
       <div
          ref={rootRef}
-         class={`player-view hls-player${controlsVisible || menu ? " controls-shown" : ""}${playlistOpen ? " playlist-open" : ""}`}
+         class={`player-view hls-player${controlsVisible || menu || playlistOpen || shortcutsOpen ? " controls-shown" : ""}${playlistOpen ? " playlist-open" : ""}`}
+         tabIndex={-1}
          style={{ cursor: cursorHidden ? "none" : "auto" }}
          onContextMenu={showPlayerContextMenu}
       >
@@ -1628,28 +1639,6 @@ export function HlsPlayerView({
             />
          )}
 
-         {nextCountdown != null && onNext && (
-            <div class="player-next-card">
-               <div
-                  class="player-next-progress"
-                  style={{ animationDuration: `${AUTOPLAY_NEXT_SECONDS}s` }}
-               />
-               <div class="player-next-label">Up next</div>
-               <div class="player-next-title">{nextLabel}</div>
-               <div class="player-next-actions">
-                  <button class="button button-primary" onClick={() => advanceToNext()}>
-                     Play now ({nextCountdown})
-                  </button>
-                  <button
-                     class="button button-quiet"
-                     onClick={() => setNextCountdown(null)}
-                  >
-                     Cancel
-                  </button>
-               </div>
-            </div>
-         )}
-
          {renderedMenu && (
             <div class={`player-menu${menu ? " open" : ""}`} ref={menuRef}>
                {renderedMenu === "subtitles" && (
@@ -1781,6 +1770,8 @@ export function HlsPlayerView({
             </div>
          )}
 
+         {shortcutsOpen && <PlayerShortcutsDialog onClose={closeShortcuts} />}
+
          {/* Always-present, invisible strips with the control bars'
           footprint: they're what the pointer hits while the bars are hidden
           (pointer-events:none), so resting there keeps the controls up -
@@ -1789,7 +1780,7 @@ export function HlsPlayerView({
          <div class="player-controls-hover-zone player-top-hover-zone" />
 
          <div
-            class={`player-controls${controlsVisible || menu ? " visible" : ""}`}
+            class={`player-controls${controlsVisible || menu || playlistOpen || shortcutsOpen ? " visible" : ""}`}
          >
             <div
                class="player-seek-wrap"

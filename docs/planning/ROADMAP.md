@@ -123,6 +123,17 @@ embedded-player ABI and HLS fallback still work.
   embedded mpv and HLS, including fullscreen, backward dragging, and targets
   not yet downloaded; stale seek completions must not override the latest drag.
 
+**v0.7.0 Settings and player accessibility additions (SB, 2026-11-01).**
+- Organize Settings into clear sections with a keyboard-accessible sidebar.
+- Add the player shortcut list to an accessible modal in both player context menus.
+- When autoplay is enabled, open the next episode immediately after the current
+  episode ends; remove the countdown prompt.
+- Add Auto-Skip OP/ED, off by default. Use explicit OP/ED/Opening/Ending/Intro/
+  Outro chapter names, plus generic Chapter 1/2 chapters lasting 85–95 seconds
+  as likely OPs.
+- Keep player controls visible while the Statistics, Sources, Subtitles or
+  Episodes popup is open in either renderer.
+
 The `msedgewebview2.DMP` snapshot reviewed 2026-10-29 contains about 2.56 GiB
 of captured memory ranges and about 2.08 GiB of private committed virtual
 memory. This is not a working-set measurement and does not attribute memory
