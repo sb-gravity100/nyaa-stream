@@ -3811,3 +3811,10 @@ Commit log, newest first. Prepend a new entry after every commit.
 - `FILE_INDEX.md`
 - `docs/planning/ARCHITECTURE.md`
 - `package.json`
+### `893b419` · 2026-11-01 · fix: skip credit chapters and mark OP ED regions
+- `CHANGELOG.md`
+- `FILE_INDEX.md`
+- `PHASES.md`
+- `src/App.css`
+- `src/PlayerView.tsx`
+- `src/changelog.ts`
