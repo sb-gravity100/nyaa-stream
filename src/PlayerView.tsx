@@ -13,9 +13,10 @@ import { getStreamStats, playMagnet, stopPlayback, streamFileLoaded, type Resume
 import { traceBegin, traceEnd, traceMark, type LoadTrace } from "./loadTrace";
 import { saveFrameThumbnail } from "./torrentThumbnail";
 import { loadingProgress } from "./loadingProgress";
-import { bestRelease, isBatchRelease, getAnimeResolution, getPreferredGroup, releaseBadges, releaseGroup, releaseResolution, seederHealth, setAnimeResolution, setPreferredGroup, sortReleases } from "./releases";
+import { bestRelease, getAnimeResolution, getPreferredGroup, releaseBadges, releaseGroup, releaseResolution, seederHealth, setAnimeResolution, setPreferredGroup, sortReleases } from "./releases";
 import type { PreferredResolution } from "./settings";
 import { labelOf } from "./episodeParser";
+import { isExtraFile, matchEpisodeFile, nextEpisodeFile, preferredBatchRelease, rememberBatchSource } from "./episodeFileMatch";
 import { Buffering } from "./Buffering";
 import { StatisticsMenu } from "./StatisticsMenu";
 import { getSettings as getSettingsSnapshot, useSettings } from "./settings";
@@ -166,14 +167,6 @@ function baseName(path: string): string {
    return path.split(/[\\/]/).pop() ?? path;
 }
 
-/** Files that must never be selected as a playable episode when a torrent is a pack. */
-const EXTRA_FILE = /\b(OVA|OAD|ONA|SP|Specials?|NCOP|NCED|Extras?|PV|Trailer)\d*\b/i;
-
-function isExtraFile(file: PlayFile): boolean {
-   const label = labelOf(file.label, baseName(file.name));
-   return EXTRA_FILE.test(baseName(file.name)) || label.kind === "special" || (label.kind === "batch" && label.extras === true);
-}
-
 function comparePackFiles(a: PlayFile, b: PlayFile): number {
    const labelA = labelOf(a.label, baseName(a.name));
    const labelB = labelOf(b.label, baseName(b.name));
@@ -184,10 +177,6 @@ function comparePackFiles(a: PlayFile, b: PlayFile): number {
    const episodeB = labelB.kind === "episode" ? labelB.number : labelB.kind === "batch" ? labelB.episodeRange?.[0] ?? Number.MAX_SAFE_INTEGER : Number.MAX_SAFE_INTEGER;
    return episodeA - episodeB || a.name.localeCompare(b.name, undefined, { numeric: true });
 }
-
-/** The batch release each anime last played from, so the next episode
- * continues in the same torrent instead of jumping to another source. */
-const lastBatchMagnet = new Map<number, string>();
 
 /** The release to resume from: the listed one with `magnet`'s info-hash,
  * else one made from the saved magnet itself (not listed, or not yet). */
@@ -217,20 +206,6 @@ function resumeSourceMagnet(animeId: number, episodeKey: string): string | undef
    return entry && !entry.completed ? entry.source?.magnet : undefined;
 }
 
-/** The video file of the episode after `current` in the same torrent
- * (batches), if its name parses to that number. */
-function nextEpisodeFile(files: PlayFile[], current: PlayFile): PlayFile | null {
-   const videos = files.filter((f) => f.isVideo && !isExtraFile(f));
-   if (videos.length < 2) return null;
-   const label = labelOf(current.label, baseName(current.name));
-   if (label.kind !== "episode") return null;
-   const next = videos.filter((f) => {
-      const l = labelOf(f.label, baseName(f.name));
-      return l.kind === "episode" && l.number === label.number + 1;
-   });
-   return next.length > 0 ? next.reduce((a, b) => (b.length > a.length ? b : a)) : null;
-}
-
 /** The file inside the torrent to play: the one whose name parses to the
  * requested episode (batches), else the backend's default (largest video).
  * `matched` is true when a batch's file was identified as that episode. */
@@ -244,25 +219,16 @@ function pickFile(
    const regularVideos = videos.filter((f) => !isExtraFile(f));
    if (regularVideos.length === 0) return null;
    if (regularVideos.length > 1 && episode != null) {
-      const matches = regularVideos.filter((f) => {
-         const label = labelOf(f.label, baseName(f.name));
-         return label.kind === "episode" && label.number === episode;
-      });
-      if (matches.length > 0) {
-         // Several seasons in one pack: this entry's season first.
-         const inSeason = season == null ? [] : matches.filter((f) => labelOf(f.label, baseName(f.name)).kind === "episode" && (labelOf(f.label, baseName(f.name)) as { season: number }).season === season);
-         const candidates = inSeason.length > 0 ? inSeason : matches;
-         const pick = candidates.reduce((a, b) => (b.length > a.length ? b : a));
+      const pick = matchEpisodeFile(regularVideos, episode, season);
+      if (pick) {
          console.info("[player] matched episode file in batch", {
             episode,
             file: pick.name,
          });
          return { file: pick, matched: true };
       }
-      console.warn(
-         "[player] no regular file in torrent matched episode, using lowest regular episode",
-         { episode },
-      );
+      console.warn("[player] batch does not contain the requested episode", { episode, season });
+      return null;
    }
    // A whole pack starts at its lowest regular season/episode, with unnumbered
    // videos last; extras are excluded even when they sort first by filename.
@@ -318,6 +284,8 @@ function MpvPlayerView({
    const startTraceRef = useRef<LoadTrace | null>(null);
    const seekTraceRef = useRef<LoadTrace | null>(null);
    const torrentIdRef = useRef<string | null>(null);
+   const playbackGenerationRef = useRef<number | null>(null);
+   const nextTransitionRef = useRef(false);
    const selectedFileRef = useRef<PlayFile | null>(null);
    const rootRef = useRef<HTMLDivElement>(null);
    const [videoEl, setVideoEl] = useState<MpvVideo | null>(null);
@@ -338,15 +306,11 @@ function MpvPlayerView({
          // buffer holds those bytes) - matched by info-hash, and from its
          // saved magnet when not listed (yet): releases arrive in phases.
          resumeRelease(releases, resumeSourceMagnet(anime.id, progressKey)) ??
-         // Keep playing from the same batch across episodes: its next
-         // episode is already being preloaded (see the preload effect).
-         releases.find((r) => r.magnet === lastBatchMagnet.get(anime.id)) ??
+         // Preserve a batch only if its resolved files contain this episode.
+         preferredBatchRelease(anime.id, releases, episode, season) ??
          bestRelease(releases, releasePrefs),
    );
-   useEffect(() => {
-      if (isBatchRelease(selectedRelease)) lastBatchMagnet.set(anime.id, selectedRelease.magnet);
-      else lastBatchMagnet.delete(anime.id);
-   }, [selectedRelease.magnet]);
+   const attemptedSourcesRef = useRef(new Set<string>());
    const [torrentId, setTorrentId] = useState<string | null>(null);
    torrentIdRef.current = torrentId;
    const [files, setFiles] = useState<PlayFile[]>([]);
@@ -385,11 +349,18 @@ function MpvPlayerView({
    const selectFromPlaylist = useCallback(
       (key: string) => {
          console.info("[player] episode picked from list", { key });
+         nextTransitionRef.current = key !== episodeKey;
          setPlaylistOpen(false);
          onSelectEpisode(key);
       },
-      [onSelectEpisode],
+      [onSelectEpisode, episodeKey],
    );
+   function advanceToNext() {
+      if (!onNext) return;
+      nextTransitionRef.current = true;
+      console.info("[player] advancing to next episode");
+      onNext();
+   }
    const closePlaylist = useCallback(() => setPlaylistOpen(false), []);
    const fullscreen = useFullscreen();
    const pip = usePip();
@@ -462,6 +433,7 @@ function MpvPlayerView({
    async function switchSource(release: NyaaResult) {
       setMenu(null);
       if (release.magnet === selectedRelease.magnet) return;
+      attemptedSourcesRef.current.clear();
       const video = videoRef.current;
       if (video && hasPlayed) resumeAtRef.current = video.currentTime;
       console.info("[player] switching source", { title: release.title, resumeAt: resumeAtRef.current, hasPlayed });
@@ -542,6 +514,8 @@ function MpvPlayerView({
    // down the previous torrent, so switching is just "play again".
    useEffect(() => {
       let cancelled = false;
+      attemptedSourcesRef.current.add(selectedRelease.magnet);
+      playbackGenerationRef.current = null;
       setTorrentId(null);
       setFiles([]);
       setSelectedFile(null);
@@ -560,6 +534,7 @@ function MpvPlayerView({
                await trace.id,
             );
             if (cancelled) return;
+            playbackGenerationRef.current = session.playbackGeneration;
             traceMark(trace, "play_magnet");
             // A movie is the torrent's largest video (the backend's
             // default) - never an extra that happens to parse as "01".
@@ -568,9 +543,17 @@ function MpvPlayerView({
                : pickFile(session.files, session.defaultFileIdx, episode, season);
             const file = picked?.file ?? null;
             if (!picked || !file) {
-               setError("This torrent has no playable video file.");
+               const fallback = sortedReleases.find((release) => !attemptedSourcesRef.current.has(release.magnet));
+               if (fallback && !isMovie(anime) && episode != null) {
+                  console.warn("[player] source lacks requested episode, trying next ranked source", { episode, season, source: selectedRelease.title, fallback: fallback.title });
+                  setSelectedRelease(fallback);
+                  return;
+               }
+               console.error("[player] no source contains a playable file for this episode", { episode, season, attempted: attemptedSourcesRef.current.size });
+               setError("No source contains a playable file for this episode.");
                return;
             }
+            rememberBatchSource(anime.id, selectedRelease.magnet, session.files);
             setTorrentId(session.torrentId);
             setFiles(session.files);
             setFileMatched(picked.matched);
@@ -595,13 +578,13 @@ function MpvPlayerView({
    // only), so pressing next starts from data that is already there.
    useEffect(() => {
       if (!hasPlayed || !torrentId || !selectedFile || !fileMatched) return;
-      const next = nextEpisodeFile(files, selectedFile);
+      const next = nextEpisodeFile(files, selectedFile, season);
       if (!next) return;
       console.info("[player] preloading next episode file", { file: next.name });
       invoke("preload_next_file", { torrentId, fileIdx: next.index }).catch((err) =>
          console.debug("[player] preload unavailable", { err: String(err) }),
       );
-   }, [hasPlayed, torrentId, selectedFile?.index, fileMatched]);
+   }, [hasPlayed, torrentId, selectedFile?.index, fileMatched, season]);
 
    // Per-file state resets (source switch or batch file switch).
    useEffect(() => {
@@ -766,7 +749,7 @@ function MpvPlayerView({
          window.clearTimeout(toastTimerRef.current);
          traceEnd(startTraceRef.current, "abandoned");
          traceEnd(seekTraceRef.current, "abandoned");
-         stopPlayback(resumeRequest());
+         stopPlayback(resumeRequest(), nextTransitionRef.current, playbackGenerationRef.current ?? undefined);
       };
    }, []);
 
@@ -879,7 +862,7 @@ function MpvPlayerView({
    useEffect(() => {
       if (nextCountdown == null) return;
       if (nextCountdown <= 0) {
-         onNext?.();
+         advanceToNext();
          return;
       }
       const timer = window.setTimeout(
@@ -1425,8 +1408,8 @@ function MpvPlayerView({
    // Hardware media keys while the player is open (see media_keys.rs).
    const togglePauseRef = useRef(togglePause);
    togglePauseRef.current = togglePause;
-   const onNextRef = useRef(onNext);
-   onNextRef.current = onNext;
+   const onNextRef = useRef(advanceToNext);
+   onNextRef.current = advanceToNext;
    useEffect(() => {
       let unlisten: (() => void) | undefined;
       let cancelled = false;
@@ -1607,7 +1590,7 @@ function MpvPlayerView({
                void saveFrame();
                break;
             case "n":
-               if (onNext) onNext();
+               advanceToNext();
                break;
             case "a":
                stepAbLoop();
@@ -1918,7 +1901,7 @@ function MpvPlayerView({
                <div class="player-next-label">Up next</div>
                <div class="player-next-title">{nextLabel}</div>
                <div class="player-next-actions">
-                  <button class="button button-primary" onClick={onNext}>
+                  <button class="button button-primary" onClick={advanceToNext}>
                      Play now ({nextCountdown})
                   </button>
                   <button
@@ -2218,7 +2201,7 @@ function MpvPlayerView({
                {onNext && (
                   <button
                      class="player-icon-button"
-                     onClick={onNext}
+                     onClick={advanceToNext}
                      aria-label="Next episode"
                      title={`${nextLabel ?? "Next episode"} (N)`}
                   >

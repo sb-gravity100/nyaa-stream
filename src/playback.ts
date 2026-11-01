@@ -62,9 +62,9 @@ export interface ResumeRequest {
   magnet: string;
 }
 
-export async function stopPlayback(resume?: ResumeRequest): Promise<void> {
+export async function stopPlayback(resume?: ResumeRequest, nextEpisode = false, playbackGeneration?: number): Promise<void> {
   if (!isTauriAvailable()) return;
-  console.debug("[stop_playback] invoked", { resume });
-  await invoke("stop_playback", { resume: resume ?? null });
+  console.debug("[stop_playback] invoked", { hasResume: resume != null, fileIdx: resume?.fileIdx, nextEpisode, playbackGeneration });
+  await invoke("stop_playback", { resume: resume ?? null, nextEpisode, playbackGeneration: playbackGeneration ?? null });
   console.info("[stop_playback] succeeded");
 }

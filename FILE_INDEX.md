@@ -141,6 +141,7 @@
 | `src/releases.ts` | Release ranking (`bestRelease`/`sortReleases`: remembered fansub group, preferred-fansubber text (`matchesFansubber`: every word in the title), preferred resolution, seeders) and per-anime preferred-group persistence (`localStorage`) | frontend |
 | `src/releaseCache.ts` | Bounded localStorage cache for per-anime Nyaa release results; saved results load immediately and are replaced by the anime page's Refresh action | frontend, search, cache |
 | `src/episodeParser.ts` | `EpisodeLabel` type (episode / batch / movie / special / unknown) + `labelOf` (the backend-parsed label on results/play files, else this file's regex parser - browser preview fallback), `episodeLabelText`, fansub group-tag submitter extraction | frontend |
+| `src/episodeFileMatch.ts` | Shared batch-file selection for mpv/HLS: exclude extras, match episode and season, retain a batch source only when the next episode exists, and find the next file for preloading | frontend, player, batch |
 | `src/recentSearches.ts` | Recent search queries (`localStorage`) for the empty-focus search dropdown | frontend, search |
 | `src/backup.ts` | Exports/imports app localStorage through the backup commands while excluding provider credential storage | frontend, backup |
 | `src/library.ts` | Saved-anime persistence via `localStorage` (PLAN.md's real store choice is still open — this doesn't commit to sqlite/flat-file) | frontend |

@@ -11,6 +11,7 @@ import { saveFrameThumbnail } from "./torrentThumbnail";
 import { loadingProgress } from "./loadingProgress";
 import { bestRelease, codecPlayable, getPreferredGroup, releaseCodec, releaseGroup, releaseResolution, setPreferredGroup, sortReleases } from "./releases";
 import { labelOf } from "./episodeParser";
+import { isExtraFile, matchEpisodeFile, preferredBatchRelease, rememberBatchSource } from "./episodeFileMatch";
 import { Buffering } from "./Buffering";
 import { StatisticsMenu } from "./StatisticsMenu";
 import { copyToClipboard, openContextMenu, openNyaaPage } from "./contextMenuStore";
@@ -160,14 +161,6 @@ function baseName(path: string): string {
    return path.split(/[\\/]/).pop() ?? path;
 }
 
-/** Files that are not episodes: OVA/OAD/ONA, specials, creditless openings/endings. */
-const EXTRA_FILE = /\b(OVA|OAD|ONA|SP|Specials?|NCOP|NCED|Extras?|PV|Trailer)\d*\b/i;
-
-function isExtraFile(file: PlayFile): boolean {
-   const label = labelOf(file.label, baseName(file.name));
-   return EXTRA_FILE.test(baseName(file.name)) || label.kind === "special" || (label.kind === "batch" && label.extras === true);
-}
-
 function comparePackFiles(a: PlayFile, b: PlayFile): number {
    const labelA = labelOf(a.label, baseName(a.name));
    const labelB = labelOf(b.label, baseName(b.name));
@@ -191,25 +184,16 @@ function pickFile(
    const regularVideos = videos.filter((f) => !isExtraFile(f));
    if (regularVideos.length === 0) return null;
    if (regularVideos.length > 1 && episode != null) {
-      const matches = regularVideos.filter((f) => {
-         const label = labelOf(f.label, baseName(f.name));
-         return label.kind === "episode" && label.number === episode;
-      });
-      if (matches.length > 0) {
-         // Several seasons in one pack: this entry's season first.
-         const inSeason = season == null ? [] : matches.filter((f) => labelOf(f.label, baseName(f.name)).kind === "episode" && (labelOf(f.label, baseName(f.name)) as { season: number }).season === season);
-         const candidates = inSeason.length > 0 ? inSeason : matches;
-         const pick = candidates.reduce((a, b) => (b.length > a.length ? b : a));
+      const pick = matchEpisodeFile(regularVideos, episode, season);
+      if (pick) {
          console.info("[player] matched episode file in batch", {
             episode,
             file: pick.name,
          });
          return pick;
       }
-      console.warn(
-         "[hls-player] no regular file in torrent matched episode, using lowest regular episode",
-         { episode },
-      );
+      console.warn("[hls-player] batch does not contain the requested episode", { episode, season });
+      return null;
    }
    // A batch opened as a whole (no episode number): start from its first
    // regular season/episode rather than the largest or a file named NCOP.
@@ -259,6 +243,8 @@ export function HlsPlayerView({
 }: Props) {
    const settings = useSettings();
    const videoRef = useRef<HTMLVideoElement | null>(null);
+   const playbackGenerationRef = useRef<number | null>(null);
+   const nextTransitionRef = useRef(false);
    const rootRef = useRef<HTMLDivElement>(null);
    // Media position to resume from when hls.js is re-attached to the same
    // file (see the attach effect).
@@ -274,8 +260,9 @@ export function HlsPlayerView({
       preferredResolution: settings.preferredResolution,
    };
    const [selectedRelease, setSelectedRelease] = useState<NyaaResult>(() =>
-      bestRelease(releases, releasePrefs),
+      preferredBatchRelease(anime.id, releases, episode, season) ?? bestRelease(releases, releasePrefs),
    );
+   const attemptedSourcesRef = useRef(new Set<string>());
 
    function showSourceContextMenu(event: MouseEvent, release: NyaaResult) {
       const group = releaseGroup(release);
@@ -284,7 +271,7 @@ export function HlsPlayerView({
       const hasNyaaPage = !!release.view_url && !customMagnet;
       console.debug("[hls-player] open source context menu", { animeId: anime.id, customSource: !!customSourceId, customMagnet, hasGroup: group !== null, hasNyaaPage });
       openContextMenu(event, [
-         { label: "Play this source", action: () => { setSelectedRelease(release); setMenu(null); } },
+         { label: "Play this source", action: () => { attemptedSourcesRef.current.clear(); setSelectedRelease(release); setMenu(null); } },
          { label: "Copy magnet", action: () => { setMenu(null); return copyToClipboard(release.magnet, "magnet"); } },
          ...(customSourceId ? [
             { label: "Edit custom source", disabled: !onEditCustomSource, action: () => { setMenu(null); onEditCustomSource?.(Number(customSourceId)); } },
@@ -358,11 +345,18 @@ export function HlsPlayerView({
    const selectFromPlaylist = useCallback(
       (key: string) => {
          console.info("[player] episode picked from list", { key });
+         nextTransitionRef.current = key !== episodeKey;
          setPlaylistOpen(false);
          onSelectEpisode(key);
       },
-      [onSelectEpisode],
+      [onSelectEpisode, episodeKey],
    );
+   function advanceToNext() {
+      if (!onNext) return;
+      nextTransitionRef.current = true;
+      console.info("[hls-player] advancing to next episode");
+      onNext();
+   }
    const closePlaylist = useCallback(() => setPlaylistOpen(false), []);
    const fullscreen = useFullscreen();
    const pip = usePip();
@@ -428,6 +422,8 @@ export function HlsPlayerView({
    // down the previous torrent, so switching is just "play again".
    useEffect(() => {
       let cancelled = false;
+      attemptedSourcesRef.current.add(selectedRelease.magnet);
+      playbackGenerationRef.current = null;
       setTorrentId(null);
       setFiles([]);
       setSelectedFile(null);
@@ -448,15 +444,24 @@ export function HlsPlayerView({
                `${anime.id}:${progressKey}`,
             );
             if (cancelled) return;
+            playbackGenerationRef.current = session.playbackGeneration;
             // A movie is the torrent's largest video (the backend's
             // default) - never an extra that happens to parse as "01".
             const file = isMovie(anime)
                ? (session.files.find((f) => f.index === session.defaultFileIdx) ?? null)
                : pickFile(session.files, session.defaultFileIdx, episode, season);
             if (!file) {
-               setError("This torrent has no playable video file.");
+               const fallback = sortedReleases.find((release) => !attemptedSourcesRef.current.has(release.magnet));
+               if (fallback && !isMovie(anime) && episode != null) {
+                  console.warn("[hls-player] source lacks requested episode, trying next ranked source", { episode, season, source: selectedRelease.title, fallback: fallback.title });
+                  setSelectedRelease(fallback);
+                  return;
+               }
+               console.error("[hls-player] no source contains a playable file for this episode", { episode, season, attempted: attemptedSourcesRef.current.size });
+               setError("No source contains a playable file for this episode.");
                return;
             }
+            rememberBatchSource(anime.id, selectedRelease.magnet, session.files);
             setTorrentId(session.torrentId);
             setFiles(session.files);
             setSelectedFile(file);
@@ -643,7 +648,7 @@ export function HlsPlayerView({
          window.clearTimeout(idleTimerRef.current);
          window.clearTimeout(keyboardSeekTimerRef.current);
          window.clearTimeout(toastTimerRef.current);
-         stopPlayback();
+         stopPlayback(undefined, nextTransitionRef.current, playbackGenerationRef.current ?? undefined);
       };
    }, []);
 
@@ -790,7 +795,7 @@ export function HlsPlayerView({
    useEffect(() => {
       if (nextCountdown == null) return;
       if (nextCountdown <= 0) {
-         onNext?.();
+         advanceToNext();
          return;
       }
       const timer = window.setTimeout(
@@ -1283,7 +1288,7 @@ export function HlsPlayerView({
                changeSubtitleDelay(SUBTITLE_DELAY_STEP);
                break;
             case "n":
-               if (onNext) onNext();
+               advanceToNext();
                break;
             case "p":
                togglePip();
@@ -1624,7 +1629,7 @@ export function HlsPlayerView({
                <div class="player-next-label">Up next</div>
                <div class="player-next-title">{nextLabel}</div>
                <div class="player-next-actions">
-                  <button class="button button-primary" onClick={onNext}>
+                  <button class="button button-primary" onClick={advanceToNext}>
                      Play now ({nextCountdown})
                   </button>
                   <button
@@ -1725,6 +1730,7 @@ export function HlsPlayerView({
                                  class={`player-menu-item player-source-item${r.magnet === selectedRelease.magnet ? " selected" : ""}`}
                                  onContextMenu={(event) => showSourceContextMenu(event, r)}
                                  onClick={() => {
+                                    attemptedSourcesRef.current.clear();
                                     setSelectedRelease(r);
                                     setMenu(null);
                                  }}
@@ -1850,7 +1856,7 @@ export function HlsPlayerView({
                {onNext && (
                   <button
                      class="player-icon-button"
-                     onClick={onNext}
+                     onClick={advanceToNext}
                      aria-label="Next episode"
                      title={`${nextLabel ?? "Next episode"} (N)`}
                   >

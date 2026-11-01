@@ -17,7 +17,7 @@ sbtl torrent streaming, embedded libmpv playback and an HLS fallback.
 |---|---|---|
 | v0.5.8 | Implemented pre-v0.6.0 work | Published |
 | v0.6.0 | Subtitle styling/smoothing plus context menus, custom magnets, artwork, thumbnails, seek previews, updates and bespoke installer | Published 2026-10-30; SB waived remaining Windows acceptance and deferred Fribb licensing; live-swarm and manual magnet acceptance remain open |
-| v0.7.0 | Custom libmpv first, then native subtitle supersampling, memory profiling, batch transitions, preload timing and continuous seek dragging | Custom DLL built and staged with 2× ASS supersampling and selected D3D11VA decode; full app UI and live torrent acceptance pending |
+| v0.7.0 | Custom libmpv first, then native subtitle supersampling, memory profiling, batch transitions, preload timing and continuous seek dragging | Custom DLL staged; batch torrent/file reuse and season-aware handoff implemented; full app UI, live torrent and transition timing acceptance pending |
 | v0.8.0 | Navigation/Home rehaul and Discover | Planned |
 | v1.0.0 | Stabilization and 32-bit Windows | Planned |
 | v1.1.0 | Binge Mode | Idea; not implementation-ready |

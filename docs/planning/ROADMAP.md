@@ -95,10 +95,15 @@ embedded-player ABI and HLS fallback still work.
   batch where it contains the next episode; use the normal source-selection
   fallback when it does not. Measure next-episode click/autoplay to first frame
   on cached, partially downloaded, and poorly seeded batches. The 2026-10-30
-  log already confirms same-torrent reuse on several transitions; retain that
-  path and cache its resolved file list. Distinguish setup time from waits for
-  missing pieces when comparing the result. SB selected retaining the current
-  mpv instance lifecycle while improving torrent and metadata reuse.
+  log already confirms same-torrent reuse on several transitions; the backend
+  now caches its resolved file list and the players match a batch's exact
+  season/episode file before retaining that source. Distinguish setup time
+  from waits for missing pieces when comparing the result. SB selected retaining
+  the current mpv instance lifecycle while improving torrent and metadata reuse. Guard
+  deferred stops with the playback generation so a late stop from the old
+  player cannot remove the new session; an intentional episode transition
+  has ten seconds of grace for its next route to open. Full app timing remains
+  to be measured.
 - Add a next-episode preload timing option: retain the existing spare-bandwidth
   behavior as the default and offer "Only after the current episode is fully
   downloaded". Gate the latter on 100% verified bytes of the current episode's

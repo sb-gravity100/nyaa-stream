@@ -132,11 +132,12 @@ The checklist below groups related work and does not override this order.
       separate FFmpeg and libmpv. On this GPU `hwdec-current` selects
       `d3d11va-copy` for H.264/HEVC; AV1 loads through software fallback.
       Full Tauri UI and broader GPU coverage remain pending.
-- [ ] Improve batch next-episode transitions by reusing torrent/file metadata and
-      verified data; preserve season-aware file selection and source fallback.
-      The 2026-10-30 trace already shows same-torrent reuse; cache the resolved
-      file list, reject a wrong-season target, and measure the handoff separately
-      from torrent waits.
+- [~] Improve batch next-episode transitions by reusing torrent/file metadata
+      and verified data. The 2026-10-30 trace already showed same-torrent reuse;
+      the resolved file list is now cached, wrong-season files and extras are
+      rejected, alternate sources are tried in ranked order, and stale player
+      stops cannot remove a successor. Measure the handoff in the full app,
+      separately from waits for missing torrent pieces.
 - [ ] Measure next-episode click/autoplay to first frame on cached, partial,
       and poorly seeded batches
 - [ ] Add preload timing choice: existing spare-bandwidth behavior (default)

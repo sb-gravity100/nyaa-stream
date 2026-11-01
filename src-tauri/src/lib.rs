@@ -1375,6 +1375,8 @@ struct PlayFile {
 #[serde(rename_all = "camelCase")]
 struct PlaySession {
     torrent_id: TorrentId,
+    /// Identifies this player load so an older view cannot stop its successor.
+    playback_generation: u64,
     /// Every file in the torrent with its own HLS URL - the frontend picks
     /// which one to play (matching the requested episode inside a batch
     /// with its own title parser) and can switch between them without
@@ -1406,7 +1408,7 @@ async fn play_magnet(
     };
     // Cancels a deferred removal from the previous player view (see
     // `stop_playback`).
-    state.stop_generation.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    let playback_generation = state.stop_generation.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
 
     // The next episode of the same torrent (a batch) reuses the session, with
     // whatever the low-priority preload already downloaded. Anything else
@@ -1479,7 +1481,7 @@ async fn play_magnet(
         .collect();
     tracing::info!(%title, torrent_id = %added.id, file_count = files.len(), default_file_idx, "torrent added, streaming");
 
-    Ok(PlaySession { torrent_id: added.id, files, default_file_idx })
+    Ok(PlaySession { torrent_id: added.id, playback_generation, files, default_file_idx })
 }
 
 /// The Continue watching row's episodes (`<animeId>:<episodeKey>`), whose
@@ -1752,19 +1754,25 @@ pub(crate) async fn set_clipboard_image(width: usize, height: usize, pixels: Vec
 /// Removes the active torrent (stop seeding, drop partial files) - called
 /// when the user closes the player or navigates away from the media page.
 ///
-/// The removal is deferred a few seconds: an episode change unmounts the old
-/// player view (this call) just before the new one asks for its torrent, and
-/// a batch's next episode is the same torrent - `play_magnet` cancels the
-/// removal and keeps it, preloaded data included.
+/// The removal is deferred: a normal stop has four seconds of grace, while an
+/// intentional episode change has ten. `play_magnet` cancels the pending stop
+/// and keeps a batch's verified and preloaded data. A playback generation
+/// rejects an old view's cleanup if the successor has already started.
 ///
 /// `resume` (an episode still in progress) first saves its resume buffer
 /// while the torrent is still in the engine - see `resume`.
 #[tauri::command]
-async fn stop_playback(state: State<'_, Arc<AppState>>, resume: Option<resume::ResumeRequest>) -> Result<(), String> {
-    /// Long enough for the next episode's `play_magnet` to arrive.
-    const KEEP_FOR_NEXT_EPISODE: Duration = Duration::from_secs(4);
-    tracing::debug!(?resume, "stop_playback invoked");
-    let generation = state.stop_generation.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
+async fn stop_playback(state: State<'_, Arc<AppState>>, resume: Option<resume::ResumeRequest>, next_episode: Option<bool>, playback_generation: Option<u64>) -> Result<(), String> {
+    const NORMAL_GRACE: Duration = Duration::from_secs(4);
+    const NEXT_EPISODE_GRACE: Duration = Duration::from_secs(10);
+    tracing::debug!(has_resume = resume.is_some(), ?next_episode, ?playback_generation, "stop_playback invoked");
+    let generation = match playback_generation {
+        Some(expected) => state.stop_generation.compare_exchange(
+            expected, expected.wrapping_add(1),
+            std::sync::atomic::Ordering::SeqCst, std::sync::atomic::Ordering::SeqCst,
+        ).ok().map(|_| expected.wrapping_add(1)),
+        None => Some(state.stop_generation.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1),
+    };
     let app = state.inner().clone();
     let playing = app.current_torrent.lock().await.clone();
     let keep_storyboard = match (resume, playing.clone()) {
@@ -1780,9 +1788,14 @@ async fn stop_playback(state: State<'_, Arc<AppState>>, resume: Option<resume::R
         (Some(_), playing) => { tracing::debug!(?playing, "resume request doesn't match the playing torrent, no buffer"); false }
         (None, _) => false
     };
+    let Some(generation) = generation else {
+        tracing::debug!(?playback_generation, "stop_playback ignored stale player cleanup");
+        return Ok(());
+    };
+    let grace = if next_episode.unwrap_or(false) { NEXT_EPISODE_GRACE } else { NORMAL_GRACE };
     tokio::spawn(async move {
         let started = tokio::time::Instant::now();
-        tokio::time::sleep(KEEP_FOR_NEXT_EPISODE.saturating_sub(started.elapsed())).await;
+        tokio::time::sleep(grace.saturating_sub(started.elapsed())).await;
         if app.stop_generation.load(std::sync::atomic::Ordering::SeqCst) == generation {
             cleanup_playback(&app, keep_storyboard).await;
             tracing::info!("stop_playback completed");

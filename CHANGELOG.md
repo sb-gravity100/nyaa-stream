@@ -16,6 +16,7 @@ step when cutting a release.
 
 ### Changed
 - Embedded mpv defaults to video-resolution ASS with Bicubic upscaling and downscaling, antialiasing off and blur 0.0. Settings can blend subtitles with video or draw them as a separate overlay; both paths support the ASS filters and blur controls, and 2× window rendering remains available with video blending.
+- Next-episode batch playback reuses the active torrent's resolved file list, selects a matching season and episode file, and tries other ranked sources when the batch lacks the target.
 
 ### Fixed
 - The mouse cursor hides after its idle timeout when `N` opens the next episode.

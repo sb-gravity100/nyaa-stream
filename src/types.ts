@@ -124,6 +124,8 @@ export interface PlayFile {
 export interface PlaySession {
   /** Torrent info-hash (not a numeric session id - see torrent-engine's `TorrentId`). */
   torrentId: string;
+  /** Rejects cleanup from an older player after a new episode has started. */
+  playbackGeneration: number;
   files: PlayFile[];
   /** Largest video file - fallback when no file matches the episode. */
   defaultFileIdx: number;
