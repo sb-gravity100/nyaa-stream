@@ -1,3 +1,15 @@
+### `0656361` · 2026-11-01 · feat: update mpv subtitle rendering profile
+- `CHANGELOG.md`
+- `PHASES.md`
+- `docs/planning/MPV_BUILD.md`
+- `native/mpv/patches/mpv-ass-overlay-sampling.patch`
+- `native/mpv/sources.lock.json`
+- `src-tauri/lib/README.md`
+- `src/SettingsPanel.tsx`
+- `src/changelog.ts`
+- `src/settings.ts`
+- `src/subtitles.ts`
+
 ### `ac0d9d9` · 2026-11-01 · fix: hide idle cursor after next episode
 - `src/PlayerView.tsx`
 - `src/HlsPlayerView.tsx`
