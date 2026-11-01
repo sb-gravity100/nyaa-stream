@@ -706,19 +706,16 @@ a pushed sbtl tag is never moved or re-created.
   commit `chore: sbtl vX.Y.Z` (one line on what changed), add a row below.
   nyaa never pins an untagged sbtl commit.
 - **The DLL:** nyaa links `native/sbtl/sbtl.dll` (built with sbtl's `nyaa`
-  preset: no media indexer, nyaa probes media itself) instead of compiling
+  preset, including the media indexer for indexed seeks/direct mpv playback) instead of compiling
   sbtl's C on every clean build; the bundle ships it beside the exe. A
   mismatching DLL fails at session start (`sbtl_abi_version`), and
   `scripts/release.mjs` refuses a release whose `native/sbtl/VERSION` is not
   the pinned tag.
-- **Local v0.2.0 integration (2026-11-01):** SB's sbtl 0.2.0 API and DLL are
-  available in the sibling checkout and `native/sbtl`, but the v0.2.0 Git tag
-  is not available from the remote yet. The nyaa P0 direct-stream adapter is
-  being implemented against that local API. Keep the published Cargo tag at
-  v0.1.1 until v0.2.0 is pushed; local development must use
-  `npm run dev:sbtl-local` or `npm run check:sbtl-local`. These scripts update
-  the ignored local Cargo.lock to the sibling v0.2.0 packages before building.
-  Do not release with this version mismatch.
+- **v0.2.0 pin (2026-11-01):** sbtl's v0.2.0 tag is published and
+  `crates/sbtl-engine` pins it. `native/sbtl/VERSION` matches the pin and the
+  DLL includes the media indexer for direct embedded-mpv playback. Local
+  sibling-checkout work can still use `npm run dev:sbtl-local` or
+  `npm run check:sbtl-local`; release builds resolve the published tag.
 - API changes are normally paired (the sbtl tag, native DLL, Cargo pin and
   nyaa adapter), but this v0.2.0 adapter follows SB's sbtl implementation in a
   separate session; complete the pin/DLL release alignment once the tag is

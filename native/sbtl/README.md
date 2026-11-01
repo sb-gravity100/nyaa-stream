@@ -1,7 +1,7 @@
 # sbtl.dll
 
 The prebuilt sbtl torrent engine that nyaa-stream links, instead of compiling
-sbtl's C sources on every clean build. Committed on purpose (about 170 KB).
+sbtl's C sources on every clean build. Committed on purpose (about 200 KB).
 
 | file | what |
 |---|---|
@@ -24,10 +24,12 @@ cmake --preset nyaa
 cmake --build --preset nyaa
 ```
 
-then copy `build/nyaa/bin/sbtl.dll` and `build/nyaa/bin/sbtl_import.lib` here,
-write the tag into `VERSION`, and commit all three with the Cargo tag change
-(`chore: sbtl vX.Y.Z`). The `nyaa` preset leaves out sbtl's MP4/MKV indexer,
-which nyaa-stream does not use (its `sbtl_media_*` calls report "unsupported").
+then copy `build/nyaa/bin/sbtl.dll` and `build/nyaa/bin/sbtl_import.lib` here.
+The `nyaa` preset includes sbtl's MP4/MKV indexer for the direct embedded-mpv
+playback path. For a local build from a tag, `VERSION` records that tag. The
+release preflight rejects the DLL until `crates/sbtl-engine` is pinned to the
+same published tag. Commit all three files with the Cargo tag change
+(`chore: sbtl vX.Y.Z`).
 
 ## Working on sbtl and nyaa together
 
