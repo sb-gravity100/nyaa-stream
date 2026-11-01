@@ -1,3 +1,17 @@
+### `56a3e7e` · 2026-11-01 · feat: preserve batch episode handoff
+- `CHANGELOG.md`
+- `FILE_INDEX.md`
+- `PHASES.md`
+- `PLAN.md`
+- `docs/planning/ROADMAP.md`
+- `src-tauri/src/lib.rs`
+- `src/HlsPlayerView.tsx`
+- `src/PlayerView.tsx`
+- `src/changelog.ts`
+- `src/playback.ts`
+- `src/types.ts`
+- `src/episodeFileMatch.ts`
+
 ### `5918e10` · 2026-11-01 · feat: reuse resolved batch metadata
 - `src-tauri/src/lib.rs`
 - `PHASES.md`
