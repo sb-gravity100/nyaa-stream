@@ -3775,3 +3775,6 @@ Commit log, newest first. Prepend a new entry after every commit.
 - `PLAN.md`
 - `docs/planning/MPV_SBTL_FIX_0.7.0.md`
 - `docs/planning/ROADMAP.md`
+### `0b05ef5` · 2026-11-01 · docs: detail sbtl buffering and storage plan
+- `PHASES.md`
+- `docs/planning/ROADMAP.md`
