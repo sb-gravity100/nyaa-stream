@@ -14,7 +14,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: "2026-11-01",
     features: [
       "The tailored libmpv build includes D3D11VA/D3D11VA2 hardware decoders for H.264, HEVC and AV1, with software fallback when the device cannot decode a stream.",
-      "Embedded mpv defaults to video-resolution ASS with Bicubic scaling, antialiasing off and blur 0.0. Subtitle composition can blend with video or draw a separate overlay; 2× window rendering remains available.",
+      "Embedded mpv defaults to video-resolution ASS with Bicubic scaling, antialiasing off and blur 0.0. Subtitle composition can blend with video or draw a separate overlay; both paths support ASS filters and blur controls.",
     ],
     fixes: [
       "The mouse cursor hides after its idle timeout when N opens the next episode.",

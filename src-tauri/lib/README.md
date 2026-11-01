@@ -19,7 +19,8 @@ The upstream DLL is preserved at
 preserved under `target/mpv-build/app-bundle-pre-supersampling/` and
 `target/mpv-build/app-bundle-pre-final-pipeline/` and
 `target/mpv-build/app-bundle-pre-d3d11va/` and
-`target/mpv-build/app-bundle-pre-composition/`. `mpv-player`
+`target/mpv-build/app-bundle-pre-composition/` and
+`target/mpv-build/app-bundle-pre-overlay-smoothing/`. `mpv-player`
 loads the Settings override first, then `<exe dir>`, `<exe dir>/lib`, and PATH;
 on Windows it searches dependencies beside the selected DLL. Without a usable
 libmpv or its dependencies the app falls back to the HLS player.

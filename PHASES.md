@@ -166,7 +166,10 @@ The checklist below groups related work and does not override this order.
       ASS encode path.
 - [~] Add With video / Overlay subtitle composition to embedded mpv Settings;
       the revised 0.7.0 defaults are applied, the locked DLL rebuilt, and both
-      modes rendered ASS in a gpu-next probe. Full app UI verification remains.
+      modes rendered ASS in a gpu-next probe. Bicubic/AA/blur are wired to
+      Overlay subtitles without filtering OSD; the 1080p probe confirmed
+      scale and blur differences, while AA had no effect at 1:1. Full app UI
+      verification remains pending.
 - [ ] Record current bundled libmpv identity/options and a baseline for ASS
       edge quality, E-AC-3 playback, seek latency, and hardware decoding
 - [x] Inspect `msedgewebview2.DMP` structure: about 2.56 GiB captured and

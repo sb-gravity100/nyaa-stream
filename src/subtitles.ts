@@ -222,19 +222,17 @@ export async function mpvSubtitleRenderingSettings(
     console.debug("[subtitles] cannot inspect the current mpv renderer", { error: String(error) });
     return {};
   }
-  if (rendering.composition === "overlay") {
-    console.debug("[subtitles] selecting window overlay composition");
-    return { "blend-subtitles": "no", "sub-ass-scale-with-window": true };
-  }
+  const overlay = rendering.composition === "overlay";
+  console.debug("[subtitles] selecting subtitle composition", { overlay });
   try {
     await mpv.getProperty("ass-scale");
   } catch (error) {
-    console.debug("[subtitles] custom ASS filters unavailable; using mpv video composition", { error: String(error) });
-    return { "blend-subtitles": "video" };
+    console.debug("[subtitles] custom ASS filters unavailable; using mpv composition", { overlay, error: String(error) });
+    return { "blend-subtitles": overlay ? "no" : "video" };
   }
   return {
-    "blend-subtitles": "video",
-    "sub-ass-scale-with-window": rendering.resolution === "window",
+    "blend-subtitles": overlay ? "no" : "video",
+    "sub-ass-scale-with-window": overlay || rendering.resolution === "window",
     "ass-scale": rendering.upscale,
     "ass-dscale": rendering.downscale,
     "ass-aa": rendering.videoAntialias,

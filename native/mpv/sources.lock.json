@@ -405,7 +405,7 @@
     {
       "package": "mpv",
       "file": "native/mpv/patches/mpv-ass-overlay-sampling.patch",
-      "sha256_lf": "bac212d4906131f71d027165ff33a14600611f7cc21021283b47d3294eabb6bb",
+      "sha256_lf": "0da00555538d57d574ee46a284b04595695382950b19141155634fec067d7805",
       "reason": "Register independent ASS filters and render window-mode ASS at 2x before downsampling to the video frame",
       "apply_to": "mpv"
     },
@@ -445,5 +445,5 @@
       "apply_to": "ffmpeg"
     }
   ],
-  "source_audit_status": "Pinned source closure and seven native patches verified; separate-FFmpeg/x64 libmpv pipeline rebuilt and D3D11VA/D3D11VA2 retained only for H.264, HEVC and AV1. With video uses custom ASS filters; Overlay uses mpv's native window overlay. Both modes rendered visible ASS in a 1920x1080 gpu-next probe. Candidate SHA-256 A36ABF7B80FC010A3EE7A7D55CABF782A8BC055073032DF64C64DEDEA038810F is staged with MSVC/Vulkan sidecars; prior DLL is backed up. Earlier API/options, codec playback, subtitle-burned export, supersampling, Rust EmbeddedMpv/encode_clip, and H.264/HEVC D3D11VA probes passed. Full Tauri UI, clean-Windows dependencies, live missing-piece A/B, other subtitle controls and wider GPU/AV1 coverage remain pending."
+  "source_audit_status": "Pinned source closure and seven native patches verified; separate-FFmpeg/x64 libmpv pipeline rebuilt with D3D11VA/D3D11VA2 retained for H.264, HEVC and AV1. With video and Overlay both use ASS sampling controls; Overlay filtering is restricted to subtitle bitmaps. A 1920x1080 gpu-next probe showed visible ASS in both modes, 85,714 changed subtitle-region bytes when window blur changed from 0.0 to 1.2, and no top OSD-region changes. Bicubic at blur 0.0 matched the prior native overlay at 1:1; AA had no visible effect there. Candidate SHA-256 C900C403ABE7C131A33B332AB22C82060CDBE36D25507E2144575ACBEF4CEB11 is staged with MSVC/Vulkan sidecars; prior DLL is backed up. Earlier API/options, codec playback, subtitle-burned export, supersampling, Rust EmbeddedMpv/encode_clip, and H.264/HEVC D3D11VA probes passed. Full Tauri UI, clean-Windows dependencies, live missing-piece A/B, other subtitle controls and wider GPU/AV1 coverage remain pending."
 }

@@ -126,14 +126,16 @@
                  .color = {
                      (c >> 24) / 255.0f,
                      ((c >> 16) & 0xFF) / 255.0f,
-@@ -379,6 +421,40 @@
+@@ -379,6 +421,42 @@
              },
              .coords = coords,
          };
 +
-+        if (item->format == SUBBITMAP_LIBASS &&
-+            coords == PL_OVERLAY_COORDS_SRC_CROP && res.w > 0 && res.h > 0 &&
-+            vo->dwidth > 0 && vo->dheight > 0) {
++        // osd_state.h assigns render indices 0 and 1 to subtitle tracks.
++        if (item->format == SUBBITMAP_LIBASS && item->render_index <= 1 &&
++            (coords == PL_OVERLAY_COORDS_SRC_CROP ||
++             coords == PL_OVERLAY_COORDS_DST_FRAME) &&
++            res.w > 0 && res.h > 0 && vo->dwidth > 0 && vo->dheight > 0) {
 +            const bool window_scale = sub_opts->ass_scale_with_window;
 +            const bool upscale = supersample
 +                ? sample_scale_x >= 1.0f && sample_scale_y >= 1.0f
@@ -167,7 +169,7 @@
  
          switch (item->format) {
          case SUBBITMAP_BGRA:
-@@ -2132,6 +2208,8 @@
+@@ -2132,6 +2210,8 @@
      struct priv *p = vo->priv;
      p->opts_cache = m_config_cache_alloc(p, vo->global, &gl_video_conf);
      p->next_opts_cache = m_config_cache_alloc(p, vo->global, &gl_next_conf);

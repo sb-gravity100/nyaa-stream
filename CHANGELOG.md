@@ -15,7 +15,7 @@ step when cutting a release.
 - The tailored libmpv build includes D3D11VA/D3D11VA2 hardware decoders for H.264, HEVC and AV1, with software fallback when the device cannot decode a stream.
 
 ### Changed
-- Embedded mpv defaults to video-resolution ASS with Bicubic upscaling and downscaling, antialiasing off and blur 0.0. Settings can switch between blending subtitles with video and drawing them as a separate overlay; 2× window rendering remains available with the video path.
+- Embedded mpv defaults to video-resolution ASS with Bicubic upscaling and downscaling, antialiasing off and blur 0.0. Settings can blend subtitles with video or draw them as a separate overlay; both paths support the ASS filters and blur controls, and 2× window rendering remains available with video blending.
 
 ### Fixed
 - The mouse cursor hides after its idle timeout when `N` opens the next episode.

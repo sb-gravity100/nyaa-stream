@@ -949,10 +949,10 @@ yaa-stream screenshots.">
                   <option value="overlay">Overlay</option>
                 </select>
               </Row>
-              {rendering.composition === "overlay" ? (
-                <p class="settings-hint">Overlay uses mpv's native window-resolution subtitle renderer. The video-stage ASS controls stay saved for switching back.</p>
-              ) : (
-                <>
+              {rendering.composition === "overlay" && (
+                <p class="settings-hint">Overlay uses the ASS filters and window-resolution edge controls. At native window size, Bicubic with zero blur may look unchanged; increase the window blur for a visible softening.</p>
+              )}
+              {rendering.composition === "video" && (
               <Row label="Render resolution" hint="Video resolution renders subtitles at video size. 2× window renders ASS at twice the window resolution, then downsamples to video resolution before blending.">
                 <select
                   value={rendering.resolution}
@@ -962,6 +962,7 @@ yaa-stream screenshots.">
                   <option value="window">2× window, downsample to video</option>
                 </select>
               </Row>
+              )}
               <Row label="ASS upscaler">
                 <select
                   value={rendering.upscale}
@@ -980,6 +981,8 @@ yaa-stream screenshots.">
                   <option value="bicubic">Bicubic</option>
                 </select>
               </Row>
+              {rendering.composition === "video" && (
+                <>
               <Toggle
                 label="Antialias video-scaled ASS edges"
                 checked={rendering.videoAntialias}
@@ -988,16 +991,17 @@ yaa-stream screenshots.">
               <Row label={`Video-scaled ASS blur (${rendering.videoBlur.toFixed(1)})`}>
                 <input type="range" min={0} max={2} step={0.1} value={rendering.videoBlur} onInput={(event) => updateSettings({ subtitleRendering: { ...rendering, videoBlur: Number((event.currentTarget as HTMLInputElement).value) } })} />
               </Row>
+                </>
+              )}
               <Toggle
                 label="Antialias window-resolution ASS edges"
+                hint="At native overlay size this may not change the image; it matters when subtitle masks are downscaled."
                 checked={rendering.windowAntialias}
                 onChange={(value) => updateSettings({ subtitleRendering: { ...rendering, windowAntialias: value } })}
               />
               <Row label={`Window-resolution ASS blur (${rendering.windowBlur.toFixed(1)})`}>
                 <input type="range" min={0} max={2} step={0.1} value={rendering.windowBlur} onInput={(event) => updateSettings({ subtitleRendering: { ...rendering, windowBlur: Number((event.currentTarget as HTMLInputElement).value) } })} />
               </Row>
-                </>
-              )}
               <div class="settings-inline-actions">
                 <button class="link-button" onClick={() => updateSettings({ subtitleRendering: DEFAULT_MPV_SUBTITLE_RENDERING })}>
                   Reset ASS rendering
