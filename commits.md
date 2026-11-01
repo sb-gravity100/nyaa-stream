@@ -1,3 +1,14 @@
+### `30c8c9f` · 2026-11-01 · feat: smooth mpv overlay subtitles
+- `CHANGELOG.md`
+- `PHASES.md`
+- `docs/planning/MPV_BUILD.md`
+- `native/mpv/patches/mpv-ass-overlay-sampling.patch`
+- `native/mpv/sources.lock.json`
+- `src-tauri/lib/README.md`
+- `src/SettingsPanel.tsx`
+- `src/changelog.ts`
+- `src/subtitles.ts`
+
 ### `0656361` · 2026-11-01 · feat: update mpv subtitle rendering profile
 - `CHANGELOG.md`
 - `PHASES.md`
