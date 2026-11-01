@@ -1,3 +1,19 @@
+### `9813790` · 2026-11-01 · feat: add per-run playback diagnostics
+- `src-tauri/src/lib.rs`
+- `src-tauri/src/player.rs`
+- `src-tauri/src/logs_export.rs`
+- `crates/mpv-player/src/libmpv.rs`
+- `crates/mpv-player/src/stream.rs`
+- `crates/mpv-player/src/embedded.rs`
+- `crates/mpv-player/src/encode.rs`
+- `crates/sbtl-engine/src/torrent.rs`
+- `crates/torrent-engine/src/lib.rs`
+- `src/devLogger.ts`
+- `src/mpvVideo.ts`
+- `PLAN.md`
+- `PHASES.md`
+- `FILE_INDEX.md`
+- `docs/planning/MPV_SBTL_FIX_0.7.0.md`
 ### `2193683` · 2026-11-01 · docs: plan per-run log files
 - `PLAN.md`
 - `PHASES.md`
