@@ -146,7 +146,11 @@ The checklist below groups related work and does not override this order.
 - [~] Log next-episode click/autoplay/playlist selection to first frame in mpv
       and HLS. Run cached, partial and poorly seeded batches in the app to
       measure the result against the 2026-10-30 traces.
-- [ ] Implement the direct sbtl-to-mpv path in phases: P0 stock-libmpv
+- [ ] sbtl-side prerequisite (SB-owned, separate sbtl session): add
+      `sbtl_stream_wake`, make stream teardown/removal safe while mpv reads,
+      and expose `stalled_ms` in buffer info. The existing verified-read,
+      nonblocking, event-queue and seek APIs need no sbtl changes.
+- [ ] Implement this repository's mpv/app phases: P0 stock-libmpv
       `mpv_stream_cb_add_ro("sbtl")` baseline and metrics; P1 `sbtl://`
       registered ops vtable and cancellable reader (`wait` in 50 ms slices,
       `wake` on cancel); P2 shared `sbtl-buffer` property/cache-pause; P3 seek
@@ -155,12 +159,13 @@ The checklist below groups related work and does not override this order.
 - [ ] Compare direct sbtl and HTTP Range on cached, live and partial torrents:
       first byte/frame, random and sequential seeks, stalls, bytes requested,
       RSS and disk use. Accept only with zero wrong-byte reads and no resume or
-      stale-seek regressions; zero-copy remains optional and requires a verified
-      piece peek API.
+      stale-seek regressions.
 - [ ] Target one durable data copy: retain verified sbtl storage as the back
       cache, cap mpv packet buffers, disable mpv disk cache, and adapt sbtl's
       ahead window to bitrate/playback speed. Measure packet eviction before
       considering keyframe-aligned eviction changes.
+- [ ] Treat `sbtl_stream_peek`/release zero-copy as optional P5 work; require
+      verified-piece ownership/refcount safety and measured benefit before use.
 - [ ] Treat sliding-window torrent storage as optional P6 work; quantify disk
       savings against re-downloads on back-seek and reduced seeding.
 - [ ] Add preload timing choice: existing spare-bandwidth behavior (default)
