@@ -70,7 +70,7 @@ Anti-flicker rules (implement in P2):
 ## Debug / logging
 - `[sbtl]` prefix: reader-open -> first-byte latency (new),  seek (target ms, key offset, already available?, time to first byte), any wait > 100 ms, level transitions, 1 s stat (`ahead_ms`, `fill_rate`, RSS).
 - Every state change: `[sbtl] state A->B reason=... ahead=... eta=...`.
-- mpv: `--msg-level=all=info,sbtl=trace,demux=debug`.
+- mpv: `--msg-level=all=info,demux=debug,stream_callback=debug`; request libmpv debug messages, log every event/property summary, and suppress only identical repeated mpv log lines while reporting a count.
 
 ## Test / metrics (compare P0 vs HTTP path, then each patch)
 - Start-up time to first frame, seek latency (random + sequential), stall count/duration, RSS, disk usage, wrong-bytes = 0.
@@ -81,6 +81,7 @@ Anti-flicker rules (implement in P2):
 - `Cargo.lock` now resolves both `sbtl` and `sbtl-sys` to the current published `v0.2.0` tag commit. Direct streams switch to a 45-second playback-time read-ahead window when the container index exposes its measured bitrate; until then, sbtl retains its existing defaults.
 - Absolute seek commands now ask active direct streams to prioritize the indexed target keyframe before forwarding the command to mpv. HTTP/HLS playback and mpv's actual byte seek are unchanged when no direct reader or usable index is available.
 - The 45-second baseline window now scales with mpv playback speed (bounded to 15–180 seconds of indexed media).
+- Playback diagnostics now capture mpv debug output and event/property summaries, player command outcomes, and direct-stream callback lifecycle/read/seek totals; frontend logs redact credential values and raw stream URLs. Each app run starts a separate UTC timestamped log; the seven newest run files are retained.
 - Remaining implementation: locked mpv source patch and app/UI buffer signaling, generic demux seek hook, and pause hint. Keep this work in v0.7.0.
 
 ## Log findings (nyaa-stream_2026-11-01.log, sbtl clean: 0 sbtl_engine WARN/ERROR)

@@ -1965,32 +1965,109 @@ fn log_dir() -> std::path::PathBuf {
         .join("logs")
 }
 
+fn run_log_filename(now: std::time::SystemTime) -> String {
+    let elapsed = now.duration_since(std::time::UNIX_EPOCH).unwrap_or_default();
+    let days = (elapsed.as_secs() / 86_400) as i64;
+    let seconds_today = elapsed.as_secs() % 86_400;
+
+    // Civil date from days since 1970-01-01 (UTC).
+    let z = days + 719_468;
+    let era = z / 146_097;
+    let day_of_era = z - era * 146_097;
+    let year_of_era = (day_of_era - day_of_era / 1_460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
+    let year = year_of_era + era * 400;
+    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
+    let month_part = (5 * day_of_year + 2) / 153;
+    let day = day_of_year - (153 * month_part + 2) / 5 + 1;
+    let month = month_part + if month_part < 10 { 3 } else { -9 };
+    let year = year + i64::from(month <= 2);
+    let hour = seconds_today / 3_600;
+    let minute = (seconds_today % 3_600) / 60;
+    let second = seconds_today % 60;
+
+    format!(
+        "nyaa-stream.{year:04}-{month:02}-{day:02}T{hour:02}-{minute:02}-{second:02}.{:03}Z.log",
+        elapsed.subsec_millis()
+    )
+}
+
+fn create_run_log_file(dir: &std::path::Path) -> std::io::Result<(std::path::PathBuf, std::fs::File)> {
+    std::fs::create_dir_all(dir)?;
+    let base = run_log_filename(std::time::SystemTime::now());
+    for suffix in 0..100u32 {
+        let filename = if suffix == 0 {
+            base.clone()
+        } else {
+            base.replacen(".log", &format!("-{suffix}.log"), 1)
+        };
+        let path = dir.join(filename);
+        match std::fs::OpenOptions::new().write(true).create_new(true).open(&path) {
+            Ok(file) => return Ok((path, file)),
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(error) => return Err(error),
+        }
+    }
+    Err(std::io::Error::new(std::io::ErrorKind::AlreadyExists, "couldn't reserve a unique per-run log file"))
+}
+
+fn prune_run_logs(dir: &std::path::Path, current: &std::path::Path, keep: usize) -> std::io::Result<usize> {
+    let mut logs = Vec::new();
+    for entry in std::fs::read_dir(dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        let name = entry.file_name();
+        if path == current
+            || !entry.file_type()?.is_file()
+            || !name.to_string_lossy().starts_with("nyaa-stream.")
+            || path.extension().is_none_or(|extension| extension != "log")
+        {
+            continue;
+        }
+        let modified = entry.metadata()?.modified().unwrap_or(std::time::UNIX_EPOCH);
+        logs.push((modified, path));
+    }
+    logs.sort_by(|left, right| right.0.cmp(&left.0));
+    let mut removed = 0;
+    for (_, path) in logs.into_iter().skip(keep.saturating_sub(1)) {
+        std::fs::remove_file(path)?;
+        removed += 1;
+    }
+    Ok(removed)
+}
+
 /// Keeps the file writer's flush thread alive for the whole run.
 static LOG_GUARD: std::sync::OnceLock<tracing_appender::non_blocking::WorkerGuard> =
     std::sync::OnceLock::new();
 
-/// Logs to stdout (dev terminal) and to a daily-rotating file, since a release
-/// build has no console. Keeps the last 7 days.
+/// Logs to stdout (dev terminal) and to one timestamped file per app run,
+/// since a release build has no console. Keeps the seven most recent runs.
 fn init_logging() {
     use tracing_subscriber::prelude::*;
 
     let filter = tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-        "nyaa_stream_lib=debug,anilist_client=debug,nyaa_client=debug,torrent_engine=debug,mpv_player=debug,frontend=debug,info"
+        "nyaa_stream_lib=debug,anilist_client=debug,nyaa_client=debug,torrent_engine=debug,mpv_player=debug,mpv=debug,frontend=debug,info"
             .into()
     });
+    // Preserve the diagnostics this pass depends on even when RUST_LOG sets
+    // a coarser global level for the rest of the application.
+    let filter = filter
+        .add_directive("mpv=debug".parse().expect("valid static log directive"))
+        .add_directive("mpv_player=debug".parse().expect("valid static log directive"))
+        .add_directive("frontend=debug".parse().expect("valid static log directive"));
     let stdout = tracing_subscriber::fmt::layer();
-    let appender = tracing_appender::rolling::Builder::new()
-        .rotation(tracing_appender::rolling::Rotation::DAILY)
-        .filename_prefix("nyaa-stream")
-        .filename_suffix("log")
-        .max_log_files(7)
-        .build(log_dir());
-    match appender {
-        Ok(appender) => {
-            let (writer, guard) = tracing_appender::non_blocking(appender);
+    let dir = log_dir();
+    match create_run_log_file(&dir) {
+        Ok((path, file_handle)) => {
+            let (writer, guard) = tracing_appender::non_blocking(file_handle);
             let _ = LOG_GUARD.set(guard);
             let file = tracing_subscriber::fmt::layer().with_ansi(false).with_writer(writer);
             tracing_subscriber::registry().with(filter).with(stdout).with(file).init();
+            tracing::info!(path = %path.display(), "per-run log file opened");
+            match prune_run_logs(&dir, &path, 7) {
+                Ok(removed) if removed > 0 => tracing::info!(removed, "older per-run log files pruned"),
+                Ok(_) => {}
+                Err(error) => tracing::warn!(%error, "couldn't prune older per-run log files"),
+            }
         }
         Err(err) => {
             tracing_subscriber::registry().with(filter).with(stdout).init();

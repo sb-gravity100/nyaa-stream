@@ -30,9 +30,6 @@ const MPV_FORMAT_NODE_MAP: c_int = 8;
 
 const MPV_EVENT_SHUTDOWN: c_int = 1;
 const MPV_EVENT_LOG_MESSAGE: c_int = 2;
-/// Most mpv log lines written to our log per second; a decoder error storm
-/// is summarized instead of flooding it.
-const MAX_LOG_LINES_PER_SEC: u32 = 20;
 const MPV_EVENT_START_FILE: c_int = 6;
 const MPV_EVENT_END_FILE: c_int = 7;
 const MPV_EVENT_PROPERTY_CHANGE: c_int = 22;
@@ -336,18 +333,21 @@ impl Mpv {
         let (n, v) = (CString::new(name)?, CString::new(value)?);
         // SAFETY: valid handle and NUL-terminated strings.
         let code = unsafe { (self.lib.set_option_string)(self.handle.0, n.as_ptr(), v.as_ptr()) };
-        self.lib.check(code).with_context(|| format!("option {name}={value}"))
+        self.lib.check(code).with_context(|| format!("setting mpv option {name}"))
+            .inspect(|_| tracing::debug!(target: "mpv", option = name, "mpv option set"))
+            .inspect_err(|error| tracing::warn!(target: "mpv", option = name, %error, "mpv option rejected"))
     }
 
     pub fn initialize(&self) -> anyhow::Result<()> {
         // SAFETY: valid handle.
         let code = unsafe { (self.lib.initialize)(self.handle.0) };
         self.lib.check(code).context("mpv_initialize")
+            .inspect(|_| tracing::info!(target: "mpv", "libmpv initialized"))
+            .inspect_err(|error| tracing::error!(target: "mpv", %error, "libmpv initialization failed"))
     }
 
-    /// Writes mpv's own log messages at `level` and above ("warn", "error"...)
-    /// to our log (target `mpv`) from the event thread - decoder and demuxer
-    /// errors otherwise never reach it.
+    /// Writes mpv's own log messages at `level` and above to our log (target
+    /// `mpv`) from the event thread, including demux and stream diagnostics.
     pub fn request_log_messages(&self, level: &str) -> anyhow::Result<()> {
         let level_c = CString::new(level)?;
         // SAFETY: valid handle and NUL-terminated string.
@@ -364,7 +364,10 @@ impl Mpv {
         let thread = std::thread::Builder::new()
             .name("mpv-events".into())
             .spawn(move || event_loop(&lib, handle, &stop, sender))
-            .expect("spawning the mpv event thread");
+            .unwrap_or_else(|error| {
+                tracing::error!(%error, "couldn't spawn mpv event thread");
+                panic!("spawning the mpv event thread: {error}");
+            });
         *self.events.lock().unwrap() = Some(thread);
     }
 
@@ -373,19 +376,36 @@ impl Mpv {
     /// Returns the reply's `data`.
     pub fn command(&self, args: &[Value]) -> anyhow::Result<Value> {
         let name = args.first().and_then(Value::as_str).unwrap_or_default();
-        match (name, args) {
-            ("observe_property", [_, Value::Number(id), Value::String(property)]) => {
-                let id = id.as_u64().ok_or_else(|| anyhow!("observe_property id must be a non-negative integer"))?;
-                let property = CString::new(property.as_str())?;
-                // SAFETY: valid handle and property string.
-                let code = unsafe { (self.lib.observe_property)(self.handle.0, id, property.as_ptr(), MPV_FORMAT_NODE) };
-                self.lib.check(code)?;
-                Ok(Value::Null)
+        let property = matches!(name, "observe_property" | "get_property" | "set_property")
+            .then(|| args.get(1).and_then(Value::as_str))
+            .flatten();
+        let seek_seconds = (name == "seek").then(|| args.get(1).and_then(Value::as_f64)).flatten();
+        tracing::debug!(target: "mpv", command = name, property = ?property,
+            seek_seconds = ?seek_seconds, arg_count = args.len().saturating_sub(1),
+            "libmpv command started");
+        let started = std::time::Instant::now();
+        let result = (|| {
+            match (name, args) {
+                ("observe_property", [_, Value::Number(id), Value::String(property)]) => {
+                    let id = id.as_u64().ok_or_else(|| anyhow!("observe_property id must be a non-negative integer"))?;
+                    let property = CString::new(property.as_str())?;
+                    // SAFETY: valid handle and property string.
+                    let code = unsafe { (self.lib.observe_property)(self.handle.0, id, property.as_ptr(), MPV_FORMAT_NODE) };
+                    self.lib.check(code)?;
+                    Ok(Value::Null)
+                }
+                ("get_property", [_, Value::String(property)]) => self.get_property(property),
+                ("set_property", [_, Value::String(property), value]) => self.set_property(property, value),
+                _ => self.command_node(args),
             }
-            ("get_property", [_, Value::String(property)]) => self.get_property(property),
-            ("set_property", [_, Value::String(property), value]) => self.set_property(property, value),
-            _ => self.command_node(args),
+        })();
+        match &result {
+            Ok(_) => tracing::debug!(target: "mpv", command = name, property = ?property,
+                elapsed_ms = started.elapsed().as_millis() as u64, "libmpv command completed"),
+            Err(error) => tracing::warn!(target: "mpv", command = name, property = ?property,
+                elapsed_ms = started.elapsed().as_millis() as u64, %error, "libmpv command failed"),
         }
+        result
     }
 
     fn get_property(&self, property: &str) -> anyhow::Result<Value> {
@@ -439,29 +459,28 @@ impl Drop for Mpv {
     }
 }
 
-/// Per-second budget for mpv log lines (`MAX_LOG_LINES_PER_SEC`).
+/// Per-second de-duplication for identical mpv log lines.
 struct LogBudget {
     window_start: std::time::Instant,
-    lines: u32,
+    seen: std::collections::HashSet<String>,
     suppressed: u32,
 }
 
 impl LogBudget {
     fn new() -> Self {
-        Self { window_start: std::time::Instant::now(), lines: 0, suppressed: 0 }
+        Self { window_start: std::time::Instant::now(), seen: std::collections::HashSet::new(), suppressed: 0 }
     }
 
-    /// Whether this line may be logged; opens a new window each second and
-    /// reports what the previous one suppressed.
-    fn allow(&mut self) -> bool {
+    /// Logs each distinct line per second and suppresses only exact repeats.
+    fn allow(&mut self, level: &str, prefix: &str, text: &str) -> bool {
         if self.window_start.elapsed() >= std::time::Duration::from_secs(1) {
             if self.suppressed > 0 {
-                tracing::warn!(target: "mpv", suppressed = self.suppressed, "mpv log lines suppressed (rate limit)");
+                tracing::warn!(target: "mpv", suppressed = self.suppressed, "repeated identical mpv log lines suppressed");
             }
             *self = Self::new();
         }
-        if self.lines < MAX_LOG_LINES_PER_SEC {
-            self.lines += 1;
+        let key = format!("{level}\0{prefix}\0{text}");
+        if self.seen.insert(key) {
             true
         } else {
             self.suppressed += 1;
@@ -493,9 +512,9 @@ fn is_audio_decode_error(prefix: &str, level: &str, text: &str) -> bool {
         && (text.to_ascii_lowercase().contains("error decoding") || text.to_ascii_lowercase().contains("out-of-range"))
 }
 
-/// Writes one `mpv_event_log_message` to our log; a corruption line also
-/// becomes a `stream-corrupt` event for the frontend (see
-/// `is_corruption_message`), regardless of the log rate limit.
+/// Writes one `mpv_event_log_message` to our log; corruption and audio decoder
+/// diagnostics also become frontend events even when an identical log line
+/// was de-duplicated.
 ///
 /// # Safety
 /// `event` must be a live MPV_EVENT_LOG_MESSAGE from `mpv_wait_event`.
@@ -515,8 +534,8 @@ unsafe fn log_mpv_message(event: &MpvEvent, budget: &mut LogBudget) -> Option<Va
     } else {
         None
     };
-    if !budget.allow() {
-        return diagnostic_event.filter(|event| event["event"] == "stream-corrupt");
+    if !budget.allow(&level, &prefix, text) {
+        return diagnostic_event;
     }
     match level.as_str() {
         "fatal" | "error" => tracing::error!(target: "mpv", %prefix, "{text}"),
@@ -530,6 +549,7 @@ unsafe fn log_mpv_message(event: &MpvEvent, budget: &mut LogBudget) -> Option<Va
 fn event_loop(lib: &Lib, handle: Handle, stop: &AtomicBool, sender: mpsc::UnboundedSender<Value>) {
     tracing::debug!("mpv event thread started");
     let mut log_budget = LogBudget::new();
+    let mut receiver_closed_logged = false;
     while !stop.load(Ordering::Relaxed) {
         // SAFETY: valid handle; the event is only read before the next wait.
         let event = unsafe { &*(lib.wait_event)(handle.0, 1.0) };
@@ -549,14 +569,46 @@ fn event_loop(lib: &Lib, handle: Handle, stop: &AtomicBool, sender: mpsc::Unboun
             continue;
         }
         // SAFETY: `event` came from mpv_wait_event just above.
-        let Some(message) = (unsafe { event_to_json(lib, event) }) else { continue };
+        let Some(message) = (unsafe { event_to_json(lib, event) }) else {
+            tracing::debug!(target: "mpv", event_id, "ignored mpv event without an app payload");
+            continue;
+        };
+        log_event_summary(&message);
         if sender.send(message).is_err() {
             // Nobody listens any more (headless captures never read events);
             // keep draining so mpv's queue doesn't overflow.
+            if !receiver_closed_logged {
+                tracing::warn!(target: "mpv", "mpv event receiver closed; continuing to drain events");
+                receiver_closed_logged = true;
+            }
             continue;
         }
     }
     tracing::debug!("mpv event thread ended");
+}
+
+fn log_event_summary(message: &Value) {
+    let event = message.get("event").and_then(Value::as_str).unwrap_or("unknown");
+    if event == "property-change" {
+        let property = message.get("name").and_then(Value::as_str).unwrap_or("unknown");
+        let safe_value = matches!(property, "pause" | "paused-for-cache" | "speed" | "duration" | "eof-reached" | "volume" | "mute" | "aid" | "sid" | "vid" | "hwdec-current")
+            .then(|| message.get("data"))
+            .flatten();
+        if let Some(value) = safe_value {
+            tracing::debug!(target: "mpv", event, property, value = %value, "mpv event");
+        } else {
+            tracing::debug!(target: "mpv", event, property, "mpv event");
+        }
+        return;
+    }
+    tracing::debug!(
+        target: "mpv",
+        event,
+        reason = ?message.get("reason").and_then(|value| value.as_str()),
+        playlist_entry_id = ?message.get("playlist_entry_id").and_then(|value| value.as_i64()),
+        file_error_present = message.get("file_error").is_some(),
+        "mpv event"
+    );
 }
 
 /// The event as an IPC-style JSON line (`{"event": "...", ...}`), or `None`

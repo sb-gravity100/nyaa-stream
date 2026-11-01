@@ -77,6 +77,26 @@ function command(args: unknown[]): Promise<unknown> {
    return invoke("mpv_command", { args });
 }
 
+function summarizeMpvEvent(event: MpvEvent): Record<string, unknown> {
+   const summary: Record<string, unknown> = { event: event.event };
+   if (event.event === "property-change") {
+      summary.property = event.name;
+      if (["time-pos", "duration", "pause", "paused-for-cache", "eof-reached", "volume", "mute", "seeking", "speed"].includes(event.name ?? "")
+         && ["number", "boolean", "string"].includes(typeof event.data)) {
+         summary.value = event.data;
+      }
+   } else if (event.event === "start-file" || event.event === "end-file") {
+      summary.playlistEntryId = event.playlist_entry_id;
+      if (event.event === "end-file") {
+         summary.reason = event.reason;
+         summary.error = event.file_error;
+      }
+   } else if (event.event === "stream-corrupt" || event.event === "audio-decode-error") {
+      summary.prefix = event.prefix;
+   }
+   return summary;
+}
+
 /**
  * The embedded mpv player behind a small `HTMLVideoElement`-shaped facade
  * (`currentTime`, `paused`, `buffered`, `play()`, DOM-style events...) so
@@ -147,7 +167,13 @@ export class MpvVideo extends EventTarget {
     * load), so its packets are demuxed from the first byte instead of after
     * the on-open pick - PLAN.md "Subtitle preloading". */
    async load(url: string, start: number | null, subtitles?: { language: string; visible: boolean }): Promise<void> {
-      console.info("[mpv] loading", { url, start, subtitles });
+      const scheme = /^[a-z][a-z\d+.-]*:/i.exec(url)?.[0].slice(0, -1) ?? "local";
+      console.info("[mpv] loading", {
+         scheme,
+         start,
+         subtitleLanguage: subtitles?.language,
+         subtitlesVisible: subtitles?.visible,
+      });
       window.clearTimeout(this.subtitleCheckTimer);
       if (subtitles) {
          this.subtitleVisible = subtitles.visible;
@@ -520,6 +546,7 @@ export class MpvVideo extends EventTarget {
    }
 
    private handleEvent(e: MpvEvent) {
+      console.debug("[mpv] event", summarizeMpvEvent(e));
       switch (e.event) {
          case "property-change":
             if (e.name) this.handleProperty(e.name as Observed, e.data);

@@ -69,6 +69,7 @@ async fn encode_once(clip: &EncodeClip, encoder: &str, encoder_options: &str) ->
         ("config".into(), "no".into()),
         ("sub-visibility".into(), "yes".into()),
         ("sid".into(), clip.subtitle_id.map_or("no".to_string(), |id| id.to_string())),
+        ("msg-level".into(), "all=info,demux=debug".into()),
     ];
     if let Some(id) = clip.audio_id {
         options.push(("aid".into(), id.to_string()));
@@ -83,6 +84,9 @@ async fn encode_once(clip: &EncodeClip, encoder: &str, encoder_options: &str) ->
             mpv.set_option(name, value)?;
         }
         mpv.initialize()?;
+        if let Err(error) = mpv.request_log_messages("debug") {
+            tracing::warn!(%error, "couldn't request mpv log messages for clip export");
+        }
         mpv.start_events(events_tx);
         mpv.command(&["loadfile".into(), input.into()])?;
         Ok(mpv)

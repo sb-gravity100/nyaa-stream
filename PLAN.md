@@ -17,7 +17,7 @@ sbtl torrent streaming, embedded libmpv playback and an HLS fallback.
 |---|---|---|
 | v0.5.8 | Implemented pre-v0.6.0 work | Published |
 | v0.6.0 | Subtitle styling/smoothing plus context menus, custom magnets, artwork, thumbnails, seek previews, updates and bespoke installer | Published 2026-10-30; SB waived remaining Windows acceptance and deferred Fribb licensing; live-swarm and manual magnet acceptance remain open |
-| v0.7.0 | Custom libmpv and direct sbtl streaming first, then subtitle rendering, memory profiling, batch transitions, preload timing, seek dragging and player/settings accessibility | P0 direct `sbtl://` stream callback is implemented and pinned to published sbtl 0.2.0; a cleared-cache A/B is promising but not conclusive; indexed-bitrate read-ahead, speed-scaled window and app-side seek prefetch are implemented; playback/mpv logging now captures debug messages and lifecycle events with command redaction; mpv buffer-property/cache-pause hooks and broader runtime measurements remain pending; batch torrent/file reuse and season-aware handoff implemented |
+| v0.7.0 | Custom libmpv and direct sbtl streaming first, then subtitle rendering, memory profiling, batch transitions, preload timing, seek dragging and player/settings accessibility | P0 direct `sbtl://` stream callback is implemented and pinned to published sbtl 0.2.0; a cleared-cache A/B is promising but not conclusive; indexed-bitrate read-ahead, speed-scaled window and app-side seek prefetch are implemented; playback/mpv logging captures debug messages and lifecycle events, redacts command data, and creates a timestamped file per run; mpv buffer-property/cache-pause hooks and broader runtime measurements remain pending; batch torrent/file reuse and season-aware handoff implemented |
 | v0.8.0 | Navigation/Home rehaul and Discover | Planned |
 | v1.0.0 | Stabilization and 32-bit Windows | Planned |
 | v1.1.0 | Binge Mode | Idea; not implementation-ready |
@@ -173,19 +173,19 @@ See [detailed specification](docs/planning/PLAYBACK.md).
 
 See [detailed specification](docs/planning/PLAYBACK.md).
 
-## Playback and mpv logging coverage (planned, v0.7.0 - patch: diagnostics)
+## Playback and mpv logging coverage (implemented, v0.7.0 patch: diagnostics)
 
 Problem: playback traces span the frontend, Tauri commands, torrent readers and
-libmpv, while mpv currently forwards only warning-level messages. This makes
+libmpv, while mpv previously forwarded only warning-level messages. This made
 start, seek, cancellation, fallback and decode failures hard to connect.
 
-Fix: log player command categories, state transitions, stream lifecycle and
-read/seek outcomes, libmpv messages/events, and frontend event/error branches
-with shared playback correlation fields. Redact sensitive command values and
-credentials; rate-limit repetitive high-frequency records while retaining a
-suppression count. Start a fresh log file for each app run, named with that
-run's start timestamp. This is a diagnostics patch within v0.7.0, with no
-feature version change.
+Implemented: log player command categories and outcomes, stream callback
+lifecycle/read/seek totals, libmpv debug messages and event summaries, and
+frontend mpv event/error branches. Redact sensitive command values and media
+URLs; suppress only identical repeated mpv log lines while retaining a count.
+Each app run starts a new UTC timestamped log file, with the seven most recent
+run files retained. This is a diagnostics patch within v0.7.0, with no feature
+version change. `cargo check --workspace` and `npm run build` pass.
 
 ## 32-bit Windows support (planned, v1.0.0 - minor: new target)
 

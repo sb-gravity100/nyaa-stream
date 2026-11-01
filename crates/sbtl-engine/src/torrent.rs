@@ -478,23 +478,34 @@ impl MpvStream {
 
     pub fn seek(&self, offset: u64) -> std::io::Result<u64> {
         if self.cancelled.load(Ordering::SeqCst) {
+            tracing::debug!(offset, "sbtl mpv seek rejected because the stream was cancelled");
             return Err(std::io::Error::new(std::io::ErrorKind::Interrupted, "sbtl mpv stream cancelled"));
         }
         if offset > self.len {
+            tracing::warn!(offset, size = self.len, "sbtl mpv seek exceeds the file length");
             return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "seek beyond sbtl stream length"));
         }
+        let previous = self.position();
+        let available_bytes = self.stream.available(offset);
         if offset < self.len {
             match self.stream.wait(offset, 1, Duration::ZERO) {
                 Ok(_) | Err(sbtl::Error::WOULD_BLOCK) => {}
-                Err(error) => return Err(error.into()),
+                Err(error) => {
+                    tracing::warn!(previous, offset, %error, "sbtl mpv seek could not prepare the target");
+                    return Err(error.into());
+                }
             }
         }
         *self.position.lock().unwrap_or_else(|e| e.into_inner()) = offset;
+        tracing::debug!(previous, offset, available_bytes, "sbtl mpv byte seek completed");
         Ok(offset)
     }
 
     pub fn cancel(&self) {
-        self.cancelled.store(true, Ordering::SeqCst);
+        let already_cancelled = self.cancelled.swap(true, Ordering::SeqCst);
+        if !already_cancelled {
+            tracing::debug!("sbtl mpv stream cancellation requested");
+        }
         if let Err(error) = self.stream.wake() {
             tracing::debug!(%error, "sbtl mpv stream wake returned an error");
         }

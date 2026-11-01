@@ -10,7 +10,7 @@ use tauri::{AppHandle, State};
 
 use crate::player::PlayerState;
 
-/// Daily log files included, newest first.
+/// Per-run log files included, newest first.
 const MAX_LOG_FILES: usize = 7;
 
 /// Replaces the profile path (as written in logs: `\`, `/`, and

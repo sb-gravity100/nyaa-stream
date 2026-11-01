@@ -54,6 +54,7 @@ impl EmbeddedMpv {
             "--input-vo-keyboard=no".to_string(),
             "--no-input-cursor".to_string(),
             "--cursor-autohide=no".to_string(),
+            "--msg-level=all=info,demux=debug,stream_callback=debug".to_string(),
             "--hwdec=auto-safe".to_string(),
             "--vo=gpu-next,gpu,".to_string(),
             // Blend subtitles onto upscaled video frames. EWA Lanczos and
@@ -85,9 +86,9 @@ impl EmbeddedMpv {
             }
             apply_options(&mpv, &options)?;
             mpv.initialize()?;
-            // Decoder/demuxer warnings and errors go to our log (rate
-            // limited) - e.g. why a frame came out corrupted.
-            if let Err(err) = mpv.request_log_messages("warn") {
+            // Request the debug stream too, so demux/decoder details reach
+            // the app log (identical repeats are summarized by libmpv.rs).
+            if let Err(err) = mpv.request_log_messages("debug") {
                 tracing::warn!(%err, "couldn't request mpv log messages");
             }
             mpv.start_events(events);

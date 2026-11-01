@@ -37,6 +37,12 @@ struct AppMpvStreamProvider {
 
 struct AppMpvStream(Arc<torrent_engine::DirectMpvStream>);
 
+impl Drop for AppMpvStream {
+    fn drop(&mut self) {
+        tracing::debug!(size = self.0.len(), "app mpv stream reader released");
+    }
+}
+
 impl StreamReader for AppMpvStream {
     fn read(&self, buffer: &mut [u8]) -> std::io::Result<usize> {
         self.0.read(buffer)
@@ -211,17 +217,40 @@ pub async fn mpv_start(app: AppHandle, window: WebviewWindow, state: State<'_, P
 /// "time-pos"]`...) - the frontend owns playback logic.
 #[tauri::command]
 pub async fn mpv_command(state: State<'_, PlayerState>, args: Vec<Value>) -> Result<Value, String> {
-    // Property reads are the stats menu's once-a-second polling - trace, not
-    // debug, so they don't bury everything else.
-    if args.first().and_then(Value::as_str) == Some("get_property") {
-        tracing::trace!(?args, "mpv_command");
-    } else {
-        tracing::debug!(?args, "mpv_command");
-    }
+    let command = args.first().and_then(Value::as_str).unwrap_or("invalid");
+    let property = matches!(command, "get_property" | "set_property" | "observe_property")
+        .then(|| args.get(1).and_then(Value::as_str))
+        .flatten();
+    let seek_seconds = (command == "seek").then(|| args.get(1).and_then(Value::as_f64)).flatten();
+    let seek_mode = (command == "seek").then(|| args.get(2).and_then(Value::as_str)).flatten();
+    let speed = (command == "set_property" && property == Some("speed"))
+        .then(|| args.get(2).and_then(Value::as_f64))
+        .flatten();
+    let uri_scheme = (command == "loadfile")
+        .then(|| args.get(1).and_then(Value::as_str).and_then(|url| url.split_once(':').map(|(scheme, _)| scheme)))
+        .flatten();
+    let arg_count = args.len().saturating_sub(1);
+    tracing::debug!(command, property = ?property, seek_seconds = ?seek_seconds,
+        seek_mode = ?seek_mode, speed = ?speed, uri_scheme = ?uri_scheme,
+        arg_count, "mpv command received");
+
+    let Some(mpv) = state.mpv.lock().await.clone() else {
+        tracing::warn!(command, property = ?property, "mpv command rejected because the player is not running");
+        return Err("mpv is not running".to_string());
+    };
     update_direct_stream_speed(&state, &args);
     prefetch_absolute_seek(&state, &args);
-    let mpv = state.mpv.lock().await.clone().ok_or_else(|| "mpv is not running".to_string())?;
-    mpv.command(&args).await.map_err(|err| err.to_string())
+    let started = std::time::Instant::now();
+    match mpv.command(&args).await {
+        Ok(value) => {
+            tracing::debug!(command, property = ?property, elapsed_ms = started.elapsed().as_millis() as u64, "mpv command completed");
+            Ok(value)
+        }
+        Err(error) => {
+            tracing::warn!(command, property = ?property, elapsed_ms = started.elapsed().as_millis() as u64, %error, "mpv command failed");
+            Err(error.to_string())
+        }
+    }
 }
 
 /// Ask active sbtl readers to prioritize the target keyframe before libmpv

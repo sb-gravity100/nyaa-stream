@@ -198,6 +198,7 @@ impl DirectMpvStream {
     }
 
     pub fn cancel(&self) {
+        tracing::debug!(torrent_id = %self.torrent_id, file_idx = self.file_idx, "direct mpv stream cancellation forwarded");
         self.inner.cancel();
     }
 }
