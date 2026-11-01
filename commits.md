@@ -3778,3 +3778,6 @@ Commit log, newest first. Prepend a new entry after every commit.
 ### `0b05ef5` · 2026-11-01 · docs: detail sbtl buffering and storage plan
 - `PHASES.md`
 - `docs/planning/ROADMAP.md`
+### `e8907a7` · 2026-11-01 · docs: separate sbtl and mpv milestone ownership
+- `PHASES.md`
+- `docs/planning/ROADMAP.md`
