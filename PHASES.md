@@ -147,11 +147,11 @@ The checklist below groups related work and does not override this order.
 - [~] Log next-episode click/autoplay/playlist selection to first frame in mpv
       and HLS. Run cached, partial and poorly seeded batches in the app to
       measure the result against the 2026-10-30 traces.
-- [ ] Audit the playback path's logging end to end: player commands and state
-      transitions, direct sbtl stream open/read/seek/cancel, HTTP/HLS fallback,
-      libmpv messages/events, and frontend mpv event handling. Redact sensitive
-      command values, retain useful mpv info/debug details, and rate-limit only
-      repetitive high-frequency output.
+- [ ] Audit playback logging end to end: player commands and state transitions,
+      direct sbtl callback open/read/seek/cancel/close, libmpv debug messages and
+      events, plus frontend mpv event handling. Command/media URLs and credential
+      values are redacted; only identical repeated mpv lines are suppressed, with
+      a count. Start each app run in a new log file named by its start timestamp.
 - [x] Use sbtl 0.2.0's published DLL/API: `wake`, safe stream invalidation on
       removal, `stalled_ms`, verified reads and direct wait/seek APIs are present;
       refresh `Cargo.lock` to the current published `v0.2.0` tag commit.
