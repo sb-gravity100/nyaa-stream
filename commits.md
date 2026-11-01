@@ -1,3 +1,11 @@
+### `ac0d9d9` · 2026-11-01 · fix: hide idle cursor after next episode
+- `src/PlayerView.tsx`
+- `src/HlsPlayerView.tsx`
+- `src/changelog.ts`
+- `CHANGELOG.md`
+- `PHASES.md`
+- `docs/planning/ROADMAP.md`
+
 ### `e839a76` · 2026-11-01 · docs: record D3D11VA candidate under v0.7.0
 - `CHANGELOG.md`
 - `PHASES.md`
