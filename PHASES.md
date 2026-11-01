@@ -160,9 +160,12 @@ The checklist below groups related work and does not override this order.
       this is promising, not conclusive, and cached/live/partial cases remain.
 - [x] Configure the direct sbtl stream to switch to a 45-second playback-time
       read-ahead window once its container index reports a measured bitrate.
-- [ ] If measurements warrant it, add the later sbtl buffer property/cache-pause,
-      demux seek-time prefetch and bitrate/pause hints; preserve the app as the
-      sole sbtl event consumer.
+- [x] Before forwarding an absolute mpv seek command, ask the active direct
+      sbtl stream to prioritize the indexed keyframe at that target time;
+      preserve mpv's normal seek and HTTP/HLS behavior when no index is ready.
+- [ ] Add the custom mpv sbtl buffer property/cache-pause, generic demux
+      seek-time hook and pause/speed hints; preserve the app as the sole sbtl
+      event consumer.
 - [ ] Compare direct sbtl and HTTP Range on cached, live and partial torrents:
       first byte/frame, random and sequential seeks, stalls, bytes requested,
       RSS and disk use. Accept only with zero wrong-byte reads and no resume or

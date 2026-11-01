@@ -186,6 +186,12 @@ impl DirectMpvStream {
         self.inner.seek(offset)
     }
 
+    /// Starts indexed torrent prefetch for an absolute mpv seek without
+    /// waiting for an in-flight read or changing the reader's byte position.
+    pub fn prefetch_seek_time(&self, time: Duration) -> anyhow::Result<(u64, bool)> {
+        self.inner.prefetch_seek_time(time)
+    }
+
     pub fn cancel(&self) {
         self.inner.cancel();
     }

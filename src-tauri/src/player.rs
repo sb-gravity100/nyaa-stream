@@ -19,6 +19,9 @@ use tokio::sync::{mpsc, Mutex};
 #[derive(Default)]
 pub struct PlayerState {
     mpv: Mutex<Option<Arc<EmbeddedMpv>>>,
+    /// Weak handles to currently open direct sbtl readers. The frontend's
+    /// absolute seeks can prefetch by media time before mpv's byte seek.
+    active_mpv_streams: Arc<std::sync::Mutex<Vec<std::sync::Weak<torrent_engine::DirectMpvStream>>>>,
     /// Player views currently attached (`mpv_start` minus `mpv_stop`). On an
     /// episode change the new view's start can land before the old view's
     /// stop; only the last stop may unload the file and make the webview
@@ -27,9 +30,12 @@ pub struct PlayerState {
     attached: std::sync::atomic::AtomicUsize,
 }
 
-struct AppMpvStreamProvider(Arc<crate::AppState>);
+struct AppMpvStreamProvider {
+    app: Arc<crate::AppState>,
+    active_streams: Arc<std::sync::Mutex<Vec<std::sync::Weak<torrent_engine::DirectMpvStream>>>>,
+}
 
-struct AppMpvStream(torrent_engine::DirectMpvStream);
+struct AppMpvStream(Arc<torrent_engine::DirectMpvStream>);
 
 impl StreamReader for AppMpvStream {
     fn read(&self, buffer: &mut [u8]) -> std::io::Result<usize> {
@@ -59,7 +65,10 @@ impl StreamProvider for AppMpvStreamProvider {
             return Err(anyhow!("invalid sbtl stream URI"));
         }
         tracing::info!(torrent_id, file_idx, "opening mpv direct sbtl stream");
-        let stream = self.0.torrent_engine.open_mpv_stream(torrent_id, file_idx).context("opening sbtl stream for mpv")?;
+        let stream = Arc::new(self.app.torrent_engine.open_mpv_stream(torrent_id, file_idx).context("opening sbtl stream for mpv")?);
+        let mut active = self.active_streams.lock().unwrap_or_else(|error| error.into_inner());
+        active.retain(|stream| stream.strong_count() > 0);
+        active.push(Arc::downgrade(&stream));
         Ok(Box::new(AppMpvStream(stream)))
     }
 }
@@ -147,7 +156,10 @@ async fn ensure_mpv(app: &AppHandle, window: &WebviewWindow, state: &PlayerState
         extra_args.push(format!("--cache-pause-wait={pause_wait}"));
         let mpv = if mpv_player::supports_stream_callbacks() {
             let app_state = app.state::<Arc<crate::AppState>>();
-            let provider: Arc<dyn StreamProvider> = Arc::new(AppMpvStreamProvider(app_state.inner().clone()));
+            let provider: Arc<dyn StreamProvider> = Arc::new(AppMpvStreamProvider {
+                app: app_state.inner().clone(),
+                active_streams: state.active_mpv_streams.clone(),
+            });
             EmbeddedMpv::spawn_with_stream_provider(wid, &extra_args, provider, events_tx).await
         } else {
             tracing::warn!("libmpv lacks custom stream callbacks; direct sbtl playback disabled");
@@ -206,8 +218,53 @@ pub async fn mpv_command(state: State<'_, PlayerState>, args: Vec<Value>) -> Res
     } else {
         tracing::debug!(?args, "mpv_command");
     }
+    prefetch_absolute_seek(&state, &args);
     let mpv = state.mpv.lock().await.clone().ok_or_else(|| "mpv is not running".to_string())?;
     mpv.command(&args).await.map_err(|err| err.to_string())
+}
+
+/// Ask active sbtl readers to prioritize the target keyframe before libmpv
+/// starts resolving its normal byte seek. Non-absolute commands and streams
+/// without a ready index simply continue through the existing mpv path.
+fn prefetch_absolute_seek(state: &PlayerState, args: &[Value]) {
+    let Some(seconds) = args
+        .first()
+        .and_then(Value::as_str)
+        .filter(|command| *command == "seek")
+        .and_then(|_| args.get(1))
+        .and_then(Value::as_f64)
+        .filter(|seconds| seconds.is_finite() && *seconds >= 0.0)
+    else {
+        return;
+    };
+    if args.get(2).and_then(Value::as_str) != Some("absolute") {
+        return;
+    }
+
+    let streams = {
+        let mut active = state.active_mpv_streams.lock().unwrap_or_else(|error| error.into_inner());
+        let streams = active.iter().filter_map(std::sync::Weak::upgrade).collect::<Vec<_>>();
+        active.retain(|stream| stream.strong_count() > 0);
+        streams
+    };
+    if streams.is_empty() {
+        return;
+    }
+
+    let Ok(target) = Duration::try_from_secs_f64(seconds) else {
+        return;
+    };
+    for stream in streams {
+        match stream.prefetch_seek_time(target) {
+            Ok((key_offset, already_available)) => tracing::debug!(
+                target_seconds = seconds,
+                key_offset,
+                already_available,
+                "sbtl: prefetched absolute mpv seek"
+            ),
+            Err(error) => tracing::debug!(target_seconds = seconds, %error, "sbtl: indexed seek prefetch unavailable; continuing with mpv seek"),
+        }
+    }
 }
 
 /// libmpv's version, when the player has been started this run.

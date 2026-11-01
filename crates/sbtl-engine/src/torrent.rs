@@ -415,6 +415,15 @@ impl MpvStream {
         *self.position.lock().unwrap_or_else(|e| e.into_inner())
     }
 
+    /// Prioritizes the indexed keyframe for an upcoming player seek. This
+    /// changes sbtl's download priority but leaves mpv's byte-read position
+    /// alone; mpv still performs the actual seek through `seek` below.
+    pub fn prefetch_seek_time(&self, time: Duration) -> Result<(u64, bool)> {
+        let key = self.stream.seek_time(time)?;
+        let already_available = self.stream.available(key.offset) > 0;
+        Ok((key.offset, already_available))
+    }
+
     /// Reads verified bytes, waiting in bounded slices so cancellation can
     /// wake the callback promptly. A zero return is reserved for true EOF.
     pub fn read(&self, buffer: &mut [u8]) -> std::io::Result<usize> {

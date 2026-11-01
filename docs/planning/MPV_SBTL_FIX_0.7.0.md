@@ -25,7 +25,7 @@ sbtl (session owned by app) --ops vtable--> libmpv (stream_sbtl.c) --> demuxer -
 | P0 | Baseline: stock libmpv + `mpv_stream_cb_add_ro("sbtl")` | No fork. `cancel_fn` already bridged via `mp_cancel_set_cb`. Metrics reference. |
 | P1 | `include/mpv/sbtl.h`, `stream/stream_sbtl.c` | vtable + id registry; `read` loops `wait(50ms)`, WOULDBLOCK -> wait (never return 0, 0 = EOF); `cancel` -> `wake`. Edit `stream_list[]` (stream.c ~L45-85), `meson.build` (L186 sources, L1799 headers). |
 | P2 | Buffer-driven cache-pause + `sbtl-buffer` property | `STREAM_CTRL_GET_SBTL_BUFFER`; `playloop.c` L724-776: `is_low \|\| sbtl level < READY`; percent = `ahead_ms/ready_ms`; new option `--sbtl-ready-ms` (near `options.c` L662). Poll `sbtl_stream_get_buffer` ~10 Hz; **never drain `sbtl_next_event`** (single consumer = app). Property notified on change from `player/command.c`. |
-| P3 | Seek hook | In `demux_seek` (`demux.c` L3804) before `queue_seek`: `sbtl_media_seek_time(ms)` -> `sbtl_seq_seek(key_off)` so prefetch starts during the seek, not after first read. |
+| P3 | Seek hook | In nyaa-stream, intercept absolute seek commands before forwarding them to mpv and call `sbtl_media_seek_time(ms)` on the active direct stream. This starts indexed prefetch before mpv's normal byte seek. A future generic mpv fork can move the same hook into `demux_seek` before `queue_seek`; no separate `sbtl_seq_seek` is needed. |
 | P4 | Hints | `sbtl_stream_set_bitrate` = bitrate x playback speed (from `sbtl_media_get_info`); on pause `SBTL_IDLE_SEQ_AHEAD`; on seek preempt. |
 | P5 | Zero-copy (optional) | Needs `sbtl_stream_peek` (ptr+len+refcount into verified-piece cache) -> wrap as `AVBufferRef`. |
 
@@ -75,6 +75,12 @@ Anti-flicker rules (implement in P2):
 ## Test / metrics (compare P0 vs HTTP path, then each patch)
 - Start-up time to first frame, seek latency (random + sequential), stall count/duration, RSS, disk usage, wrong-bytes = 0.
 - Reuse sbtl `bench/` swarm + paced-playback harness (10 random seeks).
+
+## Implementation status (v0.7.0)
+- P0 direct `sbtl://` custom stream callbacks are implemented. The 2026-11-01 cleared-cache A/B log showed the sbtl run reaching first frame sooner than the HTTP run, with a cancelled first attempt and retry; treat the result as promising, not conclusive.
+- `Cargo.lock` now resolves both `sbtl` and `sbtl-sys` to the current published `v0.2.0` tag commit. Direct streams switch to a 45-second playback-time read-ahead window when the container index exposes its measured bitrate; until then, sbtl retains its existing defaults.
+- Absolute seek commands now ask active direct streams to prioritize the indexed target keyframe before forwarding the command to mpv. HTTP/HLS playback and mpv's actual byte seek are unchanged when no direct reader or usable index is available.
+- Remaining implementation: locked mpv source patch and app/UI buffer signaling, generic demux seek hook, and pause/speed hints. Keep this work in v0.7.0.
 
 ## Log findings (nyaa-stream_2026-11-01.log, sbtl clean: 0 sbtl_engine WARN/ERROR)
 **High**

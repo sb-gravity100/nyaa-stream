@@ -99,9 +99,10 @@ lower disk use. The required sbtl-side wake, safe stream teardown/invalidation
 and stalled-duration reporting are now present in the local sbtl 0.2.0 API and
 DLL. This repository has implemented the P0 app callback path, refreshed
 Cargo.lock to the current tag commit, and configured a 45-second playback-time
-read-ahead window once the container index supplies its bitrate. Remaining
-work includes P1+ mpv-side buffer/seek hooks and broader direct-vs-HTTP app
-measurements. Keep HLS FFmpeg independent. The custom DLL remains the stock
+read-ahead window once the container index supplies its bitrate, and the app
+prefetches indexed keyframes before forwarding absolute mpv seeks. Remaining
+work includes P1+ mpv-side buffer/cache-pause hooks and broader direct-vs-HTTP
+app measurements. Keep HLS FFmpeg independent. The custom DLL remains the stock
 mpv v0.41.0 build; P0 uses its
 public stream-callback API without a new mpv source patch. Phases and metrics
 are detailed in
