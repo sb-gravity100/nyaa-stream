@@ -67,7 +67,8 @@ const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 /** Jump when Shift is tapped in a file with no opening chapter marked - a
  * standard anime OP length. */
 const INTRO_SKIP_SECONDS = 90;
-const INTRO_CHAPTER = /^(op|opening|intro)\b|\bopening\b/i;
+const INTRO_CHAPTER = /\bintro\b/i;
+const OPENING_CHAPTER = /^(op|opening)\b|\bopening\b/i;
 const ENDING_CHAPTER = /^(ed|ending|outro|credits?)\b|\b(ending|outro|credits?)\b/i;
 const GENERIC_OPENING_CHAPTER = /^chapter\s*[12]$/i;
 const PROGRESS_SAVE_MS = 5000;
@@ -78,7 +79,10 @@ type OpEdRegion = "opening" | "ending";
 
 function chapterOpEdRegion(title: string, index: number, duration: number): OpEdRegion | null {
    const normalizedTitle = title.trim();
-   if (INTRO_CHAPTER.test(normalizedTitle)) return "opening";
+   if (INTRO_CHAPTER.test(normalizedTitle)) {
+      return duration >= 85 && duration <= 95 ? "opening" : null;
+   }
+   if (OPENING_CHAPTER.test(normalizedTitle)) return "opening";
    if (ENDING_CHAPTER.test(normalizedTitle)) return "ending";
    if (index < 2 && GENERIC_OPENING_CHAPTER.test(normalizedTitle) && duration >= 85 && duration <= 95) return "opening";
    return null;

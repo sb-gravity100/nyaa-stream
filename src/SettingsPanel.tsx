@@ -852,7 +852,7 @@ export function SettingsPanel({ onClose, playbackActive = false, showUpdates = f
             />
             <Toggle
               label="Auto-Skip OP/ED"
-              hint="Skips marked OP/ED chapters and generic Chapter 1/2 sections lasting 85–95 seconds. Embedded mpv only."
+              hint="Skips marked OP/ED chapters. Intro and generic Chapter 1/2 sections must last 85–95 seconds. Embedded mpv only."
               checked={settings.autoSkipOpEd}
               onChange={(v) => updateSettings({ autoSkipOpEd: v })}
             />

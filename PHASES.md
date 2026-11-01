@@ -214,8 +214,9 @@ The checklist below groups related work and does not override this order.
 - [x] Start the next episode immediately on end when autoplay is enabled;
       retain the setting to disable autoplay; verify in the app.
 - [x] Add Auto-Skip OP/ED (off by default): skip mpv chapters labeled OP/ED,
-      Opening/Ending/Intro/Outro/Credits; recognize generic Chapter 1/2 chapters
-      lasting 85–95 seconds as likely OPs. HLS chapter extraction is not implemented.
+      Opening/Ending/Outro/Credits; only treat an `Intro` chapter as an opening
+      when it lasts 85–95 seconds. Generic Chapter 1/2 chapters in that window
+      are also likely OPs. HLS chapter extraction is not implemented.
 - [x] Remove the side skip-opening prompt; tint OP and ED chapter spans on the
       seek bar. Verify Credits skipping and region colors in the running app.
 - [x] Keep player controls visible while the Statistics, Sources, Subtitles or

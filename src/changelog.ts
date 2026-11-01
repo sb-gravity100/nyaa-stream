@@ -19,7 +19,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Settings are organized into keyboard-navigable sections, and the player context menu opens a shortcut reference.",
       "Autoplay starts the next episode immediately. Player controls stay visible while a player popup is open.",
       "The seek bar highlights opening and ending chapter regions; the side skip-opening prompt is removed.",
-      "Auto-Skip OP/ED can skip labeled mpv chapters, including Credits; generic Chapter 1/2 chapters lasting 85–95 seconds are treated as openings. It is off by default.",
+      "Auto-Skip OP/ED can skip labeled mpv chapters, including Credits; Intro and generic Chapter 1/2 chapters lasting 85–95 seconds are treated as openings. It is off by default.",
     ],
     fixes: [
       "The mouse cursor hides after its idle timeout when N opens the next episode.",
