@@ -26,8 +26,9 @@
 | `docs/planning/ARCHITECTURE.md` | Stack/build prerequisites, workspace/data flow, sbtl engines, development and legacy gap inventory | docs, architecture |
 | `docs/planning/PLAYBACK.md` | Playback/cache/resume/subtitle/desktop specifications and historical measurements | docs, player |
 | `docs/planning/MATCHING.md` | Release matching, AnimeTosho dataset, rule-based search debugger | docs, search |
-| `docs/planning/ROADMAP.md` | Future milestone details: v0.7.0 player/memory/playback, navigation/Discover, x86 and Binge Mode | docs, planning |
+| `docs/planning/ROADMAP.md` | Future milestone details: v0.7.0 custom libmpv, direct sbtl-to-mpv streaming, player/memory/playback, navigation/Discover, x86 and Binge Mode | docs, planning |
 | `docs/planning/MPV_BUILD.md` | Custom libmpv v0.41.0 native Windows LLVM recipe, approved and locked dependency pins, isolated setup stages and acceptance gates | docs, planning, mpv, build-config |
+| `docs/planning/MPV_SBTL_FIX_0.7.0.md` | v0.7.0 design to replace loopback HTTP Range delivery with a registered direct `sbtl://` stream in mpv, including phased patches, buffer signaling, seek prefetch, risks and A/B metrics | docs, planning, mpv, sbtl, playback |
 | `docs/planning/RELEASING.md` | Release policy/tooling and dated release decisions; defers to active roadmap and current SB instructions | docs, release |
 | `PHASES.md` | Build order / task list | docs |
 | `commits.md` | Commit log (prepend after every commit) | docs |

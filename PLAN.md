@@ -17,7 +17,7 @@ sbtl torrent streaming, embedded libmpv playback and an HLS fallback.
 |---|---|---|
 | v0.5.8 | Implemented pre-v0.6.0 work | Published |
 | v0.6.0 | Subtitle styling/smoothing plus context menus, custom magnets, artwork, thumbnails, seek previews, updates and bespoke installer | Published 2026-10-30; SB waived remaining Windows acceptance and deferred Fribb licensing; live-swarm and manual magnet acceptance remain open |
-| v0.7.0 | Custom libmpv first, then native subtitle supersampling, memory profiling, batch transitions, preload timing and continuous seek dragging | Custom DLL staged; batch torrent/file reuse and season-aware handoff implemented; full app UI, live torrent and transition timing acceptance pending |
+| v0.7.0 | Custom libmpv and direct sbtl streaming first, then subtitle rendering, memory profiling, batch transitions, preload timing, seek dragging and player/settings accessibility | Custom DLL staged; direct `sbtl://` mpv integration is planned in [the sbtl/mpv design](docs/planning/MPV_SBTL_FIX_0.7.0.md); batch torrent/file reuse and season-aware handoff implemented; app acceptance pending |
 | v0.8.0 | Navigation/Home rehaul and Discover | Planned |
 | v1.0.0 | Stabilization and 32-bit Windows | Planned |
 | v1.1.0 | Binge Mode | Idea; not implementation-ready |
@@ -98,6 +98,7 @@ v0.7.0.
 | [Matching](docs/planning/MATCHING.md) | Matching, AnimeTosho and rule-based search debugger |
 | [Future milestones](docs/planning/ROADMAP.md) | v0.7.0 player/memory/playback, navigation, Discover, x86 and Binge Mode |
 | [Custom libmpv build](docs/planning/MPV_BUILD.md) | Native LLVM recipe, proposed dependency pins, setup stages and acceptance gates |
+| [Direct sbtl/mpv streaming](docs/planning/MPV_SBTL_FIX_0.7.0.md) | v0.7.0 design and phased work to replace loopback HTTP Range delivery with direct sbtl streams in libmpv |
 | [Releasing](docs/planning/RELEASING.md) | Release tooling/policy and dated release history |
 
 <details>

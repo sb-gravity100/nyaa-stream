@@ -87,6 +87,11 @@ ahead/seek behavior. The approved D3D11VA/D3D11VA2 decoders are now compiled
 for H.264, HEVC and AV1; headless runtime checks selected hardware decode for
 H.264/HEVC and software fallback for AV1 on this GPU. Full app UI and live
 missing-piece acceptance remain open.
+SB added a direct `sbtl://` stream integration to the v0.7.0 scope on
+2026-11-01. The current custom mpv v0.41.0 DLL still uses the existing HTTP
+Range path; the direct-stream work is a planned fork/integration, not part of
+the candidate already built. Design and measurement criteria:
+`docs/planning/MPV_SBTL_FIX_0.7.0.md`.
 The checklist below groups related work and does not override this order.
 - [x] Agree custom-DLL scope with SB: baseline x64, Lua, selected video/audio
       codecs, HDR/tone mapping, broad GPU support and software/hardware clip
@@ -141,6 +146,15 @@ The checklist below groups related work and does not override this order.
 - [~] Log next-episode click/autoplay/playlist selection to first frame in mpv
       and HLS. Run cached, partial and poorly seeded batches in the app to
       measure the result against the 2026-10-30 traces.
+- [ ] Implement the direct sbtl-to-mpv path in phases: P0 `mpv_stream_cb_add_ro`
+      baseline and metrics; P1 `sbtl://` registered ops vtable and cancellable
+      reader; P2 shared buffer property/cache-pause; P3 seek prefetch; P4
+      bitrate and pause hints. Keep the HTTP Range path as a fallback.
+- [ ] Compare direct sbtl and HTTP Range on cached, live and partial torrents:
+      first byte/frame, random and sequential seeks, stalls, bytes requested,
+      RSS and disk use. Accept only with zero wrong-byte reads and no resume or
+      stale-seek regressions; zero-copy remains optional and requires a verified
+      piece peek API.
 - [ ] Add preload timing choice: existing spare-bandwidth behavior (default)
       or only after the current episode file reaches 100% verified download
 - [ ] Verify file-level threshold (not whole torrent/playhead), already-cached

@@ -83,6 +83,18 @@ old and new DLLs on the same ASS, E-AC-3, seek-latency, and hardware-decoding
 cases, and confirms the existing
 embedded-player ABI and HLS fallback still work.
 
+**v0.7.0 direct sbtl-to-mpv streaming (design, 2026-11-01).** After the
+custom v0.41.0 DLL baseline, replace the torrent-engine loopback HTTP Range
+hop with an in-process `sbtl://` stream callback. The app owns the sbtl
+session and registers a read/wait/wake/seek/buffer vtable with libmpv; mpv
+does not link sbtl. Add shared buffer state and cache-pause reporting, seek
+prefetch hooks, and bitrate/pause hints, while preserving the HTTP reader as
+fallback until comparative live and partial-torrent measurements accept the
+new path. Keep HLS FFmpeg independent. Optional zero-copy depends on a verified
+piece peek API. The current custom DLL does not include this integration yet;
+phases and metrics are detailed in
+[MPV_SBTL_FIX_0.7.0.md](MPV_SBTL_FIX_0.7.0.md).
+
 **v0.7.0 batch transitions, next-episode preload, and seek dragging
 (requested 2026-10-29).**
 - The next episode now starts a two-second idle cursor timer when the mpv or
