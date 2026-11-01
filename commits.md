@@ -1,3 +1,6 @@
+### `634684c` · 2026-11-02 · docs: plan mpv sbtl buffer control
+- `PLAN.md`
+- `PHASES.md`
 ### `9813790` · 2026-11-01 · feat: add per-run playback diagnostics
 - `src-tauri/src/lib.rs`
 - `src-tauri/src/player.rs`
