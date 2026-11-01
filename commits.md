@@ -3756,3 +3756,16 @@ Commit log, newest first. Prepend a new entry after every commit.
 - `PLAN.md`
 - `PHASES.md`
 - `CHANGELOG.md`
+### `d24f748` · 2026-11-01 · feat: improve settings and player controls
+- `CHANGELOG.md`
+- `FILE_INDEX.md`
+- `PHASES.md`
+- `docs/planning/ROADMAP.md`
+- `src/App.css`
+- `src/HelpSection.tsx`
+- `src/HlsPlayerView.tsx`
+- `src/PlayerShortcuts.tsx`
+- `src/PlayerView.tsx`
+- `src/SettingsPanel.tsx`
+- `src/changelog.ts`
+- `src/settings.ts`
