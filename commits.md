@@ -1,3 +1,6 @@
+### `16c7225` · 2026-11-01 · docs: plan playback logging coverage
+- `PLAN.md`
+- `PHASES.md`
 ### `a3da9ec` · 2026-11-01 · perf: scale sbtl read-ahead with playback speed
 - `crates/sbtl-engine/src/torrent.rs`
 - `crates/torrent-engine/src/lib.rs`
