@@ -1,4 +1,8 @@
-### `e803813` · 2026-11-02 · feat: expose sbtl buffer state to mpv
+### `ee54e0b` · 2026-11-02 · fix: limit intro chapter skipping by duration
+- `src/PlayerView.tsx`
+- `src/SettingsPanel.tsx`
+- `src/changelog.ts`
+- `PHASES.md`### `e803813` · 2026-11-02 · feat: expose sbtl buffer state to mpv
 - `native/mpv/patches/mpv-sbtl-buffer.patch`
 - `native/mpv/sources.lock.json`
 - `crates/mpv-player/`
