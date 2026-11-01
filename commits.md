@@ -3799,3 +3799,7 @@ Commit log, newest first. Prepend a new entry after every commit.
 - `src-tauri/src/player.rs`
 - `src/PlayerView.tsx`
 - `src/types.ts`
+### `bbffe7b` · 2026-11-01 · fix: refresh local sbtl dependency for builds
+- `FILE_INDEX.md`
+- `docs/planning/ARCHITECTURE.md`
+- `package.json`
