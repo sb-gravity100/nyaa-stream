@@ -9,7 +9,8 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use mpv_player::EmbeddedMpv;
+use anyhow::{Context, anyhow};
+use mpv_player::{EmbeddedMpv, StreamProvider, StreamReader};
 use serde_json::Value;
 use tauri::webview::Color;
 use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow};
@@ -24,6 +25,43 @@ pub struct PlayerState {
     /// opaque again, or the video ends up hidden behind an opaque webview
     /// (or the new file gets stopped).
     attached: std::sync::atomic::AtomicUsize,
+}
+
+struct AppMpvStreamProvider(Arc<crate::AppState>);
+
+struct AppMpvStream(torrent_engine::DirectMpvStream);
+
+impl StreamReader for AppMpvStream {
+    fn read(&self, buffer: &mut [u8]) -> std::io::Result<usize> {
+        self.0.read(buffer)
+    }
+
+    fn seek(&self, offset: u64) -> std::io::Result<u64> {
+        self.0.seek(offset)
+    }
+
+    fn size(&self) -> u64 {
+        self.0.len()
+    }
+
+    fn cancel(&self) {
+        self.0.cancel();
+    }
+}
+
+impl StreamProvider for AppMpvStreamProvider {
+    fn open(&self, uri: &str) -> anyhow::Result<Box<dyn StreamReader>> {
+        let target = uri.strip_prefix("sbtl://").ok_or_else(|| anyhow!("unsupported custom stream URI"))?;
+        let mut parts = target.split('/');
+        let torrent_id = parts.next().unwrap_or_default();
+        let file_idx = parts.next().ok_or_else(|| anyhow!("sbtl URI is missing its file index"))?.parse::<usize>()?;
+        if parts.next().is_some() || torrent_id.len() != 40 || !torrent_id.bytes().all(|b| b.is_ascii_hexdigit()) {
+            return Err(anyhow!("invalid sbtl stream URI"));
+        }
+        tracing::info!(torrent_id, file_idx, "opening mpv direct sbtl stream");
+        let stream = self.0.torrent_engine.open_mpv_stream(torrent_id, file_idx).context("opening sbtl stream for mpv")?;
+        Ok(Box::new(AppMpvStream(stream)))
+    }
 }
 
 /// Whether libmpv can be loaded - the player falls back to HLS without it.
@@ -107,7 +145,15 @@ async fn ensure_mpv(app: &AppHandle, window: &WebviewWindow, state: &PlayerState
         let pause_wait = torrent_engine::MPV_CACHE_PAUSE_WAIT_SECS;
         tracing::debug!(pause_wait, "mpv cache-pause-wait");
         extra_args.push(format!("--cache-pause-wait={pause_wait}"));
-        let mpv = EmbeddedMpv::spawn(wid, &extra_args, events_tx).await.map_err(|err| err.to_string())?;
+        let mpv = if mpv_player::supports_stream_callbacks() {
+            let app_state = app.state::<Arc<crate::AppState>>();
+            let provider: Arc<dyn StreamProvider> = Arc::new(AppMpvStreamProvider(app_state.inner().clone()));
+            EmbeddedMpv::spawn_with_stream_provider(wid, &extra_args, provider, events_tx).await
+        } else {
+            tracing::warn!("libmpv lacks custom stream callbacks; direct sbtl playback disabled");
+            EmbeddedMpv::spawn(wid, &extra_args, events_tx).await
+        }
+        .map_err(|err| err.to_string())?;
         tokio::spawn(push_mpv_window_to_bottom(wid));
         let mpv = Arc::new(mpv);
         *slot = Some(mpv.clone());

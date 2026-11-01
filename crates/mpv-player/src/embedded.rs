@@ -9,6 +9,7 @@ use serde_json::Value;
 use tokio::sync::mpsc;
 
 use crate::libmpv::{apply_options, Mpv};
+use crate::stream::StreamProvider;
 
 pub struct EmbeddedMpv {
     mpv: Arc<Mpv>,
@@ -20,6 +21,26 @@ impl EmbeddedMpv {
     /// Every mpv event is forwarded to `events` as JSON; the channel closing
     /// means mpv shut down.
     pub async fn spawn(wid: i64, extra_options: &[String], events: mpsc::UnboundedSender<Value>) -> anyhow::Result<Self> {
+        Self::spawn_inner(wid, extra_options, None, events).await
+    }
+
+    /// Starts an embedded player with an application-owned custom stream
+    /// provider registered before mpv initialization.
+    pub async fn spawn_with_stream_provider(
+        wid: i64,
+        extra_options: &[String],
+        provider: Arc<dyn StreamProvider>,
+        events: mpsc::UnboundedSender<Value>,
+    ) -> anyhow::Result<Self> {
+        Self::spawn_inner(wid, extra_options, Some(provider), events).await
+    }
+
+    async fn spawn_inner(
+        wid: i64,
+        extra_options: &[String],
+        provider: Option<Arc<dyn StreamProvider>>,
+        events: mpsc::UnboundedSender<Value>,
+    ) -> anyhow::Result<Self> {
         tracing::debug!(wid, "starting embedded libmpv");
         let mut options = vec![
             format!("--wid={wid}"),
@@ -58,7 +79,10 @@ impl EmbeddedMpv {
         options.extend_from_slice(extra_options);
 
         let mpv = tokio::task::spawn_blocking(move || -> anyhow::Result<Mpv> {
-            let mpv = Mpv::new()?;
+            let mut mpv = Mpv::new()?;
+            if let Some(provider) = provider {
+                mpv.register_stream_provider(provider)?;
+            }
             apply_options(&mpv, &options)?;
             mpv.initialize()?;
             // Decoder/demuxer warnings and errors go to our log (rate

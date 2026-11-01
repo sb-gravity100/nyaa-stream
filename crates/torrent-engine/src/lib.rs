@@ -1,8 +1,9 @@
 use std::collections::HashMap;
+use std::io;
 use std::net::SocketAddr;
 use std::path::{Path as FsPath, PathBuf};
-use std::sync::Arc;
-use std::time::Duration;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
 use axum::extract::{Path, Query, State};
 use axum::routing::get;
@@ -10,7 +11,7 @@ use axum::Router;
 use axum_extra::headers::Range;
 use axum_extra::TypedHeader;
 use axum_range::{KnownSize, Ranged};
-use sbtl_engine::{Engine, ReadKind, Source};
+use sbtl_engine::{Engine, MpvStream as SbtlMpvStream, ReadKind, Source};
 pub use sbtl_engine::{BufferStatus, TorrentState};
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex as AsyncMutex;
@@ -28,7 +29,7 @@ pub mod read_stats;
 pub mod resume_buffer;
 mod subtitle_log;
 use direct_input::TorrentSources;
-use resume_buffer::{BufferedReader, LoadedBuffer, OpenReads, RecordingReader, ResumeBuffers};
+use resume_buffer::{BufferedReader, LoadedBuffer, OpenLogHandle, OpenReads, RecordingReader, ResumeBuffers};
 use read_stats::{ReadSnapshot, ReadStats, ReadSummary};
 use subtitle_log::SubtitleLogs;
 pub use media::H264Encoder;
@@ -120,6 +121,74 @@ pub struct TorrentEngine {
     resume_buffers: ResumeBuffers,
     read_stats: ReadStats,
     storyboards: Arc<StoryboardJobs>,
+}
+
+/// Direct, blocking reader passed to libmpv's custom stream callbacks.
+pub struct DirectMpvStream {
+    inner: SbtlMpvStream,
+    resume: Option<Arc<LoadedBuffer>>,
+    operation: Mutex<()>,
+    log: OpenLogHandle,
+    reads: Arc<read_stats::TorrentReads>,
+    torrent_id: TorrentId,
+    file_idx: usize,
+    opened_at: Instant,
+    first_byte_logged: std::sync::atomic::AtomicBool,
+}
+
+impl DirectMpvStream {
+    pub fn len(&self) -> u64 {
+        self.inner.len()
+    }
+
+    pub fn read(&self, buffer: &mut [u8]) -> io::Result<usize> {
+        let _operation = self.operation.lock().unwrap_or_else(|e| e.into_inner());
+        let position = self.inner.position();
+        let started = Instant::now();
+        let result = if let Some(bytes) = self.resume.as_ref().and_then(|resume| resume.slice_at(position)) {
+            let n = buffer.len().min(bytes.len());
+            buffer[..n].copy_from_slice(&bytes[..n]);
+            self.inner.seek(position + n as u64).map(|_| n)
+        } else {
+            self.inner.read(buffer)
+        };
+        let elapsed = started.elapsed();
+        if elapsed >= Duration::from_millis(10) {
+            self.reads.waited(elapsed);
+        }
+        match result {
+            Ok(n) => {
+                if n > 0 {
+                    self.log.add(position, position + n as u64);
+                    self.reads.read(n as u64);
+                    if !self.first_byte_logged.swap(true, std::sync::atomic::Ordering::SeqCst) {
+                        tracing::info!(torrent_id = %self.torrent_id, file_idx = self.file_idx, first_byte_ms = self.opened_at.elapsed().as_millis(), bytes = n, "direct mpv stream delivered first byte");
+                    }
+                }
+                if elapsed >= Duration::from_millis(100) {
+                    tracing::debug!(torrent_id = %self.torrent_id, file_idx = self.file_idx, pos = position, bytes = n, wait_ms = elapsed.as_millis(), "direct mpv stream read completed");
+                }
+                Ok(n)
+            }
+            Err(error) => {
+                if error.kind() == io::ErrorKind::Interrupted {
+                    tracing::debug!(torrent_id = %self.torrent_id, file_idx = self.file_idx, pos = position, "direct mpv stream read cancelled");
+                } else {
+                    tracing::warn!(torrent_id = %self.torrent_id, file_idx = self.file_idx, pos = position, wait_ms = elapsed.as_millis(), %error, "direct mpv stream read failed");
+                }
+                Err(error)
+            }
+        }
+    }
+
+    pub fn seek(&self, offset: u64) -> io::Result<u64> {
+        let _operation = self.operation.lock().unwrap_or_else(|e| e.into_inner());
+        self.inner.seek(offset)
+    }
+
+    pub fn cancel(&self) {
+        self.inner.cancel();
+    }
 }
 
 #[derive(Default)]
@@ -1518,6 +1587,25 @@ impl TorrentEngine {
     /// doc comment for why).
     pub fn stream_url(&self, torrent_id: &TorrentId, file_idx: usize) -> String {
         format!("http://{}/stream/{}/{}", self.stream_addr, torrent_id, file_idx)
+    }
+
+    /// Opens a torrent-backed stream for libmpv's `sbtl://` callbacks.
+    pub fn open_mpv_stream(&self, torrent_id: &str, file_idx: usize) -> anyhow::Result<DirectMpvStream> {
+        let torrent = self.torrents.get(torrent_id).ok_or_else(|| anyhow::anyhow!("unknown torrent {torrent_id}"))?;
+        self.torrents.touch_playback(torrent_id, file_idx, "mpv-direct");
+        let inner = torrent.open_mpv_stream(file_idx)?;
+        let torrent_id = torrent_id.to_string();
+        Ok(DirectMpvStream {
+            inner,
+            resume: self.resume_buffers.get(&torrent_id, file_idx),
+            operation: Mutex::new(()),
+            log: self.open_reads.log_for(&torrent_id, file_idx),
+            reads: self.read_stats.for_torrent(&torrent_id),
+            torrent_id: torrent_id.clone(),
+            file_idx,
+            opened_at: Instant::now(),
+            first_byte_logged: std::sync::atomic::AtomicBool::new(false),
+        })
     }
 
     /// URL for an HLS playlist covering a specific file within an

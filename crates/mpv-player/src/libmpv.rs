@@ -16,6 +16,8 @@ use anyhow::{anyhow, bail, Context};
 use serde_json::{json, Map, Number, Value};
 use tokio::sync::mpsc;
 
+use crate::stream::{self, ProviderContext, StreamProvider};
+
 const MPV_FORMAT_NONE: c_int = 0;
 const MPV_FORMAT_STRING: c_int = 1;
 const MPV_FORMAT_OSD_STRING: c_int = 2;
@@ -116,6 +118,8 @@ type WakeupFn = unsafe extern "C" fn(*mut c_void);
 type FreeNodeContentsFn = unsafe extern "C" fn(*mut MpvNode);
 type NameFn = unsafe extern "C" fn(c_int) -> *const c_char;
 type RequestLogMessagesFn = unsafe extern "C" fn(*mut c_void, *const c_char) -> c_int;
+type StreamCbAddFn = unsafe extern "C" fn(*mut c_void, *const c_char, *mut c_void, stream::OpenFn) -> c_int;
+type ClientApiVersionFn = unsafe extern "C" fn() -> u32;
 
 /// The resolved client-API entry points. `_library` keeps the DLL mapped for
 /// as long as any function pointer (or `Mpv`) is alive.
@@ -136,6 +140,8 @@ pub struct Lib {
     error_string: NameFn,
     event_name: NameFn,
     request_log_messages: RequestLogMessagesFn,
+    stream_cb_add_ro: Option<StreamCbAddFn>,
+    client_api_version: Option<ClientApiVersionFn>,
 }
 
 impl Lib {
@@ -158,6 +164,8 @@ impl Lib {
                 *unsafe { library.get(concat!($name, "\0").as_bytes()) }.with_context(|| format!("libmpv is missing {}", $name))?
             };
         }
+        let stream_cb_add_ro = unsafe { library.get::<StreamCbAddFn>(b"mpv_stream_cb_add_ro\0").ok().map(|f| *f) };
+        let client_api_version = unsafe { library.get::<ClientApiVersionFn>(b"mpv_client_api_version\0").ok().map(|f| *f) };
         Ok(Self {
             create: symbol!("mpv_create"),
             initialize: symbol!("mpv_initialize"),
@@ -173,6 +181,8 @@ impl Lib {
             error_string: symbol!("mpv_error_string"),
             event_name: symbol!("mpv_event_name"),
             request_log_messages: symbol!("mpv_request_log_messages"),
+            stream_cb_add_ro,
+            client_api_version,
             path: path.to_path_buf(),
             _library: library,
         })
@@ -262,6 +272,16 @@ pub fn is_available() -> bool {
     library().is_ok()
 }
 
+/// Whether the selected libmpv supports cancellable custom read-only streams.
+/// Without the cancel callback, a read parked on a missing torrent piece
+/// cannot be interrupted promptly when mpv seeks or replaces the file.
+pub fn supports_stream_callbacks() -> bool {
+    library().is_ok_and(|lib| {
+        let Some(api_version) = lib.client_api_version else { return false };
+        lib.stream_cb_add_ro.is_some() && unsafe { api_version() >= ((1 << 16) | 106) }
+    })
+}
+
 #[derive(Clone, Copy)]
 struct Handle(*mut c_void);
 // SAFETY: the mpv client API is thread-safe: any thread may call it on a handle.
@@ -276,6 +296,7 @@ pub struct Mpv {
     handle: Handle,
     stop: Arc<AtomicBool>,
     events: Mutex<Option<JoinHandle<()>>>,
+    stream_context: Option<Box<ProviderContext>>,
 }
 
 impl Mpv {
@@ -287,7 +308,27 @@ impl Mpv {
             bail!("mpv_create failed");
         }
         tracing::debug!("libmpv instance created");
-        Ok(Self { lib, handle: Handle(handle), stop: Arc::default(), events: Mutex::new(None) })
+        Ok(Self { lib, handle: Handle(handle), stop: Arc::default(), events: Mutex::new(None), stream_context: None })
+    }
+
+    /// Registers `sbtl://` before initialization. The provider context stays
+    /// alive until the mpv core is destroyed, after stream close callbacks.
+    pub fn register_stream_provider(&mut self, provider: Arc<dyn StreamProvider>) -> anyhow::Result<()> {
+        let add = self.lib.stream_cb_add_ro.ok_or_else(|| anyhow!("libmpv does not export mpv_stream_cb_add_ro"))?;
+        let api_version = self.lib.client_api_version.map(|version| unsafe { version() }).unwrap_or(0);
+        let cancel_supported = api_version >= ((1 << 16) | 106);
+        if !cancel_supported {
+            bail!("direct sbtl streams require libmpv client API 1.106 or newer for cancellation");
+        }
+        let context = Box::new(ProviderContext { provider, cancel_supported });
+        let protocol = CString::new("sbtl")?;
+        // SAFETY: context is retained by this Mpv until after core destruction;
+        // registration is made before mpv_initialize.
+        let code = unsafe { add(self.handle.0, protocol.as_ptr(), (&*context as *const ProviderContext).cast_mut().cast(), stream::open_stream) };
+        self.lib.check(code).context("mpv_stream_cb_add_ro(sbtl)")?;
+        self.stream_context = Some(context);
+        tracing::info!(api_version, "registered direct sbtl stream protocol with libmpv");
+        Ok(())
     }
 
     /// Sets a pre-initialize option (`--name=value` on mpv's command line).

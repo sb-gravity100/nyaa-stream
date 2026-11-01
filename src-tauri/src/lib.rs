@@ -27,11 +27,11 @@ use tauri::{Emitter, Manager, State};
 use tokio::sync::Mutex;
 use torrent_engine::{largest_video_file, DecoderSupport, StreamStats, SubtitleTrack, TorrentEngine, TorrentFile, TorrentId};
 
-struct AppState {
+pub(crate) struct AppState {
     anilist: AniListClient,
     kitsu: KitsuClient,
     nyaa: NyaaClient,
-    torrent_engine: TorrentEngine,
+    pub(crate) torrent_engine: TorrentEngine,
     /// The torrent currently backing playback, if any - tracked so
     /// `stop_playback` can remove it from the session (stop seeding, drop
     /// partial files) once the user is done, mirroring how the
@@ -1364,9 +1364,12 @@ struct PlayFile {
     /// Base HLS playlist URL for this file - the frontend appends
     /// `?duration=<seconds>`.
     hls_url: String,
-    /// Raw Range-capable byte stream of this file - what the embedded mpv
-    /// player opens.
+    /// Raw Range-capable HTTP stream, retained for HLS and older libmpv builds.
     stream_url: String,
+    /// Direct sbtl callback URL when the selected libmpv exports that API.
+    /// The HTTP URL remains available for older libmpv builds and HLS.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    mpv_url: Option<String>,
     /// The file name's episode label (same parser as search results).
     label: nyaa_client::EpisodeLabel,
 }
@@ -1400,6 +1403,8 @@ async fn play_magnet(
     trace: Option<u64>,
 ) -> Result<PlaySession, String> {
     tracing::debug!(%title, ?episode, ?trace, "play_magnet invoked");
+    let direct_mpv_streams = tokio::task::spawn_blocking(mpv_player::supports_stream_callbacks).await.unwrap_or(false);
+    tracing::info!(direct_mpv_streams, "selected embedded libmpv stream callback support");
     // Load profiler stages (see load_trace).
     let mark = |stage: &str, duration: Option<Duration>, detail: Option<String>| {
         if let Some(id) = trace {
@@ -1475,6 +1480,7 @@ async fn play_magnet(
         .map(|file| PlayFile {
             hls_url: state.torrent_engine.hls_playlist_url(&added.id, file.index),
             stream_url: state.torrent_engine.stream_url(&added.id, file.index),
+            mpv_url: direct_mpv_streams.then(|| format!("sbtl://{}/{}", added.id, file.index)),
             label: nyaa_client::EpisodeLabel::of_path(&file.name),
             file,
         })

@@ -206,7 +206,7 @@ impl OpenReads {
 pub(crate) struct OpenLogHandle(Arc<Mutex<OpenLog>>);
 
 impl OpenLogHandle {
-    fn add(&self, start: u64, end: u64) {
+    pub(crate) fn add(&self, start: u64, end: u64) {
         self.0.lock().unwrap_or_else(|e| e.into_inner()).add(start, end);
     }
 }

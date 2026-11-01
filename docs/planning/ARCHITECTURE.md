@@ -711,8 +711,16 @@ a pushed sbtl tag is never moved or re-created.
   mismatching DLL fails at session start (`sbtl_abi_version`), and
   `scripts/release.mjs` refuses a release whose `native/sbtl/VERSION` is not
   the pinned tag.
-- **API changes** come in pairs, in one sitting: the sbtl tag, then the
-  nyaa adapter commit (nyaa is sbtl's only consumer).
+- **Local v0.2.0 integration (2026-11-01):** SB's sbtl 0.2.0 API and DLL are
+  available in the sibling checkout and `native/sbtl`, but the v0.2.0 Git tag
+  is not available from the remote yet. The nyaa P0 direct-stream adapter is
+  being implemented against that local API. Keep the published Cargo tag at
+  v0.1.1 until v0.2.0 is pushed; local development must use
+  `npm run dev:sbtl-local`. Do not release with this version mismatch.
+- API changes are normally paired (the sbtl tag, native DLL, Cargo pin and
+  nyaa adapter), but this v0.2.0 adapter follows SB's sbtl implementation in a
+  separate session; complete the pin/DLL release alignment once the tag is
+  available remotely.
 
 | sbtl | nyaa commit | what changed |
 |---|---|---|

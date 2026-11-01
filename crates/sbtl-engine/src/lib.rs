@@ -18,7 +18,7 @@ mod torrent;
 pub mod tracker_prober;
 pub mod trackers;
 
-pub use torrent::{BufferStatus, FileInfo, FileStats, READY_MS, ReadKind, Reader, Torrent, TorrentState, TorrentStats};
+pub use torrent::{BufferStatus, FileInfo, FileStats, MpvStream, READY_MS, ReadKind, Reader, Torrent, TorrentState, TorrentStats};
 
 use std::collections::HashMap;
 use std::path::PathBuf;

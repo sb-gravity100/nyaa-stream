@@ -718,14 +718,15 @@ function MpvPlayerView({
       const video = videoEl;
       if (!video || !selectedFile) return;
       const startAt = resumeAtRef.current;
-      console.info("[player] loading file", { file: selectedFile.name, startAt });
+      const streamUrl = selectedFile.mpvUrl ?? selectedFile.streamUrl;
+      console.info("[player] loading file", { file: selectedFile.name, startAt, directSbtl: streamUrl.startsWith("sbtl://") });
       traceMark(startTraceRef.current, "loadfile", startAt != null ? `start=${Math.round(startAt)}s` : undefined);
       const subs = getSettingsSnapshot();
-      video.load(selectedFile.streamUrl, startAt, { language: subs.subtitleLanguage, visible: subs.subtitlesEnabled }).catch((err) => {
+      video.load(streamUrl, startAt, { language: subs.subtitleLanguage, visible: subs.subtitlesEnabled }).catch((err) => {
          console.error("[player] loadfile failed", { err: String(err) });
          setError(`Couldn't open this file: ${String(err)}`);
       });
-   }, [videoEl, selectedFile?.streamUrl]);
+   }, [videoEl, selectedFile?.streamUrl, selectedFile?.mpvUrl]);
 
    useEffect(() => {
       if (torrentId == null || !selectedFile) return;

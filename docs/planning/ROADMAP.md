@@ -95,12 +95,14 @@ mpv disk caching and using sbtl as the durable back cache; adapt sbtl's window
 to bitrate and playback speed. Measure keyframe-aligned eviction before
 patching it. Optional zero-copy depends on a verified-piece peek API, and
 optional sliding-window storage trades back-seek redownloads and seeding for
-lower disk use. SB plans to implement the required sbtl-side wake, safe stream
-teardown/invalidation and stalled-duration reporting in a separate sbtl
-session. This repository's 0.7.0 work consumes those APIs and implements the
-mpv stream, buffering property, seek hooks and app/UI integration. Keep HLS
-FFmpeg independent. The current custom DLL does not include this integration yet;
-phases and metrics are detailed in
+lower disk use. The required sbtl-side wake, safe stream teardown/invalidation
+and stalled-duration reporting are now present in the local sbtl 0.2.0 API and
+DLL. This repository has implemented the P0 app callback path against that
+local API; remaining work includes published-tag alignment, P1+ mpv-side
+buffer/seek hooks, and direct-vs-HTTP app measurements. Keep HLS FFmpeg
+independent. The custom DLL remains the stock mpv v0.41.0 build; P0 uses its
+public stream-callback API without a new mpv source patch. Phases and metrics
+are detailed in
 [MPV_SBTL_FIX_0.7.0.md](MPV_SBTL_FIX_0.7.0.md).
 
 **v0.7.0 batch transitions, next-episode preload, and seek dragging

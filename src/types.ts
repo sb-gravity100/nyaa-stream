@@ -115,8 +115,10 @@ export interface PlayFile {
   isVideo: boolean;
   /** Base HLS playlist URL - append `?duration=<seconds>` before use. */
   hlsUrl: string;
-  /** Raw Range-capable byte stream - what the embedded mpv opens. */
+  /** Raw HTTP Range stream for HLS and libmpv builds without stream callbacks. */
   streamUrl: string;
+  /** Direct sbtl callback URL for libmpv builds that support stream callbacks. */
+  mpvUrl?: string;
   /** The file name's episode label, parsed by the backend. */
   label?: EpisodeLabel;
 }

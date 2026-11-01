@@ -88,9 +88,10 @@ for H.264, HEVC and AV1; headless runtime checks selected hardware decode for
 H.264/HEVC and software fallback for AV1 on this GPU. Full app UI and live
 missing-piece acceptance remain open.
 SB added a direct `sbtl://` stream integration to the v0.7.0 scope on
-2026-11-01. The current custom mpv v0.41.0 DLL still uses the existing HTTP
-Range path; the direct-stream work is a planned fork/integration, not part of
-the candidate already built. Design and measurement criteria:
+2026-11-01. The P0 path now uses stock mpv v0.41.0's public stream callback
+API with local sbtl 0.2.0; it does not require an mpv DLL fork. HTTP Range
+remains the fallback. Direct-vs-HTTP playback measurements are still open.
+Design and measurement criteria:
 `docs/planning/MPV_SBTL_FIX_0.7.0.md`.
 The checklist below groups related work and does not override this order.
 - [x] Agree custom-DLL scope with SB: baseline x64, Lua, selected video/audio
@@ -146,16 +147,19 @@ The checklist below groups related work and does not override this order.
 - [~] Log next-episode click/autoplay/playlist selection to first frame in mpv
       and HLS. Run cached, partial and poorly seeded batches in the app to
       measure the result against the 2026-10-30 traces.
-- [ ] sbtl-side prerequisite (SB-owned, separate sbtl session): add
-      `sbtl_stream_wake`, make stream teardown/removal safe while mpv reads,
-      and expose `stalled_ms` in buffer info. The existing verified-read,
-      nonblocking, event-queue and seek APIs need no sbtl changes.
-- [ ] Implement this repository's mpv/app phases: P0 stock-libmpv
-      `mpv_stream_cb_add_ro("sbtl")` baseline and metrics; P1 `sbtl://`
-      registered ops vtable and cancellable reader (`wait` in 50 ms slices,
-      `wake` on cancel); P2 shared `sbtl-buffer` property/cache-pause; P3 seek
-      prefetch; P4 bitrate-adaptive window and pause/seek hints. Keep the HTTP
-      Range path as a fallback and leave event consumption with the app.
+- [x] Use the local sbtl 0.2.0 DLL/API: `wake`, safe stream invalidation on
+      removal, `stalled_ms`, verified reads and direct wait/seek APIs are present.
+      Keep the app's Cargo dependency pinned to the published tag until v0.2.0
+      is available remotely; local builds use `npm run dev:sbtl-local`.
+- [x] Implement P0 using stock libmpv's `mpv_stream_cb_add_ro("sbtl")`:
+      direct `sbtl://<infohash>/<file-index>` URLs, cancellable verified-byte
+      reader, torrent-lifetime guard, open-read/resume accounting, and first-byte
+      logging. Older libmpv builds retain the HTTP URL fallback.
+- [ ] Measure P0 against HTTP Range in the app on identical cached, live and
+      partial torrents before changing mpv cache defaults or adding core patches.
+- [ ] If measurements warrant it, add the later sbtl buffer property/cache-pause,
+      demux seek-time prefetch and bitrate/pause hints; preserve the app as the
+      sole sbtl event consumer.
 - [ ] Compare direct sbtl and HTTP Range on cached, live and partial torrents:
       first byte/frame, random and sequential seeks, stalls, bytes requested,
       RSS and disk use. Accept only with zero wrong-byte reads and no resume or

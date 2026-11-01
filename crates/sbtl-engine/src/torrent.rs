@@ -14,7 +14,7 @@ use std::collections::HashMap;
 use std::io::Seek;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
@@ -111,7 +111,22 @@ struct Streams {
     _idle: sbtl::Stream,
     preload: Option<(usize, sbtl::Stream)>,
     /// Newest foreground reader per file (weak: doesn't keep it open).
-    probes: HashMap<usize, sbtl::BufferProbe>,
+    probes: HashMap<usize, ReaderProbe>,
+}
+
+#[derive(Clone)]
+enum ReaderProbe {
+    Async(sbtl::BufferProbe),
+    Direct(std::sync::Weak<sbtl::Stream>),
+}
+
+impl ReaderProbe {
+    fn buffer(&self) -> Option<sbtl::BufferInfo> {
+        match self {
+            Self::Async(probe) => probe.buffer(),
+            Self::Direct(stream) => stream.upgrade().map(|stream| stream.buffer()),
+        }
+    }
 }
 
 pub struct Torrent {
@@ -247,7 +262,7 @@ impl Torrent {
         stream.set_buffer_targets(Some(Duration::from_millis(READY_MS)), None);
         let stream = sbtl::AsyncStream::from(stream);
         if foreground {
-            self.streams.lock().unwrap_or_else(|e| e.into_inner()).probes.insert(file_idx, stream.buffer_probe());
+            self.streams.lock().unwrap_or_else(|e| e.into_inner()).probes.insert(file_idx, ReaderProbe::Async(stream.buffer_probe()));
         }
         self.readers.fetch_add(1, Ordering::SeqCst);
         tracing::info!(info_hash = %self.info_hash, file_idx, offset, ?kind, "sbtl: reader opened");
@@ -255,6 +270,36 @@ impl Torrent {
             size: file.size,
             name: self.relative(file),
             stream,
+            _open: OpenReader(self.readers.clone()),
+        })
+    }
+
+    /// Opens a blocking, thread-safe reader for libmpv's stream callback API.
+    /// This owns the sbtl stream until mpv closes its callback cookie, so the
+    /// torrent lifecycle cannot remove it while demux is reading.
+    pub fn open_mpv_stream(&self, file_idx: usize) -> Result<MpvStream> {
+        self.touch();
+        let files = self.sbtl_files();
+        let file = files.get(file_idx).ok_or_else(|| anyhow!("no file {file_idx} in {}", self.info_hash))?;
+        let opts = sbtl::StreamOptions {
+            sequential: true,
+            idle: sbtl::Idle::SeqAhead,
+            tail_prefetch: true,
+            media_probe: true,
+            bitrate: None,
+            read_timeout: None,
+        };
+        let stream = self.torrent.open_stream(file_idx as u32, &opts).map_err(|e| anyhow!("sbtl mpv stream for file {file_idx}: {e}"))?;
+        stream.set_buffer_targets(Some(Duration::from_secs(3)), None);
+        let stream = Arc::new(stream);
+        self.streams.lock().unwrap_or_else(|e| e.into_inner()).probes.insert(file_idx, ReaderProbe::Direct(Arc::downgrade(&stream)));
+        self.readers.fetch_add(1, Ordering::SeqCst);
+        tracing::info!(info_hash = %self.info_hash, file_idx, length = file.size, "sbtl: direct mpv stream opened");
+        Ok(MpvStream {
+            stream,
+            position: Mutex::new(0),
+            cancelled: AtomicBool::new(false),
+            len: file.size,
             _open: OpenReader(self.readers.clone()),
         })
     }
@@ -322,6 +367,83 @@ pub struct Reader {
     pub name: String,
     stream: sbtl::AsyncStream,
     _open: OpenReader,
+}
+
+/// Direct, seekable sbtl stream used by libmpv's synchronous callbacks.
+pub struct MpvStream {
+    stream: Arc<sbtl::Stream>,
+    position: Mutex<u64>,
+    cancelled: AtomicBool,
+    len: u64,
+    _open: OpenReader,
+}
+
+impl MpvStream {
+    pub fn len(&self) -> u64 {
+        self.len
+    }
+
+    pub fn position(&self) -> u64 {
+        *self.position.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// Reads verified bytes, waiting in bounded slices so cancellation can
+    /// wake the callback promptly. A zero return is reserved for true EOF.
+    pub fn read(&self, buffer: &mut [u8]) -> std::io::Result<usize> {
+        if buffer.is_empty() {
+            return Ok(0);
+        }
+        let mut position = self.position.lock().unwrap_or_else(|e| e.into_inner());
+        loop {
+            if self.cancelled.load(Ordering::SeqCst) {
+                return Err(std::io::Error::new(std::io::ErrorKind::Interrupted, "sbtl mpv stream cancelled"));
+            }
+            if *position >= self.len {
+                return Ok(0);
+            }
+            match self.stream.read_at(*position, buffer) {
+                Ok(n) if n > 0 => {
+                    *position += n as u64;
+                    return Ok(n);
+                }
+                Ok(_) if *position >= self.len => return Ok(0),
+                Ok(_) | Err(sbtl::Error::WOULD_BLOCK) => {
+                    match self.stream.wait(*position, 1, Duration::from_millis(250)) {
+                        Ok(_) => {}
+                        Err(sbtl::Error::CANCELLED) if self.cancelled.load(Ordering::SeqCst) => {
+                            return Err(std::io::Error::new(std::io::ErrorKind::Interrupted, "sbtl mpv stream cancelled"));
+                        }
+                        Err(error) => return Err(error.into()),
+                    }
+                }
+                Err(error) => return Err(error.into()),
+            }
+        }
+    }
+
+    pub fn seek(&self, offset: u64) -> std::io::Result<u64> {
+        if self.cancelled.load(Ordering::SeqCst) {
+            return Err(std::io::Error::new(std::io::ErrorKind::Interrupted, "sbtl mpv stream cancelled"));
+        }
+        if offset > self.len {
+            return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "seek beyond sbtl stream length"));
+        }
+        if offset < self.len {
+            match self.stream.wait(offset, 1, Duration::ZERO) {
+                Ok(_) | Err(sbtl::Error::WOULD_BLOCK) => {}
+                Err(error) => return Err(error.into()),
+            }
+        }
+        *self.position.lock().unwrap_or_else(|e| e.into_inner()) = offset;
+        Ok(offset)
+    }
+
+    pub fn cancel(&self) {
+        self.cancelled.store(true, Ordering::SeqCst);
+        if let Err(error) = self.stream.wake() {
+            tracing::debug!(%error, "sbtl mpv stream wake returned an error");
+        }
+    }
 }
 
 impl AsyncRead for Reader {
