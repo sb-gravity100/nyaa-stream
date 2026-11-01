@@ -1,3 +1,6 @@
+### `2193683` · 2026-11-01 · docs: plan per-run log files
+- `PLAN.md`
+- `PHASES.md`
 ### `16c7225` · 2026-11-01 · docs: plan playback logging coverage
 - `PLAN.md`
 - `PHASES.md`
