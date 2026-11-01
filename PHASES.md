@@ -163,8 +163,10 @@ The checklist below groups related work and does not override this order.
 - [x] Before forwarding an absolute mpv seek command, ask the active direct
       sbtl stream to prioritize the indexed keyframe at that target time;
       preserve mpv's normal seek and HTTP/HLS behavior when no index is ready.
+- [x] Scale the direct stream's playback-time read-ahead window with mpv speed
+      changes, retaining the 45-second baseline at 1×.
 - [ ] Add the custom mpv sbtl buffer property/cache-pause, generic demux
-      seek-time hook and pause/speed hints; preserve the app as the sole sbtl
+      seek-time hook and pause hint; preserve the app as the sole sbtl
       event consumer.
 - [ ] Compare direct sbtl and HTTP Range on cached, live and partial torrents:
       first byte/frame, random and sequential seeks, stalls, bytes requested,

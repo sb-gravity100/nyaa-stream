@@ -192,6 +192,11 @@ impl DirectMpvStream {
         self.inner.prefetch_seek_time(time)
     }
 
+    /// Scales sbtl's read-ahead budget with the playback rate.
+    pub fn set_playback_speed(&self, speed: f64) {
+        self.inner.set_playback_speed(speed);
+    }
+
     pub fn cancel(&self) {
         self.inner.cancel();
     }

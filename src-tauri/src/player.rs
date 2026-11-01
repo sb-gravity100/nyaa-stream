@@ -218,6 +218,7 @@ pub async fn mpv_command(state: State<'_, PlayerState>, args: Vec<Value>) -> Res
     } else {
         tracing::debug!(?args, "mpv_command");
     }
+    update_direct_stream_speed(&state, &args);
     prefetch_absolute_seek(&state, &args);
     let mpv = state.mpv.lock().await.clone().ok_or_else(|| "mpv is not running".to_string())?;
     mpv.command(&args).await.map_err(|err| err.to_string())
@@ -241,12 +242,7 @@ fn prefetch_absolute_seek(state: &PlayerState, args: &[Value]) {
         return;
     }
 
-    let streams = {
-        let mut active = state.active_mpv_streams.lock().unwrap_or_else(|error| error.into_inner());
-        let streams = active.iter().filter_map(std::sync::Weak::upgrade).collect::<Vec<_>>();
-        active.retain(|stream| stream.strong_count() > 0);
-        streams
-    };
+    let streams = active_direct_streams(state);
     if streams.is_empty() {
         return;
     }
@@ -265,6 +261,29 @@ fn prefetch_absolute_seek(state: &PlayerState, args: &[Value]) {
             Err(error) => tracing::debug!(target_seconds = seconds, %error, "sbtl: indexed seek prefetch unavailable; continuing with mpv seek"),
         }
     }
+}
+
+/// Updates the direct stream's adaptive window before sending mpv's speed
+/// property change, so the torrent read-ahead tracks the requested rate.
+fn update_direct_stream_speed(state: &PlayerState, args: &[Value]) {
+    if args.first().and_then(Value::as_str) != Some("set_property")
+        || args.get(1).and_then(Value::as_str) != Some("speed")
+    {
+        return;
+    }
+    let Some(speed) = args.get(2).and_then(Value::as_f64).filter(|speed| speed.is_finite() && *speed > 0.0) else {
+        return;
+    };
+    for stream in active_direct_streams(state) {
+        stream.set_playback_speed(speed);
+    }
+}
+
+fn active_direct_streams(state: &PlayerState) -> Vec<Arc<torrent_engine::DirectMpvStream>> {
+    let mut active = state.active_mpv_streams.lock().unwrap_or_else(|error| error.into_inner());
+    let streams = active.iter().filter_map(std::sync::Weak::upgrade).collect::<Vec<_>>();
+    active.retain(|stream| stream.strong_count() > 0);
+    streams
 }
 
 /// libmpv's version, when the player has been started this run.

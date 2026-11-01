@@ -80,7 +80,8 @@ Anti-flicker rules (implement in P2):
 - P0 direct `sbtl://` custom stream callbacks are implemented. The 2026-11-01 cleared-cache A/B log showed the sbtl run reaching first frame sooner than the HTTP run, with a cancelled first attempt and retry; treat the result as promising, not conclusive.
 - `Cargo.lock` now resolves both `sbtl` and `sbtl-sys` to the current published `v0.2.0` tag commit. Direct streams switch to a 45-second playback-time read-ahead window when the container index exposes its measured bitrate; until then, sbtl retains its existing defaults.
 - Absolute seek commands now ask active direct streams to prioritize the indexed target keyframe before forwarding the command to mpv. HTTP/HLS playback and mpv's actual byte seek are unchanged when no direct reader or usable index is available.
-- Remaining implementation: locked mpv source patch and app/UI buffer signaling, generic demux seek hook, and pause/speed hints. Keep this work in v0.7.0.
+- The 45-second baseline window now scales with mpv playback speed (bounded to 15–180 seconds of indexed media).
+- Remaining implementation: locked mpv source patch and app/UI buffer signaling, generic demux seek hook, and pause hint. Keep this work in v0.7.0.
 
 ## Log findings (nyaa-stream_2026-11-01.log, sbtl clean: 0 sbtl_engine WARN/ERROR)
 **High**

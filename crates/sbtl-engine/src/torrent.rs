@@ -299,7 +299,7 @@ impl Torrent {
             stream,
             position: Mutex::new(0),
             cancelled: AtomicBool::new(false),
-            adaptive_window_set: AtomicBool::new(false),
+            adaptive_window: Mutex::new(AdaptiveWindow { playback_speed: 1.0, configured_seconds: None }),
             len: file.size,
             _open: OpenReader(self.readers.clone()),
         })
@@ -375,9 +375,14 @@ pub struct MpvStream {
     stream: Arc<sbtl::Stream>,
     position: Mutex<u64>,
     cancelled: AtomicBool,
-    adaptive_window_set: AtomicBool,
+    adaptive_window: Mutex<AdaptiveWindow>,
     len: u64,
     _open: OpenReader,
+}
+
+struct AdaptiveWindow {
+    playback_speed: f64,
+    configured_seconds: Option<u64>,
 }
 
 impl MpvStream {
@@ -386,25 +391,37 @@ impl MpvStream {
     /// Retrying while the index is probing is cheap and lets the stream
     /// adapt as soon as the index becomes available.
     fn update_adaptive_window(&self) {
-        const WINDOW: Duration = Duration::from_secs(45);
-        if self.adaptive_window_set.load(Ordering::Relaxed) {
+        let mut adaptive = self.adaptive_window.lock().unwrap_or_else(|error| error.into_inner());
+        let window_seconds = (45.0 * adaptive.playback_speed).round().clamp(15.0, 180.0) as u64;
+        if adaptive.configured_seconds == Some(window_seconds) {
             return;
         }
         let media = self.stream.media_info();
         if media.state != sbtl::MediaState::Ready || media.avg_bitrate == 0 {
             return;
         }
-        match self.stream.set_window_time(WINDOW) {
+        match self.stream.set_window_time(Duration::from_secs(window_seconds)) {
             Ok(()) => {
-                self.adaptive_window_set.store(true, Ordering::Relaxed);
+                adaptive.configured_seconds = Some(window_seconds);
                 tracing::info!(
                     avg_bitrate = media.avg_bitrate,
-                    window_seconds = WINDOW.as_secs(),
+                    window_seconds,
+                    playback_speed = adaptive.playback_speed,
                     "sbtl: configured bitrate-adaptive mpv read-ahead window"
                 );
             }
             Err(error) => tracing::debug!(%error, "sbtl: couldn't configure adaptive read-ahead window"),
         }
+    }
+
+    /// Updates the read-ahead budget when mpv's playback speed changes.
+    pub fn set_playback_speed(&self, speed: f64) {
+        if !speed.is_finite() || speed <= 0.0 {
+            return;
+        }
+        let speed = speed.clamp(0.25, 4.0);
+        self.adaptive_window.lock().unwrap_or_else(|error| error.into_inner()).playback_speed = speed;
+        self.update_adaptive_window();
     }
 
     pub fn len(&self) -> u64 {
