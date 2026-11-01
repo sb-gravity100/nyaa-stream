@@ -3769,3 +3769,9 @@ Commit log, newest first. Prepend a new entry after every commit.
 - `src/SettingsPanel.tsx`
 - `src/changelog.ts`
 - `src/settings.ts`
+### `7122e94` · 2026-11-01 · docs: add direct sbtl mpv work to 0.7.0 plan
+- `FILE_INDEX.md`
+- `PHASES.md`
+- `PLAN.md`
+- `docs/planning/MPV_SBTL_FIX_0.7.0.md`
+- `docs/planning/ROADMAP.md`
