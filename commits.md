@@ -1,4 +1,18 @@
-### `634684c` · 2026-11-02 · docs: plan mpv sbtl buffer control
+### `e803813` · 2026-11-02 · feat: expose sbtl buffer state to mpv
+- `native/mpv/patches/mpv-sbtl-buffer.patch`
+- `native/mpv/sources.lock.json`
+- `crates/mpv-player/`
+- `crates/sbtl-engine/`
+- `crates/torrent-engine/src/lib.rs`
+- `src-tauri/src/player.rs`
+- `src/mpvVideo.ts`
+- `src/loadingProgress.ts`
+- `src/PlayerView.tsx`
+- `src/types.ts`
+- `PLAN.md`
+- `PHASES.md`
+- `FILE_INDEX.md`
+- `docs/planning/MPV_BUILD.md`### `634684c` · 2026-11-02 · docs: plan mpv sbtl buffer control
 - `PLAN.md`
 - `PHASES.md`
 ### `9813790` · 2026-11-01 · feat: add per-run playback diagnostics
