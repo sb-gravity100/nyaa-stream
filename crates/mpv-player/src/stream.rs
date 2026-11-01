@@ -15,6 +15,16 @@ pub trait StreamReader: Send + Sync + 'static {
     fn seek(&self, offset: u64) -> io::Result<u64>;
     fn size(&self) -> u64;
     fn cancel(&self);
+
+    /// Optional sbtl buffer snapshot supported by the custom mpv extension.
+    fn sbtl_buffer(&self) -> Option<StreamBuffer> {
+        None
+    }
+
+    /// `paused=true` lets sbtl continue the stream's sequential read-ahead.
+    fn set_sbtl_paused(&self, _paused: bool) -> io::Result<()> {
+        Ok(())
+    }
 }
 
 pub trait StreamProvider: Send + Sync + 'static {
@@ -36,7 +46,27 @@ pub(crate) struct StreamInfo {
     cancel_fn: Option<unsafe extern "C" fn(*mut c_void)>,
 }
 
+#[repr(C)]
+pub(crate) struct StreamInfoEx {
+    base: StreamInfo,
+    get_sbtl_buffer_fn: Option<unsafe extern "C" fn(*mut c_void, *mut StreamBuffer) -> c_int>,
+    set_sbtl_idle_fn: Option<unsafe extern "C" fn(*mut c_void, c_int) -> c_int>,
+}
+
 pub(crate) type OpenFn = unsafe extern "C" fn(*mut c_void, *mut c_char, *mut StreamInfo) -> c_int;
+pub(crate) type OpenFnEx = unsafe extern "C" fn(*mut c_void, *mut c_char, *mut StreamInfoEx) -> c_int;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct StreamBuffer {
+    pub ahead_ms: u32,
+    pub ready_ms: u32,
+    pub eta_ready_ms: u32,
+    pub fill_rate: u32,
+    pub stalled_ms: u32,
+    pub level: u32,
+    pub rate_known: c_int,
+}
 
 struct StreamCookie {
     reader: Box<dyn StreamReader>,
@@ -47,18 +77,18 @@ struct StreamCookie {
     cancelled: AtomicBool,
 }
 
-pub(crate) unsafe extern "C" fn open_stream(user_data: *mut c_void, uri: *mut c_char, info: *mut StreamInfo) -> c_int {
-    if user_data.is_null() || uri.is_null() || info.is_null() {
+unsafe fn create_stream_cookie(user_data: *mut c_void, uri: *mut c_char) -> Result<(Box<StreamCookie>, bool), c_int> {
+    if user_data.is_null() || uri.is_null() {
         tracing::error!("libmpv called custom stream open with a null argument");
-        return -13; // MPV_ERROR_LOADING_FAILED
+        return Err(-13); // MPV_ERROR_LOADING_FAILED
     }
     // SAFETY: the registration's context remains alive until
     // mpv_terminate_destroy returns.
-    let cancel_supported = unsafe { (*(user_data.cast::<ProviderContext>())).cancel_supported };
+    let context = unsafe { &*(user_data.cast::<ProviderContext>()) };
+    let cancel_supported = context.cancel_supported;
     let opened = catch_unwind(AssertUnwindSafe(|| {
         // SAFETY: libmpv passes a NUL-terminated URI and the registration's
         // context remains alive until mpv_terminate_destroy returns.
-        let context = unsafe { &*(user_data.cast::<ProviderContext>()) };
         let uri = unsafe { CStr::from_ptr(uri) }.to_string_lossy();
         context.provider.open(&uri)
     }));
@@ -66,35 +96,113 @@ pub(crate) unsafe extern "C" fn open_stream(user_data: *mut c_void, uri: *mut c_
         Ok(Ok(reader)) => reader,
         Ok(Err(error)) => {
             tracing::warn!(%error, "libmpv custom stream open failed");
-            return -13;
+            return Err(-13);
         }
         Err(_) => {
             tracing::error!("panic while opening libmpv custom stream");
-            return -13;
+            return Err(-13);
         }
     };
-    let cookie = Box::into_raw(Box::new(StreamCookie {
+    Ok((Box::new(StreamCookie {
         reader,
         opened_at: Instant::now(),
         read_calls: AtomicU64::new(0),
         bytes_read: AtomicU64::new(0),
         seek_calls: AtomicU64::new(0),
         cancelled: AtomicBool::new(false),
-    })).cast::<c_void>();
+    }), cancel_supported))
+}
+
+fn fill_info(info: &mut StreamInfo, cookie: *mut c_void, cancel_supported: bool) {
+    info.cookie = cookie;
+    info.read_fn = Some(read_stream);
+    info.seek_fn = Some(seek_stream);
+    info.size_fn = Some(size_stream);
+    info.close_fn = Some(close_stream);
+    if cancel_supported {
+        info.cancel_fn = Some(cancel_stream);
+    }
+}
+
+pub(crate) unsafe extern "C" fn open_stream(user_data: *mut c_void, uri: *mut c_char, info: *mut StreamInfo) -> c_int {
+    if info.is_null() {
+        tracing::error!("libmpv called custom stream open with a null info pointer");
+        return -13;
+    }
+    let (cookie, cancel_supported) = match unsafe { create_stream_cookie(user_data, uri) } {
+        Ok(opened) => opened,
+        Err(error) => return error,
+    };
+    let cookie = Box::into_raw(cookie).cast::<c_void>();
     tracing::debug!("libmpv custom stream opened");
     // SAFETY: `info` is valid for this callback. Only write the cancel field
     // when supported by the loaded mpv client API (it was added in 1.106).
+    unsafe { fill_info(&mut *info, cookie, cancel_supported) };
+    0
+}
+
+pub(crate) unsafe extern "C" fn open_stream_ex(user_data: *mut c_void, uri: *mut c_char, info: *mut StreamInfoEx) -> c_int {
+    if info.is_null() {
+        tracing::error!("libmpv called extended custom stream open with a null info pointer");
+        return -13;
+    }
+    let (cookie, cancel_supported) = match unsafe { create_stream_cookie(user_data, uri) } {
+        Ok(opened) => opened,
+        Err(error) => return error,
+    };
+    let cookie = Box::into_raw(cookie).cast::<c_void>();
+    tracing::debug!("libmpv extended sbtl stream opened");
+    // SAFETY: `info` is valid for this callback and the cookie lives until close.
     unsafe {
-        (*info).cookie = cookie;
-        (*info).read_fn = Some(read_stream);
-        (*info).seek_fn = Some(seek_stream);
-        (*info).size_fn = Some(size_stream);
-        (*info).close_fn = Some(close_stream);
-        if cancel_supported {
-            (*info).cancel_fn = Some(cancel_stream);
-        }
+        fill_info(&mut (*info).base, cookie, cancel_supported);
+        (*info).get_sbtl_buffer_fn = Some(get_sbtl_buffer);
+        (*info).set_sbtl_idle_fn = Some(set_sbtl_idle);
     }
     0
+}
+
+unsafe extern "C" fn get_sbtl_buffer(cookie: *mut c_void, out: *mut StreamBuffer) -> c_int {
+    if cookie.is_null() || out.is_null() {
+        tracing::error!("libmpv called sbtl buffer callback with a null argument");
+        return -1;
+    }
+    let outcome = catch_unwind(AssertUnwindSafe(|| {
+        // SAFETY: callback cookie and output pointer are valid for this call.
+        let stream = unsafe { &*(cookie.cast::<StreamCookie>()) };
+        let Some(buffer) = stream.reader.sbtl_buffer() else { return Err(()) };
+        unsafe { out.write(buffer) };
+        Ok(())
+    }));
+    match outcome {
+        Ok(Ok(())) => 0,
+        Ok(Err(())) => -1,
+        Err(_) => {
+            tracing::error!("panic while querying sbtl stream buffer");
+            -1
+        }
+    }
+}
+
+unsafe extern "C" fn set_sbtl_idle(cookie: *mut c_void, idle: c_int) -> c_int {
+    if cookie.is_null() || !(0..=1).contains(&idle) {
+        tracing::warn!(idle, "libmpv called sbtl idle callback with an invalid argument");
+        return -1;
+    }
+    let outcome = catch_unwind(AssertUnwindSafe(|| {
+        // SAFETY: callback cookie remains valid until the close callback.
+        unsafe { &*(cookie.cast::<StreamCookie>()) }.reader.set_sbtl_paused(idle == 1)
+    }));
+    match outcome {
+        Ok(Ok(())) => 0,
+        Ok(Err(error)) => {
+            tracing::warn!(idle, %error, "couldn't update sbtl idle policy");
+            -1
+        }
+        Err(_) => {
+            tracing::error!(idle, "panic while updating sbtl idle policy");
+            -1
+        }
+    }
 }
 
 unsafe extern "C" fn read_stream(cookie: *mut c_void, buffer: *mut c_char, length: u64) -> i64 {

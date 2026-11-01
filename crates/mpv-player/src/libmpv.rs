@@ -116,6 +116,7 @@ type FreeNodeContentsFn = unsafe extern "C" fn(*mut MpvNode);
 type NameFn = unsafe extern "C" fn(c_int) -> *const c_char;
 type RequestLogMessagesFn = unsafe extern "C" fn(*mut c_void, *const c_char) -> c_int;
 type StreamCbAddFn = unsafe extern "C" fn(*mut c_void, *const c_char, *mut c_void, stream::OpenFn) -> c_int;
+type StreamCbAddExFn = unsafe extern "C" fn(*mut c_void, *const c_char, *mut c_void, stream::OpenFnEx) -> c_int;
 type ClientApiVersionFn = unsafe extern "C" fn() -> u32;
 
 /// The resolved client-API entry points. `_library` keeps the DLL mapped for
@@ -138,6 +139,7 @@ pub struct Lib {
     event_name: NameFn,
     request_log_messages: RequestLogMessagesFn,
     stream_cb_add_ro: Option<StreamCbAddFn>,
+    stream_cb_add_ro_ex: Option<StreamCbAddExFn>,
     client_api_version: Option<ClientApiVersionFn>,
 }
 
@@ -162,6 +164,7 @@ impl Lib {
             };
         }
         let stream_cb_add_ro = unsafe { library.get::<StreamCbAddFn>(b"mpv_stream_cb_add_ro\0").ok().map(|f| *f) };
+        let stream_cb_add_ro_ex = unsafe { library.get::<StreamCbAddExFn>(b"mpv_stream_cb_add_ro_ex\0").ok().map(|f| *f) };
         let client_api_version = unsafe { library.get::<ClientApiVersionFn>(b"mpv_client_api_version\0").ok().map(|f| *f) };
         Ok(Self {
             create: symbol!("mpv_create"),
@@ -179,6 +182,7 @@ impl Lib {
             event_name: symbol!("mpv_event_name"),
             request_log_messages: symbol!("mpv_request_log_messages"),
             stream_cb_add_ro,
+            stream_cb_add_ro_ex,
             client_api_version,
             path: path.to_path_buf(),
             _library: library,
@@ -321,10 +325,17 @@ impl Mpv {
         let protocol = CString::new("sbtl")?;
         // SAFETY: context is retained by this Mpv until after core destruction;
         // registration is made before mpv_initialize.
-        let code = unsafe { add(self.handle.0, protocol.as_ptr(), (&*context as *const ProviderContext).cast_mut().cast(), stream::open_stream) };
-        self.lib.check(code).context("mpv_stream_cb_add_ro(sbtl)")?;
+        let user_data = (&*context as *const ProviderContext).cast_mut().cast();
+        if let Some(add_ex) = self.lib.stream_cb_add_ro_ex {
+            let code = unsafe { add_ex(self.handle.0, protocol.as_ptr(), user_data, stream::open_stream_ex) };
+            self.lib.check(code).context("mpv_stream_cb_add_ro_ex(sbtl)")?;
+            tracing::info!(api_version, "registered sbtl stream buffer and idle callbacks with libmpv");
+        } else {
+            let code = unsafe { add(self.handle.0, protocol.as_ptr(), user_data, stream::open_stream) };
+            self.lib.check(code).context("mpv_stream_cb_add_ro(sbtl)")?;
+            tracing::info!(api_version, "registered direct sbtl stream protocol with stock libmpv");
+        }
         self.stream_context = Some(context);
-        tracing::info!(api_version, "registered direct sbtl stream protocol with libmpv");
         Ok(())
     }
 
@@ -387,12 +398,17 @@ impl Mpv {
         let result = (|| {
             match (name, args) {
                 ("observe_property", [_, Value::Number(id), Value::String(property)]) => {
-                    let id = id.as_u64().ok_or_else(|| anyhow!("observe_property id must be a non-negative integer"))?;
-                    let property = CString::new(property.as_str())?;
-                    // SAFETY: valid handle and property string.
-                    let code = unsafe { (self.lib.observe_property)(self.handle.0, id, property.as_ptr(), MPV_FORMAT_NODE) };
-                    self.lib.check(code)?;
-                    Ok(Value::Null)
+                    if property == "sbtl-buffer" && self.lib.stream_cb_add_ro_ex.is_none() {
+                        tracing::debug!(target: "mpv", "custom sbtl-buffer property unavailable in this libmpv; using the app stats fallback");
+                        Ok(Value::Null)
+                    } else {
+                        let id = id.as_u64().ok_or_else(|| anyhow!("observe_property id must be a non-negative integer"))?;
+                        let property = CString::new(property.as_str())?;
+                        // SAFETY: valid handle and property string.
+                        let code = unsafe { (self.lib.observe_property)(self.handle.0, id, property.as_ptr(), MPV_FORMAT_NODE) };
+                        self.lib.check(code)?;
+                        Ok(Value::Null)
+                    }
                 }
                 ("get_property", [_, Value::String(property)]) => self.get_property(property),
                 ("set_property", [_, Value::String(property), value]) => self.set_property(property, value),

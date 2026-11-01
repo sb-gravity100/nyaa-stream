@@ -33,6 +33,18 @@ interface MpvEvent {
    text?: string;
 }
 
+export interface MpvSbtlBuffer {
+   state: "loading" | "buffering" | "seeking" | "waiting-peers" | "ready" | "error";
+   reason: "initial" | "stall" | "seek" | "none" | string;
+   level: "stalled" | "low" | "ready" | "full";
+   ahead_ms: number;
+   ready_ms: number;
+   eta_ready_ms: number | null;
+   fill_rate: number;
+   stalled_ms: number;
+   rate_known: boolean;
+}
+
 /** Buffer rebuilds on corruption: at most one per REBUILD_MIN_GAP_MS, and
  * none after REBUILD_LIMIT within REBUILD_WINDOW_MS (a spot that stays bad
  * isn't retried forever). */
@@ -46,6 +58,7 @@ const OBSERVED = [
    "duration",
    "pause",
    "paused-for-cache",
+   "sbtl-buffer",
    "eof-reached",
    "volume",
    "mute",
@@ -62,7 +75,7 @@ const OBSERVED = [
 type Observed = (typeof OBSERVED)[number];
 
 /** Properties that belong to the loaded file (reset on `load`). */
-const FILE_PROPERTIES: Observed[] = ["time-pos", "duration", "eof-reached", "demuxer-cache-state", "video-params", "track-list", "seeking", "chapter-list", "sub-ass-extradata"];
+const FILE_PROPERTIES: Observed[] = ["time-pos", "duration", "eof-reached", "demuxer-cache-state", "sbtl-buffer", "video-params", "track-list", "seeking", "chapter-list", "sub-ass-extradata"];
 
 // `<video>` fires timeupdate ~4x a second; the seek bar's own rAF loop
 // reads `currentTime` for smoothness. Re-rendering the player on every
@@ -344,6 +357,10 @@ export class MpvVideo extends EventTarget {
 
    get muted(): boolean {
       return this.props.mute === true;
+   }
+
+   get sbtlBuffer(): MpvSbtlBuffer | null {
+      return (this.props["sbtl-buffer"] as MpvSbtlBuffer | undefined) ?? null;
    }
 
    set muted(value: boolean) {
@@ -659,6 +676,7 @@ export class MpvVideo extends EventTarget {
             this.emit("volumechange");
             return;
          case "demuxer-cache-state":
+         case "sbtl-buffer":
             this.emit("progress");
             return;
          case "track-list":

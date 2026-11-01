@@ -1,0 +1,605 @@
+diff --git a/demux/demux.c b/demux/demux.c
+index d1accba..a0bf7b7 100644
+--- a/demux/demux.c
++++ b/demux/demux.c
+@@ -256,6 +256,11 @@ struct demux_internal {
+ 
+     // Transient state.
+     double duration;
++    bool sbtl_buffer_valid;
++    struct demux_sbtl_buffer sbtl_buffer;
++    bool sbtl_idle_set;
++    bool sbtl_idle_changed;
++    int sbtl_idle;
+     // Cached state.
+     int64_t stream_size;
+     int64_t last_speed_query;
+@@ -4175,6 +4180,10 @@ static void update_cache(struct demux_internal *in)
+     struct demuxer *demuxer = in->d_thread;
+     struct stream *stream = demuxer->stream;
+ 
++    bool sbtl_idle_changed = in->sbtl_idle_changed;
++    int sbtl_idle = in->sbtl_idle;
++    in->sbtl_idle_changed = false;
++
+     int64_t now = mp_time_ns();
+     int64_t diff = now - in->last_speed_query;
+     bool do_update = diff >= MP_TIME_S_TO_NS(1) || !in->last_speed_query;
+@@ -4184,10 +4193,18 @@ static void update_cache(struct demux_internal *in)
+ 
+     int64_t stream_size = -1;
+     struct mp_tags *stream_metadata = NULL;
++    struct stream_sbtl_buffer sbtl_buffer = {0};
++    bool sbtl_buffer_valid = false;
+     if (stream) {
+         if (do_update)
+             stream_size = stream_get_size(stream);
+         stream_control(stream, STREAM_CTRL_GET_METADATA, &stream_metadata);
++        sbtl_buffer_valid = stream_control(stream, STREAM_CTRL_GET_SBTL_BUFFER,
++                                           &sbtl_buffer) == STREAM_OK;
++        if (sbtl_idle_changed) {
++            struct stream_sbtl_idle idle = {.idle = sbtl_idle};
++            stream_control(stream, STREAM_CTRL_SET_SBTL_IDLE, &idle);
++        }
+     }
+ 
+     mp_mutex_lock(&in->lock);
+@@ -4196,6 +4213,24 @@ static void update_cache(struct demux_internal *in)
+ 
+     if (do_update)
+         in->stream_size = stream_size;
++    bool had_sbtl_buffer = in->sbtl_buffer_valid;
++    in->sbtl_buffer_valid = sbtl_buffer_valid;
++    if (sbtl_buffer_valid) {
++        in->sbtl_buffer = (struct demux_sbtl_buffer){
++            .ahead_ms = sbtl_buffer.ahead_ms,
++            .ready_ms = sbtl_buffer.ready_ms,
++            .eta_ready_ms = sbtl_buffer.eta_ready_ms,
++            .fill_rate = sbtl_buffer.fill_rate,
++            .stalled_ms = sbtl_buffer.stalled_ms,
++            .level = sbtl_buffer.level,
++            .rate_known = sbtl_buffer.rate_known,
++        };
++        if (!had_sbtl_buffer && !in->sbtl_idle_set) {
++            in->sbtl_idle = 0;
++            in->sbtl_idle_set = true;
++            in->sbtl_idle_changed = true;
++        }
++    }
+     if (stream_metadata) {
+         add_timed_metadata(in, stream_metadata, NULL, MP_NOPTS_VALUE);
+         talloc_free(stream_metadata);
+@@ -4215,6 +4250,8 @@ static void update_cache(struct demux_internal *in)
+     // The idea is to update as long as there is "activity".
+     if (in->bytes_per_second)
+         in->next_cache_update = now + MP_TIME_S_TO_NS(1) + MP_TIME_US_TO_NS(1);
++    if (in->sbtl_buffer_valid)
++        in->next_cache_update = MPMIN(in->next_cache_update, now + MP_TIME_MS_TO_NS(100));
+ }
+ 
+ static void dumper_close(struct demux_internal *in)
+@@ -4525,6 +4562,8 @@ void demux_get_reader_state(struct demuxer *demuxer, struct demux_reader_state *
+ 
+     *r = (struct demux_reader_state){
+         .eof = in->eof,
++        .sbtl_buffer_valid = in->sbtl_buffer_valid,
++        .sbtl_buffer = in->sbtl_buffer,
+         .ts_info = {
+             .reader = MP_NOPTS_VALUE,
+             .end = MP_NOPTS_VALUE,
+@@ -4604,6 +4643,20 @@ void demux_get_reader_state(struct demuxer *demuxer, struct demux_reader_state *
+     mp_mutex_unlock(&in->lock);
+ }
+ 
++void demux_set_sbtl_idle(struct demuxer *demuxer, bool paused)
++{
++    struct demux_internal *in = demuxer->in;
++    int idle = paused ? 1 : 0;
++    mp_mutex_lock(&in->lock);
++    if (!in->sbtl_idle_set || in->sbtl_idle != idle) {
++        in->sbtl_idle = idle;
++        in->sbtl_idle_set = true;
++        in->sbtl_idle_changed = true;
++        mp_cond_signal(&in->wakeup);
++    }
++    mp_mutex_unlock(&in->lock);
++}
++
+ bool demux_cancel_test(struct demuxer *demuxer)
+ {
+     return mp_cancel_test(demuxer->cancel);
+diff --git a/demux/demux.h b/demux/demux.h
+index 6f2f38c..a02076f 100644
+--- a/demux/demux.h
++++ b/demux/demux.h
+@@ -42,9 +42,23 @@ struct demux_ctrl_ts_info {
+     double end;    // approx. timestamp of end of buffered range
+ };
+ 
++enum demux_sbtl_buffer_level {
++    DEMUX_SBTL_BUF_STALLED = 0,
++    DEMUX_SBTL_BUF_LOW = 1,
++    DEMUX_SBTL_BUF_READY = 2,
++    DEMUX_SBTL_BUF_FULL = 3,
++};
++
++struct demux_sbtl_buffer {
++    uint32_t ahead_ms, ready_ms, eta_ready_ms, fill_rate, stalled_ms, level;
++    bool rate_known;
++};
++
+ struct demux_reader_state {
+     bool eof, underrun, idle;
++    bool sbtl_buffer_valid;
+     bool bof_cached, eof_cached;
++    struct demux_sbtl_buffer sbtl_buffer;
+     struct demux_ctrl_ts_info ts_info;
+     struct demux_ctrl_ts_info ts_per_stream[STREAM_TYPE_COUNT];
+     int64_t total_bytes;
+@@ -326,6 +340,7 @@ void demux_set_ts_offset(struct demuxer *demuxer, double offset);
+ 
+ void demux_get_bitrate_stats(struct demuxer *demuxer, double *rates);
+ void demux_get_reader_state(struct demuxer *demuxer, struct demux_reader_state *r);
++void demux_set_sbtl_idle(struct demuxer *demuxer, bool paused);
+ 
+ void demux_block_reading(struct demuxer *demuxer, bool block);
+ 
+diff --git a/include/mpv/stream_cb.h b/include/mpv/stream_cb.h
+index 9ae6f31..b8f0eeb 100644
+--- a/include/mpv/stream_cb.h
++++ b/include/mpv/stream_cb.h
+@@ -189,6 +189,33 @@ typedef struct mpv_stream_cb_info {
+     mpv_stream_cb_cancel_fn cancel_fn; /* since API 1.106 */
+ } mpv_stream_cb_info;
+ 
++/* Optional sbtl buffer metadata exposed by the nyaa-stream mpv build. All
++ * times are media milliseconds; UINT32_MAX means the ETA is unknown. */
++typedef struct mpv_stream_cb_sbtl_buffer {
++    uint32_t ahead_ms;
++    uint32_t ready_ms;
++    uint32_t eta_ready_ms;
++    uint32_t fill_rate;
++    uint32_t stalled_ms;
++    uint32_t level; /* 0 stalled, 1 low, 2 ready, 3 full */
++    int rate_known;
++} mpv_stream_cb_sbtl_buffer;
++
++typedef int (*mpv_stream_cb_get_sbtl_buffer_fn)(void *cookie,
++                                                mpv_stream_cb_sbtl_buffer *buffer);
++/* idle=0 means no idle downloading; idle=1 continues sequential read-ahead. */
++typedef int (*mpv_stream_cb_set_sbtl_idle_fn)(void *cookie, int idle);
++
++/* Extended info is separate from mpv_stream_cb_info to preserve its ABI. */
++typedef struct mpv_stream_cb_info_ex {
++    mpv_stream_cb_info base;
++    mpv_stream_cb_get_sbtl_buffer_fn get_sbtl_buffer_fn;
++    mpv_stream_cb_set_sbtl_idle_fn set_sbtl_idle_fn;
++} mpv_stream_cb_info_ex;
++
++typedef int (*mpv_stream_cb_open_ro_fn_ex)(void *user_data, char *uri,
++                                           mpv_stream_cb_info_ex *info);
++
+ /**
+  * Open callback used to implement a custom read-only (ro) stream. The user
+  * must set the callback fields in the passed info struct. The cookie field
+@@ -233,10 +260,18 @@ typedef int (*mpv_stream_cb_open_ro_fn)(void *user_data, char *uri,
+ MPV_EXPORT int mpv_stream_cb_add_ro(mpv_handle *ctx, const char *protocol, void *user_data,
+                                     mpv_stream_cb_open_ro_fn open_fn);
+ 
++/* Extended read-only stream registration. This is an nyaa-stream mpv
++ * extension; stock libmpv consumers should keep using mpv_stream_cb_add_ro(). */
++MPV_EXPORT int mpv_stream_cb_add_ro_ex(mpv_handle *ctx, const char *protocol,
++                                       void *user_data,
++                                       mpv_stream_cb_open_ro_fn_ex open_fn);
++
+ #ifdef MPV_CPLUGIN_DYNAMIC_SYM
+ 
+ MPV_DEFINE_SYM_PTR(mpv_stream_cb_add_ro)
+ #define mpv_stream_cb_add_ro pfn_mpv_stream_cb_add_ro
++MPV_DEFINE_SYM_PTR(mpv_stream_cb_add_ro_ex)
++#define mpv_stream_cb_add_ro_ex pfn_mpv_stream_cb_add_ro_ex
+ 
+ #endif
+ 
+diff --git a/options/options.c b/options/options.c
+index f26976d..a186cb8 100644
+--- a/options/options.c
++++ b/options/options.c
+@@ -678,6 +678,7 @@ static const m_option_t mp_opts[] = {
+     {"cache-pause", OPT_BOOL(cache_pause)},
+     {"cache-pause-initial", OPT_BOOL(cache_pause_initial)},
+     {"cache-pause-wait", OPT_FLOAT(cache_pause_wait), M_RANGE(0, FLT_MAX)},
++    {"sbtl-ready-ms", OPT_INT(sbtl_ready_ms), M_RANGE(1, 60000)},
+ 
+ #if HAVE_DVBIN
+     {"dvbin", OPT_SUBSTRUCT(stream_dvb_opts, stream_dvb_conf)},
+@@ -1048,6 +1049,7 @@ static const struct MPOpts mp_default_opts = {
+     .hls_bitrate = INT_MAX,
+     .cache_pause = true,
+     .cache_pause_wait = 1.0,
++    .sbtl_ready_ms = 3000,
+     .ab_loop = {MP_NOPTS_VALUE, MP_NOPTS_VALUE},
+     .ab_loop_count = -1,
+     .edition_id = -1,
+diff --git a/options/options.h b/options/options.h
+index 995a4aa..6d8fb76 100644
+--- a/options/options.h
++++ b/options/options.h
+@@ -333,6 +333,7 @@ typedef struct MPOpts {
+     bool cache_pause;
+     bool cache_pause_initial;
+     float cache_pause_wait;
++    int sbtl_ready_ms;
+ 
+     struct image_writer_opts *screenshot_image_opts;
+     char *screenshot_template;
+diff --git a/player/client.c b/player/client.c
+index e23b98b..4fd59c1 100644
+--- a/player/client.c
++++ b/player/client.c
+@@ -2194,12 +2194,14 @@ struct mp_custom_protocol {
+     char *protocol;
+     void *user_data;
+     mpv_stream_cb_open_ro_fn open_fn;
++    mpv_stream_cb_open_ro_fn_ex open_fn_ex;
+ };
+ 
+-int mpv_stream_cb_add_ro(mpv_handle *ctx, const char *protocol, void *user_data,
+-                         mpv_stream_cb_open_ro_fn open_fn)
++static int stream_cb_add_ro(mpv_handle *ctx, const char *protocol, void *user_data,
++                            mpv_stream_cb_open_ro_fn open_fn,
++                            mpv_stream_cb_open_ro_fn_ex open_fn_ex)
+ {
+-    if (!open_fn)
++    if (!!open_fn == !!open_fn_ex)
+         return MPV_ERROR_INVALID_PARAMETER;
+ 
+     struct mp_client_api *clients = ctx->clients;
+@@ -2219,6 +2221,7 @@ int mpv_stream_cb_add_ro(mpv_handle *ctx, const char *protocol, void *user_data,
+             .protocol = talloc_strdup(clients, protocol),
+             .user_data = user_data,
+             .open_fn = open_fn,
++            .open_fn_ex = open_fn_ex,
+         };
+         MP_TARRAY_APPEND(clients, clients->custom_protocols,
+                          clients->num_custom_protocols, proto);
+@@ -2227,8 +2230,21 @@ int mpv_stream_cb_add_ro(mpv_handle *ctx, const char *protocol, void *user_data,
+     return r;
+ }
+ 
++int mpv_stream_cb_add_ro(mpv_handle *ctx, const char *protocol, void *user_data,
++                         mpv_stream_cb_open_ro_fn open_fn)
++{
++    return stream_cb_add_ro(ctx, protocol, user_data, open_fn, NULL);
++}
++
++int mpv_stream_cb_add_ro_ex(mpv_handle *ctx, const char *protocol, void *user_data,
++                            mpv_stream_cb_open_ro_fn_ex open_fn)
++{
++    return stream_cb_add_ro(ctx, protocol, user_data, NULL, open_fn);
++}
++
+ bool mp_streamcb_lookup(struct mpv_global *g, const char *protocol,
+-                        void **out_user_data, mpv_stream_cb_open_ro_fn *out_fn)
++                        void **out_user_data, mpv_stream_cb_open_ro_fn *out_fn,
++                        mpv_stream_cb_open_ro_fn_ex *out_fn_ex)
+ {
+     struct mp_client_api *clients = g->client_api;
+     bool found = false;
+@@ -2238,6 +2254,7 @@ bool mp_streamcb_lookup(struct mpv_global *g, const char *protocol,
+         if (strcmp(proto->protocol, protocol) == 0) {
+             *out_user_data = proto->user_data;
+             *out_fn = proto->open_fn;
++            *out_fn_ex = proto->open_fn_ex;
+             found = true;
+             break;
+         }
+diff --git a/player/client.h b/player/client.h
+index eed1a1c..03c3f53 100644
+--- a/player/client.h
++++ b/player/client.h
+@@ -52,6 +52,7 @@ mp_client_api_acquire_render_context(struct mp_client_api *ca);
+ void kill_video_async(struct mp_client_api *client_api);
+ 
+ bool mp_streamcb_lookup(struct mpv_global *g, const char *protocol,
+-                        void **out_user_data, mpv_stream_cb_open_ro_fn *out_fn);
++                        void **out_user_data, mpv_stream_cb_open_ro_fn *out_fn,
++                        mpv_stream_cb_open_ro_fn_ex *out_fn_ex);
+ 
+ #endif
+diff --git a/player/command.c b/player/command.c
+index 96bc06a..8553b78 100644
+--- a/player/command.c
++++ b/player/command.c
+@@ -1621,6 +1621,56 @@ static int mp_property_paused_for_cache(void *ctx, struct m_property *prop,
+     return m_property_bool_ro(action, arg, mpctx->paused_for_cache);
+ }
+ 
++static int mp_property_sbtl_buffer(void *ctx, struct m_property *prop,
++                                   int action, void *arg)
++{
++    MPContext *mpctx = ctx;
++    if (!mpctx->playback_initialized || !mpctx->demuxer)
++        return M_PROPERTY_UNAVAILABLE;
++    if (action == M_PROPERTY_GET_TYPE) {
++        *(struct m_option *)arg = (struct m_option){.type = CONF_TYPE_NODE};
++        return M_PROPERTY_OK;
++    }
++    if (action != M_PROPERTY_GET)
++        return M_PROPERTY_NOT_IMPLEMENTED;
++
++    struct demux_reader_state state;
++    demux_get_reader_state(mpctx->demuxer, &state);
++    if (!state.sbtl_buffer_valid)
++        return M_PROPERTY_UNAVAILABLE;
++
++    const struct demux_sbtl_buffer *buffer = &state.sbtl_buffer;
++    const char *level = buffer->level == DEMUX_SBTL_BUF_STALLED ? "stalled" :
++                        buffer->level == DEMUX_SBTL_BUF_LOW ? "low" :
++                        buffer->level == DEMUX_SBTL_BUF_READY ? "ready" : "full";
++    const char *reason = state.seeking != MP_NOPTS_VALUE ? "seek" :
++                         !mpctx->restart_complete ? "initial" :
++                         buffer->level >= DEMUX_SBTL_BUF_READY &&
++                             buffer->ahead_ms >= (uint32_t)mpctx->opts->sbtl_ready_ms ? "none" :
++                         buffer->level == DEMUX_SBTL_BUF_STALLED ? "stall" : "low";
++    const char *status = state.seeking != MP_NOPTS_VALUE ? "seeking" :
++                         !mpctx->restart_complete ? "loading" :
++                         buffer->level >= DEMUX_SBTL_BUF_READY &&
++                             buffer->ahead_ms >= (uint32_t)mpctx->opts->sbtl_ready_ms ? "ready" :
++                         buffer->stalled_ms >= 4000 && buffer->fill_rate == 0 ? "waiting-peers" : "buffering";
++
++    struct mpv_node *node = arg;
++    node_init(node, MPV_FORMAT_NODE_MAP, NULL);
++    node_map_add_string(node, "state", status);
++    node_map_add_string(node, "reason", reason);
++    node_map_add_string(node, "level", level);
++    node_map_add_int64(node, "ahead_ms", buffer->ahead_ms);
++    node_map_add_int64(node, "ready_ms", mpctx->opts->sbtl_ready_ms);
++    if (buffer->eta_ready_ms == UINT32_MAX)
++        node_map_add(node, "eta_ready_ms", MPV_FORMAT_NONE);
++    else
++        node_map_add_int64(node, "eta_ready_ms", buffer->eta_ready_ms);
++    node_map_add_int64(node, "fill_rate", buffer->fill_rate);
++    node_map_add_int64(node, "stalled_ms", buffer->stalled_ms);
++    node_map_add_flag(node, "rate_known", buffer->rate_known);
++    return M_PROPERTY_OK;
++}
++
+ static int mp_property_cache_buffering(void *ctx, struct m_property *prop,
+                                        int action, void *arg)
+ {
+@@ -4403,6 +4453,7 @@ static const struct m_property mp_properties_base[] = {
+     {"demuxer-cache-state", mp_property_demuxer_cache_state},
+     {"cache-buffering-state", mp_property_cache_buffering},
+     {"paused-for-cache", mp_property_paused_for_cache},
++    {"sbtl-buffer", mp_property_sbtl_buffer},
+     {"demuxer-via-network", mp_property_demuxer_is_network},
+     {"clock", mp_property_clock},
+     {"seekable", mp_property_seekable},
+diff --git a/player/core.h b/player/core.h
+index eb7f508..0365ec0 100644
+--- a/player/core.h
++++ b/player/core.h
+@@ -24,6 +24,7 @@
+ #include "audio/aframe.h"
+ #include "clipboard/clipboard.h"
+ #include "common/common.h"
++#include "demux/demux.h"
+ #include "filters/f_output_chain.h"
+ #include "filters/filter.h"
+ #include "options/options.h"
+@@ -431,6 +432,8 @@ typedef struct MPContext {
+     double cache_stop_time;
+     int cache_buffer;
+     double cache_update_pts;
++    bool sbtl_buffer_seen;
++    struct demux_sbtl_buffer sbtl_buffer_last;
+ 
+     // Set after showing warning about decoding being too slow for realtime
+     // playback rate. Used to avoid showing it multiple times.
+diff --git a/player/playloop.c b/player/playloop.c
+index f111920..ed9ee08 100644
+--- a/player/playloop.c
++++ b/player/playloop.c
+@@ -703,6 +703,26 @@ static void clear_underruns(struct MPContext *mpctx)
+     }
+ }
+ 
++static bool update_sbtl_buffer_snapshot(struct MPContext *mpctx,
++                                        const struct demux_reader_state *state)
++{
++    bool changed = mpctx->sbtl_buffer_seen != state->sbtl_buffer_valid;
++    if (state->sbtl_buffer_valid) {
++        struct demux_sbtl_buffer *old = &mpctx->sbtl_buffer_last;
++        const struct demux_sbtl_buffer *cur = &state->sbtl_buffer;
++        changed |= old->ahead_ms != cur->ahead_ms ||
++                   old->ready_ms != cur->ready_ms ||
++                   old->eta_ready_ms != cur->eta_ready_ms ||
++                   old->fill_rate != cur->fill_rate ||
++                   old->stalled_ms != cur->stalled_ms ||
++                   old->level != cur->level ||
++                   old->rate_known != cur->rate_known;
++        mpctx->sbtl_buffer_last = *cur;
++    }
++    mpctx->sbtl_buffer_seen = state->sbtl_buffer_valid;
++    return changed;
++}
++
+ static void handle_update_cache(struct MPContext *mpctx)
+ {
+     bool force_update = false;
+@@ -718,6 +738,12 @@ static void handle_update_cache(struct MPContext *mpctx)
+     struct demux_reader_state s;
+     demux_get_reader_state(mpctx->demuxer, &s);
+ 
++    if (s.sbtl_buffer_valid) {
++        demux_set_sbtl_idle(mpctx->demuxer, mpctx->paused);
++    }
++    if (update_sbtl_buffer_snapshot(mpctx, &s))
++        mp_client_property_change(mpctx, "sbtl-buffer");
++
+     mpctx->demux_underrun |= s.underrun;
+ 
+     int cache_buffer = 100;
+@@ -732,8 +758,12 @@ static void handle_update_cache(struct MPContext *mpctx)
+                                      mpctx->audio_status == STATUS_READY);
+     }
+ 
++    bool sbtl_low = s.sbtl_buffer_valid &&
++                    (s.sbtl_buffer.level < DEMUX_SBTL_BUF_READY ||
++                     s.sbtl_buffer.ahead_ms < (uint32_t)opts->sbtl_ready_ms);
+     bool is_low = use_pause_on_low_cache && !s.idle &&
+-                  s.ts_info.duration < opts->cache_pause_wait;
++                  (s.sbtl_buffer_valid ? sbtl_low :
++                   s.ts_info.duration < opts->cache_pause_wait);
+ 
+     // Enter buffering state only if there actually was an underrun (or if
+     // initial caching before playback restart is used).
+@@ -772,8 +802,13 @@ static void handle_update_cache(struct MPContext *mpctx)
+         clear_underruns(mpctx);
+ 
+     if (mpctx->paused_for_cache) {
+-        cache_buffer =
+-            100 * MPCLAMP(s.ts_info.duration / opts->cache_pause_wait, 0, 0.99);
++        if (s.sbtl_buffer_valid) {
++            cache_buffer = 100 * MPCLAMP(
++                s.sbtl_buffer.ahead_ms / (double)opts->sbtl_ready_ms, 0, 0.99);
++        } else {
++            cache_buffer =
++                100 * MPCLAMP(s.ts_info.duration / opts->cache_pause_wait, 0, 0.99);
++        }
+         mp_set_timeout(mpctx, 0.2);
+     }
+ 
+diff --git a/stream/stream.h b/stream/stream.h
+index fb62fdd..db2879b 100644
+--- a/stream/stream.h
++++ b/stream/stream.h
+@@ -94,6 +94,10 @@ enum stream_ctrl {
+     STREAM_CTRL_GET_LANG,
+     STREAM_CTRL_GET_CURRENT_TITLE,
+     STREAM_CTRL_SET_CURRENT_TITLE,
++
++    // Optional buffer/read-ahead controls supplied by sbtl-backed streams.
++    STREAM_CTRL_GET_SBTL_BUFFER,
++    STREAM_CTRL_SET_SBTL_IDLE,
+ };
+ 
+ struct stream_lang_req {
+@@ -107,6 +111,20 @@ struct stream_dvd_info_req {
+     int num_subs;
+ };
+ 
++struct stream_sbtl_buffer {
++    uint32_t ahead_ms;
++    uint32_t ready_ms;
++    uint32_t eta_ready_ms;
++    uint32_t fill_rate;
++    uint32_t stalled_ms;
++    uint32_t level;
++    bool rate_known;
++};
++
++struct stream_sbtl_idle {
++    int idle;
++};
++
+ // for STREAM_CTRL_AVSEEK
+ struct stream_avseek {
+     int stream_index;
+diff --git a/stream/stream_cb.c b/stream/stream_cb.c
+index 27e04a9..e935bf2 100644
+--- a/stream/stream_cb.c
++++ b/stream/stream_cb.c
+@@ -17,6 +17,8 @@
+ 
+ struct priv {
+     mpv_stream_cb_info info;
++    mpv_stream_cb_info_ex info_ex;
++    bool extended;
+     struct mp_cancel *cancel;
+ };
+ 
+@@ -51,23 +53,70 @@ static void s_close(stream_t *s)
+     p->info.close_fn(p->info.cookie);
+ }
+ 
++static int control(stream_t *s, int cmd, void *arg)
++{
++    struct priv *p = s->priv;
++    if (!p->extended)
++        return STREAM_UNSUPPORTED;
++    if (!arg)
++        return STREAM_ERROR;
++
++    if (cmd == STREAM_CTRL_GET_SBTL_BUFFER) {
++        if (!p->info_ex.get_sbtl_buffer_fn)
++            return STREAM_UNSUPPORTED;
++        mpv_stream_cb_sbtl_buffer buffer = {0};
++        if (p->info_ex.get_sbtl_buffer_fn(p->info.cookie, &buffer) < 0)
++            return STREAM_ERROR;
++        struct stream_sbtl_buffer *out = arg;
++        *out = (struct stream_sbtl_buffer){
++            .ahead_ms = buffer.ahead_ms,
++            .ready_ms = buffer.ready_ms,
++            .eta_ready_ms = buffer.eta_ready_ms,
++            .fill_rate = buffer.fill_rate,
++            .stalled_ms = buffer.stalled_ms,
++            .level = buffer.level,
++            .rate_known = buffer.rate_known != 0,
++        };
++        return STREAM_OK;
++    }
++
++    if (cmd == STREAM_CTRL_SET_SBTL_IDLE) {
++        if (!p->info_ex.set_sbtl_idle_fn)
++            return STREAM_UNSUPPORTED;
++        struct stream_sbtl_idle *idle = arg;
++        return p->info_ex.set_sbtl_idle_fn(p->info.cookie, idle->idle) < 0
++            ? STREAM_ERROR : STREAM_OK;
++    }
++
++    return STREAM_UNSUPPORTED;
++}
++
+ static int open_cb(stream_t *stream)
+ {
+     struct priv *p = talloc_ptrtype(stream, p);
++    *p = (struct priv){0};
+     stream->priv = p;
+ 
+     bstr bproto = mp_split_proto(bstr0(stream->url), NULL);
+     char *proto = bstrto0(stream, bproto);
+ 
+     void *user_data;
+-    mpv_stream_cb_open_ro_fn open_fn;
++    mpv_stream_cb_open_ro_fn open_fn = NULL;
++    mpv_stream_cb_open_ro_fn_ex open_fn_ex = NULL;
+ 
+-    if (!mp_streamcb_lookup(stream->global, proto, &user_data, &open_fn))
++    if (!mp_streamcb_lookup(stream->global, proto, &user_data, &open_fn, &open_fn_ex))
+         return STREAM_UNSUPPORTED;
+ 
+     mpv_stream_cb_info info = {0};
+-
+-    int r = open_fn(user_data, stream->url, &info);
++    int r;
++    if (open_fn_ex) {
++        p->extended = true;
++        p->info_ex = (mpv_stream_cb_info_ex){0};
++        r = open_fn_ex(user_data, stream->url, &p->info_ex);
++        info = p->info_ex.base;
++    } else {
++        r = open_fn(user_data, stream->url, &info);
++    }
+     if (r < 0) {
+         if (r != MPV_ERROR_LOADING_FAILED)
+             MP_WARN(stream, "unknown error from user callback\n");
+@@ -89,6 +138,7 @@ static int open_cb(stream_t *stream)
+     stream->fill_buffer = fill_buffer;
+     stream->get_size = get_size;
+     stream->close = s_close;
++    stream->control = control;
+ 
+     if (p->info.cancel_fn && stream->cancel) {
+         p->cancel = mp_cancel_new(p);

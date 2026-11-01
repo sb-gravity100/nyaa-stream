@@ -10,7 +10,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{Context, anyhow};
-use mpv_player::{EmbeddedMpv, StreamProvider, StreamReader};
+use mpv_player::{EmbeddedMpv, StreamBuffer, StreamProvider, StreamReader};
 use serde_json::Value;
 use tauri::webview::Color;
 use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow};
@@ -58,6 +58,30 @@ impl StreamReader for AppMpvStream {
 
     fn cancel(&self) {
         self.0.cancel();
+    }
+
+    fn sbtl_buffer(&self) -> Option<StreamBuffer> {
+        let buffer = self.0.buffer_status();
+        let level = match buffer.level.as_str() {
+            "low" => 1,
+            "ready" => 2,
+            "full" => 3,
+            _ => 0,
+        };
+        let as_u32 = |value: u64| value.min(u32::MAX as u64) as u32;
+        Some(StreamBuffer {
+            ahead_ms: as_u32(buffer.ahead_ms),
+            ready_ms: as_u32(buffer.ready_ms),
+            eta_ready_ms: buffer.eta_ready_ms.map(as_u32).unwrap_or(u32::MAX),
+            fill_rate: as_u32(buffer.fill_rate),
+            stalled_ms: as_u32(buffer.stalled_ms),
+            level,
+            rate_known: i32::from(buffer.rate_known),
+        })
+    }
+
+    fn set_sbtl_paused(&self, paused: bool) -> std::io::Result<()> {
+        self.0.set_idle_policy(paused).map_err(std::io::Error::other)
     }
 }
 

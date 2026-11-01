@@ -163,6 +163,8 @@ export interface BufferStatus {
   etaReadyMs: number | null;
   rate: number;
   rateKnown: boolean;
+  fillRate: number;
+  stalledMs: number;
 }
 
 export interface StreamStats {

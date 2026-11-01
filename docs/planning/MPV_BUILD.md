@@ -41,7 +41,7 @@ isolated tools from `native/mpv/tools.lock.json`, records local tool identity,
 and leaves all downloads/build output under `target/mpv-build/`. The source
 lock is recorded separately in `native/mpv/sources.lock.json`, before compilation.
 The source lock covers 21 repository archives, 15 Meson source/build definitions
-and seven native patches. Their archives/patches are SHA-256 checked; the two
+and eight native patches. Their archives/patches are SHA-256 checked; the two
 ASS source patches are applied to the extracted mpv and libplacebo trees. This
 proves source preparation, not successful configuration, media compilation or
 runtime compatibility.
@@ -232,12 +232,20 @@ replacement and publication remain later steps.
 
 Stage 1 passed: tool bootstrap completed and pkgconf compiled with LLVM.
 Stage 2 passed: the tracked runner verified the full source closure and all
-seven native patches. Stage 3 passed: the runner built the static dependencies,
+eight native patches. Stage 3 passed: the runner built the static dependencies,
 separate FFmpeg and shared candidate DLL with every stage exit code 0. Runtime
 checks passed for libmpv initialization/options, H.264/AAC and AV1 playback, and
 x264/AAC MP4 export with a visibly burned subtitle. The DLL is staged in the
 app bundle. Full app UI playback/export, wider hardware-path acceptance and
 broader codec/media coverage remain pending.
+
+On 2026-11-02, the locked `mpv-sbtl-buffer.patch` was added and the candidate
+was rebuilt successfully with the extended stream-callback buffer/idle API and
+cache-pause/property changes. Candidate SHA-256 is
+`3E6E898EA6F37128A40B8C801E97D0FDBBFF25C7F4436B4F44EE2AA59C524ABD`; it is
+staged in `src-tauri/lib/` with the existing sidecars, and the prior candidate
+is backed up under `target/mpv-build/backups/`. Runtime behavior remains to be
+verified in the app.
 
 ## Acceptance and evidence
 

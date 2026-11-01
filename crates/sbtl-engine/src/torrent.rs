@@ -103,6 +103,31 @@ pub struct BufferStatus {
     /// Consumption rate used, bytes/s; `rate_known` false = assumed.
     pub rate: u64,
     pub rate_known: bool,
+    /// Current torrent download rate used to fill this reader's buffer.
+    pub fill_rate: u64,
+    /// Continuous duration with no verified data at the read position.
+    pub stalled_ms: u64,
+}
+
+fn make_buffer_status(buffer: sbtl::BufferInfo) -> BufferStatus {
+    BufferStatus {
+        level: match buffer.level {
+            sbtl::BufferLevel::Stalled => "stalled",
+            sbtl::BufferLevel::Low => "low",
+            sbtl::BufferLevel::Ready => "ready",
+            sbtl::BufferLevel::Full => "full",
+        }
+        .to_string(),
+        pos: buffer.pos,
+        ahead_bytes: buffer.ahead_bytes,
+        ahead_ms: buffer.ahead.as_millis() as u64,
+        ready_ms: READY_MS,
+        eta_ready_ms: buffer.eta_ready.map(|duration| duration.as_millis() as u64),
+        rate: buffer.rate as u64,
+        rate_known: buffer.rate_known,
+        fill_rate: buffer.fill_rate as u64,
+        stalled_ms: buffer.stalled_for.as_millis() as u64,
+    }
 }
 
 struct Streams {
@@ -309,22 +334,7 @@ impl Torrent {
     pub fn buffer(&self, file_idx: usize) -> Option<BufferStatus> {
         let probe = self.streams.lock().unwrap_or_else(|e| e.into_inner()).probes.get(&file_idx).cloned()?;
         let b = probe.buffer()?;
-        Some(BufferStatus {
-            level: match b.level {
-                sbtl::BufferLevel::Stalled => "stalled",
-                sbtl::BufferLevel::Low => "low",
-                sbtl::BufferLevel::Ready => "ready",
-                sbtl::BufferLevel::Full => "full",
-            }
-            .to_string(),
-            pos: b.pos,
-            ahead_bytes: b.ahead_bytes,
-            ahead_ms: b.ahead.as_millis() as u64,
-            ready_ms: READY_MS,
-            eta_ready_ms: b.eta_ready.map(|d| d.as_millis() as u64),
-            rate: b.rate as u64,
-            rate_known: b.rate_known,
-        })
+        Some(make_buffer_status(b))
     }
 
     /// Downloads `file_idx` in order behind everything else (the next
@@ -439,6 +449,23 @@ impl MpvStream {
         let key = self.stream.seek_time(time)?;
         let already_available = self.stream.available(key.offset) > 0;
         Ok((key.offset, already_available))
+    }
+
+    pub fn buffer_status(&self) -> BufferStatus {
+        make_buffer_status(self.stream.buffer())
+    }
+
+    pub fn set_idle_policy(&self, paused: bool) -> Result<()> {
+        let idle = if paused { sbtl_sys::SBTL_IDLE_SEQ_AHEAD } else { sbtl_sys::SBTL_IDLE_NONE };
+        // SAFETY: Stream::id returns the opaque handle for this live stream;
+        // self.stream retains ownership until this call returns.
+        let stream = self.stream.id() as *mut sbtl_sys::sbtl_stream;
+        let result = unsafe { sbtl_sys::sbtl_set_idle_policy(stream, idle) };
+        if result != sbtl_sys::SBTL_OK {
+            anyhow::bail!("sbtl_set_idle_policy returned {result}");
+        }
+        tracing::debug!(paused, "sbtl mpv stream idle policy updated");
+        Ok(())
     }
 
     /// Reads verified bytes, waiting in bounded slices so cancellation can

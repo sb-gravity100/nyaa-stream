@@ -1881,7 +1881,7 @@ function MpvPlayerView({
             <div class={`player-loading player-loading-fade${loadingVisible ? " shown" : ""}`}>
                {/* Mid-episode the readiness fill would sit near full, so a
                 seek wait shows a sweeping arc instead. */}
-               <Buffering progress={loadingProgress(stats)} indeterminate={hasPlayed} />
+               <Buffering progress={loadingProgress(stats, videoEl?.sbtlBuffer ?? null)} indeterminate={hasPlayed} />
                <div class="player-loading-status">
                   {seekingTo != null && hasPlayed
                      ? `Seeking to ${formatTime(seekingTo)}`

@@ -172,12 +172,16 @@ The checklist below groups related work and does not override this order.
       preserve mpv's normal seek and HTTP/HLS behavior when no index is ready.
 - [x] Scale the direct stream's playback-time read-ahead window with mpv speed
       changes, retaining the 45-second baseline at 1×.
-- [ ] Add the locked libmpv sbtl stream interface and buffer query; keep mpv
-      independent of sbtl linking and preserve the app as sole event consumer.
-- [ ] Expose `sbtl-buffer` with state, ahead/ready time, ETA and fill rate;
-      drive mpv cache pause from sbtl readiness with low/ready hysteresis.
-- [ ] Forward pause/resume and playback-speed changes to the active sbtl stream
-      so its idle policy and read-ahead budget follow player state.
+- [x] Add the locked extended libmpv stream-callback interface for buffer and
+      idle-policy callbacks; keep mpv independent of sbtl linking and preserve
+      the app as sole sbtl event consumer. Build and stage candidate SHA-256
+      `3E6E898EA6F37128A40B8C801E97D0FDBBFF25C7F4436B4F44EE2AA59C524ABD`.
+- [x] Expose `sbtl-buffer` with state, ahead/ready time, ETA and fill rate;
+      drive mpv cache pause from sbtl readiness with LOW/READY hysteresis.
+- [x] Forward pause/resume changes to the active sbtl stream's idle policy;
+      read-ahead budget also follows mpv playback speed.
+- [ ] Verify `sbtl-buffer`, startup/stall/resume cache pause and pause/resume idle
+      hints in the running app with the newly staged custom DLL.
 - [ ] Keep the app UI on one sbtl buffer snapshot source; verify startup, seek,
       stall, waiting-peer and resume transitions through the mpv event bridge.
 - [ ] Compare direct sbtl and HTTP Range on cached, live and partial torrents:

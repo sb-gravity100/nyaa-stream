@@ -17,7 +17,7 @@ sbtl torrent streaming, embedded libmpv playback and an HLS fallback.
 |---|---|---|
 | v0.5.8 | Implemented pre-v0.6.0 work | Published |
 | v0.6.0 | Subtitle styling/smoothing plus context menus, custom magnets, artwork, thumbnails, seek previews, updates and bespoke installer | Published 2026-10-30; SB waived remaining Windows acceptance and deferred Fribb licensing; live-swarm and manual magnet acceptance remain open |
-| v0.7.0 | Custom libmpv and direct sbtl streaming first, then subtitle rendering, memory profiling, batch transitions, preload timing, seek dragging and player/settings accessibility | P0 direct `sbtl://` stream callback is implemented and pinned to published sbtl 0.2.0; a cleared-cache A/B is promising but not conclusive; indexed-bitrate read-ahead, speed-scaled window and app-side seek prefetch are implemented; playback/mpv logging captures debug messages and lifecycle events, redacts command data, and creates a timestamped file per run; mpv buffer-property/cache-pause hooks and broader runtime measurements remain pending; batch torrent/file reuse and season-aware handoff implemented |
+| v0.7.0 | Custom libmpv and direct sbtl streaming first, then subtitle rendering, memory profiling, batch transitions, preload timing, seek dragging and player/settings accessibility | P0 direct `sbtl://` stream callback is implemented and pinned to published sbtl 0.2.0; a cleared-cache A/B is promising but not conclusive; indexed-bitrate read-ahead, speed-scaled window, app-side seek prefetch and custom mpv sbtl buffer/cache-pause/idle hooks are implemented; playback/mpv logging captures debug messages and lifecycle events, redacts command data, and creates a timestamped file per run; broader runtime measurements remain pending; batch torrent/file reuse and season-aware handoff implemented |
 | v0.8.0 | Navigation/Home rehaul and Discover | Planned |
 | v1.0.0 | Stabilization and 32-bit Windows | Planned |
 | v1.1.0 | Binge Mode | Idea; not implementation-ready |
@@ -187,18 +187,20 @@ Each app run starts a new UTC timestamped log file, with the seven most recent
 run files retained. This is a diagnostics patch within v0.7.0, with no feature
 version change. `cargo check --workspace` and `npm run build` pass.
 
-## Direct sbtl buffer control in mpv (planned, v0.7.0 patch: playback)
+## Direct sbtl buffer control in mpv (implemented, v0.7.0 patch: playback)
 
-Problem: mpv currently sees direct sbtl reads only as a blocking custom stream,
+Problem: mpv previously saw direct sbtl reads only as a blocking custom stream,
 so its cache-pause decisions and the player UI cannot use sbtl's verified
 playback-time buffer as their source of truth. Pausing also leaves sbtl's
 read-ahead policy unchanged.
 
-Fix: add a locked custom-libmpv stream interface that exposes sbtl buffer
+Implemented: add a locked custom-libmpv stream interface that exposes sbtl buffer
 snapshots without linking mpv to sbtl or consuming sbtl's event queue. Drive
 `sbtl-buffer` and cache pause from the same readiness thresholds; forward
 playback pause changes to the active sbtl stream while keeping the app as the
-single event consumer. Retain the public callback/HTTP paths as fallbacks.
+single event consumer. Retain the public callback/HTTP paths as fallbacks. The
+patched candidate was rebuilt and staged locally; live app verification remains
+open.
 
 ## 32-bit Windows support (planned, v1.0.0 - minor: new target)
 

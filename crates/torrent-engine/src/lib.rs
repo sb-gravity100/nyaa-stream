@@ -192,6 +192,14 @@ impl DirectMpvStream {
         self.inner.prefetch_seek_time(time)
     }
 
+    pub fn buffer_status(&self) -> BufferStatus {
+        self.inner.buffer_status()
+    }
+
+    pub fn set_idle_policy(&self, paused: bool) -> anyhow::Result<()> {
+        self.inner.set_idle_policy(paused)
+    }
+
     /// Scales sbtl's read-ahead budget with the playback rate.
     pub fn set_playback_speed(&self, speed: f64) {
         self.inner.set_playback_speed(speed);
