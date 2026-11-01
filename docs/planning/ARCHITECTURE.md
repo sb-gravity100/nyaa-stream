@@ -716,7 +716,9 @@ a pushed sbtl tag is never moved or re-created.
   is not available from the remote yet. The nyaa P0 direct-stream adapter is
   being implemented against that local API. Keep the published Cargo tag at
   v0.1.1 until v0.2.0 is pushed; local development must use
-  `npm run dev:sbtl-local`. Do not release with this version mismatch.
+  `npm run dev:sbtl-local` or `npm run check:sbtl-local`. These scripts update
+  the ignored local Cargo.lock to the sibling v0.2.0 packages before building.
+  Do not release with this version mismatch.
 - API changes are normally paired (the sbtl tag, native DLL, Cargo pin and
   nyaa adapter), but this v0.2.0 adapter follows SB's sbtl implementation in a
   separate session; complete the pin/DLL release alignment once the tag is
