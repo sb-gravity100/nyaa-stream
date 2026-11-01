@@ -1,3 +1,11 @@
+### `2228116` · 2026-11-01 · feat: prefetch indexed sbtl seek targets
+- `crates/sbtl-engine/src/torrent.rs`
+- `crates/torrent-engine/src/lib.rs`
+- `src-tauri/src/player.rs`
+- `PLAN.md`
+- `PHASES.md`
+- `docs/planning/ROADMAP.md`
+- `docs/planning/MPV_SBTL_FIX_0.7.0.md`
 ### `e3b5c13` · 2026-11-01 · perf: adapt sbtl window to indexed bitrate
 - `crates/sbtl-engine/src/torrent.rs`
 - `PLAN.md`
