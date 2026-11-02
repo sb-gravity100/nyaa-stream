@@ -28,6 +28,7 @@ fn extra_name(name: &str) -> bool {
     static SHORT: OnceLock<Regex> = OnceLock::new();
     static WORDS: OnceLock<Regex> = OnceLock::new();
     static NUMBERED: OnceLock<Regex> = OnceLock::new();
+    static NC_VERSION: OnceLock<Regex> = OnceLock::new();
     let name = re(&CRC, r"[\[(][0-9A-Fa-f]{8}[\])]").replace_all(name, "");
     let name = name.as_ref();
     // A letter suffix ("NCED01a") only after NC tokens: "ED60f" is a codec/hash fragment.
@@ -37,6 +38,16 @@ fn extra_name(name: &str) -> bool {
     re(&SHORT, r"(?:^|[^A-Za-z0-9])(?:(?:NC\s?OP|NC\s?ED)[\s_-]?\d{0,3}[a-z]?(?:[^A-Za-z0-9]|$)|(?:OP|ED|PV|CM|SP|MENU|Menu)(?:[\s_-]?\d{1,3})?(?:$|[\s_]*[\[\]().]|[\s_]*-))").is_match(name)
         || re(&NUMBERED, r"(?i)(?:^|[^a-z])extras?\s+\d{1,3}(?:$|[^0-9])").is_match(name)
         || re(&WORDS, r"(?i)(?:^|[^a-z])(?:creditless|textless|trailer|teaser|preview|clean[\s_.-]+(?:opening|ending)|mini[\s_.-]+ep)(?:[^a-z]|$)").is_match(name)
+        || re(&NC_VERSION, r"(?i)\bNC\s*Ver(?:sion)?\b").is_match(name)
+}
+
+/// Fractional episode counters cannot match the app's integer episode keys.
+/// Keep them out of automatic episode selection instead of truncating 24.5 to 24.
+pub(crate) fn fractional_episode(name: &str, episode_number: u32) -> bool {
+    static RE: OnceLock<Regex> = OnceLock::new();
+    re(&RE, r"(?i)(?:\bS\d{1,2}E(\d{1,3})\.\d\b|\b(?:episode|ep)[\s._-]*(\d{1,3})\.\d(?:v\d+)?(?:\s*[-–—]\s*[A-Za-z]|\s*[\[(|]|$)|\b(?:season\s*\d{1,2}|\d{1,2}(?:st|nd|rd|th)\s+season)\s*-?\s*(\d{1,3})\.\d(?:v\d+)?(?:\s*[-–—]\s*[A-Za-z]|\s*[\[(|]|$)|(?:^|-\s*)(\d{1,3})\.\d(?:v\d+)?(?:\s*[-–—]\s*[A-Za-z]|\s*[\[(|]|$))")
+        .captures(name)
+        .is_some_and(|captures| captures.iter().skip(1).flatten().any(|part| part.as_str().parse::<u32>().ok() == Some(episode_number)))
 }
 
 /// True when the file at `path` (folders joined by `/` or `\`) is an extra.

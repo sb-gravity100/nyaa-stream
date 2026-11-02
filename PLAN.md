@@ -17,7 +17,7 @@ sbtl torrent streaming, embedded libmpv playback and an HLS fallback.
 |---|---|---|
 | v0.5.8 | Implemented pre-v0.6.0 work | Published |
 | v0.6.0 | Subtitle styling/smoothing plus context menus, custom magnets, artwork, thumbnails, seek previews, updates and bespoke installer | Published 2026-10-30; SB waived remaining Windows acceptance and deferred Fribb licensing; live-swarm and manual magnet acceptance remain open |
-| v0.7.0 | Custom libmpv and direct sbtl streaming first, then subtitle rendering, memory profiling, batch transitions, preload timing, seek dragging and player/settings accessibility | P0 direct `sbtl://` stream callback is implemented and pinned to published sbtl 0.2.0; a cleared-cache A/B is promising but not conclusive; indexed-bitrate read-ahead, speed-scaled window, app-side seek prefetch and custom mpv sbtl buffer/cache-pause/idle hooks are implemented; playback/mpv logging captures debug messages and lifecycle events, redacts command data, and creates a timestamped file per run; broader runtime measurements remain pending; batch torrent/file reuse and season-aware handoff implemented |
+| v0.7.0 | Custom libmpv and direct sbtl streaming first, then subtitle rendering, memory profiling, batch transitions, preload timing, seek dragging and player/settings accessibility | P0 direct `sbtl://` stream callback is implemented and pinned to published sbtl 0.2.0; a cleared-cache A/B is promising but not conclusive; indexed-bitrate read-ahead, speed-scaled window, app-side seek prefetch and custom mpv sbtl buffer/cache-pause/idle hooks are implemented; playback/mpv logging captures debug messages and lifecycle events, redacts command data, and creates a timestamped file per run; broader runtime measurements remain pending; batch file matching now applies AniList episode offsets and rejects fractional/NC alternates; batch torrent/file reuse and season-aware handoff implemented |
 | v0.8.0 | Navigation/Home rehaul and Discover | Planned |
 | v1.0.0 | Stabilization and 32-bit Windows | Planned |
 | v1.1.0 | Binge Mode | Idea; not implementation-ready |
@@ -232,7 +232,7 @@ See [detailed specification](docs/planning/MATCHING.md).
 
 Remote Nyaa queries stay within 600 characters; long first-season sibling-exclusion lists are trimmed because local season matching remains authoritative.
 
-## Batch file selection from torrent manifests (planned, v0.7.0 patch: playback)
+## Batch file selection from torrent manifests (implemented, v0.7.0 patch: playback)
 
 Use the same AniList franchise episode offset for file labels inside a torrent
 that source grouping already uses for release titles. Do not let fractional
@@ -240,9 +240,11 @@ labels such as `24.5` silently match integer Episode 24; keep NC-version
 alternates out of automatic episode selection. Reject a single video whose
 explicit episode label disagrees with the requested episode; retain the
 single-file fallback only when its filename has no usable episode label. If a
-manifest still cannot be matched safely, preserve ranked-source fallback.
-Validate against the MKV/MP4 file lists in `nyaa-crawl-30pages_batches.json`
-and the Asakura Slime season packs.
+manifest still cannot be matched safely, preserve ranked-source fallback. A
+libtorrent audit parsed 2,248 of 2,250 crawl entries and produced 126,979
+MKV/MP4 entries for analysis. The two
+unresolved listings had no downloadable torrent and no available magnet
+metadata. App playback verification remains open.
 
 ## AnimeTosho dataset (v0.5.0, was v0.4.4 - minor feature)
 

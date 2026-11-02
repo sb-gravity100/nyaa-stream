@@ -46,6 +46,8 @@ interface Props {
   groupedSources: SourceGroup[];
   /** The entry's season from the backend; falls back to the episode group's. */
   entrySeason?: number | null;
+  /** Franchise episode count before this season; null while AniList loads it. */
+  episodeOffset?: number | null;
   sourcesLoading: boolean;
   sourcesCount: number;
   onRefreshReleases: () => void;
@@ -291,6 +293,7 @@ export function MediaPage({
   artwork,
   groupedSources,
   entrySeason = null,
+  episodeOffset,
   sourcesLoading,
   sourcesCount,
   onRefreshReleases,
@@ -613,6 +616,7 @@ export function MediaPage({
       progressKey={watchLabel ?? playing[0]}
       episode={playing[1].label.kind === "episode" ? playing[1].label.number : null}
       season={entrySeason ?? (playing[1].label.kind === "episode" ? playing[1].label.season : null)}
+      episodeOffset={episodeOffset}
       releases={playing[1].releases}
       onClose={onCloseWatch}
       onNext={next ? () => play(next[0], true) : null}

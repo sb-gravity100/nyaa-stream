@@ -144,12 +144,15 @@ The checklist below groups related work and does not override this order.
       rejected, alternate sources are tried in ranked order, and stale player
       stops cannot remove a successor. Measure the handoff in the full app,
       separately from waits for missing torrent pieces.
-- [ ] Match files in absolute-numbered season packs using the AniList episode
+- [x] Match files in absolute-numbered season packs using the AniList episode
       offset, never truncate fractional file numbers into the preceding integer
-      episode, and exclude NC-version alternates from automatic selection. Use
-      the libtorrent-parsed 30-page batch file-list corpus for coverage. Reject
-      an explicitly mislabeled single file, retain an unknown single-file
-      fallback, and keep ranked-source fallback when a pack cannot be matched.
+      episode, and exclude NC-version alternates from automatic selection. The
+      libtorrent audit parsed 2,248 of 2,250 crawl entries and analyzed only
+      126,979 MKV/MP4 paths. Reject an explicitly mislabeled single file, retain
+      an unknown single-file fallback, and keep ranked-source fallback.
+- [ ] Verify Asakura Season 2 Episode 1 selects file 25, Season 1 Episode 24
+      selects file 24 rather than 24.5, and NC-version duplicates are skipped in
+      the running app.
 - [~] Log next-episode click/autoplay/playlist selection to first frame in mpv
       and HLS. Run cached, partial and poorly seeded batches in the app to
       measure the result against the 2026-10-30 traces.

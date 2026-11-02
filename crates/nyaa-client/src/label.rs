@@ -32,6 +32,12 @@ impl EpisodeLabel {
     /// Parses a release title or a file name.
     pub fn of(title: &str) -> EpisodeLabel {
         let r = release_parse::parse_release(title);
+        if matches!(&r.kind, release_parse::Kind::Episode)
+            && r.episodes.is_some_and(|(number, _)| crate::file_name::fractional_episode(title, number))
+        {
+            tracing::debug!(title, "fractional episode label is not an integer episode");
+            return EpisodeLabel::Special;
+        }
         let season = r.season();
         let label = match r.kind {
             release_parse::Kind::Episode => match r.episodes {

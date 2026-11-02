@@ -15,7 +15,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     features: [
       "The tailored libmpv build includes D3D11VA/D3D11VA2 hardware decoders for H.264, HEVC and AV1, with software fallback when the device cannot decode a stream.",
       "Embedded mpv defaults to video-resolution ASS with Bicubic scaling, antialiasing off and blur 0.0. Subtitle composition can blend with video or draw a separate overlay; both paths support ASS filters and blur controls.",
-      "Next-episode batch playback reuses resolved torrent files, chooses the matching season and episode, and falls back to another source when needed.",
+      "Next-episode batch playback applies franchise episode offsets inside torrent file lists, ignores fractional and NC-version alternatives, and falls back safely when a source does not contain the requested episode.",
       "Settings are organized into keyboard-navigable sections, and the player context menu opens a shortcut reference.",
       "Autoplay starts the next episode immediately. Player controls stay visible while a player popup is open.",
       "The seek bar highlights opening and ending chapter regions; the side skip-opening prompt is removed.",

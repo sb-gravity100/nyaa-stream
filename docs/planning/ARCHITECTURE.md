@@ -138,7 +138,11 @@ Building the workspace requires, beyond Rust/Node:
   The database is user data - "Clear cache" leaves it alone.
 - **Batch playback:** a batch source plays only its matched episode file (each
   torrent keeps an idle sbtl stream open, so files nobody reads don't
-  download). While it plays, the next episode's file is registered as a
+  download). File matching applies the AniList cumulative prequel offset to
+  absolute-numbered files, excludes fractional-numbered specials and NC-version
+  duplicates, and rejects a single file whose explicit episode label disagrees
+  with the requested episode; unnumbered single-file sources remain usable.
+  While it plays, the next episode's file is registered as a
   *preload file* (`preload_next_file` → `sbtl_engine`'s `set_preload_file`, a
   reader-less sbtl stream behind everything else) so it only takes spare
   bandwidth; the next episode keeps using the same batch and torrent

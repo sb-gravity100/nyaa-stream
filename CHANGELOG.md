@@ -20,7 +20,7 @@ step when cutting a release.
 - Autoplay starts the next episode immediately, and player controls stay visible while a player popup is open.
 - The seek bar highlights opening and ending chapter regions; the side skip-opening prompt is removed.
 - Embedded mpv defaults to video-resolution ASS with Bicubic upscaling and downscaling, antialiasing off and blur 0.0. Settings can blend subtitles with video or draw them as a separate overlay; both paths support the ASS filters and blur controls, and 2× window rendering remains available with video blending.
-- Next-episode batch playback reuses the active torrent's resolved file list, selects a matching season and episode file, and tries other ranked sources when the batch lacks the target.
+- Next-episode batch playback reuses the active torrent's resolved file list, applies franchise episode offsets inside the file list, ignores fractional/NC-version alternatives and rejects explicitly mismatched single files before trying other ranked sources.
 
 ### Fixed
 - The mouse cursor hides after its idle timeout when `N` opens the next episode.

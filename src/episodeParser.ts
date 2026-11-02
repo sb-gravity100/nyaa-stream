@@ -66,6 +66,23 @@ const EPISODE_PATTERNS: RegExp[] = [
 // unaffected.
 const SEASON_DASH_EPISODE_PATTERN = /\bseason\s*\d{1,2}\s*-\s*(\d{1,4})\b/i;
 
+// Fractional counters are specials/parts, never the preceding integer
+// episode. Without this guard, S01E24.5 was parsed as episode 24 and could
+// beat the real E24 file by size in a batch torrent.
+const FRACTIONAL_EPISODE_PATTERNS = [
+  /\bS\d{1,2}E(\d{1,3})\.\d\b/i,
+  /\b(?:episode|ep)\s*[-._ ]*(\d{1,3})\.\d(?:v\d+)?(?:\s*[-–—]\s*[A-Za-z]|\s*[\[(|]|$)/i,
+  /\b(?:season\s*\d{1,2}|\d{1,2}(?:st|nd|rd|th)\s+season)\s*-?\s*(\d{1,3})\.\d(?:v\d+)?(?:\s*[-–—]\s*[A-Za-z]|\s*[\[(|]|$)/i,
+  /(?:^|-\s*)(\d{1,3})\.\d(?:v\d+)?(?:\s*[-–—]\s*[A-Za-z]|\s*[\[(|]|$)/i,
+];
+
+export function isFractionalEpisode(title: string, episodeNumber: number): boolean {
+  return FRACTIONAL_EPISODE_PATTERNS.some((pattern) => {
+    const match = title.match(pattern);
+    return match != null && Number(match[1]) === episodeNumber;
+  });
+}
+
 // Weakest, most false-positive-prone signal (a bare "E" + digits can
 // coincidentally appear in unrelated bracketed metadata) - kept as a
 // strict last resort rather than part of the leftmost-wins comparison
@@ -190,7 +207,7 @@ function batchLabel(title: string, withRange = true): Extract<EpisodeLabel, { ki
   return label;
 }
 
-export function parseEpisode(title: string): EpisodeLabel {
+function parseEpisodeCore(title: string): EpisodeLabel {
   const seasonEpisodeMatch = title.match(SEASON_EPISODE_PATTERN);
   if (seasonEpisodeMatch) {
     const season = parseInt(seasonEpisodeMatch[1], 10);
@@ -222,6 +239,14 @@ export function parseEpisode(title: string): EpisodeLabel {
     }
   }
   return { kind: "unknown" };
+}
+
+export function parseEpisode(title: string): EpisodeLabel {
+  const label = parseEpisodeCore(title);
+  if (label.kind === "episode" && isFractionalEpisode(title, label.number)) {
+    return { kind: "special" };
+  }
+  return label;
 }
 
 // Fansub group tag from the leading "[Name]" bracket, e.g. "[SubsPlease]

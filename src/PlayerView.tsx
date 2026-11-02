@@ -126,6 +126,8 @@ interface Props {
    /** The episode group's season: among a pack's files with the same
     * episode number, the ones of this season win. */
    season?: number | null;
+   /** Franchise episode count before this season; null means still loading. */
+   episodeOffset?: number | null;
    releases: NyaaResult[];
    onClose: () => void;
    /** Present when there's a next episode to go to. */
@@ -229,18 +231,35 @@ function pickFile(
    defaultIdx: number,
    episode: number | null,
    season: number | null = null,
+   episodeOffset = 0,
+   seasonEpisodeCount = 0,
 ): { file: PlayFile; matched: boolean } | null {
    const videos = files.filter((f) => f.isVideo);
    const regularVideos = videos.filter((f) => !isExtraFile(f));
    if (regularVideos.length === 0) return null;
-   if (regularVideos.length > 1 && episode != null) {
-      const pick = matchEpisodeFile(regularVideos, episode, season);
+   if (episode != null) {
+      const pick = matchEpisodeFile(regularVideos, episode, season, episodeOffset, seasonEpisodeCount);
       if (pick) {
          console.info("[player] matched episode file in batch", {
             episode,
             file: pick.name,
          });
          return { file: pick, matched: true };
+      }
+      if (regularVideos.length === 1) {
+         const onlyFile = regularVideos[0];
+         const label = labelOf(onlyFile.label, baseName(onlyFile.name));
+         if (label.kind === "unknown") {
+            console.info("[player] using unnumbered single-file source", { episode, file: onlyFile.name });
+            return { file: onlyFile, matched: false };
+         }
+         console.warn("[player] single-file source label disagrees with requested episode", {
+            episode,
+            season,
+            file: onlyFile.name,
+            label,
+         });
+         return null;
       }
       console.warn("[player] batch does not contain the requested episode", { episode, season });
       return null;
@@ -252,7 +271,7 @@ function pickFile(
       return { file: first, matched: false };
    }
    const fallback = regularVideos.find((f) => f.index === defaultIdx) ?? regularVideos[0] ?? null;
-   return fallback ? { file: fallback, matched: videos.length <= 1 } : null;
+   return fallback ? { file: fallback, matched: false } : null;
 }
 
 function fileLabel(file: PlayFile): string {
@@ -281,6 +300,7 @@ function MpvPlayerView({
    progressKey,
    episode,
    season = null,
+   episodeOffset,
    releases,
    onClose,
    onNext,
@@ -324,7 +344,7 @@ function MpvPlayerView({
          // saved magnet when not listed (yet): releases arrive in phases.
          resumeRelease(releases, resumeSourceMagnet(anime.id, progressKey)) ??
          // Preserve a batch only if its resolved files contain this episode.
-         preferredBatchRelease(anime.id, releases, episode, season) ??
+         preferredBatchRelease(anime.id, releases, episode, season, episodeOffset ?? 0, anime.episodes ?? 0) ??
          bestRelease(releases, releasePrefs),
    );
    const attemptedSourcesRef = useRef(new Set<string>());
@@ -538,6 +558,11 @@ function MpvPlayerView({
    // Re-runs whenever the user picks a different source: play_magnet tears
    // down the previous torrent, so switching is just "play again".
    useEffect(() => {
+      if (episode != null && season != null && season > 1 && episodeOffset == null) {
+         console.debug("[player] waiting for absolute episode offset before batch file selection", { animeId: anime.id, season, episode });
+         setStatus("Preparing episode match…");
+         return;
+      }
       let cancelled = false;
       attemptedSourcesRef.current.add(selectedRelease.magnet);
       playbackGenerationRef.current = null;
@@ -565,7 +590,7 @@ function MpvPlayerView({
             // default) - never an extra that happens to parse as "01".
             const picked = isMovie(anime)
                ? ((f) => (f ? { file: f, matched: true } : null))(session.files.find((f) => f.index === session.defaultFileIdx))
-               : pickFile(session.files, session.defaultFileIdx, episode, season);
+               : pickFile(session.files, session.defaultFileIdx, episode, season, episodeOffset ?? 0, anime.episodes ?? 0);
             const file = picked?.file ?? null;
             if (!picked || !file) {
                const fallback = sortedReleases.find((release) => !attemptedSourcesRef.current.has(release.magnet));
@@ -596,20 +621,20 @@ function MpvPlayerView({
          cancelled = true;
          traceEnd(trace, "abandoned");
       };
-   }, [selectedRelease, anime.id, progressKey, episode]);
+   }, [selectedRelease, anime.id, progressKey, episode, season, episodeOffset]);
 
    // Batch source: once this episode is playing, fetch the next episode's
    // file from the same torrent at the lowest priority (spare bandwidth
    // only), so pressing next starts from data that is already there.
    useEffect(() => {
       if (!hasPlayed || !torrentId || !selectedFile || !fileMatched) return;
-      const next = nextEpisodeFile(files, selectedFile, season);
+      const next = nextEpisodeFile(files, selectedFile, season, episodeOffset ?? 0, anime.episodes ?? 0);
       if (!next) return;
       console.info("[player] preloading next episode file", { file: next.name });
       invoke("preload_next_file", { torrentId, fileIdx: next.index }).catch((err) =>
          console.debug("[player] preload unavailable", { err: String(err) }),
       );
-   }, [hasPlayed, torrentId, selectedFile?.index, fileMatched, season]);
+   }, [hasPlayed, torrentId, selectedFile?.index, fileMatched, season, episodeOffset, anime.episodes]);
 
    // Per-file state resets (source switch or batch file switch).
    useEffect(() => {

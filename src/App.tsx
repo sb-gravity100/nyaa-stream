@@ -620,6 +620,7 @@ function App() {
   }, [selectedAnime, entrySeasonByMedia]);
 
   const currentEpisodeOffset = selectedAnime ? (episodeOffsetByMedia[selectedAnime.id] ?? 0) : 0;
+  const currentEpisodeOffsetReady = selectedAnime != null && selectedAnime.id in episodeOffsetByMedia;
 
   const debugActive = import.meta.env.DEV && location.hash === "#/debug";
   const sourceAnalysis = useMemo(() => {
@@ -1113,6 +1114,7 @@ function App() {
     progressKey="Custom source"
     episode={directPlay.episode}
     season={directPlay.season}
+    episodeOffset={0}
     releases={[directPlay.source]}
     onAttachCustomSource={(release) => { setAttachmentSource(null); setAttachmentInput(release.magnet); }}
     onClose={() => setDirectPlay(null)}
@@ -1158,6 +1160,7 @@ function App() {
           onRemoveCustomSource={removeCustomSource}
           onMoveCustomSource={(source) => { setAttachmentSource(source); setAttachmentInput(source.magnet); }}
           entrySeason={entrySeasonByMedia[selectedAnime.id] ?? null}
+          episodeOffset={currentEpisodeOffsetReady ? currentEpisodeOffset : null}
           sourcesLoading={sourcesLoading}
           sourcesCount={sources.length}
           onRefreshReleases={() => { void openAnime(selectedAnime, false, true); }}

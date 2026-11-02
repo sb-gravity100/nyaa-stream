@@ -123,6 +123,8 @@ interface Props {
    /** The episode group's season: among a pack's files with the same
     * episode number, the ones of this season win. */
    season?: number | null;
+   /** Franchise episode count before this season; null means still loading. */
+   episodeOffset?: number | null;
    releases: NyaaResult[];
    onClose: () => void;
    /** Present when there's a next episode to go to. */
@@ -178,18 +180,35 @@ function pickFile(
    defaultIdx: number,
    episode: number | null,
    season: number | null = null,
+   episodeOffset = 0,
+   seasonEpisodeCount = 0,
 ): PlayFile | null {
    const videos = files.filter((f) => f.isVideo);
    const regularVideos = videos.filter((f) => !isExtraFile(f));
    if (regularVideos.length === 0) return null;
-   if (regularVideos.length > 1 && episode != null) {
-      const pick = matchEpisodeFile(regularVideos, episode, season);
+   if (episode != null) {
+      const pick = matchEpisodeFile(regularVideos, episode, season, episodeOffset, seasonEpisodeCount);
       if (pick) {
          console.info("[player] matched episode file in batch", {
             episode,
             file: pick.name,
          });
          return pick;
+      }
+      if (regularVideos.length === 1) {
+         const onlyFile = regularVideos[0];
+         const label = labelOf(onlyFile.label, baseName(onlyFile.name));
+         if (label.kind === "unknown") {
+            console.info("[hls-player] using unnumbered single-file source", { episode, file: onlyFile.name });
+            return onlyFile;
+         }
+         console.warn("[hls-player] single-file source label disagrees with requested episode", {
+            episode,
+            season,
+            file: onlyFile.name,
+            label,
+         });
+         return null;
       }
       console.warn("[hls-player] batch does not contain the requested episode", { episode, season });
       return null;
@@ -229,6 +248,7 @@ export function HlsPlayerView({
    progressKey,
    episode,
    season = null,
+   episodeOffset,
    releases,
    onClose,
    onNext,
@@ -261,7 +281,7 @@ export function HlsPlayerView({
       preferredResolution: settings.preferredResolution,
    };
    const [selectedRelease, setSelectedRelease] = useState<NyaaResult>(() =>
-      preferredBatchRelease(anime.id, releases, episode, season) ?? bestRelease(releases, releasePrefs),
+      preferredBatchRelease(anime.id, releases, episode, season, episodeOffset ?? 0, anime.episodes ?? 0) ?? bestRelease(releases, releasePrefs),
    );
    const attemptedSourcesRef = useRef(new Set<string>());
 
@@ -428,6 +448,11 @@ export function HlsPlayerView({
    // Re-runs whenever the user picks a different source: play_magnet tears
    // down the previous torrent, so switching is just "play again".
    useEffect(() => {
+      if (episode != null && season != null && season > 1 && episodeOffset == null) {
+         console.debug("[hls-player] waiting for absolute episode offset before batch file selection", { animeId: anime.id, season, episode });
+         setStatus("Preparing episode match…");
+         return;
+      }
       let cancelled = false;
       attemptedSourcesRef.current.add(selectedRelease.magnet);
       playbackGenerationRef.current = null;
@@ -456,7 +481,7 @@ export function HlsPlayerView({
             // default) - never an extra that happens to parse as "01".
             const file = isMovie(anime)
                ? (session.files.find((f) => f.index === session.defaultFileIdx) ?? null)
-               : pickFile(session.files, session.defaultFileIdx, episode, season);
+               : pickFile(session.files, session.defaultFileIdx, episode, season, episodeOffset ?? 0, anime.episodes ?? 0);
             if (!file) {
                const fallback = sortedReleases.find((release) => !attemptedSourcesRef.current.has(release.magnet));
                if (fallback && !isMovie(anime) && episode != null) {
@@ -483,7 +508,7 @@ export function HlsPlayerView({
       return () => {
          cancelled = true;
       };
-   }, [selectedRelease, anime.id, progressKey, episode]);
+   }, [selectedRelease, anime.id, progressKey, episode, season, episodeOffset, anime.episodes]);
 
    // Per-file state resets (source switch or batch file switch).
    useEffect(() => {
