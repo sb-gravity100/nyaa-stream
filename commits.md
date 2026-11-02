@@ -34,6 +34,10 @@
 - `crates/torrent-engine/src/media.rs`
 - `crates/torrent-engine/src/subtitle_log.rs`
 
+### `2adade5` · 2026-11-02 · docs: plan split run logging
+- `PLAN.md`
+- `PHASES.md`
+
 ### `ce543b8` · 2026-11-02 · fix: select only one OP region
 - `src/PlayerView.tsx`
 
