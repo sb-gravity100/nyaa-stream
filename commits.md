@@ -1,3 +1,7 @@
+### `b88efb1` · 2026-11-02 · fix: resume autoplay after mpv loads next episode
+- `src/PlayerView.tsx`
+- `PHASES.md`
+
 ### `5e716cc` · 2026-11-02 · docs: plan HLS retirement and playback handoff
 - `PLAN.md`
 - `PHASES.md`
