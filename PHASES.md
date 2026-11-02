@@ -222,9 +222,10 @@ The checklist below groups related work and does not override this order.
       player context menus; manual app verification remains pending.
 - [x] Start the next episode immediately on end when autoplay is enabled;
       retain the setting to disable autoplay; verify in the app.
-- [ ] For autoplay transitions, explicitly resume mpv after the successor
-      emits `file-loaded`; ensure the close path stops/unloads mpv, resets only
-      per-file state, and retains saved user playback/subtitle preferences.
+- [x] For autoplay transitions, explicitly resume mpv after the successor
+      emits `file-loaded`; the close path already stops/unloads mpv, resets
+      only per-file state and retains saved user playback/subtitle preferences.
+      Verify the autoplay handoff in the running app.
 - [ ] Remove the legacy HLS player, its HLS-only stream/transcode routes and
       cache UI, and the JASSUB dependency; retain embedded mpv and its native
       ASS subtitle support. Keep FFmpeg features used by export, thumbnails,

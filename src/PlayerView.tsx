@@ -315,6 +315,7 @@ function MpvPlayerView({
    const settings = useSettings();
    const [episodeTransition] = useState(() => takeEpisodeTransition(anime.id, episodeKey));
    const transitionLoggedRef = useRef(false);
+   const autoplayResumeAttemptedRef = useRef(false);
    const videoRef = useRef<MpvVideo | null>(null);
    // Load profiler traces (PLAN.md "Load profiler"): the current start
    // (player open / source -> first frame) and seek (-> playback restart).
@@ -672,7 +673,16 @@ function MpvPlayerView({
       videoRef.current = video;
       const on = (type: string, handler: () => void) => video.addEventListener(type, handler);
       on("durationchange", () => setDuration(video.duration));
-      on("loadedmetadata", () => setDuration(video.duration));
+      on("loadedmetadata", () => {
+         setDuration(video.duration);
+         if (episodeTransition?.trigger === "autoplay" && !autoplayResumeAttemptedRef.current) {
+            autoplayResumeAttemptedRef.current = true;
+            console.info("[player] resuming autoplay after next file loaded", { animeId: anime.id, episodeKey });
+            void video.play().catch((err) =>
+               console.error("[player] autoplay resume failed", { animeId: anime.id, episodeKey, err: String(err) }),
+            );
+         }
+      });
       on("timeupdate", () => {
          setPosition(video.currentTime);
          autoSkipChapterRef.current?.(video.currentTime);
