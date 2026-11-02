@@ -164,6 +164,9 @@ The checklist below groups related work and does not override this order.
       are suppressed, with a count. Start each app run in a new UTC timestamped
       log file and retain the seven most recent run files. `cargo check --workspace`
       and `npm run build` pass.
+- [ ] Split each run's logs: concise readable `.log` output and full verbose
+      tracing events in a paired SQLite `.db` with compressed event chunks.
+      Keep seven run pairs and include scrubbed copies in Send Logs.
 - [x] Use sbtl 0.2.0's published DLL/API: `wake`, safe stream invalidation on
       removal, `stalled_ms`, verified reads and direct wait/seek APIs are present;
       refresh `Cargo.lock` to the current published `v0.2.0` tag commit.

@@ -73,6 +73,9 @@ v0.7.0.
 - sbtl must resolve from a published git tag; native DLL identity must match.
   No committed local patch overrides.
 - Preserve permanent release data, source attachments and playback/resume state.
+- Keep per-run `.log` files concise (INFO and above); write full verbose
+  tracing events to a paired SQLite `.db` using compressed event chunks, with
+  seven-run retention and scrubbed log export.
 - Keep FFmpeg for clip export, thumbnails, storyboards and media probing;
   remove the HLS-only pipeline and JASSUB dependency in v0.7.0.
 - Preserve authored ASS layout/animation and embedded mpv subtitle rendering;
