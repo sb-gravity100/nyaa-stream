@@ -1,3 +1,39 @@
+### `2356bbd` · 2026-11-02 · refactor: remove HLS and JASSUB playback
+- `README.md`
+- `PHASES.md`
+- `FILE_INDEX.md`
+- `CHANGELOG.md`
+- `docs/planning/ARCHITECTURE.md`
+- `docs/planning/MPV_BUILD.md`
+- `docs/planning/PLAYBACK.md`
+- `docs/planning/ROADMAP.md`
+- `package.json`
+- `package-lock.json`
+- `src/PlayerView.tsx`
+- `src/SettingsPanel.tsx`
+- `src/App.tsx`
+- `src/App.css`
+- `src/playback.ts`
+- `src/releases.ts`
+- `src/subtitles.ts`
+- `src/settings.ts`
+- `src/types.ts`
+- `src/mpvVideo.ts`
+- `src/devLogger.ts`
+- `src/changelog.ts`
+- `vite.config.ts`
+- `src/HlsPlayerView.tsx`
+- `src/assRenderer.ts`
+- `src-tauri/src/cache.rs`
+- `src-tauri/src/lib.rs`
+- `src-tauri/src/player.rs`
+- `crates/mpv-player/src/libmpv.rs`
+- `crates/sbtl-engine/src/lib.rs`
+- `crates/torrent-engine/Cargo.toml`
+- `crates/torrent-engine/src/lib.rs`
+- `crates/torrent-engine/src/media.rs`
+- `crates/torrent-engine/src/subtitle_log.rs`
+
 ### `ce543b8` · 2026-11-02 · fix: select only one OP region
 - `src/PlayerView.tsx`
 
