@@ -1,4 +1,6 @@
-### `5a89fa9` · 2026-11-02 · docs: align batch audit scope
+### `28d913f` · 2026-11-02 · docs: scope batch audit to mkv and mp4
+- `PLAN.md`
+- `PHASES.md`### `5a89fa9` · 2026-11-02 · docs: align batch audit scope
 - `PLAN.md`
 - `PHASES.md`### `deb68ea` · 2026-11-02 · docs: define safe batch fallback
 - `PLAN.md`
