@@ -1,3 +1,7 @@
+### `5e716cc` · 2026-11-02 · docs: plan HLS retirement and playback handoff
+- `PLAN.md`
+- `PHASES.md`
+
 ### `cd9923c` · 2026-11-02 · fix: normalize torrent batch file matching
 - `crates/nyaa-client/src/file_name.rs`
 - `crates/nyaa-client/src/label.rs`
