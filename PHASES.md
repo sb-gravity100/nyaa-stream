@@ -149,7 +149,8 @@ The checklist below groups related work and does not override this order.
       episode, and exclude NC-version alternates from automatic selection. Use
       the libtorrent-parsed 30-page batch file-list corpus for coverage. Reject
       an explicitly mislabeled single file, retain an unknown single-file
-      fallback, and keep ranked-source fallback when a pack cannot be matched.
+      fallback, align `.m2ts`/`.flv` discovery with playback, and keep ranked-
+      source fallback when a pack cannot be matched.
 - [~] Log next-episode click/autoplay/playlist selection to first frame in mpv
       and HLS. Run cached, partial and poorly seeded batches in the app to
       measure the result against the 2026-10-30 traces.

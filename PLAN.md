@@ -240,7 +240,9 @@ labels such as `24.5` silently match integer Episode 24; keep NC-version
 alternates out of automatic episode selection. Reject a single video whose
 explicit episode label disagrees with the requested episode; retain the
 single-file fallback only when its filename has no usable episode label. If a
-manifest still cannot be matched safely, preserve ranked-source fallback.
+manifest still cannot be matched safely, preserve ranked-source fallback. Keep
+the Nyaa file-list parser's video extensions aligned with playback-supported
+containers so `.m2ts` and `.flv` files participate in batch verification.
 Validate against the real file lists in `nyaa-crawl-30pages_batches.json` and
 the Asakura Slime season packs.
 
