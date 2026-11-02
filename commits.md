@@ -1,4 +1,6 @@
-### `ee54e0b` · 2026-11-02 · fix: limit intro chapter skipping by duration
+### `5ef869f` · 2026-11-02 · docs: plan batch manifest matching
+- `PLAN.md`
+- `PHASES.md`### `ee54e0b` · 2026-11-02 · fix: limit intro chapter skipping by duration
 - `src/PlayerView.tsx`
 - `src/SettingsPanel.tsx`
 - `src/changelog.ts`
