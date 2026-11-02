@@ -237,10 +237,12 @@ Remote Nyaa queries stay within 600 characters; long first-season sibling-exclus
 Use the same AniList franchise episode offset for file labels inside a torrent
 that source grouping already uses for release titles. Do not let fractional
 labels such as `24.5` silently match integer Episode 24; keep NC-version
-alternates out of automatic episode selection. If a manifest still cannot be
-matched safely, preserve ranked-source fallback. Validate against the real
-file lists in `nyaa-crawl-30pages_batches.json` and the Asakura Slime season
-packs.
+alternates out of automatic episode selection. Reject a single video whose
+explicit episode label disagrees with the requested episode; retain the
+single-file fallback only when its filename has no usable episode label. If a
+manifest still cannot be matched safely, preserve ranked-source fallback.
+Validate against the real file lists in `nyaa-crawl-30pages_batches.json` and
+the Asakura Slime season packs.
 
 ## AnimeTosho dataset (v0.5.0, was v0.4.4 - minor feature)
 
