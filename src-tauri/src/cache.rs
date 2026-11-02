@@ -1,5 +1,5 @@
 //! Backup file I/O and on-disk caches under `<cache_dir>/nyaa-stream`: sizes for Settings, the
-//! clear buttons, and the HLS segment cache's startup/exit purge.
+//! clear buttons and one-time cleanup of the retired HLS segment cache.
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -13,9 +13,8 @@ fn root() -> PathBuf {
     dirs::cache_dir().unwrap_or_else(std::env::temp_dir).join("nyaa-stream")
 }
 
-/// Transcoded HLS segments - only meaningful while their torrent plays, and
-/// they grow to several GB, so they're purged rather than kept.
-fn hls_dir() -> PathBuf {
+/// HLS segments from app versions before the player retirement.
+fn legacy_hls_dir() -> PathBuf {
     root().join("hls_cache")
 }
 
@@ -33,16 +32,14 @@ fn dir_size(path: &Path) -> u64 {
         .sum()
 }
 
-/// Deletes the HLS segment cache. Best effort - a file still held open by a
-/// running job just stays until the next purge. Called at startup (a crash
-/// skips the exit purge) and on exit.
-pub fn purge_hls_cache() {
-    let dir = hls_dir();
+/// Removes the unused HLS cache left by older versions.
+pub fn purge_legacy_hls_cache() {
+    let dir = legacy_hls_dir();
     let size = dir_size(&dir);
     match std::fs::remove_dir_all(&dir) {
-        Ok(()) => tracing::info!(bytes = size, "purged hls cache"),
+        Ok(()) => tracing::info!(bytes = size, "removed retired hls cache"),
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
-        Err(err) => tracing::warn!(%err, "couldn't fully purge hls cache"),
+        Err(err) => tracing::warn!(%err, "couldn't fully remove retired hls cache"),
     }
 }
 
@@ -51,7 +48,7 @@ pub fn purge_hls_cache() {
 pub struct CacheSizes {
     nyaa: u64,
     thumbnails: u64,
-    hls: u64,
+    storyboards: u64,
     torrents: u64,
 }
 
@@ -65,9 +62,7 @@ pub async fn get_cache_sizes(state: State<'_, Arc<AppState>>) -> Result<CacheSiz
         CacheSizes {
             nyaa: dir_size(&root.join("nyaa_cache")),
             thumbnails: dir_size(&root.join("thumbnails")),
-            // Storyboards share playback-cache cleanup and are retained only
-            // for a saved Continue-watching resume point.
-            hls: dir_size(&hls_dir()) + dir_size(&root.join("storyboard")),
+            storyboards: dir_size(&root.join("storyboard")),
             // Allocated bytes - the download cache's files are sparse.
             torrents: app.download_cache.status().0 + dir_size(&root.join("engine_cache")) + dir_size(&crate::resume::root()),
         }
@@ -76,8 +71,8 @@ pub async fn get_cache_sizes(state: State<'_, Arc<AppState>>) -> Result<CacheSiz
     .map_err(|err| err.to_string())
 }
 
-/// Empties one cache: `nyaa`, `thumbnails`, `hls` or `torrents`. The last
-/// two are in use while something plays, so they refuse then.
+/// Empties one cache: `nyaa`, `thumbnails`, `storyboards` or `torrents`.
+/// Storyboards and torrent data are in use while something plays, so they refuse then.
 #[tauri::command]
 pub async fn clear_cache(state: State<'_, Arc<AppState>>, kind: String) -> Result<(), String> {
     tracing::debug!(%kind, "clear_cache invoked");
@@ -85,11 +80,11 @@ pub async fn clear_cache(state: State<'_, Arc<AppState>>, kind: String) -> Resul
     let dirs: Vec<PathBuf> = match kind.as_str() {
         "nyaa" => vec![root.join("nyaa_cache")],
         "thumbnails" => vec![root.join("thumbnails")],
-        "hls" => {
+        "storyboards" => {
             if state.current_torrent.lock().await.is_some() {
                 return Err("Stop playback first - this cache is in use.".into());
             }
-            vec![hls_dir(), root.join("storyboard")]
+            vec![root.join("storyboard")]
         }
         // Everything but the playing torrent (see download_cache::clear).
         "torrents" => {

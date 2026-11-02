@@ -113,9 +113,7 @@ export interface PlayFile {
   name: string;
   length: number;
   isVideo: boolean;
-  /** Base HLS playlist URL - append `?duration=<seconds>` before use. */
-  hlsUrl: string;
-  /** Raw HTTP Range stream for HLS and libmpv builds without stream callbacks. */
+  /** Raw HTTP Range stream for libmpv builds without stream callbacks. */
   streamUrl: string;
   /** Direct sbtl callback URL for libmpv builds that support stream callbacks. */
   mpvUrl?: string;
@@ -134,8 +132,7 @@ export interface PlaySession {
 }
 
 export interface SubtitleTrack {
-  /** Absolute demuxer stream index - what identifies this track to the
-   * backend (see torrent-engine's `SubtitleTrack` doc comment). */
+  /** mpv's track id. */
   index: number;
   language: string | null;
   title: string | null;
@@ -143,14 +140,6 @@ export interface SubtitleTrack {
   codec: string;
   /** Container's own default-track flag. */
   default: boolean;
-  /** Merged ASS script URL, polled by `assRenderer.ts` as it grows. */
-  url: string;
-}
-
-export interface SubtitleInfo {
-  tracks: SubtitleTrack[];
-  /** Embedded font attachment URLs for the libass renderer. */
-  fonts: string[];
 }
 
 /** Verified data ahead of the player's newest read (sbtl backend only). */
@@ -175,20 +164,9 @@ export interface StreamStats {
   finished: boolean;
   downloadedBytes: number;
   totalBytes: number;
-  /** How far into the file (seconds) HLS segments are actually produced
-   * and instantly seekable - not the same as progressPercent, which
-   * tracks raw torrent byte download and can run ahead of or behind
-   * this (see torrent-engine's StreamStats doc comment). */
-  readySeconds: number;
-  /** Every produced `[start, end)` stretch in seconds - seek restarts
-   * leave several disjoint ones. */
-  readyRanges: [number, number][];
   /** The file's verified bytes as `[start, end)` runs (file-relative) - the
    * mpv player's seek bar maps them to time for its "downloaded" layer. */
   downloadedByteRanges: [number, number][];
-  /** "direct" (stream copy) or e.g. "HEVC -> H.264 (h264_nvenc)" when the
-   * streaming server is transcoding; null before the first segment. */
-  videoMode: string | null;
   torrentName: string;
   fileName: string;
   uploadSpeedMbps: number;
@@ -197,14 +175,6 @@ export interface StreamStats {
   queuedPeers: number;
   swarmSize: number;
   sources: number;
-  /** The live HLS run (torrent-engine's HlsRunInfo), null before one starts. */
-  run: {
-    startSeconds: number;
-    segmentsProduced: number;
-    speedXRealtime: number;
-    running: boolean;
-    subtitleTracks: number;
-  } | null;
   /** null before the player reads. */
   buffer?: BufferStatus | null;
 }

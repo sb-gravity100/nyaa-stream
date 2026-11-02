@@ -414,7 +414,6 @@ export class MpvVideo extends EventTarget {
             title: t.title ?? null,
             codec: t.codec ?? "",
             default: t.default === true,
-            url: "",
          }));
    }
 
@@ -429,7 +428,6 @@ export class MpvVideo extends EventTarget {
             title: t.title ?? null,
             codec: t.codec ?? "",
             default: t.default === true,
-            url: "",
          }));
    }
 

@@ -39,8 +39,8 @@ Custom-build scope approved by SB on 2026-10-31:
 - Use mpv v0.41.0 stable and a native Windows LLVM build, approved by SB.
   The agreed trimming scope is frozen; dependency locks and setup commands
   are reviewed through [the native build recipe](MPV_BUILD.md).
-- Baseline x64 applies to this DLL. The existing Rust/HLS build still targets
-  x86-64-v3; changing the whole app's CPU requirement is outside this build scope.
+- Baseline x64 applies to the custom DLL. The app's Rust/FFmpeg build still
+  targets x86-64-v3; changing the whole app's CPU requirement is outside scope.
 
 Native subtitle supersampling remains deferred to this milestone by SB.
 Render subtitle masks at bounded 1.5x resolution and downsample before
@@ -61,8 +61,8 @@ benchmarks rather than assumed. The linked `mpv-build` scripts
 are Linux-focused; use them as a source-selection/options reference, and base
 the Windows build on mpv's documented Windows build workflow or a maintained
 Windows cross-toolchain after a small build feasibility spike. Keep the
-existing vcpkg FFmpeg build for the HLS pipeline separate unless a later
-measured design proves safe to consolidate.
+existing vcpkg FFmpeg build for clip export, thumbnails and storyboards
+separate from the custom libmpv FFmpeg build.
 
 Implement improvements through upstream mpv/FFmpeg/libass/libplacebo features
 or independently authored patches: keep ASS antialiasing
@@ -81,7 +81,7 @@ credentials. Ship required license notices and corresponding source or
 source-offer materials for the exact distributed build. Acceptance compares
 old and new DLLs on the same ASS, E-AC-3, seek-latency, and hardware-decoding
 cases, and confirms the existing
-embedded-player ABI and HLS fallback still work.
+embedded-player ABI and app playback through mpv still work.
 
 **v0.7.0 direct sbtl-to-mpv streaming (design, 2026-11-01).** After the
 custom v0.41.0 DLL baseline, replace the torrent-engine loopback HTTP Range
@@ -102,7 +102,8 @@ Cargo.lock to the current tag commit, and configured a 45-second playback-time
 read-ahead window once the container index supplies its bitrate, scales that
 window with playback speed, and prefetches indexed keyframes before forwarding
 absolute mpv seeks. Remaining work includes P1+ mpv-side buffer/cache-pause
-hooks and broader direct-vs-HTTP app measurements. Keep HLS FFmpeg independent.
+hooks and broader direct-vs-HTTP app measurements. Keep app FFmpeg for media
+export and image jobs independent.
 The custom DLL remains the stock
 mpv v0.41.0 build; P0 uses its
 public stream-callback API without a new mpv source patch. Phases and metrics
@@ -112,7 +113,7 @@ are detailed in
 **v0.7.0 batch transitions, next-episode preload, and seek dragging
 (requested 2026-10-29).**
 - The next episode now starts a two-second idle cursor timer when the mpv or
-  HLS player mounts, including transitions started with `N`; verify the cursor
+  mpv player mounts, including transitions started with `N`; verify the cursor
   hides in the running app after the timeout.
 - Improve next-episode loading from batch sources: reuse the active torrent,
   resolved file list, and verified downloaded data rather than removing and
@@ -146,7 +147,7 @@ are detailed in
   clamp to the playable duration, coalesce intermediate seek requests, and
   commit the final target on release. Handle cancel, source changes and unknown
   duration cleanly; preserve paused state and keyboard seeking. Verify both
-  embedded mpv and HLS, including fullscreen, backward dragging, and targets
+  embedded mpv, including fullscreen, backward dragging, and targets
   not yet downloaded; stale seek completions must not override the latest drag.
 
 **v0.7.0 Settings and player accessibility additions (SB, 2026-11-01).**
@@ -212,10 +213,10 @@ until then, but must not add 64-bit-only assumptions).
   The in-app updater picks its own arch automatically.
 - **Verify**: 32-bit Windows VM or the WoW64 build of the 32-bit installer on
   this PC (installs and runs on 64-bit Windows, so live QA is possible
-  here): playback, subtitles, resume, HLS fallback, updater. WebView2 is
+  here): playback, subtitles, resume, updater. WebView2 is
   available for x86.
 - Risks: 32-bit builds of vcpkg FFmpeg or sbtl may need patches; memory
-  exhaustion on long HLS runs; small user base vs. extra build/QA cost.
+  exhaustion during long playback sessions; small user base vs. extra build/QA cost.
 
 ## Navigation and home rehaul + Discover (planned, v0.8.0 navigation, Home and Discover)
 

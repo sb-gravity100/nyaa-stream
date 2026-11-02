@@ -10,7 +10,7 @@ function redactText(text: string): string {
     .replace(/(https?:\/\/)[^/@\s]+:[^/@\s]+@/gi, "$1[REDACTED]@")
     .replace(/magnet:\?[^\s"'<>]+/gi, "magnet:[REDACTED]")
     .replace(/sbtl:\/\/[0-9a-f]{40}\/\d+/gi, "sbtl://[TORRENT]/[FILE]")
-    .replace(/(http:\/\/127\.0\.0\.1:\d+\/(?:stream|hls)\/)[0-9a-f]{40}\/(\d+)/gi, "$1[TORRENT]/$2");
+    .replace(/(http:\/\/127\.0\.0\.1:\d+\/stream\/)[0-9a-f]{40}\/(\d+)/gi, "$1[TORRENT]/$2");
 }
 
 function sanitizeArg(arg: unknown, key?: string, seen = new WeakSet<object>()): unknown {

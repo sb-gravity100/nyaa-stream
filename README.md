@@ -91,10 +91,10 @@ an embedded [mpv](https://mpv.io/) player.
 - **Instant resume:** the first seconds of an unfinished episode are kept, so **Continue watching** reopens the exact release without waiting on peers
 - The seek bar shows which parts of the episode are already downloaded
 - Stremio-style buffering indicator and a statistics panel (peers, speeds, codecs, hardware decoding, dropped frames)
-- **Fallback player:** when libmpv isn't available, an HLS player built on FFmpeg and hls.js takes over automatically, with JASSUB (libass) subtitles
+- Embedded libmpv is required for playback; ASS subtitles use mpv's native renderer
 
 ### Manage
-- Cache sizes and one-click clearing (nyaa responses, thumbnails, HLS segments, torrent data)
+- Cache sizes and one-click clearing (nyaa responses, thumbnails, seek previews, torrent data)
 - A download cache (10 GB by default): played episodes stay on disk, so rewatching or seeking back doesn't download again
 - **Settings → Help:** contact details and a *Send logs* export (logs are scrubbed first)
 - Back up and restore your library, progress and settings
@@ -113,7 +113,7 @@ an embedded [mpv](https://mpv.io/) player.
 - A CPU with AVX2 (x86-64-v3: Intel Haswell / AMD Excavator or newer, roughly 2013+). The build targets it, so older CPUs won't run it
 - WebView2 (preinstalled on Windows 11 and current Windows 10; the installer bootstraps it if missing, requiring internet on a clean machine)
 - The installer includes the app-local MSVC runtime required by its native torrent bridge
-- For the fallback player only: a GPU with NVENC, QSV or AMF helps a lot with transcoding. Without one it uses OpenH264 on the CPU
+- `libmpv-2.dll` is required for playback; the installer bundles the app's custom x64 build
 
 ---
 
@@ -178,8 +178,8 @@ Open them with the gear icon in the app bar.
 | --- | --- |
 | Library, watch progress, settings | WebView `localStorage` (use **Settings → Backup** to move it between machines) |
 | Release database (`nyaa.db`) | `%APPDATA%\nyaa-stream\` (permanent, not touched by *Clear cache*) |
-| Torrent data, thumbnails, nyaa response cache, HLS segments | `%LOCALAPPDATA%\nyaa-stream\` (safe to clear) |
-| Logs (daily, last 7 kept) | `%LOCALAPPDATA%\nyaa-stream\logs\` |
+| Torrent data, thumbnails, nyaa response cache, seek previews | `%LOCALAPPDATA%\nyaa-stream\` (safe to clear) |
+| Logs (one UTC-timestamped file per run, seven kept) | `%LOCALAPPDATA%\nyaa-stream\logs\` |
 | Screenshots | `Pictures` by default (configurable) |
 
 ---
@@ -194,7 +194,7 @@ Open them with the gear icon in the app bar.
 | [Node.js](https://nodejs.org/) (LTS) + npm | |
 | Visual Studio 2022 Build Tools | "Desktop development with C++" workload |
 | [LLVM](https://github.com/llvm/llvm-project/releases) | For libclang (bindgen). Expected at `C:\Program Files\LLVM\bin`. Override with `LIBCLANG_PATH` in `.cargo/config.toml` |
-| `libmpv-2.dll` | Optional. A GPL build (e.g. [zhongfly/mpv-winbuild](https://github.com/zhongfly/mpv-winbuild), `mpv-dev-x86_64-*.7z`) placed in `src-tauri/lib/`. Without it the app uses the HLS fallback player |
+| `libmpv-2.dll` | Required. Place the Windows x64 build in `src-tauri/lib/` or set **Settings → libmpv path** |
 
 You don't need vcpkg or CMake. `npm run setup` downloads a prebuilt, checksum-verified archive of static
 **FFmpeg 7.1.2** into `vcpkg_installed/` (the current archive, about 1.3 GB, still holds libtorrent and OpenSSL from before sbtl; nothing links them). The first build also fetches [sbtl](https://github.com/sb-gravity100/sbtl) from GitHub and compiles its C sources with LLVM's `clang-cl`. You only need vcpkg to
@@ -214,8 +214,8 @@ npm run setup
 npm run tauri dev
 ```
 
-In development mode, daily app logs are also written to `logs/` in the
-project directory. Terminal logging remains unchanged.
+In development mode, one UTC-timestamped app log per run is also written to
+`logs/` in the project directory. Terminal logging remains unchanged.
 
 `npm run setup` is only needed once, or again after the native-deps version changes.
 
@@ -265,9 +265,8 @@ git config core.hooksPath .githooks
 │  │  anilist-client   kitsu-client   nyaa-client (+SQLite)  │  │
 │  │  release-parse (title parser)                           │  │
 │  │                                                         │  │
-│  │  torrent-engine ──► local axum HTTP server              │  │
-│  │   (sbtl)             ├─ raw bytes (Range)  ──► libmpv   │  │
-│  │                      └─ HLS (in-process FFmpeg) ► hls.js│  │
+│  │  torrent-engine ──► local axum HTTP Range server         │  │
+│  │   (sbtl)             └─ raw bytes ────────────► libmpv   │  │
 │  └─────────────────────────────────────────────────────────┘  │
 │  libmpv renders into the window (wid) beneath the webview     │
 └───────────────────────────────────────────────────────────────┘
@@ -275,7 +274,7 @@ git config core.hooksPath .githooks
 
 - **Shell:** Tauri 2. The window stays opaque. Only the *webview* background is transparent, so mpv's video shows through under the HTML controls.
 - **Torrents:** [sbtl](https://github.com/sb-gravity100/sbtl), a streaming-first BitTorrent engine built for nyaa-stream, through `crates/sbtl-engine`. What the player reads decides what downloads, so seeks jump straight to the new spot and files you aren't watching don't download.
-- **Streaming server:** a local `axum` server with two layers: raw Range-capable bytes (mpv reads these directly) and an HLS layer (one continuous FFmpeg run per file, stream copy when possible, hardware H.264 transcode otherwise) for the browser fallback.
+- **Streaming server:** a local `axum` Range endpoint supports older libmpv builds; current builds can read directly from sbtl. FFmpeg remains for clip export, thumbnails and storyboards.
 - **FFmpeg** is linked statically and runs in-process, using **LGPL features only** (no x264).
 - **Release parsing:** `release-parse` turns a nyaa title into group, resolution, season(s) and episode(s), checked against a corpus of real nyaa titles ([TITLE_ANALYSIS.md](TITLE_ANALYSIS.md)).
 - **Search:** nyaa.si's HTML results are scraped, since its RSS feed caps at 75 results. All requests go through one shared throttle with 429/503 back-off, and every release lands in a permanent local database.
@@ -292,7 +291,7 @@ src-tauri/            Tauri app: commands, embedded mpv, cache/backup, media key
   lib/                bundled native libs (libmpv-2.dll, gitignored)
 crates/
   sbtl-engine/        torrent engine over sbtl
-  torrent-engine/     streaming server, HLS/FFmpeg pipeline
+  torrent-engine/     raw streaming server, FFmpeg export and image jobs
   nyaa-client/        nyaa.si search, throttle, release database, cache
   release-parse/      release title parser (MPL-2.0 port of anitopy + nyaa fixes)
   anilist-client/     AniList GraphQL metadata
@@ -332,10 +331,9 @@ Every user-facing change ships with a version bump, because the updater only off
 
 | Problem | Try |
 | --- | --- |
-| Player looks different or mpv features are missing | libmpv didn't load, so the HLS fallback player is running. Check `src-tauri/lib/libmpv-2.dll` (dev) or set **Settings → libmpv path** |
+| Player doesn't start | Embedded libmpv is required. Check `src-tauri/lib/libmpv-2.dll` (dev) or set **Settings → libmpv path** |
 | Search results are missing or stale | nyaa.si may be rate-limiting. Cached and local-database results are shown in the meantime, and requests retry on their own |
 | Stuck buffering | The torrent may have few seeders. Check peers in the statistics panel or pick another source |
-| Fallback player stutters on 1080p HEVC/AV1 | No hardware encoder was found, so transcoding runs on the CPU. mpv playback doesn't need to transcode |
 | Build fails in `bindgen` / `clang` | Install LLVM, or point `LIBCLANG_PATH` in `.cargo/config.toml` at its `bin` folder |
 | Build can't find FFmpeg | Run `npm run setup` |
 | Anything else | Check the logs in `%LOCALAPPDATA%\nyaa-stream\logs\` |
@@ -363,7 +361,7 @@ See [CHANGELOG.md](CHANGELOG.md) for what changed in each release.
 
 - [Stremio](https://github.com/Stremio): the UX inspiration, plus reference for the buffering indicator and statistics panel
 - [stremio-native/stream-server](https://github.com/stremio-native/stream-server): `enginefs`, nyaa's torrent layer before sbtl_engine (its tracker list code lives on in `crates/sbtl-engine`)
-- [mpv](https://mpv.io/), [FFmpeg](https://ffmpeg.org/), [hls.js](https://github.com/video-dev/hls.js), [JASSUB](https://github.com/ThaUnknown/jassub)
+- [mpv](https://mpv.io/) and [FFmpeg](https://ffmpeg.org/)
 - [AniList](https://anilist.co/) and [Kitsu](https://kitsu.app/) for metadata
 - Bundled fonts: Gandhi Sans, Zen Kaku Gothic New, Outfit
 

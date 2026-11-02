@@ -1,6 +1,6 @@
 //! In-process libmpv over its C client API, loaded at runtime from
-//! `libmpv-2.dll` (so the app still starts - and falls back to HLS - when the
-//! DLL is missing). `Mpv::command` speaks the same JSON argument arrays mpv's
+//! `libmpv-2.dll` (the required playback backend). `Mpv::command` speaks the
+//! same JSON argument arrays mpv's
 //! JSON IPC does (`["set_property", "pause", true]`, `["observe_property", 1,
 //! "time-pos"]`...) and events come out shaped like IPC event lines, so the
 //! frontend's `mpvVideo.ts` contract is unchanged from the old spawned-mpv
@@ -268,7 +268,7 @@ pub fn library() -> anyhow::Result<Arc<Lib>> {
     Err(last_error.context(format!("{DLL_NAME} not found (put it next to the app or set its path in Settings)")))
 }
 
-/// Whether libmpv can be loaded - the player falls back to HLS without it.
+/// Whether the required playback backend can be loaded.
 pub fn is_available() -> bool {
     library().is_ok()
 }

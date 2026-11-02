@@ -103,15 +103,6 @@ impl StreamProvider for AppMpvStreamProvider {
     }
 }
 
-/// Whether libmpv can be loaded - the player falls back to HLS without it.
-/// The frontend asks once per run (and again when the path override changes).
-#[tauri::command]
-pub async fn mpv_available() -> bool {
-    let found = tokio::task::spawn_blocking(mpv_player::is_available).await.unwrap_or(false);
-    tracing::info!(found, "libmpv availability checked");
-    found
-}
-
 /// Points libmpv loading at `path` (a `libmpv-2.dll` or its folder; empty/
 /// `None`: the default search) - the Settings override.
 #[tauri::command]
@@ -143,8 +134,7 @@ pub fn warm_mpv_once(app: AppHandle) {
 
 /// Spawns the embedded mpv early - idle, below the still-opaque webview - so
 /// the first episode skips libmpv load + font install. Skipped when libmpv
-/// can't be found (the player then uses the HLS fallback, or `mpv_start`
-/// spawns lazily after a Settings path override).
+/// can't be found; `mpv_start` can spawn lazily after a Settings path override.
 pub fn warm_mpv(app: AppHandle) {
     tauri::async_runtime::spawn(async move {
         let available = tokio::task::spawn_blocking(mpv_player::is_available).await.unwrap_or(false);

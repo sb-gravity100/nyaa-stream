@@ -5,9 +5,8 @@ import { useEffect, useState } from "preact/hooks";
 const STORAGE_KEY = "nyaa-stream:settings";
 
 export interface SubtitleStyle {
-  /** Font family libass should use. Resolved from embedded fonts first,
-   * then local system fonts (JASSUB `queryFonts: "local"`), falling back
-   * to JASSUB's bundled Liberation Sans. */
+  /** Font family libass should use. Resolved from embedded mpv fonts first,
+   * then local system fonts. */
   fontFamily: string;
   /** Font size as a percentage of video height. */
   sizePercent: number;
@@ -40,7 +39,7 @@ export interface SubtitleStyle {
 export type SubtitleUpscaler = "ewa_lanczos" | "bicubic";
 export type SubtitleDownscaler = "mitchell" | "bicubic";
 
-/** Embedded mpv's ASS-only overlay sampling. HLS keeps its JASSUB renderer. */
+/** Embedded mpv's ASS-only overlay sampling. */
 export interface MpvSubtitleRendering {
   /** Blend with the video or draw as a separate window overlay. */
   composition: "video" | "overlay";

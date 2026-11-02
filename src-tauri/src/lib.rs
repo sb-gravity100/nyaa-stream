@@ -25,7 +25,7 @@ use nyaa_client::{Category, NyaaClient, NyaaResult, TorrentDetails};
 use serde::{Deserialize, Serialize};
 use tauri::{Emitter, Manager, State};
 use tokio::sync::Mutex;
-use torrent_engine::{largest_video_file, DecoderSupport, StreamStats, SubtitleTrack, TorrentEngine, TorrentFile, TorrentId};
+use torrent_engine::{largest_video_file, StreamStats, TorrentEngine, TorrentFile, TorrentId};
 
 pub(crate) struct AppState {
     anilist: AniListClient,
@@ -492,7 +492,7 @@ const THUMBNAIL_POLL_INTERVAL: Duration = Duration::from_millis(250);
 /// to seek and decode one frame near the middle of the episode (a
 /// cold-open/black-frame/logo risk at the very start, unlike a
 /// frame from partway through - `duration_minutes` is the frontend's
-/// AniList-derived estimate, same source as the HLS playlist duration;
+/// AniList-derived estimate;
 /// falls back to a fixed early point if it's unavailable, since waiting
 /// for *actual* real-time playback to reach a real midpoint - many minutes
 /// - isn't practical within this call's timeout), grabs one frame, then
@@ -1361,13 +1361,10 @@ async fn get_torrent_details_batch(
 struct PlayFile {
     #[serde(flatten)]
     file: TorrentFile,
-    /// Base HLS playlist URL for this file - the frontend appends
-    /// `?duration=<seconds>`.
-    hls_url: String,
-    /// Raw Range-capable HTTP stream, retained for HLS and older libmpv builds.
+    /// Raw Range-capable HTTP stream for libmpv builds without stream callbacks.
     stream_url: String,
     /// Direct sbtl callback URL when the selected libmpv exports that API.
-    /// The HTTP URL remains available for older libmpv builds and HLS.
+    /// The HTTP URL remains available for older libmpv builds.
     #[serde(skip_serializing_if = "Option::is_none")]
     mpv_url: Option<String>,
     /// The file name's episode label (same parser as search results).
@@ -1380,18 +1377,15 @@ struct PlaySession {
     torrent_id: TorrentId,
     /// Identifies this player load so an older view cannot stop its successor.
     playback_generation: u64,
-    /// Every file in the torrent with its own HLS URL - the frontend picks
-    /// which one to play (matching the requested episode inside a batch
-    /// with its own title parser) and can switch between them without
-    /// re-adding the torrent.
+    /// Every file in the torrent; the frontend picks the requested episode
+    /// inside a batch and can switch files without re-adding the torrent.
     files: Vec<PlayFile>,
     /// Largest video file - the frontend's fallback pick.
     default_file_idx: usize,
 }
 
 /// Adds `magnet` to the torrent session and returns every file's raw
-/// stream URL (what the embedded mpv opens - see `player.rs`) plus its HLS
-/// playlist URL (the fallback player's, used when mpv isn't installed).
+/// stream URL (what the embedded mpv opens - see `player.rs`).
 #[tauri::command]
 async fn play_magnet(
     app: tauri::AppHandle,
@@ -1447,9 +1441,6 @@ async fn play_magnet(
         }
     };
     let added = torrent_engine::AddedTorrent { id: added_id };
-    // The HLS URL is only for the fallback player: raw container bytes
-    // aren't reliably playable in a browser <video> element (see
-    // torrent-engine's hls_playlist_handler), while mpv reads them fine.
     let cached_files = state.current_files.lock().await.clone();
     let files = if let Some((cached_id, files)) = cached_files.filter(|(id, _)| id == &added.id) {
         tracing::debug!(torrent_id = %cached_id, file_count = files.len(), "play_magnet reusing resolved file list");
@@ -1478,7 +1469,6 @@ async fn play_magnet(
     let files: Vec<PlayFile> = files
         .into_iter()
         .map(|file| PlayFile {
-            hls_url: state.torrent_engine.hls_playlist_url(&added.id, file.index),
             stream_url: state.torrent_engine.stream_url(&added.id, file.index),
             mpv_url: direct_mpv_streams.then(|| format!("sbtl://{}/{}", added.id, file.index)),
             label: nyaa_client::EpisodeLabel::of_path(&file.name),
@@ -1634,63 +1624,6 @@ fn stop_storyboard(state: State<'_, Arc<AppState>>, torrent_id: TorrentId, file_
 async fn storyboard_frame(state: State<'_, Arc<AppState>>, torrent_id: TorrentId, file_idx: usize, seconds: f64) -> Result<Option<String>, String> {
     let Some(path) = state.torrent_engine.storyboard_frame(&torrent_id, file_idx, seconds) else { return Ok(None) };
     Ok(storyboard_url(&path, &torrent_id, file_idx, seconds))
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct SubtitleTrackInfo {
-    index: usize,
-    language: Option<String>,
-    title: Option<String>,
-    codec: String,
-    default: bool,
-    url: String,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct SubtitleInfo {
-    tracks: Vec<SubtitleTrackInfo>,
-    /// Embedded font attachment URLs, for the frontend's libass renderer.
-    fonts: Vec<String>,
-}
-
-/// Lists `torrent_id`'s embedded text subtitle tracks and font attachments
-/// for one file of the torrent - see
-/// `TorrentEngine::media_probe`. Errors while the container header hasn't
-/// downloaded yet; the frontend retries until this succeeds, since that
-/// failure is transient and never cached.
-#[tauri::command]
-async fn get_subtitle_tracks(state: State<'_, Arc<AppState>>, torrent_id: TorrentId, file_idx: usize) -> Result<SubtitleInfo, String> {
-    tracing::debug!(torrent_id = %torrent_id, file_idx, "get_subtitle_tracks invoked");
-    let probe = state.torrent_engine.media_probe(&torrent_id, file_idx).await.map_err(|err| {
-        tracing::warn!(torrent_id = %torrent_id, %err, "get_subtitle_tracks failed");
-        err.to_string()
-    })?;
-    tracing::info!(torrent_id = %torrent_id, count = probe.subtitles.len(), fonts = probe.fonts.len(), "get_subtitle_tracks succeeded");
-    let tracks = probe
-        .subtitles
-        .into_iter()
-        .map(|track: SubtitleTrack| SubtitleTrackInfo {
-            url: state.torrent_engine.subtitle_url(&torrent_id, file_idx, track.index),
-            index: track.index,
-            language: track.language,
-            title: track.title,
-            codec: track.codec,
-            default: track.default,
-        })
-        .collect();
-    let fonts = probe.fonts.iter().map(|font| state.torrent_engine.font_url(&torrent_id, file_idx, font.index)).collect();
-    Ok(SubtitleInfo { tracks, fonts })
-}
-
-/// Frontend reports which codecs its WebView decodes natively (MSE
-/// `isTypeSupported`), so the streaming server only transcodes what it has
-/// to - see `torrent_engine::plan_video`.
-#[tauri::command]
-fn set_decoder_support(state: State<'_, Arc<AppState>>, support: DecoderSupport) {
-    tracing::debug!(?support, "set_decoder_support invoked");
-    state.torrent_engine.set_decoder_support(support);
 }
 
 /// Puts a video frame on the system clipboard. The body is raw RGBA pixels
@@ -2109,8 +2042,8 @@ pub fn run() {
 
     let app_state = tauri::async_runtime::block_on(async {
         tracing::info!("starting nyaa-stream");
-        // Segments from the last run are unreachable garbage now.
-        cache::purge_hls_cache();
+        // One-time cleanup for HLS segments left by older app versions.
+        cache::purge_legacy_hls_cache();
         // The user's actual Downloads folder isn't the right place for
         // torrent scratch data the app manages and cleans up itself
         // (stop_playback removes the torrent, but the on-disk file lingers
@@ -2252,8 +2185,6 @@ pub fn run() {
             pause_storyboard,
             stop_storyboard,
             storyboard_frame,
-            get_subtitle_tracks,
-            set_decoder_support,
             copy_frame_to_clipboard,
             stop_playback,
             wait_for_playback_stop,
@@ -2270,7 +2201,6 @@ pub fn run() {
             set_download_cache_limit,
             cache::export_backup,
             cache::import_backup,
-            player::mpv_available,
             player::set_mpv_path,
             player::mpv_start,
             player::mpv_command,
@@ -2280,11 +2210,7 @@ pub fn run() {
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
-        .run(|_app, event| {
-            if let tauri::RunEvent::Exit = event {
-                cache::purge_hls_cache();
-            }
-        });
+        .run(|_app, _event| {});
 }
 
 #[cfg(test)]

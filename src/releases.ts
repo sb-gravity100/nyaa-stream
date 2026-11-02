@@ -68,40 +68,6 @@ export function releaseResolution(release: NyaaResult): string | null {
   return match[1] ?? "2160";
 }
 
-// Video codec from the release title. Only the ones WebView2 may not be
-// able to decode matter - everything else is assumed H.264.
-const HEVC_PATTERN = /\b(hevc|x265|h\.?265)\b/i;
-const AV1_PATTERN = /\bav1\b/i;
-
-export type RiskyCodec = "hevc" | "av1";
-
-export function releaseCodec(release: NyaaResult): RiskyCodec | null {
-  if (HEVC_PATTERN.test(release.title)) return "hevc";
-  if (AV1_PATTERN.test(release.title)) return "av1";
-  return null;
-}
-
-const CODEC_PROBES: Record<RiskyCodec, string> = {
-  hevc: 'video/mp4; codecs="hvc1.1.6.L120.90"',
-  av1: 'video/mp4; codecs="av01.0.08M.08"',
-};
-const codecSupportCache = new Map<RiskyCodec, boolean>();
-
-/** Whether this machine's WebView can decode `codec` through MSE (HEVC
- * needs the OS extension/hardware on Windows - verified live: an HEVC
- * release failed with hls.js bufferAddCodecError). Releases that fail
- * this are transcoded by the streaming server, not rejected. */
-export function codecPlayable(codec: RiskyCodec | null): boolean {
-  if (codec == null) return true;
-  let supported = codecSupportCache.get(codec);
-  if (supported === undefined) {
-    supported = typeof MediaSource !== "undefined" && MediaSource.isTypeSupported(CODEC_PROBES[codec]);
-    codecSupportCache.set(codec, supported);
-    console.info("[releases] codec support", { codec, supported });
-  }
-  return supported;
-}
-
 export interface ReleasePreferences {
   preferredGroup?: string | null;
   preferredFansubber?: string;
@@ -123,10 +89,6 @@ export function matchesFansubber(release: NyaaResult, fansubber: string | undefi
 
 function score(release: NyaaResult, prefs: ReleasePreferences): number {
   let value = Math.log10(release.seeders + 1) * 10;
-  // Not natively decodable here: the streaming server transcodes it to
-  // H.264, which works but costs GPU/CPU and startup time - so a native
-  // release of similar health wins, without burying the others.
-  if (!codecPlayable(releaseCodec(release))) value -= 25;
   if (release.seeders < MIN_PREFERRED_SEEDERS) return value;
   const group = releaseGroup(release);
   if (prefs.preferredGroup && group && group.toLowerCase() === prefs.preferredGroup.toLowerCase()) value += 100;
@@ -191,8 +153,8 @@ export function releaseBadges(release: NyaaResult): ReleaseBadge[] {
   if (DUAL_AUDIO_PATTERN.test(title)) badges.push({ label: "Dual audio", kind: "good" });
   const source = title.match(SOURCE_PATTERN);
   if (source) badges.push({ label: source[1].replace(/-/g, "").toUpperCase().replace("BLURAY", "BD"), kind: "info" });
-  const codec = releaseCodec(release);
-  if (codec) badges.push({ label: codec === "hevc" ? "HEVC" : "AV1", kind: "info" });
+  const codec = title.match(/\b(av1|av01|hevc|x265|h\.?265)\b/i)?.[1]?.toLowerCase();
+  if (codec) badges.push({ label: codec === "av1" || codec === "av01" ? "AV1" : "HEVC", kind: "info" });
   if (TEN_BIT_PATTERN.test(title)) badges.push({ label: "10-bit", kind: "info" });
   return badges;
 }

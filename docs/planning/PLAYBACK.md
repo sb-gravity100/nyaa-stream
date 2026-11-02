@@ -103,8 +103,8 @@ first seconds before C's mode is known):**
   cause was dev-only: Vite listened on IPv6 `::1` only while the webview's
   IPv4 attempts to `localhost:1420` took ~2s each to fail; Vite and
   `devUrl` now both use `127.0.0.1`.)
-  Skipped when libmpv isn't found at launch (HLS fallback, or `mpv_start`
-  spawns lazily after a Settings path override).
+  Skipped when libmpv isn't found at launch; `mpv_start` spawns lazily after a
+  Settings path override, and playback requires the DLL.
 - `mpv_stop` resets per-file state after `stop` - `ab-loop-a/b`, `speed`,
   `sub-delay`, `audio-delay`, `pause` - so nothing leaks into the next file.
 
@@ -158,8 +158,9 @@ seek). The mpv player's bar only shows mpv's demuxer cache
 (`demuxer-cache-state.seekable-ranges`, `src/mpvVideo.ts` `buffered`); mpv
 evicts old ranges once its back-buffer limit (default 50 MiB) is hit, so
 after a jump the earlier buffered stretch disappears even though the torrent
-still has those bytes on disk. `readyRanges` in `StreamStats` is HLS-only
-(transcoded segments) and is empty for mpv. Fix - two layers:
+still has those bytes on disk. The HLS-only `readyRanges` segment layer was
+removed in v0.7.0; the player draws verified byte ranges plus mpv's buffer.
+The implementation keeps two layers:
 
 - **Downloaded (dim):** `StreamStats` gains `downloaded_ranges` (seconds): the
   file's verified pieces merged into byte runs, mapped to time with the
@@ -173,7 +174,6 @@ still has those bytes on disk. `readyRanges` in `StreamStats` is HLS-only
   `--demuxer-max-back-bytes=150MiB` (from 50 MiB default; forward stays
   150 MiB) so a jump back into just-played video stays instant and its range
   stays on the bar. Costs up to ~100 MiB more RAM while playing.
-- Tooltip unchanged; the HLS fallback keeps its `readyRanges` layer.
 - **Implemented (2026-09-29) with the linear mapping only:** `StatsFile`
   (vendored enginefs) → `StreamStats.downloadedByteRanges` (file-relative
   bytes) → `downloadedTimeRanges` in `PlayerView.tsx` maps bytes/total ×

@@ -54,7 +54,7 @@ export function playResY(script: string): number {
 // when `applyToStyled` is on, so signs/typesetting keep their look.
 const DIALOGUE_STYLE_NAME = /^(default|main|dialog(ue)?|top|italics?|flashback|narrat(ion|or)|internal|overlap)\b/i;
 
-/** Shared field selection for the HLS renderer and mpv/export overrides.
+/** Shared field selection for mpv/export overrides.
  * Missing flags retain the previous behavior for older settings/backups. */
 function assOverrideFields(style: SubtitleStyle): Set<string> {
   const fields = new Set<string>();
@@ -69,57 +69,7 @@ function assOverrideFields(style: SubtitleStyle): Set<string> {
   return fields;
 }
 
-/**
- * Rewrites the `Style:` lines of a script with the user's default subtitle
- * style. For plain (converted) tracks every style is restyled - ffmpeg only
- * ever emits `Default`. For real ASS tracks only when `applyToStyled` is on,
- * and then only dialogue-looking styles. Sizes are expressed relative to
- * the script's own `PlayResY` so they're independent of the track's
- * authoring resolution.
- */
-export function applySubtitleStyle(script: string, style: SubtitleStyle, styled: boolean): string {
-  console.debug("[subtitles] applying script style", { styled, applyToStyled: style.applyToStyled });
-  if (styled && !style.applyToStyled) return script;
-  const selected = styled ? assOverrideFields(style) : null;
-  const resY = playResY(script);
-  const formatMatch = script.match(/^\[V4\+? Styles\][\s\S]*?^Format:\s*(.+)$/m);
-  if (!formatMatch) return script;
-  const fields = formatMatch[1].split(",").map((f) => f.trim().toLowerCase());
-  const col = (name: string) => fields.indexOf(name.toLowerCase());
-
-  const fontSize = ((style.sizePercent / 100) * resY).toFixed(1);
-  const outline = style.background ? "0" : ((style.outlineWidth / 100) * resY).toFixed(2);
-  const margin = Math.round((style.marginPercent / 100) * resY).toString();
-  const backAlpha = 255 - (style.backgroundOpacity / 100) * 255;
-
-  const overrides: Record<string, string> = {
-    fontname: style.fontFamily,
-    fontsize: fontSize,
-    primarycolour: assColor(style.color),
-    outlinecolour: style.background ? assColor(style.backgroundColor, backAlpha) : assColor(style.outlineColor),
-    // Shadow colour: Crunchyroll's translucent grey (&HA0404040).
-    backcolour: style.background ? assColor(style.backgroundColor, backAlpha) : assColor("#404040", 0xa0),
-    bold: style.bold ? "-1" : "0",
-    borderstyle: style.background ? "3" : "1",
-    outline: style.background ? "2" : outline,
-    shadow: String(style.shadow),
-    marginv: margin,
-  };
-
-  return script.replace(/^Style:\s*(.+)$/gm, (line, body: string) => {
-    const values = body.split(",");
-    const name = values[col("name")]?.trim() ?? "";
-    if (styled && !DIALOGUE_STYLE_NAME.test(name)) return line;
-    for (const [field, value] of Object.entries(overrides)) {
-      if (selected && !selected.has(field)) continue;
-      const i = col(field);
-      if (i >= 0 && i < values.length) values[i] = value;
-    }
-    return `Style: ${values.join(",")}`;
-  });
-}
-
-/** What `applyMpvSubtitleStyle` needs from the player (`MpvVideo`). */
+/** Subtitle option/property access exposed by the `MpvVideo` facade. */
 interface MpvSubtitleTarget {
   setProperty(name: string, value: unknown): Promise<unknown>;
   getProperty(name: string): Promise<unknown>;
@@ -143,9 +93,8 @@ const CONVERTED_PLAY_RES_Y = 288;
  * style. Plain tracks go through mpv's own `sub-*` options (mpv styles
  * non-ASS subtitles with them). Real ASS tracks are only touched when
  * `applyToStyled` is on, and then only their dialogue-looking styles, via
- * `sub-ass-style-overrides` sized against the track's own `PlayResY` - the
- * same rules `applySubtitleStyle` applied to scripts. Shared by the live
- * player (`applyMpvSubtitleStyle`) and clip export (burned-in subtitles).
+ * `sub-ass-style-overrides` sized against the track's own `PlayResY`. This is
+ * shared by the live mpv player and clip export (burned-in subtitles).
  */
 export async function mpvSubtitleSettings(
   mpv: Pick<MpvSubtitleTarget, "getProperty">,

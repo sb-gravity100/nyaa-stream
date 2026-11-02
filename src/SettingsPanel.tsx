@@ -30,9 +30,7 @@ const SETTINGS_SECTIONS = [
   { id: "help", label: "Help" },
 ] as const;
 
-// Fonts libass can resolve: the bundled default, plus common system fonts
-// found through the Local Font Access API (see assRenderer.ts's
-// `queryFonts: "local"`). Anything unavailable falls back to the default.
+// Fonts libass can resolve: the bundled default, plus common system fonts.
 const FONT_CHOICES = ["Gandhi Sans", "Liberation Sans", "Arial", "Segoe UI", "Verdana", "Trebuchet MS", "Tahoma", "Georgia", "Yu Gothic"];
 
 const LANGUAGE_CHOICES: [string, string][] = [
@@ -64,14 +62,14 @@ function Toggle({ checked, onChange, label, hint }: { checked: boolean; onChange
 interface CacheSizes {
   nyaa: number;
   thumbnails: number;
-  hls: number;
+  storyboards: number;
   torrents: number;
 }
 
 const CACHES: { kind: keyof CacheSizes; label: string; hint: string }[] = [
   { kind: "nyaa", label: "Search cache", hint: "nyaa.si search results and torrent details" },
   { kind: "thumbnails", label: "Thumbnails", hint: "Episode thumbnails and Kitsu metadata" },
-  { kind: "hls", label: "Transcoded video (HLS)", hint: "Temporary segments - also cleared on every start and exit" },
+  { kind: "storyboards", label: "Seek previews", hint: "Generated episode frame previews" },
   { kind: "torrents", label: "Downloaded torrent data", hint: "Played torrents kept so re-watching and seeking back don't download again" },
 ];
 
@@ -1008,7 +1006,7 @@ yaa-stream screenshots.">
             )}
             <div class="setting-subsection">
               <h4>Embedded mpv ASS rendering</h4>
-              <p class="settings-hint">These controls independently scale and smooth ASS edges when mpv uses gpu-next. HLS and the gpu fallback keep their standard subtitle output; clip export retains its ASS style.</p>
+              <p class="settings-hint">These controls independently scale and smooth ASS edges when mpv uses gpu-next. Other mpv renderers keep their standard subtitle output; clip export retains its ASS style.</p>
               <Row label="Subtitle composition" hint="With video blends subtitles with the video. Overlay draws them separately at window resolution after video scaling.">
                 <select
                   value={rendering.composition}

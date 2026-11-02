@@ -226,7 +226,7 @@ impl Engine {
     }
 
     /// Keeps `info_hash` from being removed as idle while `file_idx` plays
-    /// (HLS polls and stream requests call it; expires after `LEASE_TTL`).
+    /// (mpv callback and HTTP stream reads call it; expires after `LEASE_TTL`).
     pub fn touch_playback(&self, info_hash: &str, file_idx: usize, source: &'static str) {
         let hash = info_hash.to_ascii_lowercase();
         let fresh = lock(&self.leases).insert((hash.clone(), file_idx), Instant::now()).is_none();

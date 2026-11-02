@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { isTauriAvailable } from "./browserFallback";
-import type { PlaySession, StreamStats, SubtitleInfo } from "./types";
+import type { PlaySession, StreamStats } from "./types";
 
 type EpisodeTransition = { animeId: number; targetKey: string; startedAt: number; trigger: "manual" | "autoplay" | "playlist" };
 let pendingEpisodeTransition: EpisodeTransition | null = null;
@@ -43,24 +43,6 @@ export async function getStreamStats(torrentId: string, fileIdx: number): Promis
 
 // No browser-fallback path (see this file's top comment): a torrent-less
 // dev preview has no subtitle tracks to list either. Rejects while the
-// container header hasn't downloaded yet - callers retry.
-export async function getSubtitleTracks(torrentId: string, fileIdx: number): Promise<SubtitleInfo> {
-  if (!isTauriAvailable()) return { tracks: [], fonts: [] };
-  return invoke<SubtitleInfo>("get_subtitle_tracks", { torrentId, fileIdx });
-}
-
-// Tells the streaming server what this WebView decodes natively, so it
-// only transcodes what it must (see torrent-engine's plan_video). Probed
-// with MSE, the same path hls.js feeds.
-let decoderSupportSent = false;
-export async function reportDecoderSupport(): Promise<void> {
-  if (!isTauriAvailable() || decoderSupportSent) return;
-  const hevc = typeof MediaSource !== "undefined" && MediaSource.isTypeSupported('video/mp4; codecs="hvc1.1.6.L120.90"');
-  console.info("[set_decoder_support] invoked", { hevc });
-  await invoke("set_decoder_support", { support: { hevc } });
-  decoderSupportSent = true;
-}
-
 /** The player opened `fileIdx` (mpv's file-loaded) - ends the backend's
  * open-read recording for the resume buffer. Best effort. */
 export async function streamFileLoaded(torrentId: string, fileIdx: number): Promise<void> {

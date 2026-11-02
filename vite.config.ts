@@ -11,10 +11,6 @@ const host = process.env.TAURI_DEV_HOST;
 export default defineConfig(async () => ({
   plugins: [preact()],
   define: { __APP_VERSION__: JSON.stringify(appVersion) },
-  // JASSUB (libass renderer, see src/assRenderer.ts) runs in a module
-  // worker; its worker/wasm are imported as explicit asset URLs.
-  worker: { format: "es" as const },
-
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
   // 1. prevent Vite from obscuring rust errors

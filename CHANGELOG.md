@@ -13,6 +13,7 @@ step when cutting a release.
 
 ### Added
 - The tailored libmpv build includes D3D11VA/D3D11VA2 hardware decoders for H.264, HEVC and AV1, with software fallback when the device cannot decode a stream.
+- Playback now uses embedded mpv only; the HLS/JASSUB fallback is removed while mpv's native ASS subtitle support remains.
 - Settings are organized into keyboard-navigable sections, and the player context menu opens a shortcut reference.
 - Auto-Skip OP/ED can skip labeled mpv chapters, including Credits; generic Chapter 1/2 chapters lasting 85–95 seconds are treated as openings. It is off by default.
 
@@ -24,6 +25,7 @@ step when cutting a release.
 
 ### Fixed
 - The mouse cursor hides after its idle timeout when `N` opens the next episode.
+- Autoplay resumes when the next mpv file reports loaded; only one opening region is marked or skipped, preferring an explicit OP/Opening chapter over earlier Intro or generic chapter candidates.
 
 ## [0.6.0] - 2026-10-30
 

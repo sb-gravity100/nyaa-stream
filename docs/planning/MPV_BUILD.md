@@ -62,8 +62,8 @@ needs to prove the complete path.
 
 Develop on `release/0.7.0`. Use a dedicated `target/mpv-build/` tree for tools,
 source archives/checkouts, static dependency installation, build logs and the
-candidate DLL. Keep the tracked recipe/source lock, installed DLL and existing
-HLS FFmpeg tree separate.
+candidate DLL. Keep the tracked recipe/source lock, installed DLL and app's
+FFmpeg build for clip export, thumbnails and storyboards separate.
 
 Run `python scripts/build-mpv.py` from the repository root to prepare the locked
 tools and sources, build the approved static dependencies and separate FFmpeg,
@@ -160,7 +160,7 @@ Docker, MinGW binaries or a prebuilt full-featured DLL if it fails.
   with the selected filter, then maps it onto the source-sized overlay. The
   build recipe syncs the separately locked libplacebo source into mpv's Meson
   subproject before configuration, so compilation uses the patched source.
-  HLS keeps its existing 1.5× JASSUB path; clip export keeps its ASS encode path.
+  ASS playback uses mpv's native renderer; clip export keeps its ASS encode path.
 - FFmpeg: explicitly select approved H.264, HEVC and AV1 software decoders plus
   D3D11VA/D3D11VA2 hwaccels for those three codecs only; software fallback stays
   available. Leave other hardware decode APIs out. Retain AAC, AC-3, E-AC-3,
@@ -188,7 +188,8 @@ Docker, MinGW binaries or a prebuilt full-featured DLL if it fails.
   These behaviors will use original mpv/libplacebo renderer patches; the
   `ass-*`/`wns-*` examples in mpv issue 2820 were not options in mpv v0.41.0;
   the locked native patches register and implement the selected controls.
-  HLS keeps its existing 1.5x JASSUB path and does not consume these controls.
+  Native mpv ASS rendering consumes these controls; no browser subtitle renderer
+  is included.
   SB selected the 0.7.0 default profile on 2026-11-01: render ASS at video
   resolution, use Bicubic for upscaling and downscaling, disable both edge
   antialias switches, and set both blur values to 0.0. Keep existing saved
@@ -198,7 +199,7 @@ Docker, MinGW binaries or a prebuilt full-featured DLL if it fails.
   mpv's window-resolution subtitle overlay after video scaling. Overlay mode
   also uses the existing ASS Bicubic up/down filters and window-resolution
   antialias/blur controls. Apply the custom sampler only to subtitle bitmaps,
-  not mpv's OSD, and keep the authored ASS layout plus HLS/clip-export paths.
+  not mpv's OSD, and keep the authored ASS layout plus clip-export path.
   At native window size, Bicubic with antialias off and blur 0.0 produces the
   same pixels as the prior overlay; the defaults remain as SB specified.
 - Keep saved-frame screenshots aligned with the embedded playback renderer.
@@ -260,7 +261,7 @@ verified in the app.
   source video remains unchanged; check video- and window-resolution subtitle
   modes, AA/blur bounds, scaling ratios, borders, anime typesetting/animation,
   Settings persistence and updates, high-DPI changes, fullscreen, embedded mpv,
-  clip export and screenshots. Confirm HLS retains its current subtitle output.
+  clip export and screenshots.
 - Compare playback/start/seek results against the original DLL on identical
   sources. Load traces must include a bounded sample of Range offsets and
   lengths (first and last 16 requests) with engine waits and byte totals. The
@@ -312,7 +313,7 @@ verified in the app.
   behavior before attributing failures or improvements to the new DLL.
 - Add build/decoder/GPU identity evidence for comparisons; the inspected log
   lacks those details. Measure CPU, GPU, memory and binary size rather than
-  claiming gains from trimming alone. Verify HLS fallback remains functional.
+  claiming gains from trimming alone. Verify app playback through embedded mpv.
 - Retain complete licenses and corresponding source/build material for the exact
   distributed DLL. Native subtitle supersampling requires its own implementation
   and verification; a custom build alone does not establish that feature.

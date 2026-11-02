@@ -13,7 +13,8 @@ Feature work follows this order; remaining checks and release waivers are record
 - [x] Embedded mpv `blend-subtitles=yes` and `scale=ewa_lanczos`; retain existing blur/downscale choices
 - [x] Plain-text light hinting with ASS reset; bounded 1.5x HLS supersampling
 - [x] Bundled libmpv initialization/live option checks, 8 high-DPI sizing cases, frontend build and workspace checks
-- [ ] Visually compare subtitle edges and HLS rendering cost on real playback
+- [~] HLS subtitle-cost comparison dropped with the HLS retirement; embedded
+      mpv subtitle quality was accepted by SB for the v0.7.0 profile
 - [~] Native mpv supersampling stays deferred to v0.7.0
 
 ### Remaining v0.6.0 work
@@ -131,8 +132,8 @@ The checklist below groups related work and does not override this order.
       the staged `src-tauri/lib/` path.
 - [ ] Verify staged candidate playback and clip export through the full
       nyaa-stream app UI
-- [~] Start the mouse cursor idle timer when the next episode mounts in mpv or
-      HLS, including the `N` transition; verify in the app that it hides after
+- [~] Start the mouse cursor idle timer when the next episode mounts in mpv,
+      including the `N` transition; verify in the app that it hides after
       two seconds.
 - [x] Enable only D3D11VA/D3D11VA2 decoding for H.264, HEVC and AV1; rebuild
       separate FFmpeg and libmpv. On this GPU `hwdec-current` selects
@@ -153,12 +154,12 @@ The checklist below groups related work and does not override this order.
 - [ ] Verify Asakura Season 2 Episode 1 selects file 25, Season 1 Episode 24
       selects file 24 rather than 24.5, and NC-version duplicates are skipped in
       the running app.
-- [~] Log next-episode click/autoplay/playlist selection to first frame in mpv
-      and HLS. Run cached, partial and poorly seeded batches in the app to
+- [~] Log next-episode click/autoplay/playlist selection to first frame in mpv.
+      Run cached, partial and poorly seeded batches in the app to
       measure the result against the 2026-10-30 traces.
 - [x] Audit playback logging end to end: player commands and state transitions,
       direct sbtl callback open/read/seek/cancel/close, libmpv debug messages and
-      events, plus frontend mpv and HTTP/HLS fallback event handling. Command/media
+      events, plus frontend mpv and HTTP Range fallback event handling. Command/media
       URLs and credential values are redacted; only identical repeated mpv lines
       are suppressed, with a count. Start each app run in a new UTC timestamped
       log file and retain the seven most recent run files. `cargo check --workspace`
@@ -178,7 +179,7 @@ The checklist below groups related work and does not override this order.
       read-ahead window once its container index reports a measured bitrate.
 - [x] Before forwarding an absolute mpv seek command, ask the active direct
       sbtl stream to prioritize the indexed keyframe at that target time;
-      preserve mpv's normal seek and HTTP/HLS behavior when no index is ready.
+      preserve mpv's normal seek and HTTP Range behavior when no index is ready.
 - [x] Scale the direct stream's playback-time read-ahead window with mpv speed
       changes, retaining the 45-second baseline at 1×.
 - [x] Add the locked extended libmpv stream-callback interface for buffer and
@@ -213,31 +214,31 @@ The checklist below groups related work and does not override this order.
       prevent playback events from snapping the drag position back
 - [ ] Capture the pointer, clamp targets, coalesce intermediate seeks and commit
       the final target on release; handle cancel, unknown duration and source changes
-- [ ] Verify mpv/HLS scrubbing in fullscreen, paused/backward/undownloaded seeks,
+- [ ] Verify mpv scrubbing in fullscreen, paused/backward/undownloaded seeks,
       keyboard seeking, and rejection of stale seek completions
 - [x] Reorganize Settings into accessible sections with a section sidebar,
       keyboard focus handling and deep links; manual keyboard and small-window
       verification remains pending.
-- [x] Add the shared, focus-trapped player shortcuts dialog to both mpv and HLS
-      player context menus; manual app verification remains pending.
+- [x] Add the shared, focus-trapped player shortcuts dialog to the mpv player
+      context menu; manual app verification remains pending.
 - [x] Start the next episode immediately on end when autoplay is enabled;
       retain the setting to disable autoplay; verify in the app.
 - [x] For autoplay transitions, explicitly resume mpv after the successor
       emits `file-loaded`; the close path already stops/unloads mpv, resets
       only per-file state and retains saved user playback/subtitle preferences.
       Verify the autoplay handoff in the running app.
-- [ ] Remove the legacy HLS player, its HLS-only stream/transcode routes and
-      cache UI, and the JASSUB dependency; retain embedded mpv and its native
-      ASS subtitle support. Keep FFmpeg features used by export, thumbnails,
-      storyboards and media probing.
+- [x] Remove the HLS player, HLS-only stream/transcode routes, cache UI and
+      JASSUB dependency; retain embedded mpv with native ASS support and FFmpeg
+      features used by export, thumbnails and storyboards.
 - [x] Add Auto-Skip OP/ED (off by default): skip mpv chapters labeled OP/ED,
       Opening/Ending/Outro/Credits; only treat an `Intro` chapter as an opening
       when it lasts 85–95 seconds. Generic Chapter 1/2 chapters in that window
-      are also likely OPs. HLS chapter extraction is not implemented.
+      are also likely OPs. Prefer an explicit OP/Opening chapter over any
+      earlier Intro or generic opening candidate, and mark/skip only one OP.
 - [x] Remove the side skip-opening prompt; tint OP and ED chapter spans on the
       seek bar. Verify Credits skipping and region colors in the running app.
 - [x] Keep player controls visible while the Statistics, Sources, Subtitles or
-      Episodes popup is open in both mpv and HLS; verify in the app.
+      Episodes popup is open in mpv; verify in the app.
 - [x] Implement independent ASS overlay filters and AA/blur options in the
       locked mpv gpu-next/libplacebo source patches; source application and hashes
       verified and compiled in the candidate DLL.
@@ -288,8 +289,8 @@ The checklist below groups related work and does not override this order.
       Linux-focused source/options reference
 - [ ] Pin mpv, FFmpeg, libass, and libplacebo source revisions and create a
       reproducible x64 `libmpv-2.dll` build with license/source materials
-- [ ] Preserve the existing HLS FFmpeg build separately unless measurements
-      support a safe consolidation
+- [x] Remove the HLS-only FFmpeg pipeline while retaining FFmpeg for clip
+      export, thumbnails and storyboard generation
 - [x] Add capped load-trace samples of Range offsets/lengths (first and last
       16 requests per trace)
 - [ ] Measure streamer-to-mpv Range reads, first byte, first frame, buffering,
@@ -306,7 +307,7 @@ The checklist below groups related work and does not override this order.
       no stale-seek or resume regressions
 - [ ] Verify hardware decode and software fallback on supported Windows GPUs
 - [ ] Integrate the candidate DLL and check existing embedded-player ABI,
-      torrent playback, screenshots, and HLS fallback
+      torrent playback and screenshots through embedded mpv
 - [ ] Sync docs, bump/tag v0.7.0 locally on `release/0.7.0`
 
 ## v0.5.5 — Polish fixes

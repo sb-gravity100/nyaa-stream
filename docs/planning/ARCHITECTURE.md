@@ -6,6 +6,13 @@ Implementation descriptions and historical measurements are retained below. The
 legacy gap inventory at the end needs code verification before treating an item
 as an active defect; current milestones live in PLAN.md and PHASES.md.
 
+**v0.7.0 playback update:** the HLS/JASSUB player and its transcode/subtitle
+backend were removed. Descriptions of that implementation below are historical.
+Current playback requires embedded libmpv, which retains native ASS support.
+Torrent streaming uses direct sbtl callbacks when available and an HTTP Range
+endpoint for older libmpv builds; FFmpeg remains for clip export, thumbnails
+and storyboards.
+
 ## Reference
 
 `reference/stremio-core/` — shallow clone of https://github.com/Stremio/stremio-core,
@@ -38,14 +45,12 @@ solid-color skeleton blocks, not a spinner).
 
 - **Shell:** Tauri 2 (Rust backend + Preact/TypeScript frontend via Vite)
 - **Player:** libmpv (`libmpv-2.dll`, a GPL build, bundled from
-  `src-tauri/lib/` and loaded at runtime with `libloading`, so a missing DLL
-  only disables it) running in-process, embedded in the app window via
+  `src-tauri/lib/` and loaded at runtime with `libloading`; required for
+  playback) running in-process, embedded in the app window via
   `wid` (`crates/mpv-player`'s `EmbeddedMpv`, `src-tauri/src/player.rs`),
   driven by the HTML controls in `src/PlayerView.tsx` through
-  `src/mpvVideo.ts` with mpv-IPC-shaped JSON commands/events. Fallback
-  without libmpv: the HLS `<video>` + `hls.js` player
-  (`src/HlsPlayerView.tsx`). Thumbnail frames use the in-process FFmpeg
-  pipeline over direct seekable sbtl readers
+  `src/mpvVideo.ts` with mpv-IPC-shaped JSON commands/events. Thumbnail
+  frames use the in-process FFmpeg pipeline over direct seekable sbtl readers
 - **Torrent engine:** sbtl (https://github.com/sb-gravity100/sbtl, a C
   library with Rust bindings, built for nyaa-stream) through
   `crates/sbtl-engine` (see "sbtl_engine"), which replaced the vendored
@@ -66,15 +71,13 @@ solid-color skeleton blocks, not a spinner).
   `downloads/.sbtl/`), so partial downloads survive an app restart; a
   torrent's `remove()` keeps its files (the download cache decides when
   they go).
-- **Streaming server:** our own `axum` HTTP server (it talks to the torrent
-  engine only through `sbtl_engine`'s `Engine`/`Torrent`/`Reader` API,
-  never to sbtl directly) with two layers: raw Range-capable file bytes (`axum-range`),
-  and an HLS layer on top of that (FFmpeg-produced segments, one
-  continuous run per file) that real playback actually uses, since raw
-  torrent bytes aren't reliably playable in a browser `<video>`. FFmpeg
-  runs **in-process** (`crates/torrent-engine/src/media.rs`: ez-ffmpeg for
-  the HLS/subtitle pipelines, ffmpeg-next for probing and font
-  extraction), statically linked from FFmpeg 7.1.2 built by our
+- **Streaming server:** our own `axum` HTTP Range server (it talks to the
+  torrent engine only through `sbtl_engine`'s `Engine`/`Torrent`/`Reader` API,
+  never to sbtl directly). Current mpv builds read through direct sbtl
+  callbacks; the Range endpoint remains for older libmpv builds and clip
+  export. FFmpeg runs **in-process** (`crates/torrent-engine/src/media.rs`:
+  ez-ffmpeg for clip export and captures, ffmpeg-next for keyframe indexing),
+  statically linked from FFmpeg 7.1.2 built by our
   `vcpkg.json` - LGPL features only (avcodec/avformat/avdevice/avfilter/
   swresample/swscale, nvcodec, qsv, amf, openh264, dav1d; no x264, which
   would make the app GPL). It replaced spawning the `ffmpeg`/`ffprobe`

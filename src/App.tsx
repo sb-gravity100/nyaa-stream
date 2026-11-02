@@ -1127,7 +1127,7 @@ function App() {
   if (route.name === "anime" && selectedAnime?.id !== route.id) {
     // The route's anime is still loading (reload / back-forward into it).
     return (
-      <div class={route.watch ? "player-view hls-player" : "container route-loading"}>
+      <div class={route.watch ? "player-view" : "container route-loading"}>
         {routeError ? (
           <div class="player-message player-error" role="alert">
             <p>{routeError}</p>

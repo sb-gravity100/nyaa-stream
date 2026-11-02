@@ -2130,39 +2130,6 @@ html.mpv-active .player-view {
   visibility: visible;
 }
 
-/* HLS fallback player (HlsPlayerView): a real <video> element. */
-.player-view.hls-player {
-  background: #000;
-}
-
-.player-video {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  background: #000;
-  opacity: 0;
-  transition: opacity 0.45s var(--ease-out), filter 0.35s var(--ease-out);
-}
-
-.player-video.shown {
-  opacity: 1;
-}
-
-/* JASSUB's libass canvas sits right after the <video>; keep it under the
-   UI layers. Supersampling in the renderer handles edge smoothing. */
-.player-view canvas.JASSUB {
-  z-index: 0;
-}
-
-/* Catches clicks on the picture; mpv itself never sees input. */
-.player-video-surface {
-  position: absolute;
-  inset: 0;
-  background: transparent;
-  transition: background-color 0.35s var(--ease-out);
-}
-
 .player-topbar {
   position: absolute;
   top: 0;
@@ -2822,8 +2789,7 @@ html.mpv-active .player-view {
   background: rgba(255, 255, 255, 0.2);
 }
 
-/* On disk: transcoded HLS segments (fallback player) or the torrent's
-   downloaded bytes (mpv player). */
+/* Verified torrent bytes available for seeking. */
 .player-seek-ready {
   background: rgba(255, 255, 255, 0.42);
 }

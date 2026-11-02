@@ -2447,39 +2447,17 @@ function MpvPlayerView({
    );
 }
 
-// Asked once per app run (and again when the mpv path setting changes).
-let mpvAvailable: Promise<boolean> | null = null;
-let mpvAvailablePath: string | null = null;
-
-/** The player: embedded mpv when it's installed, otherwise the HLS
- * fallback (`HlsPlayerView`). */
+/** The player uses the embedded mpv backend. */
 export function PlayerView(props: Props) {
-   const [useMpv, setUseMpv] = useState<boolean | null>(null);
+   const [configured, setConfigured] = useState(false);
    useEffect(() => {
-      // A failed check (an older backend without the command) isn't
-      // evidence mpv is missing - mpv stays the default.
       const path = getSettingsSnapshot().mpvPath;
-      if (mpvAvailable == null || mpvAvailablePath !== path) {
-         mpvAvailablePath = path;
-         mpvAvailable = invoke("set_mpv_path", { path: path || null })
-            .then(() => invoke<boolean>("mpv_available"))
-            .catch((err) => {
-               console.warn("[player] mpv availability check failed, assuming mpv", { err: String(err) });
-               return true;
-            });
-      }
-      void mpvAvailable!.then((available) => {
-         console.info("[player] backend", { mpv: available });
-         setUseMpv(available);
-      });
+      let cancelled = false;
+      void invoke("set_mpv_path", { path: path || null })
+         .catch((err) => console.error("[player] couldn't configure mpv path", { err: String(err) }))
+         .finally(() => { if (!cancelled) setConfigured(true); });
+      return () => { cancelled = true; };
    }, []);
-   // hls.js + JASSUB (~450 kB) only load when mpv is missing.
-   const [Hls, setHls] = useState<typeof import("./HlsPlayerView").HlsPlayerView | null>(null);
-   useEffect(() => {
-      if (useMpv !== false || Hls) return;
-      console.debug("[player] loading HLS fallback chunk");
-      void import("./HlsPlayerView").then((m) => setHls(() => m.HlsPlayerView));
-   }, [useMpv, Hls]);
-   if (useMpv == null || (useMpv === false && !Hls)) return <div class="player-view hls-player" />;
-   return useMpv ? <MpvPlayerView {...props} /> : Hls && <Hls {...props} />;
+   if (!configured) return <div class="player-view" />;
+   return <MpvPlayerView {...props} />;
 }
