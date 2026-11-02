@@ -1,4 +1,17 @@
-### `28d913f` · 2026-11-02 · docs: scope batch audit to mkv and mp4
+### `cd9923c` · 2026-11-02 · fix: normalize torrent batch file matching
+- `crates/nyaa-client/src/file_name.rs`
+- `crates/nyaa-client/src/label.rs`
+- `src/episodeFileMatch.ts`
+- `src/episodeParser.ts`
+- `src/PlayerView.tsx`
+- `src/HlsPlayerView.tsx`
+- `src/MediaPage.tsx`
+- `src/App.tsx`
+- `PLAN.md`
+- `PHASES.md`
+- `docs/planning/ARCHITECTURE.md`
+- `CHANGELOG.md`
+- `src/changelog.ts`### `28d913f` · 2026-11-02 · docs: scope batch audit to mkv and mp4
 - `PLAN.md`
 - `PHASES.md`### `5a89fa9` · 2026-11-02 · docs: align batch audit scope
 - `PLAN.md`
