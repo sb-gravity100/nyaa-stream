@@ -1,7 +1,9 @@
 # PLAN.md — nyaa-stream
 
 Anime-focused Tauri 2 desktop client: Preact/TypeScript UI, Rust backend,
-sbtl torrent streaming, embedded libmpv playback and an HLS fallback.
+sbtl torrent streaming and embedded libmpv playback. The v0.7.0 scope retires
+the legacy HLS/JASSUB fallback while retaining mpv subtitle support, including
+ASS.
 
 ## Start here
 
@@ -17,7 +19,7 @@ sbtl torrent streaming, embedded libmpv playback and an HLS fallback.
 |---|---|---|
 | v0.5.8 | Implemented pre-v0.6.0 work | Published |
 | v0.6.0 | Subtitle styling/smoothing plus context menus, custom magnets, artwork, thumbnails, seek previews, updates and bespoke installer | Published 2026-10-30; SB waived remaining Windows acceptance and deferred Fribb licensing; live-swarm and manual magnet acceptance remain open |
-| v0.7.0 | Custom libmpv and direct sbtl streaming first, then subtitle rendering, memory profiling, batch transitions, preload timing, seek dragging and player/settings accessibility | P0 direct `sbtl://` stream callback is implemented and pinned to published sbtl 0.2.0; a cleared-cache A/B is promising but not conclusive; indexed-bitrate read-ahead, speed-scaled window, app-side seek prefetch and custom mpv sbtl buffer/cache-pause/idle hooks are implemented; playback/mpv logging captures debug messages and lifecycle events, redacts command data, and creates a timestamped file per run; broader runtime measurements remain pending; batch file matching now applies AniList episode offsets and rejects fractional/NC alternates; batch torrent/file reuse and season-aware handoff implemented |
+| v0.7.0 | Custom libmpv and direct sbtl streaming first, then subtitle rendering, memory profiling, batch transitions, preload timing, seek dragging and player/settings accessibility; remove HLS/JASSUB and resume autoplay after mpv loads the next episode | P0 `sbtl://` stream callback is implemented and pinned to published sbtl 0.2.0; a cleared-cache A/B is promising but not conclusive; indexed-bitrate read-ahead, speed-scaled window, app-side seek prefetch and custom mpv sbtl buffer/cache-pause/idle hooks are implemented; playback/mpv logging captures debug messages and lifecycle events, redacts command data, and creates a timestamped file per run; broader runtime measurements remain pending; batch file matching now applies AniList episode offsets and rejects fractional/NC alternates; batch torrent/file reuse and season-aware handoff implemented |
 | v0.8.0 | Navigation/Home rehaul and Discover | Planned |
 | v1.0.0 | Stabilization and 32-bit Windows | Planned |
 | v1.1.0 | Binge Mode | Idea; not implementation-ready |
@@ -66,14 +68,15 @@ v0.7.0.
 ## Architecture constraints
 
 - Keep embedded libmpv under a transparent webview; never make the native
-  window transparent. HLS remains the missing-libmpv fallback.
+  window transparent. libmpv is required for playback after the v0.7.0
+  retirement of HLS/JASSUB.
 - sbtl must resolve from a published git tag; native DLL identity must match.
   No committed local patch overrides.
 - Preserve permanent release data, source attachments and playback/resume state.
-- Keep HLS FFmpeg separate from future custom-libmpv dependencies unless a
-  measured design supports consolidation.
-- Preserve authored ASS layout/animation; HLS supersampling and the v0.7.0
-  embedded mpv 2× rendering path are implemented.
+- Keep FFmpeg for clip export, thumbnails, storyboards and media probing;
+  remove the HLS-only pipeline and JASSUB dependency in v0.7.0.
+- Preserve authored ASS layout/animation and embedded mpv subtitle rendering;
+  the v0.7.0 mpv 2× rendering path is implemented.
 
 ## Release and documentation rules
 
