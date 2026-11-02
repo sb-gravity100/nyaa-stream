@@ -75,7 +75,8 @@ v0.7.0.
 - Preserve permanent release data, source attachments and playback/resume state.
 - Keep per-run `.log` files concise (INFO and above); write full verbose
   tracing events to a paired SQLite `.db` using compressed event chunks, with
-  seven-run retention and scrubbed log export.
+  seven-run retention and scrubbed log export. Each file identifies its paired
+  run file in both the text header and database metadata.
 - Keep FFmpeg for clip export, thumbnails, storyboards and media probing;
   remove the HLS-only pipeline and JASSUB dependency in v0.7.0.
 - Preserve authored ASS layout/animation and embedded mpv subtitle rendering;

@@ -166,7 +166,8 @@ The checklist below groups related work and does not override this order.
       and `npm run build` pass.
 - [ ] Split each run's logs: concise readable `.log` output and full verbose
       tracing events in a paired SQLite `.db` with compressed event chunks.
-      Keep seven run pairs and include scrubbed copies in Send Logs.
+      Cross-reference each pair in the `.log` header and database metadata;
+      keep seven run pairs and include scrubbed copies in Send Logs.
 - [x] Use sbtl 0.2.0's published DLL/API: `wake`, safe stream invalidation on
       removal, `stalled_ms`, verified reads and direct wait/seek APIs are present;
       refresh `Cargo.lock` to the current published `v0.2.0` tag commit.
