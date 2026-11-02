@@ -1,3 +1,6 @@
+### `ce543b8` · 2026-11-02 · fix: select only one OP region
+- `src/PlayerView.tsx`
+
 ### `b88efb1` · 2026-11-02 · fix: resume autoplay after mpv loads next episode
 - `src/PlayerView.tsx`
 - `PHASES.md`
