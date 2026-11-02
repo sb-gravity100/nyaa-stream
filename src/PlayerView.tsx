@@ -88,6 +88,18 @@ function chapterOpEdRegion(title: string, index: number, duration: number): OpEd
    return null;
 }
 
+/** Select exactly one OP chapter. An explicit OP/Opening title takes
+ * precedence over an earlier Intro or generic Chapter 1/2 candidate. */
+function openingChapterIndex(chapters: Chapter[], episodeDuration: number): number | null {
+   const explicit = chapters.findIndex((chapter) => OPENING_CHAPTER.test(chapter.title.trim()));
+   if (explicit >= 0) return explicit;
+   const inferred = chapters.findIndex((chapter, index) => {
+      const end = chapters[index + 1]?.time ?? episodeDuration;
+      return chapterOpEdRegion(chapter.title, index, end - chapter.time) === "opening";
+   });
+   return inferred >= 0 ? inferred : null;
+}
+
 /** Thumbnail width for the last-frame capture (16:9 cards). */
 const LAST_FRAME_WIDTH = 640;
 
@@ -1452,22 +1464,22 @@ function MpvPlayerView({
     * whole opening, not just to where it starts. Null when the file marks
     * no opening ahead. */
    function openingFrom(time: number): { end: number } | null {
-      for (let i = 0; i < chapters.length; i++) {
-         const end = chapters[i + 1] ? chapters[i + 1].time : episodeDuration;
-         if (chapterOpEdRegion(chapters[i].title, i, end - chapters[i].time) !== "opening") continue;
-         if (end - time > 0.5) return { end };
-      }
-      return null;
+      const index = openingChapterIndex(chapters, episodeDuration);
+      if (index == null) return null;
+      const end = chapters[index + 1]?.time ?? episodeDuration;
+      return end - time > 0.5 ? { end } : null;
    }
 
    function autoSkipChapterAt(time: number): void {
       if (!settings.autoSkipOpEd || !episodeDuration || chapters.length === 0) return;
+      const openingIndex = openingChapterIndex(chapters, episodeDuration);
       for (let i = 0; i < chapters.length; i++) {
          const chapter = chapters[i];
          const title = chapter.title.trim();
          const end = chapters[i + 1]?.time ?? episodeDuration;
          const length = end - chapter.time;
          const reason = chapterOpEdRegion(title, i, length);
+         if (reason === "opening" && i !== openingIndex) continue;
          if (!reason || time < chapter.time || time >= end - 0.5) continue;
          const key = `${selectedFile?.index ?? -1}:${i}:${chapter.time}`;
          if (autoSkippedChaptersRef.current.has(key)) return;
@@ -1485,10 +1497,12 @@ function MpvPlayerView({
       autoSkippedChaptersRef.current.clear();
    }, [selectedFile?.streamUrl]);
 
+   const selectedOpeningIndex = openingChapterIndex(chapters, episodeDuration);
    const opEdRegions = chapters.flatMap((chapter, index) => {
       const start = chapter.time;
       const end = chapters[index + 1]?.time ?? episodeDuration;
-      const type = chapterOpEdRegion(chapter.title, index, end - start);
+      const classified = chapterOpEdRegion(chapter.title, index, end - start);
+      const type = classified === "opening" && index !== selectedOpeningIndex ? null : classified;
       return type && end > start ? [{ start, end, type }] : [];
    });
 
