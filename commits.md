@@ -34,6 +34,10 @@
 - `crates/torrent-engine/src/media.rs`
 - `crates/torrent-engine/src/subtitle_log.rs`
 
+### `c750283` · 2026-11-02 · docs: specify paired verbose log references
+- `PLAN.md`
+- `PHASES.md`
+
 ### `2adade5` · 2026-11-02 · docs: plan split run logging
 - `PLAN.md`
 - `PHASES.md`
